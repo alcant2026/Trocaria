@@ -91,12 +91,33 @@ const Seguranca = () => {
 
                 {!status2fa && secretData && (
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ background: '#fff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1.5rem' }}>
+                        <div style={{ background: '#fff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1rem' }}>
                             <img
                                 src={`https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(secretData.uri)}`}
                                 alt="QR Code 2FA"
-                                style={{ width: '200px', height: '200px' }}
+                                style={{ width: '200px', height: '200px', display: 'block' }}
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    setMensagem("Dica: Se o QR Code não carregar, use a chave manual abaixo.");
+                                }}
                             />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Chave Manual (para copiar no celular):</p>
+                            <code style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--primary)',
+                                fontSize: '1.1rem',
+                                letterSpacing: '1px',
+                                display: 'inline-block',
+                                userSelect: 'all'
+                            }}>
+                                {secretData.secret}
+                            </code>
                         </div>
 
                         <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border-color)' }}>

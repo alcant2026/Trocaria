@@ -37,7 +37,16 @@ if "sqlite" in SQLALCHEMY_DATABASE_URL:
     engine_args["connect_args"] = {"check_same_thread": False}
 
 # pool_pre_ping=True ajuda a evitar erros de "EOF detected" e conexões inativas
-engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, **engine_args)
+# pool_size e max_overflow limitam conexões para não estourar o limite do Neon/Render
+# pool_recycle garante que conexões velhas sejam renovadas
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    pool_pre_ping=True, 
+    pool_size=5, 
+    max_overflow=10,
+    pool_recycle=1800,
+    **engine_args
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

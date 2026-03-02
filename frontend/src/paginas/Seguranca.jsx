@@ -93,12 +93,12 @@ const Seguranca = () => {
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ background: '#fff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1rem' }}>
                             <img
-                                src={`https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(secretData.uri)}`}
+                                src={secretData.qr_code}
                                 alt="QR Code 2FA"
                                 style={{ width: '200px', height: '200px', display: 'block' }}
                                 onError={(e) => {
                                     e.target.onerror = null;
-                                    setMensagem("Dica: Se o QR Code não carregar, use a chave manual abaixo.");
+                                    setMensagem("Dica: Use a chave manual abaixo caso tenha problemas.");
                                 }}
                             />
                         </div>

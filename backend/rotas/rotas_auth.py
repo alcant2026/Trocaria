@@ -7,6 +7,9 @@ import bcrypt
 import pyotp
 from modelos.modelos_db import Usuario
 from database import get_db
+import qrcode
+import io
+import base64
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -180,7 +183,17 @@ async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Sessio
     totp = pyotp.TOTP(usuario.totp_secret)
     provisioning_uri = totp.provisioning_uri(name=usuario.email, issuer_name="Peer App")
     
-    return {"secret": usuario.totp_secret, "uri": provisioning_uri}
+    # Gerar imagem do QR Code
+    img = qrcode.make(provisioning_uri)
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    return {
+        "secret": usuario.totp_secret, 
+        "uri": provisioning_uri, 
+        "qr_code": f"data:image/png;base64,{qr_base64}"
+    }
 
 @router.post("/2fa/ativar")
 async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):

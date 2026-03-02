@@ -4,10 +4,11 @@ import Registro from './paginas/Registro';
 import DashboardTomador from './paginas/DashboardTomador';
 import DashboardInvestidor from './paginas/DashboardInvestidor';
 import AdminDashboard from './paginas/AdminDashboard';
-import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X } from 'lucide-react';
+import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle } from 'lucide-react';
 import './index.css';
 
 const App = () => {
+    const whatsappLink = 'https://wa.me/5591980177874';
     const [page, setPage] = useState('login');
     const [user, setUser] = useState(null);
     const [menuAberto, setMenuAberto] = useState(false);
@@ -43,9 +44,48 @@ const App = () => {
         window.location.hash = 'login';
     };
 
+    const botaoWhatsapp = (
+        <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Falar no WhatsApp"
+            style={{
+                position: 'fixed',
+                right: '20px',
+                bottom: '20px',
+                zIndex: 1200,
+                background: '#25D366',
+                color: '#fff',
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 20px rgba(0, 0, 0, 0.25)'
+            }}
+            title="Falar no WhatsApp"
+        >
+            <MessageCircle size={28} />
+        </a>
+    );
+
     if (!user) {
-        if (page === 'registro') return <Registro />;
-        return <Login onLogin={onLogin} />;
+        if (page === 'registro') {
+            return (
+                <>
+                    <Registro />
+                    {botaoWhatsapp}
+                </>
+            );
+        }
+        return (
+            <>
+                <Login onLogin={onLogin} />
+                {botaoWhatsapp}
+            </>
+        );
     }
 
     return (
@@ -161,6 +201,7 @@ const App = () => {
                     </div>
                 </div>
             )}
+            {botaoWhatsapp}
         </div>
     );
 };

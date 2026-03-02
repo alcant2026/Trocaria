@@ -368,6 +368,22 @@ tr:last-child td {
   letter-spacing: -1px;
 }
 
+.nav-links-desktop {
+  display: none;
+  gap: 1.5rem;
+  margin: 0 auto;
+}
+
+.nav-links-desktop .nav-item {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.nav-links-desktop .nav-item.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* Mobile Drawer (Universal Structure) */
 .mobile-overlay {
   position: fixed;
@@ -481,6 +497,14 @@ tr:last-child td {
     flex-direction: column;
     gap: 2rem;
   }
+
+  .nav-links-desktop {
+    display: flex;
+  }
+
+  .mobile-menu-btn {
+    display: none;
+  }
 }
 
 /* Modal System */
@@ -591,6 +615,7 @@ tr:last-child td {
 .alert-close:hover {
   opacity: 1;
 }
+
 /* Auth Pages (Login/Registro) */
 .auth-page {
   min-height: 100vh;

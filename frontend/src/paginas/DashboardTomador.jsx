@@ -14,7 +14,8 @@ import {
     EyeOff,
     FileText,
     Clock,
-    Wallet
+    Wallet,
+    ShieldAlert
 } from 'lucide-react';
 
 const DashboardTomador = () => {
@@ -32,6 +33,8 @@ const DashboardTomador = () => {
     const [valor, setValor] = useState('');
     const [taxa, setTaxa] = useState('');
     const [parcelas, setParcelas] = useState(1);
+    const [senhaSaque, setSenhaSaque] = useState('');
+    const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [mensagem, setMensagem] = useState('');
     const [kycDetails, setKycDetails] = useState('');
 
@@ -113,13 +116,21 @@ const DashboardTomador = () => {
     };
 
     const handleSolicitarSaque = async () => {
+        if (!senhaSaque || !codigo2faSaque) {
+            setMensagem('Erro: Senha e Código 2FA são obrigatórios.');
+            return;
+        }
         try {
             await api.post('/financeiro/solicitar-saque', {
                 valor: parseFloat(valorSaque),
-                chave_pix: usuario.chave_pix
+                chave_pix: usuario.chave_pix,
+                senha: senhaSaque,
+                codigo_2fa: codigo2faSaque
             });
-            setMensagem('Solicitação de saque enviada!');
+            setMensagem('Solicitação de saque enviada com sucesso!');
             setValorSaque('');
+            setSenhaSaque('');
+            setCodigo2faSaque('');
             setActiveView('home');
             carregarDados();
         } catch (err) {
@@ -354,23 +365,64 @@ const DashboardTomador = () => {
             {activeView === 'saque' && (
                 <div className="card">
                     <h2 className="mb-1">Solicitar Saque</h2>
-                    <p className="mb-1">O valor será enviado para sua chave PIX cadastrada: <br /><strong>{usuario.chave_pix}</strong></p>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <input
-                                type="number"
-                                className="input-field"
-                                placeholder="Valor do Saque R$"
-                                style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                value={valorSaque}
-                                onChange={(e) => setValorSaque(e.target.value)}
-                            />
+
+                    {!usuario.two_factor_enabled ? (
+                        <div className="text-center" style={{ padding: '1rem' }}>
+                            <ShieldAlert size={48} color="var(--warning)" style={{ margin: '0 auto 1rem' }} />
+                            <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
+                            <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Por segurança, o 2FA é obrigatório para todos os saques.</p>
+                            <button className="btn btn-primary" onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
+                            <button className="btn btn-secondary mt-1" onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                        <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleSolicitarSaque}>Realizar Saque</button>
-                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
-                    </div>
+                    ) : (
+                        <>
+                            <p className="mb-1">O valor será enviado para sua chave PIX cadastrada: <br /><strong>{usuario.chave_pix}</strong></p>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '1.5rem' }}>
+                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Valor do Saque</label>
+                                    <input
+                                        type="number"
+                                        className="input-field"
+                                        placeholder="R$ 0,00"
+                                        value={valorSaque}
+                                        onChange={(e) => setValorSaque(e.target.value)}
+                                        style={{ textAlign: 'center' }}
+                                    />
+                                </div>
+
+                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sua Senha de Acesso</label>
+                                    <input
+                                        type="password"
+                                        className="input-field"
+                                        placeholder="••••••••"
+                                        value={senhaSaque}
+                                        onChange={(e) => setSenhaSaque(e.target.value)}
+                                        style={{ textAlign: 'center' }}
+                                    />
+                                </div>
+
+                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
+                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Código 2FA (Authenticator)</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="000 000"
+                                        maxLength={6}
+                                        value={codigo2faSaque}
+                                        onChange={(e) => setCodigo2faSaque(e.target.value)}
+                                        style={{ textAlign: 'center', letterSpacing: '2px' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '2rem' }}>
+                                <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
+                                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 

@@ -4,7 +4,8 @@ import Registro from './paginas/Registro';
 import DashboardTomador from './paginas/DashboardTomador';
 import DashboardInvestidor from './paginas/DashboardInvestidor';
 import AdminDashboard from './paginas/AdminDashboard';
-import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle } from 'lucide-react';
+import Seguranca from './paginas/Seguranca';
+import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield } from 'lucide-react';
 import './index.css';
 
 const App = () => {
@@ -96,6 +97,23 @@ const App = () => {
                     <span>eer</span>
                 </a>
 
+                <div className="nav-links-desktop">
+                    <a href="#tomador" className={`nav-item ${page === 'tomador' ? 'active' : ''}`}>
+                        <ArrowDownUp size={18} /> Início
+                    </a>
+                    <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`}>
+                        <TrendingUp size={18} /> Investimentos
+                    </a>
+                    {user.is_admin && (
+                        <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`}>
+                            <Settings size={18} /> Admin
+                        </a>
+                    )}
+                    <a href="#seguranca" className={`nav-item ${page === 'seguranca' ? 'active' : ''}`} style={{ color: user.two_factor_enabled ? 'var(--success)' : 'var(--warning)' }}>
+                        <Shield size={18} /> Segurança
+                    </a>
+                </div>
+
                 <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)}>
                     {menuAberto ? <X size={28} /> : <Menu size={28} />}
                 </button>
@@ -115,6 +133,9 @@ const App = () => {
                                 <Settings size={20} /> Admin
                             </a>
                         )}
+                        <a href="#seguranca" className={`nav-item ${page === 'seguranca' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                            <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Segurança
+                        </a>
                     </div>
                     <div className="drawer-footer" style={{ borderTop: '1px solid var(--border-color)', marginTop: 'auto', padding: '1.5rem 0' }}>
                         <div className="flex-between mb-1" style={{ gap: '12px' }}>
@@ -165,7 +186,8 @@ const App = () => {
                 {page === 'tomador' && <DashboardTomador />}
                 {page === 'investidor' && <DashboardInvestidor />}
                 {page === 'admin' && <AdminDashboard />}
-                {(!['tomador', 'investidor', 'admin', 'login'].includes(page)) && <DashboardTomador />}
+                {page === 'seguranca' && <Seguranca />}
+                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca'].includes(page)) && <DashboardTomador />}
             </main>
             {/* Modal de Exclusão Crítica */}
             {modalExcluir && (

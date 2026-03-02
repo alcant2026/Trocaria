@@ -14,7 +14,9 @@ import {
     EyeOff,
     Search,
     ArrowRight,
-    ShieldAlert
+    ShieldAlert,
+    Copy,
+    Check
 } from 'lucide-react';
 
 const DashboardInvestidor = () => {
@@ -23,6 +25,7 @@ const DashboardInvestidor = () => {
     const [carteira, setCarteira] = useState([]);
     const [activeView, setActiveView] = useState('home'); // 'home', 'mercado', 'carteira', 'depositar', 'resgatar'
     const [verSaldo, setVerSaldo] = useState(true);
+    const [copiadoPix, setCopiadoPix] = useState(false);
 
     // Forms state
     const [valorNotificacao, setValorNotificacao] = useState('');
@@ -35,6 +38,12 @@ const DashboardInvestidor = () => {
 
     // Modal state
     const [modal, setModal] = useState({ open: false, type: '', data: null });
+
+    const copiarPix = () => {
+        navigator.clipboard.writeText('credpix@gmail.com');
+        setCopiadoPix(true);
+        setTimeout(() => setCopiadoPix(false), 2000);
+    };
 
     const carregarDados = async () => {
         try {
@@ -196,7 +205,30 @@ const DashboardInvestidor = () => {
             {activeView === 'depositar' && (
                 <div className="card">
                     <h2>Adicionar Fundos</h2>
-                    <p className="text-muted mb-1">Cura via PIX para o e-mail: <strong>credpix@gmail.com</strong></p>
+                    <p className="text-muted mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
+                    <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
+                        <div className="info-label">Chave PIX (E-mail)</div>
+                        <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            credpix@gmail.com
+                            <button
+                                onClick={copiarPix}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'var(--transition)'
+                                }}
+                                title="Copiar chave PIX"
+                            >
+                                {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                            </button>
+                        </div>
+                        {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px', textAlign: 'center' }}>Copiado!</p>}
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <input
@@ -225,8 +257,10 @@ const DashboardInvestidor = () => {
                             <div style={{ color: 'var(--warning)', marginBottom: '1rem' }}>🛡️</div>
                             <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
                             <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Por segurança, o 2FA é obrigatório para todos os resgates.</p>
-                            <button className="btn btn-primary" onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
-                            <button className="btn btn-secondary mt-1" onClick={() => setActiveView('home')}>Voltar</button>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
+                                <button className="btn btn-primary" style={{ width: 'auto', minWidth: '220px' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
+                                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                            </div>
                         </div>
                     ) : (
                         <>

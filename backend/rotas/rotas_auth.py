@@ -148,7 +148,8 @@ async def login(dados: LoginUsuario, db: Session = Depends(get_db)):
             "saldo": float(usuario.saldo),
             "score": float(usuario.score),
             "is_admin": usuario.is_admin,
-            "is_verified": usuario.is_verified
+            "is_verified": usuario.is_verified,
+            "two_factor_enabled": usuario.two_factor_enabled
         }
     }
 

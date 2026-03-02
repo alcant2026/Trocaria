@@ -93,7 +93,7 @@ const DashboardTomador = () => {
     const confirmarQuitar = async (emprestimoId) => {
         setModal({ ...modal, open: false });
         try {
-            await api.post(`/emprestimos/quitar/${emprestimoId}`);
+            await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
             setMensagem('Empréstimo quitado com sucesso!');
             carregarDados();
         } catch (err) {
@@ -483,7 +483,7 @@ const DashboardTomador = () => {
                             {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1rem' }}>
                                     <button className="btn btn-primary" style={{ width: 'auto', minWidth: '140px' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}>Pagar Parcela</button>
-                                    <button className="btn btn-outline" style={{ width: 'auto', minWidth: '100px' }} onClick={() => handleQuitarTotal(emp.id)}>Quitar</button>
+                                    <button className="btn btn-outline" style={{ width: 'auto', minWidth: '100px' }} onClick={() => handleQuitar(emp.id)}>Quitar</button>
                                 </div>
                             )}
 

@@ -3,26 +3,34 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 load_dotenv()
 
 DEFAULT_DB_URL = "sqlite:///./cred_plus.db"
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
-# Ajuste para Heroku/Render/Neon (prefixo postgresql://)
+def normalizar_database_url(url: str) -> str:
+    # Ajuste de compatibilidade Heroku/Render.
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    if "neon.tech" not in url:
+        return url
+
+    parsed = urlsplit(url)
+    params = parse_qsl(parsed.query, keep_blank_values=True)
+
+    # Remove parâmetros problemáticos/duplicados e força sslmode único.
+    params_filtrados = [(k, v) for k, v in params if k not in {"channel_binding", "sslmode"}]
+    params_filtrados.append(("sslmode", "require"))
+
+    nova_query = urlencode(params_filtrados)
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, nova_query, parsed.fragment))
+
+# Ajuste para Heroku/Render/Neon.
 if SQLALCHEMY_DATABASE_URL:
-    if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
-    # Garantir sslmode=require para Neon e remover channel_binding que causa erro no Render
-    if "neon.tech" in SQLALCHEMY_DATABASE_URL:
-        # Remove channel_binding se existir
-        if "channel_binding=require" in SQLALCHEMY_DATABASE_URL:
-            SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("channel_binding=require", "sslmode=require")
-        # Garante sslmode=require se não tiver nada de SSL
-        if "sslmode=" not in SQLALCHEMY_DATABASE_URL:
-            separator = "&" if "?" in SQLALCHEMY_DATABASE_URL else "?"
-            SQLALCHEMY_DATABASE_URL += f"{separator}sslmode=require"
+    SQLALCHEMY_DATABASE_URL = normalizar_database_url(SQLALCHEMY_DATABASE_URL)
 
 engine_args = {}
 if "sqlite" in SQLALCHEMY_DATABASE_URL:

@@ -20,6 +20,24 @@ const AdminDashboard = () => {
     const [mensagem, setMensagem] = useState('');
     const [activeTab, setActiveTab] = useState('pendentes'); // 'pendentes', 'fiscal'
 
+    const formatarDataBrasilia = (valor) => {
+        if (!valor) return '-';
+        const texto = String(valor);
+        const temTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(texto);
+        const isoNormalizado = temTimezone ? texto : `${texto}Z`;
+        const data = new Date(isoNormalizado);
+        if (Number.isNaN(data.getTime())) return texto;
+
+        return data.toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     const carregarPendentes = async () => {
         try {
             const data = await api.get('/financeiro/admin/pendentes');
@@ -164,7 +182,7 @@ const AdminDashboard = () => {
                                                 <p className="text-muted" style={{ fontSize: '0.75rem' }}>CPF: {p.usuario_cpf}</p>
                                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>•</span>
                                                 <p className="text-muted" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Clock size={12} /> {new Date(p.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    <Clock size={12} /> {formatarDataBrasilia(p.data)}
                                                 </p>
                                             </div>
                                         </div>

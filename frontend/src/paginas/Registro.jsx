@@ -23,7 +23,7 @@ const Registro = () => {
             setSucesso(true);
             setTimeout(() => window.location.hash = 'login', 2000);
         } catch (err) {
-            setMensagem(err.response?.data?.detail || 'Erro ao criar conta. Verifique os dados.');
+            setMensagem(err.message || 'Erro ao criar conta. Verifique os dados.');
         }
     };
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from decimal import Decimal
+from datetime import timezone, timedelta
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
@@ -14,6 +15,7 @@ class SolicitacaoSaque(BaseModel):
     chave_pix: str
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
+TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 @router.post("/solicitar-saque")
 async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -81,15 +83,24 @@ async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depen
         Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS])
     ).all()
     
-    return [{
-        "transacao_id": t.id,
-        "usuario_nome": t.usuario.nome,
-        "usuario_cpf": t.usuario.cpf,
-        "valor": float(t.valor),
-        "tipo": t.tipo.value,
-        "detalhes": t.detalhes,
-        "data": t.data_criacao
-    } for t in pendentes]
+    resultado = []
+    for t in pendentes:
+        data = t.data_criacao
+        if data.tzinfo is None:
+            data = data.replace(tzinfo=timezone.utc)
+        data_brasilia = data.astimezone(TZ_BRASILIA)
+
+        resultado.append({
+            "transacao_id": t.id,
+            "usuario_nome": t.usuario.nome,
+            "usuario_cpf": t.usuario.cpf,
+            "valor": float(t.valor),
+            "tipo": t.tipo.value,
+            "detalhes": t.detalhes,
+            "data": data_brasilia.isoformat()
+        })
+
+    return resultado
 
 @router.post("/admin/confirmar/{transacao_id}")
 async def confirmar_transacao(transacao_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):

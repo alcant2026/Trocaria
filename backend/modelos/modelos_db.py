@@ -41,6 +41,10 @@ class Usuario(Base):
     aceite_termos = Column(Boolean, default=False)
     data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Autenticação de Dois Fatores (2FA)
+    totp_secret = Column(String, nullable=True)
+    two_factor_enabled = Column(Boolean, default=False)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
 

@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import bcrypt
+import pyotp
 from modelos.modelos_db import Usuario
 from database import get_db
 
@@ -161,8 +162,53 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,
         "cpf": usuario.cpf,
-        "chave_pix": usuario.chave_pix
+        "chave_pix": usuario.chave_pix,
+        "two_factor_enabled": usuario.two_factor_enabled
     }
+
+@router.post("/2fa/gerar")
+async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Gera um novo segredo TOTP e retorna a URI para o QR Code."""
+    if usuario.two_factor_enabled:
+        raise HTTPException(status_code=400, detail="2FA já está ativado.")
+    
+    if not usuario.totp_secret:
+        usuario.totp_secret = pyotp.random_base32()
+        db.commit()
+    
+    totp = pyotp.TOTP(usuario.totp_secret)
+    provisioning_uri = totp.provisioning_uri(name=usuario.email, issuer_name="Peer App")
+    
+    return {"secret": usuario.totp_secret, "uri": provisioning_uri}
+
+@router.post("/2fa/ativar")
+async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Valida o código e ativa definitivamente o 2FA para o usuário."""
+    if not usuario.totp_secret:
+        raise HTTPException(status_code=400, detail="Segredo 2FA não gerado.")
+    
+    totp = pyotp.TOTP(usuario.totp_secret)
+    if totp.verify(codigo):
+        usuario.two_factor_enabled = True
+        db.commit()
+        return {"message": "2FA ativado com sucesso!"}
+    else:
+        raise HTTPException(status_code=400, detail="Código 2FA inválido.")
+
+@router.post("/2fa/desativar")
+async def desativar_2fa(senha: str, codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Desativa o 2FA mediante validação de senha e código atual."""
+    if not verify_password(senha, usuario.senha_hash):
+        raise HTTPException(status_code=401, detail="Senha incorreta.")
+    
+    totp = pyotp.TOTP(usuario.totp_secret)
+    if not totp.verify(codigo):
+        raise HTTPException(status_code=400, detail="Código 2FA inválido.")
+    
+    usuario.two_factor_enabled = False
+    usuario.totp_secret = None
+    db.commit()
+    return {"message": "2FA desativado."}
 
 @router.delete("/excluir-conta")
 async def excluir_conta(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):

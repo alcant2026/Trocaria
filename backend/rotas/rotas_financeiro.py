@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from decimal import Decimal
 from datetime import timezone, timedelta
+import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db
-from rotas.rotas_auth import obter_usuario_logado, exigir_admin
+from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal
@@ -13,6 +14,8 @@ class NotificacaoDeposito(BaseModel):
 class SolicitacaoSaque(BaseModel):
     valor: Decimal
     chave_pix: str
+    senha: str
+    codigo_2fa: str
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
@@ -43,6 +46,20 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
             status_code=401, 
             detail="Saque negado: A chave PIX deve pertencer obrigatoriamente à mesma titularidade da conta (conforme LGPD e regras Bacen)."
         )
+
+    # NOVO: Validação OBRIGATÓRIA de Senha e 2FA
+    if not verify_password(dados.senha, usuario.senha_hash):
+        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
+    
+    if not usuario.two_factor_enabled:
+        raise HTTPException(
+            status_code=403, 
+            detail="2FA Obrigatório: Você precisa ativar a Autenticação de Dois Fatores (Google Authenticator) antes de realizar um saque."
+        )
+    
+    totp = pyotp.TOTP(usuario.totp_secret)
+    if not totp.verify(dados.codigo_2fa):
+        raise HTTPException(status_code=401, detail="Código 2FA (Authenticator) inválido ou expirado.")
 
     # Deduzir saldo imediatamente (bloqueio para transação)
     usuario.saldo -= valor

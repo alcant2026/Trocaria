@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock, Copy, Check } from 'lucide-react';
 
 const Seguranca = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -8,6 +8,7 @@ const Seguranca = () => {
     const [codigo, setCodigo] = useState('');
     const [mensagem, setMensagem] = useState('');
     const [loading, setLoading] = useState(false);
+    const [copiado, setCopiado] = useState(false);
 
     useEffect(() => {
         carregarStatus();
@@ -36,6 +37,13 @@ const Seguranca = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const copiarChave = () => {
+        if (!secretData?.secret) return;
+        navigator.clipboard.writeText(secretData.secret);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
     };
 
     const ativar2fa = async () => {
@@ -109,20 +117,44 @@ const Seguranca = () => {
                         </div>
 
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Chave Manual (para copiar no celular):</p>
-                            <code style={{
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600, marginBottom: '8px' }}>Chave Manual:</p>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
                                 background: 'rgba(255,255,255,0.05)',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                color: 'var(--primary)',
-                                fontSize: '1.1rem',
-                                letterSpacing: '1px',
-                                display: 'inline-block',
-                                userSelect: 'all'
+                                padding: '12px',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border-color)'
                             }}>
-                                {secretData.secret}
-                            </code>
+                                <code style={{
+                                    color: 'var(--primary)',
+                                    fontSize: '1.1rem',
+                                    fontWeight: 'bold',
+                                    letterSpacing: '1px',
+                                    wordBreak: 'break-all'
+                                }}>
+                                    {secretData.secret}
+                                </code>
+                                <button
+                                    onClick={copiarChave}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: copiado ? 'var(--success)' : 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        transition: 'var(--transition)'
+                                    }}
+                                    title="Copiar chave"
+                                >
+                                    {copiado ? <Check size={20} /> : <Copy size={20} />}
+                                </button>
+                            </div>
+                            {copiado && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                         </div>
 
                         <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border-color)' }}>

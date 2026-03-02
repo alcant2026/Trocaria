@@ -467,11 +467,12 @@ const DashboardTomador = () => {
                     {!usuario.is_verified && (
                         <div className="card-minimal" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>✅ Verificação de Conta</h3>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Envie fotos dos seus documentos e ganhe selo de confiança.</p>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sua privacidade é prioridade: não armazenamos fotos de documentos locais. Seus dados estão protegidos sob a LGPD.</p>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Como enviar: <br /> 1. Suba seus docs no Google Drive ou Imgur <br /> 2. Cole o link no campo abaixo <br /> 3. Ou descreva como nos enviou (ex: via WhatsApp).</p>
                             <textarea
                                 className="input-field mt-1"
                                 style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
-                                placeholder="Link dos documentos ou confirmação de envio..."
+                                placeholder="Link do Google Drive/Imgur ou Informe o envio..."
                                 value={kycDetails}
                                 onChange={(e) => setKycDetails(e.target.value)}
                             />

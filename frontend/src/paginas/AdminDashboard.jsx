@@ -177,7 +177,25 @@ const AdminDashboard = () => {
                                             <User size={20} color="var(--text-muted)" />
                                         </div>
                                         <div>
-                                            <p style={{ fontWeight: 600 }}>{p.usuario_nome}</p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <p style={{ fontWeight: 600 }}>{p.usuario_nome}</p>
+                                                {p.usuario_verificado && (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: 'rgba(0, 230, 118, 0.1)',
+                                                        color: '#00e676',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 700,
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        <CheckCircle size={10} /> Verificado
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                 <p className="text-muted" style={{ fontSize: '0.75rem' }}>CPF: {p.usuario_cpf}</p>
                                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>•</span>

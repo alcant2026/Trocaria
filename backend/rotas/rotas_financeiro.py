@@ -111,6 +111,7 @@ async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depen
             "transacao_id": t.id,
             "usuario_nome": t.usuario.nome,
             "usuario_cpf": t.usuario.cpf,
+            "usuario_verificado": t.usuario.is_verified,
             "valor": float(t.valor),
             "tipo": t.tipo.value,
             "detalhes": t.detalhes,

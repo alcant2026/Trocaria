@@ -257,9 +257,9 @@ const DashboardInvestidor = () => {
                             <div style={{ color: 'var(--warning)', marginBottom: '1rem' }}>🛡️</div>
                             <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
                             <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Por segurança, o 2FA é obrigatório para todos os resgates.</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                                <button className="btn btn-primary" style={{ width: 'auto', minWidth: '220px' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
-                                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                                <button className="btn btn-primary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
+                                <button className="btn btn-secondary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                             </div>
                         </div>
                     ) : (

@@ -13,14 +13,15 @@ app = FastAPI(title="Peer API P2P")
 
 # Configuração de CORS - Aceita Front de Produção ou Local
 origins = [
-    os.getenv("FRONTEND_URL", "http://localhost:3000"), # Render URL
-    "http://127.0.0.1:3000",
+    "https://peer-front.onrender.com",
     "http://localhost:3000",
+    "http://localhost:5173", # Vite default
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if os.getenv("FRONTEND_URL") else ["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

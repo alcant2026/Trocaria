@@ -24,13 +24,18 @@ const Seguranca = () => {
 
     const gerar2fa = async () => {
         setLoading(true);
+        setMensagem('');
         try {
             const res = await api.post('/auth/2fa/gerar');
             setSecretData(res);
+            if (res.error) {
+                setMensagem(res.error);
+            }
         } catch (err) {
-            setMensagem(err.message || "Erro ao gerar 2FA.");
+            setMensagem(err.message || "Erro ao conectar com o servidor.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const ativar2fa = async () => {

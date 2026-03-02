@@ -183,17 +183,27 @@ async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Sessio
     totp = pyotp.TOTP(usuario.totp_secret)
     provisioning_uri = totp.provisioning_uri(name=usuario.email, issuer_name="Peer App")
     
-    # Gerar imagem do QR Code
-    img = qrcode.make(provisioning_uri)
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    qr_base64 = base64.b64encode(buffered.getvalue()).decode()
-    
-    return {
-        "secret": usuario.totp_secret, 
-        "uri": provisioning_uri, 
-        "qr_code": f"data:image/png;base64,{qr_base64}"
-    }
+    try:
+        # Gerar imagem do QR Code
+        img = qrcode.make(provisioning_uri)
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+        
+        return {
+            "secret": usuario.totp_secret, 
+            "uri": provisioning_uri, 
+            "qr_code": f"data:image/png;base64,{qr_base64}"
+        }
+    except Exception as e:
+        print(f"Erro ao gerar QR Code: {e}")
+        # Se falhar a imagem, ainda retornamos o segredo para pareamento manual
+        return {
+            "secret": usuario.totp_secret, 
+            "uri": provisioning_uri, 
+            "qr_code": None,
+            "error": "Não foi possível gerar a imagem do QR Code no servidor."
+        }
 
 @router.post("/2fa/ativar")
 async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):

@@ -1,27 +1,50 @@
-# 🚀 Guia Definitivo: Deploy Completo no Render
+# 🚀 Guia Definitivo: Deploy Completo (GitHub + Render)
 
-Este guia contém o passo a passo exato para colocar a plataforma **cred+** no ar, garantindo que o backend, o frontend e o banco de dados se comuniquem perfeitamente.
+Este guia contém o passo a passo exato para versionar o seu código no **GitHub** e colocá-lo no ar no **Render**, garantindo que o backend, o frontend e o banco de dados funcionem perfeitamente.
 
 ---
 
-## 🏗️ Passo 1: Banco de Dados (PostgreSQL)
+## 💾 Passo 1: Preparação e GitHub (Obrigatório)
 
-O Render oferece um banco nativo, mas você também pode usar serviços como o **Neon.tech** (gratuito e escalável).
+O Render precisa ler os arquivos do seu repositório no GitHub para fazer o deploy automático sempre que você atualizar o código.
+
+1. **Crie um repositório** no seu GitHub (Ex: nomeie como `cred-plus`).
+2. **Conecte a sua pasta local** ao GitHub:
+   ```bash
+   # Dentro da pasta do projeto
+   git init
+   git add .
+   git commit -m "feat: setup completo para produção"
+   git remote add origin https://github.com/seu-usuario/cred-plus.git
+   git branch -M main
+   git push -u origin main
+   ```
+3. **Atualizações futuras**: Sempre que mudar algo, rode:
+   ```bash
+   git add .
+   git commit -m "descrição da mudança"
+   git push origin main
+   ```
+   *O Render detectará o push e atualizará o site sozinho!*
+
+---
+
+## 🏗️ Passo 2: Banco de Dados (PostgreSQL)
+
+O Render oferece um banco nativo, mas você também pode usar serviços como o **Neon.tech**.
 
 1. No painel do Render, clique em **New +** > **PostgreSQL**.
 2. **Name**: `cred-plus-db`
-3. **Region**: Escolha a mesma região onde ficará o seu backend (Ex: `Oregon` ou `Ohio`).
-4. Após criar, copie a **Internal Database URL** (se o backend estiver no Render) ou a **External Database URL** (se quiser acessar do seu computador).
-   - Exemplo de formato: `postgresql://user:password@hostname/dbname`
+3. Após criar, copie a **Internal Database URL** (para uso dentro do Render).
 
 ---
 
-## ⚙️ Passo 2: Backend (Web Service)
+## ⚙️ Passo 3: Backend (Web Service)
 
 O backend é a API que processa os dados.
 
 1. Clique em **New +** > **Web Service**.
-2. Conecte o seu repositório do GitHub (que deve se chamar `peer`).
+2. Conecte o repositório que você criou no Passo 1.
 3. **Configurações Principais**:
    - **Name**: `cred-plus-api`
    - **Root Directory**: `backend`
@@ -29,16 +52,14 @@ O backend é a API que processa os dados.
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT`
 4. **Variáveis de Ambiente (Advanced > Add Environment Variable)**:
-   - `DATABASE_URL`: (Cole a URL do seu banco do Passo 1)
-   - `SECRET_KEY`: (Crie uma senha longa e aleatória para o JWT)
-   - `FRONTEND_URL`: `https://cred-plus-front.onrender.com` (Será o nome do seu frontend abaixo)
-   - `ACCESS_TOKEN_EXPIRE_MINUTES`: `1440` (Duração do login em minutos)
+   - `DATABASE_URL`: (URL do banco do Passo 2)
+   - `SECRET_KEY`: (Crie uma chave longa e aleatória)
+   - `FRONTEND_URL`: `https://cred-plus-front.onrender.com`
+   - `ACCESS_TOKEN_EXPIRE_MINUTES`: `1440`
 
 ---
 
-## 🎨 Passo 3: Frontend (Static Site)
-
-O frontend é a interface visual que o usuário acessa.
+## 🎨 Passo 4: Frontend (Static Site)
 
 1. Clique em **New +** > **Static Site**.
 2. Conecte o mesmo repositório do GitHub.
@@ -48,18 +69,18 @@ O frontend é a interface visual que o usuário acessa.
    - **Build Command**: `npm install && npm run build`
    - **Publish Directory**: `dist`
 4. **Variáveis de Ambiente (Environment)**:
-   - `VITE_API_URL`: `https://cred-plus-api.onrender.com` (A URL que o Render gerou para o seu backend no Passo 2)
+   - `VITE_API_URL`: `https://cred-plus-api.onrender.com` (A URL do seu backend no Passo 3)
 
 ---
 
-## ✅ Passo 4: Verificação e Manutenção
+## ✅ Passo 5: Verificação e Manutenção
 
-1. **Acesso**: Entre na URL gerada no Passo 3 (Ex: `https://cred-plus-front.onrender.com`).
-2. **Logs**: Se algo não carregar, vá no painel do Render, clique em seu Web Service de Backend e olhe a aba **Logs**.
-3. **Sincronização de Banco**: O sistema está configurado para criar automaticamente as colunas necessárias ao iniciar. Se você deletar o banco, ele se reconstruirá sozinho no primeiro acesso.
+1. **Acesso**: Entre na URL do frontend gerada no Passo 4.
+2. **Logs**: Se algo falhar, olhe a aba **Logs** no painel do seu serviço no Render.
+3. **Auto-Deploy**: Toda vez que você fizer `git push`, o Render reconstrói o sistema automaticamente.
 
 > [!WARNING]
-> **Segurança**: Nunca compartilhe o seu arquivo `.env` ou as URLs com a senha do banco em locais públicos. O Render já oculta as variáveis de ambiente para você.
+> **Segurança**: Nunca compartilhe URLs com senhas. O Render gerencia isso com segurança nas variáveis de ambiente.
 
 > [!TIP]
-> **Custom Domain**: No Render, você pode conectar o seu próprio domínio (`seu-site.com.br`) facilmente nas configurações de cada serviço (Settings > Custom Domains).
+> **Custom Domain**: Você pode conectar seu próprio domínio (`.com.br`) na aba **Settings > Custom Domains** de cada serviço no Render.

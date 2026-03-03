@@ -1,92 +1,85 @@
-# cred+
+# 🚀 cred+ | Plataforma P2P de Crédito Ético
 
-Plataforma P2P de crédito com:
-- Backend em FastAPI (autenticação JWT, regras de empréstimo, fluxo financeiro e área de investidor).
-- Frontend em React + Vite.
+O **cred+** é uma solução moderna de empréstimos *Peer-to-Peer* (P2P), conectando pessoas que precisam de crédito a investidores que buscam rentabilidade. Focada em segurança, transparência e agilidade, a plataforma elimina intermediários bancários tradicionais.
 
-## Estrutura
+---
 
-```text
-cred+/
-├── backend/
-└── frontend/
-```
+## ✨ Funcionalidades Principais
 
-## Pré-requisitos
+### 🏦 Para o Tomador (Empréstimo)
+- **Solicitação Ágil**: Peça crédito em segundos com taxas competitivas.
+- **Garantia Social**: Sistema de garantidores via ID de amigos para aumentar a confiança.
+- **Transparência Total**: Visualização clara de parcelas, juros e prazos.
+- **Score Dinâmico**: Evolução do perfil conforme o histórico de pagamentos.
 
+### 💰 Para o Investidor
+- **Mercado de Oportunidades**: Escolha onde investir com base no score e perfil do tomador.
+- **Rentabilidade Real**: Lucros líquidos calculados automaticamente (já descontada a taxa de performance de 10%).
+- **Gestão de Carteira**: Acompanhe recebimentos, ativos e fluxo de caixa diário.
+- **Segurança de Dados**: Desbloqueio seguro de perfis para análise detalhada.
+
+---
+
+## 🛡️ Segurança e Tecnologia
+
+### 🔐 Mentalidade Zero Trust
+- **Validação de Sangue Frio**: Todas as transações são validadas em múltiplas camadas (Frontend + Backend) para impedir valores negativos ou inconsistentes.
+- **Autenticação Robusta**: Proteção via JWT e suporte a Segundo Fator de Autenticação (2FA) para saques.
+- **LGPD Compliance**: Dados sensíveis protegidos e anonimizados onde necessário.
+
+### 🛠️ Stack Tecnológica
+- **Backend**: Python 3.10+ com **FastAPI** (Alta performance e assincronismo).
+- **Frontend**: React.js com **Vite** e Tailwind-like styles para UX premium.
+- **Banco de Dados**: PostgreSQL com suporte nativo a indexação financeira.
+- **Infraestrutura**: Configurado para deploy contínuo (CI/CD) no **Render**.
+
+---
+
+## 🚀 Como Começar (Ambiente Local)
+
+### Pré-requisitos
 - Python 3.10+
 - Node.js 18+
-- npm
+- PostgreSQL ativo
 
-## Configuração do backend
-
-1. Entre na pasta:
+### 1. Configurando o Backend
 ```bash
+# Entre na pasta e crie o ambiente
 cd backend
-```
-
-2. Crie e ative o ambiente virtual:
-```bash
 python -m venv .venv
-source .venv/bin/activate
-```
+source .venv/bin/activate  # No Windows: .venv\Scripts\activate
 
-3. Instale dependências:
-```bash
+# Instale as dependências
 pip install -r requirements.txt
-```
 
-4. Configure o arquivo `.env` (`backend/.env`):
-```env
-DATABASE_URL=postgresql://USUARIO:SENHA@HOST/DB?sslmode=require
-SECRET_KEY=defina_uma_chave_forte
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-FRONTEND_URL=http://localhost:3000
-```
-
-5. Rode a API:
-```bash
+# Inicie a API
 python main.py
 ```
+*Acesse a documentação Swagger em `/docs`.*
 
-API disponível em: `http://localhost:8000`  
-Swagger em: `http://localhost:8000/docs`
-
-## Configuração do frontend
-
-1. Em outro terminal, entre na pasta:
+### 2. Configurando o Frontend
 ```bash
+# Em outro terminal
 cd frontend
-```
-
-2. Instale dependências:
-```bash
 npm install
-```
-
-3. Rode em desenvolvimento:
-```bash
 npm run dev
 ```
+*O sistema estará disponível em `http://localhost:3000`.*
 
-Frontend disponível em: `http://localhost:3000`
+---
 
-Observação:
-- Em ambiente local, o Vite faz proxy de `/api` para `http://localhost:8000`.
-- Para produção, defina `VITE_API_URL` se necessário.
+## 🌍 Deploy Produção
 
-## Fluxo rápido de teste
+Para colocar o sistema no ar de forma profissional, consulte o nosso [Guia de Deploy (Render + GitHub)](/DEPLOY.md).
 
-1. Acesse `http://localhost:8000/docs`.
-2. Registre um usuário em `/auth/registrar` com `aceite_termos=true`.
-3. Faça login em `/auth/login`.
-4. Simule saldo com `/financeiro/depositar-manual`.
-5. Crie pedido em `/emprestimos/solicitar`.
-6. Liste pedidos e teste desbloqueio/investimento pelas rotas de investidor.
+---
 
-## Regras importantes do domínio
+## 📜 Regras de Negócio e Taxas
+- **Custo de Solicitação**: R$ 4,00 (Taxa administrativa).
+- **Taxa de Performance**: 10% sobre os juros recebidos pelo investidor.
+- **Janelas de Expiração**: 4 horas para pedidos sem lances e 5 dias para o ciclo total.
+- **Precisão Financeira**: Uso obrigatório da biblioteca `decimal` em todos os cálculos.
 
-- Postar solicitação de empréstimo custa `R$ 4,00`.
-- Desbloqueio de dados para investidor custa `R$ 15,00`.
-- Saques passam por validação da chave PIX do usuário.
-- Solicitações podem expirar (regras de 4h e 5 dias).
+---
+
+*Desenvolvido com foco em democratização financeira e segurança de dados.*

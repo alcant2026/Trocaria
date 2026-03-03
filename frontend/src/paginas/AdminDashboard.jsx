@@ -11,7 +11,9 @@ import {
     ArrowDownRight,
     User,
     Clock,
-    ExternalLink
+    ExternalLink,
+    X,
+    AlertCircle
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -19,6 +21,9 @@ const AdminDashboard = () => {
     const [fiscal, setFiscal] = useState(null);
     const [mensagem, setMensagem] = useState('');
     const [activeTab, setActiveTab] = useState('pendentes'); // 'pendentes', 'fiscal'
+    const [showRejeitarModal, setShowRejeitarModal] = useState(false);
+    const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
+    const [loadingRejeicao, setLoadingRejeicao] = useState(false);
 
     const formatarDataBrasilia = (valor) => {
         if (!valor) return '-';
@@ -83,17 +88,26 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleRejeitar = async (id) => {
-        const motivo = window.prompt("Motivo da rejeição (será mostrado ao usuário):", "Documento ilegível ou dados incorretos.");
-        if (motivo === null) return; // Cancelou o prompt
+    const handleRejeitar = (id) => {
+        setRejeicaoData({ id, motivo: 'Documento ilegível ou dados incorretos.' });
+        setShowRejeitarModal(true);
+    };
 
+    const confirmarRejeicao = async () => {
+        const { id, motivo } = rejeicaoData;
+        if (!motivo) return alert("Por favor, insira um motivo.");
+
+        setLoadingRejeicao(true);
         try {
             await api.post(`/financeiro/admin/rejeitar/${id}?motivo=${encodeURIComponent(motivo)}`);
             setMensagem('Transação rejeitada e notificação enviada.');
+            setShowRejeitarModal(false);
             carregarPendentes();
             carregarFiscal();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
+        } finally {
+            setLoadingRejeicao(false);
         }
     };
 
@@ -324,6 +338,77 @@ const AdminDashboard = () => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Rejeição Customizado */}
+            {showRejeitarModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.85)',
+                    backdropFilter: 'blur(5px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1.5rem'
+                }}>
+                    <div className="card" style={{
+                        width: '100%',
+                        maxWidth: '450px',
+                        animation: 'scaleUp 0.3s ease',
+                        border: '1px solid rgba(255, 61, 0, 0.2)'
+                    }}>
+                        <div className="flex-between mb-1">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
+                                <AlertCircle size={20} /> Rejeitar Solicitação
+                            </h3>
+                            <button
+                                onClick={() => setShowRejeitarModal(false)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                            Informe o motivo do cancelamento. Esta mensagem será enviada para o cliente.
+                        </p>
+
+                        <div className="input-group">
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Motivo da Rejeição</label>
+                            <textarea
+                                className="input-field mt-1"
+                                placeholder="Ex: Documento vencido ou CPF inválido..."
+                                style={{ width: '100%', minHeight: '100px', padding: '0.75rem' }}
+                                value={rejeicaoData.motivo}
+                                onChange={(e) => setRejeicaoData({ ...rejeicaoData, motivo: e.target.value })}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                            <button
+                                className="btn btn-secondary"
+                                style={{ flex: 1, padding: '0.75rem' }}
+                                onClick={() => setShowRejeitarModal(false)}
+                                disabled={loadingRejeicao}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                style={{ flex: 2, background: 'var(--danger)', color: '#fff', padding: '0.75rem' }}
+                                onClick={confirmarRejeicao}
+                                disabled={loadingRejeicao || !rejeicaoData.motivo}
+                            >
+                                {loadingRejeicao ? 'Processando...' : 'Confirmar Rejeição'}
+                            </button>
                         </div>
                     </div>
                 </div>

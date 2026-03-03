@@ -17,7 +17,8 @@ import {
     Wallet,
     ShieldAlert,
     Copy,
-    Check
+    Check,
+    AlertCircle
 } from 'lucide-react';
 
 const DashboardTomador = () => {
@@ -40,6 +41,7 @@ const DashboardTomador = () => {
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [mensagem, setMensagem] = useState('');
     const [kycDetails, setKycDetails] = useState('');
+    const [historico, setHistorico] = useState([]);
 
     const carregarDados = async () => {
         try {
@@ -50,6 +52,10 @@ const DashboardTomador = () => {
             }
             const lista = await api.get('/emprestimos/meus-emprestimos');
             setMeusEmprestimos(lista);
+
+            // Novo: Carregar histórico para ver motivos de rejeição
+            const hist = await api.get('/financeiro/meu-historico');
+            setHistorico(hist);
         } catch (err) {
             console.error('Erro ao carregar dados:', err);
         }
@@ -482,6 +488,46 @@ const DashboardTomador = () => {
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                         <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
+                </div>
+            )}
+
+            {/* Seção de Últimas Atividades (Histórico) - Visível apenas na Home */}
+            {activeView === 'home' && (
+                <div className="card mt-1">
+                    <div className="flex-between mb-1">
+                        <h3>Últimas Atividades</h3>
+                        <History size={18} color="var(--text-muted)" />
+                    </div>
+                    {historico.length === 0 ? (
+                        <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {historico.map(h => (
+                                <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
+                                    <div className="flex-between">
+                                        <div>
+                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo.replace('_', ' ')}</p>
+                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{new Date(h.data).toLocaleString('pt-BR')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
+                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor.toLocaleString('pt-BR')}
+                                            </p>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
+                                                {h.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {h.status === 'falhou' && h.detalhes && (
+                                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                            <AlertCircle size={14} color="var(--danger)" />
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

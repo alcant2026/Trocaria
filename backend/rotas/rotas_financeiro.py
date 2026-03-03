@@ -283,3 +283,28 @@ async def registrar_deposito_manual(usuario_id: int, valor: Decimal, db: Session
     db.commit()
     
     return {"message": "Depósito creditado com sucesso.", "novo_saldo": usuario.saldo}
+
+@router.get("/meu-historico")
+async def meu_historico(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """
+    Retorna as últimas transações do usuário (Depósitos, Saques, etc)
+    """
+    transacoes = db.query(Transacao).filter(Transacao.usuario_id == usuario.id).order_by(Transacao.data_criacao.desc()).limit(10).all()
+    
+    resultado = []
+    for t in transacoes:
+        data = t.data_criacao
+        if data.tzinfo is None:
+            data = data.replace(tzinfo=timezone.utc)
+        data_brasilia = data.astimezone(TZ_BRASILIA)
+
+        resultado.append({
+            "id": t.id,
+            "valor": float(t.valor),
+            "tipo": t.tipo.value,
+            "status": t.status,
+            "detalhes": t.detalhes,
+            "data": data_brasilia.isoformat()
+        })
+    
+    return resultado

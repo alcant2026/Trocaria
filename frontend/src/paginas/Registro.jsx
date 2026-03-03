@@ -85,7 +85,7 @@ const Registro = () => {
                             <input name="email" type="email" placeholder="seu@email.com" onChange={handleChange} className="input-field" required />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', width: '100%' }}>
+                        <div className="input-row input-row-2">
                             <div className="input-group">
                                 <label>CPF</label>
                                 <input name="cpf" placeholder="000.000.000-00" onChange={handleChange} className="input-field" required />
@@ -96,16 +96,15 @@ const Registro = () => {
                             </div>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', width: '100%' }}>
+                        <div className="input-row input-row-state-city">
                             <div className="input-group">
-                                <label>Estado (UF)</label>
+                                <label>UF</label>
                                 <select
                                     name="estado"
                                     value={formData.estado}
                                     onChange={handleChange}
                                     className="input-field"
                                     required
-                                    style={{ background: 'var(--card-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                                 >
                                     <option value="">UF</option>
                                     {estados.map(uf => (
@@ -122,7 +121,6 @@ const Registro = () => {
                                     className="input-field"
                                     required
                                     disabled={!formData.estado}
-                                    style={{ background: 'var(--card-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                                 >
                                     <option value="">Selecione a cidade</option>
                                     {cidades.map(cid => (

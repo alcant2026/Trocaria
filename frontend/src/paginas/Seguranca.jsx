@@ -157,14 +157,17 @@ const Seguranca = () => {
                             {copiado && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                         </div>
 
-                        <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border-color)' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                        <div style={{ textAlign: 'left', background: 'rgba(255, 214, 0, 0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(255, 214, 0, 0.2)' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--warning)', fontWeight: 600, marginBottom: '0.5rem' }}>
                                 <Smartphone size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                                1. Escaneie o QR Code acima com o seu app de autenticação (Google Authenticator, Authy, etc).
+                                Sem celular? Não tem problema!
+                            </p>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                                Você pode instalar a extensão <strong>"Authenticator"</strong> no seu navegador (Chrome/Edge/Firefox) e colar a <strong>Chave Manual</strong> acima para gerar os códigos direto no seu PC.
                             </p>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0' }}>
                                 <Key size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                                2. Digite o código de 6 dígitos gerado pelo app abaixo:
+                                Depois de parear, digite o código de 6 dígitos abaixo:
                             </p>
                         </div>
 

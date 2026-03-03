@@ -37,6 +37,7 @@ const DashboardInvestidor = () => {
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [mensagem, setMensagem] = useState('');
+    const [mostrarAlertaRejeicao, setMostrarAlertaRejeicao] = useState(true);
     const [historico, setHistorico] = useState([]);
     const [kycDetails, setKycDetails] = useState('');
     const [paginaHist, setPaginaHist] = useState(1);
@@ -216,8 +217,14 @@ const DashboardInvestidor = () => {
             {activeView === 'home' && (
                 <div className="home-content">
                     {/* Alerta de Rejeição Recente */}
-                    {historico.some(h => h.status === 'falhou') && (
-                        <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                    {mostrarAlertaRejeicao && historico.some(h => h.status === 'falhou') && (
+                        <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', position: 'relative' }}>
+                            <button
+                                onClick={() => setMostrarAlertaRejeicao(false)}
+                                style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7 }}
+                            >
+                                ✕
+                            </button>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <AlertCircle size={20} />
                                 <strong style={{ fontSize: '0.9rem' }}>Atenção: Você tem solicitações rejeitadas</strong>

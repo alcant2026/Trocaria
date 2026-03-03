@@ -339,18 +339,29 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
 async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """
     Gera um PDF profissional de contrato de mútuo.
+    - Tomador: Vê detalhes do empréstimo e nomes de quem o financiou.
+    - Investidor: Vê detalhes do seu aporte e o nome do tomador.
     """
     from fpdf import FPDF
     from fastapi import Response
     from datetime import timedelta
     
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.id == solicitacao_id,
-        SolicitacaoEmprestimo.usuario_id == usuario.id
+        SolicitacaoEmprestimo.id == solicitacao_id
     ).first()
     
     if not solicitacao:
         raise HTTPException(status_code=404, detail="Empréstimo não encontrado.")
+
+    # Verificar permissão: Deve ser o tomador OU um dos investidores
+    e_tomador = solicitacao.usuario_id == usuario.id
+    investimento_usuario = db.query(Investimento).filter(
+        Investimento.solicitacao_id == solicitacao_id,
+        Investimento.investidor_id == usuario.id
+    ).first()
+
+    if not e_tomador and not investimento_usuario:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para acessar este contrato.")
 
     if solicitacao.status not in [StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
         raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos aprovados ou concluídos.")
@@ -377,32 +388,56 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     pdf.cell(0, 10, f"CONTRATO DE MÚTUO FINANCEIRO - ID #{solicitacao.id}", ln=True, align="L", fill=True)
     pdf.ln(5)
     
-    # Seções
+    # Seção 1: Partes
     pdf.set_font("Arial", "B", 10)
     pdf.cell(0, 7, "1. PARTES", ln=True)
     pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(0, 5, f"MUTUÁRIO (TOMADOR): {usuario.nome}\nCPF: {usuario.cpf}\nPLATAFORMA: Peer - Tecnologia e Intermediação Ltda.")
+    
+    tomador = solicitacao.usuario
+    if e_tomador:
+        # Tomador vê a lista de quem o financiou
+        investidores_nomes = ", ".join([inv.investidor.nome for inv in solicitacao.investimentos])
+        texto_partes = (
+            f"MUTUÁRIO (TOMADOR): {tomador.nome}\n"
+            f"CPF: {tomador.cpf}\n"
+            f"MUTUANTES (INVESTIDORES): {investidores_nomes}\n"
+            f"INTERMEDIADORA: Peer Tecnologia Ltda."
+        )
+    else:
+        # Investidor vê apenas o Tomador e ele mesmo
+        texto_partes = (
+            f"MUTUÁRIO (TOMADOR): {tomador.nome}\n"
+            f"MUTUANTE (INVESTIDOR): {usuario.nome}\n"
+            f"CPF INVESTIDOR: {usuario.cpf}\n"
+            f"INTERMEDIADORA: Peer Tecnologia Ltda."
+        )
+    
+    pdf.multi_cell(0, 5, texto_partes)
     pdf.ln(5)
     
+    # Seção 2: Objeto
     pdf.set_font("Arial", "B", 10)
     pdf.cell(0, 7, "2. OBJETO E CONDIÇÕES", ln=True)
     pdf.set_font("Arial", "", 10)
+    
+    valor_contrato = solicitacao.valor if e_tomador else investimento_usuario.valor_investido
     texto_objeto = (
-        f"VALOR PRINCIPAL: R$ {solicitacao.valor:,.2f}\n"
+        f"VALOR APORTADO: R$ {valor_contrato:,.2f}\n"
         f"TAXA DE JUROS: {solicitacao.taxa_juros}% ao mês (Juros Simples)\n"
-        f"PRAZO: {solicitacao.prazo_meses} meses\n"
-        f"DATA DE SOLICITAÇÃO: {data_formatada}"
+        f"PRAZO TOTAL: {solicitacao.prazo_meses} meses\n"
+        f"DATA DE ORIGINAÇÃO: {data_formatada}"
     )
     pdf.multi_cell(0, 5, texto_objeto)
     pdf.ln(5)
     
+    # Seção 3: Cláusulas
     pdf.set_font("Arial", "B", 10)
     pdf.cell(0, 7, "3. CLÁUSULAS DE SEGURANÇA", ln=True)
     pdf.set_font("Arial", "", 9)
     clausulas = (
         "O MUTUÁRIO declara-se ciente que o não pagamento de parcelas acarretará em redução do score interno "
-        "e restrições de novos créditos. A plataforma atua como custodiante e facilitadora técnica, não sendo "
-        "garantidora final da inadimplência. Este contrato é regido pelo Código Civil Brasileiro (Mútuo entre Pessoas)."
+        "e restrições de novos créditos. O MUTUANTE declara ciência dos riscos inerentes ao investimento P2P. "
+        "A plataforma Peer atua apenas como facilitadora técnica e intermediadora."
     )
     pdf.multi_cell(0, 5, clausulas)
     pdf.ln(10)

@@ -38,6 +38,7 @@ const DashboardInvestidor = () => {
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [mensagem, setMensagem] = useState('');
     const [historico, setHistorico] = useState([]);
+    const [kycDetails, setKycDetails] = useState('');
 
     // Modal state
     const [modal, setModal] = useState({ open: false, type: '', data: null });
@@ -208,47 +209,6 @@ const DashboardInvestidor = () => {
                 </div>
             </div>
 
-            {/* Seção de Últimas Atividades (Histórico) - Visível apenas na Home */}
-            {activeView === 'home' && (
-                <div className="card mt-1">
-                    <div className="flex-between mb-1">
-                        <h3>Últimas Atividades</h3>
-                        <History size={18} color="var(--text-muted)" />
-                    </div>
-                    {historico.length === 0 ? (
-                        <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {historico.map(h => (
-                                <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
-                                    <div className="flex-between">
-                                        <div>
-                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo.replace('_', ' ')}</p>
-                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{new Date(h.data).toLocaleString('pt-BR')}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
-                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor.toLocaleString('pt-BR')}
-                                            </p>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                {h.status.toUpperCase()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {h.status === 'falhou' && h.detalhes && (
-                                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                            <AlertCircle size={14} color="var(--danger)" />
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Seção de Últimas Atividades (Histórico) - Visível apenas na Home */}
             {activeView === 'home' && (
                 <div className="card mt-1">
                     <div className="flex-between mb-1">
@@ -343,15 +303,19 @@ const DashboardInvestidor = () => {
                                 className="input-field mt-1"
                                 style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
                                 placeholder="Link do Google Drive/Imgur ou Informe o envio..."
-                                value={valorNotificacao} // Reaproveitando estado ou criando um específico? Vamos usar kycDetails no futuro, aqui simplificamos.
-                                onChange={(e) => setValorNotificacao(e.target.value)}
+                                value={kycDetails}
+                                onChange={(e) => setKycDetails(e.target.value)}
                             />
                             <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={async () => {
-                                if (!valorNotificacao) return alert('Informe os detalhes.');
-                                await api.post('/score/solicitar-verificacao', { detalhes: valorNotificacao });
-                                setMensagem('Solicitação enviada!');
-                                setValorNotificacao('');
-                                carregarDados();
+                                if (!kycDetails) return alert('Informe os detalhes.');
+                                try {
+                                    await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
+                                    setMensagem('Solicitação enviada!');
+                                    setKycDetails('');
+                                    carregarDados();
+                                } catch (err) {
+                                    setMensagem('Erro: ' + err.message);
+                                }
                             }}>Reenviar Docs (R$ 35,00)</button>
                         </div>
                     )}

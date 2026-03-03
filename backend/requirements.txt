@@ -12,3 +12,4 @@ python-dotenv
 pyotp
 qrcode
 Pillow
+slowapi

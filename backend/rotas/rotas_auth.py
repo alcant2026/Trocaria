@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
@@ -19,6 +19,8 @@ class RegistroUsuario(BaseModel):
     cpf: str
     senha: str 
     chave_pix: str
+    cidade: str
+    estado: str
     aceite_termos: bool = False
 
 def get_password_hash(password):
@@ -28,9 +30,51 @@ def get_password_hash(password):
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode("utf-8")
 
+from limitador import limiter
+import re
+
+def validar_cpf(cpf: str) -> bool:
+    cpf = re.sub(r'[^0-9]', '', cpf)
+    if len(cpf) != 11 or len(set(cpf)) == 1:
+        return False
+    # Cálculo do primeiro dígito verificador
+    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    digito1 = (soma * 10 % 11) % 10
+    # Cálculo do segundo dígito verificador
+    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    digito2 = (soma * 10 % 11) % 10
+    return int(cpf[9]) == digito1 and int(cpf[10]) == digito2
+
+EMAILS_TEMPORARIOS = {'mailinator.com', 'yopmail.com', 'tempmail.com', 'guerrillamail.com', '10minutemail.com', 'dropmail.me'}
+
 @router.post("/registrar")
-async def registrar_usuario(dados: RegistroUsuario, db: Session = Depends(get_db)):
-    # Verificar se email ou CPF já existem
+@limiter.limit("3/minute")
+async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Session = Depends(get_db)):
+    
+    # Validação 1: Nome Completo (Mínimo 2 palavras e sem caracteres especiais)
+    nome_limpo = dados.nome.strip()
+    if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ]+\s+[A-Za-zÀ-ÖØ-öø-ÿ]+", nome_limpo):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe seu nome completo (Nome e Sobrenome) sem números ou caracteres especiais."
+        )
+
+    # Validação 2: Email Temporário Descartável
+    dominio_email = dados.email.split('@')[-1].lower()
+    if dominio_email in EMAILS_TEMPORARIOS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Domínios de e-mail temporário não são permitidos por motivos de segurança."
+        )
+
+    # Validação 3: Cálculo Estrutural do CPF (Dígito Verificador)
+    if not validar_cpf(dados.cpf):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CPF inválido. Verifique o número digitado."
+        )
+
+    # Validação 4: Verificar se email ou CPF já existem no Banco
     usuario_existente = db.query(Usuario).filter(
         (Usuario.email == dados.email) | (Usuario.cpf == dados.cpf)
     ).first()
@@ -54,6 +98,8 @@ async def registrar_usuario(dados: RegistroUsuario, db: Session = Depends(get_db
         cpf=dados.cpf,
         senha_hash=get_password_hash(dados.senha),
         chave_pix=dados.chave_pix,
+        cidade=dados.cidade,
+        estado=dados.estado,
         aceite_termos=dados.aceite_termos,
         data_aceite=datetime.utcnow(),
         saldo=0,
@@ -128,7 +174,8 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 @router.post("/login")
-async def login(dados: LoginUsuario, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(
         Usuario.email == dados.email,
         Usuario.is_active == True
@@ -167,6 +214,8 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "is_verified": usuario.is_verified,
         "cpf": usuario.cpf,
         "chave_pix": usuario.chave_pix,
+        "cidade": usuario.cidade,
+        "estado": usuario.estado,
         "two_factor_enabled": usuario.two_factor_enabled
     }
 

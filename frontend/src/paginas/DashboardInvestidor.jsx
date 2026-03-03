@@ -1,5 +1,80 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
+
+// Hook de countdown reutilizável
+const useCountdown = (isoDate) => {
+    const calcularRestante = useCallback(() => {
+        if (!isoDate) return null;
+        const diff = new Date(isoDate + 'Z') - new Date();
+        if (diff <= 0) return '⏰ Expirado';
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        if (h >= 24) {
+            const d = Math.floor(h / 24);
+            return `${d}d ${h % 24}h restantes`;
+        }
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }, [isoDate]);
+    const [tempo, setTempo] = useState(calcularRestante);
+    useEffect(() => {
+        if (!isoDate) return;
+        const id = setInterval(() => setTempo(calcularRestante()), 1000);
+        return () => clearInterval(id);
+    }, [isoDate, calcularRestante]);
+    return tempo;
+};
+
+// Timer inline para cada card
+const TimerCard = ({ expira4h, expira5d }) => {
+    const t4h = useCountdown(expira4h);
+    const t5d = useCountdown(expira5d);
+    const expirado4h = !expira4h || new Date(expira4h + 'Z') <= new Date();
+    return (
+        <div style={{ marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: expirado4h ? 'rgba(255,61,0,0.08)' : 'rgba(255,145,0,0.08)', color: expirado4h ? 'var(--danger)' : 'var(--warning)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                        ⚡ {t4h || '—'}
+                    </span>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>Janela rápida (prioridade)</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                        🕐 {t5d || '—'}
+                    </span>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>Prazo total do pedido</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Mapeamento global de tipos de transação
+const TIPOS_LABEL = {
+    deposito: 'Depósito',
+    saque: 'Saque',
+    investimento: 'Investimento',
+    recebimento: 'Recebimento',
+    compra_score: 'Compra de Score',
+    desbloqueio_dados: 'Taxa de Verificação',
+    taxa_saque: 'Taxa de Saque',
+    taxa_intermediacao: 'Taxa de Intermediação',
+    taxa_conveniencia: 'Taxa de Conveniência',
+};
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia']);
+const formatarTipo = (tipo, detalhes) => {
+    if (tipo === 'desbloqueio_dados') {
+        if (detalhes?.toLowerCase().includes('empr')) return 'Taxa de Solicitação';
+        return 'Taxa de Verificação';
+    }
+    return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
+};
+const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
+const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+
 import {
     Wallet,
     TrendingUp,
@@ -17,9 +92,13 @@ import {
     ShieldAlert,
     Copy,
     Check,
+    CheckCircle2,
     History,
-    AlertCircle
+    AlertCircle,
+    FileText
 } from 'lucide-react';
+
+import TermosUso from '../componentes/TermosUso';
 
 const DashboardInvestidor = () => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
@@ -27,7 +106,9 @@ const DashboardInvestidor = () => {
     const [carteira, setCarteira] = useState([]);
     const [activeView, setActiveView] = useState('home'); // 'home', 'mercado', 'carteira', 'depositar', 'resgatar'
     const [verSaldo, setVerSaldo] = useState(true);
+    const [showTermos, setShowTermos] = useState(false);
     const [copiadoPix, setCopiadoPix] = useState(false);
+    const [copiadoId, setCopiadoId] = useState(false);
 
     // Forms state
     const [valorNotificacao, setValorNotificacao] = useState('');
@@ -37,7 +118,14 @@ const DashboardInvestidor = () => {
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [mensagem, setMensagem] = useState('');
-    const [mostrarAlertaRejeicao, setMostrarAlertaRejeicao] = useState(true);
+    const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
+        () => localStorage.getItem('alerta_rejeicao_investidor') !== 'fechado'
+    );
+
+    const fecharAlertaRejeicao = () => {
+        localStorage.setItem('alerta_rejeicao_investidor', 'fechado');
+        setMostrarAlertaRejeicaoState(false);
+    };
     const [historico, setHistorico] = useState([]);
     const [kycDetails, setKycDetails] = useState('');
     const [paginaHist, setPaginaHist] = useState(1);
@@ -52,6 +140,12 @@ const DashboardInvestidor = () => {
         navigator.clipboard.writeText('credpix@gmail.com');
         setCopiadoPix(true);
         setTimeout(() => setCopiadoPix(false), 2000);
+    };
+
+    const handleCopiarId = () => {
+        navigator.clipboard.writeText(usuario.id);
+        setCopiadoId(true);
+        setTimeout(() => setCopiadoId(false), 2000);
     };
 
     const carregarDados = async () => {
@@ -73,13 +167,14 @@ const DashboardInvestidor = () => {
 
     useEffect(() => {
         carregarDados();
-    }, []);
+    }, [activeView]);
 
     const handleInvestir = async (solicitacaoId) => {
         const valor = valorInvestir[solicitacaoId];
         const aceite = aceiteRisco[solicitacaoId];
 
-        if (!valor || parseFloat(valor) <= 0) return alert('Digite um valor válido.');
+        const v = parseFloat(valor);
+        if (!v || v <= 0) return alert('Digite um valor de investimento maior que zero.');
         if (!aceite) return alert('Você deve aceitar os riscos do investimento para continuar.');
 
         try {
@@ -95,10 +190,16 @@ const DashboardInvestidor = () => {
     };
 
     const handleNotificarDeposito = async () => {
+        const v = parseFloat(valorNotificacao);
+        if (!v || v <= 0) {
+            alert('Informe um valor de depósito maior que zero.');
+            return;
+        }
         try {
-            await api.post('/financeiro/notificar-deposito', { valor: parseFloat(valorNotificacao) });
+            await api.post('/financeiro/notificar-deposito', { valor: v });
             setMensagem('Notificação enviada!');
             setValorNotificacao('');
+            carregarDados();
             setActiveView('home');
         } catch (err) {
             setMensagem('Erro: ' + err.message);
@@ -110,9 +211,14 @@ const DashboardInvestidor = () => {
             setMensagem('Erro: Senha e Código 2FA são obrigatórios.');
             return;
         }
+        const v = parseFloat(valorSaque);
+        if (!v || v <= 0) {
+            setMensagem('Erro: O valor de saque deve ser maior que zero.');
+            return;
+        }
         try {
             await api.post('/financeiro/solicitar-saque', {
-                valor: parseFloat(valorSaque),
+                valor: v,
                 chave_pix: usuario.chave_pix,
                 senha: senhaSaque,
                 codigo_2fa: codigo2faSaque
@@ -153,7 +259,31 @@ const DashboardInvestidor = () => {
     return (
         <div className="investidor-dashboard">
             <header className="mb-1">
-                <h1>Painel Investidor</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h1>Painel Investidor</h1>
+                    <div
+                        onClick={handleCopiarId}
+                        style={{
+                            fontSize: '0.65rem',
+                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15), rgba(var(--success-rgb), 0.15))',
+                            padding: '6px 14px',
+                            borderRadius: '30px',
+                            border: '1px solid rgba(var(--primary-rgb), 0.3)',
+                            color: copiadoId ? 'var(--success)' : 'var(--text-main)',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+                            transform: copiadoId ? 'scale(0.95)' : 'scale(1)'
+                        }}
+                    >
+                        {copiadoId ? <Check size={14} /> : <Copy size={14} />}
+                        <span style={{ letterSpacing: '1px' }}>{usuario.id}</span>
+                    </div>
+                </div>
                 <p className="text-muted">Multiplique seu capital com segurança.</p>
             </header>
 
@@ -174,43 +304,136 @@ const DashboardInvestidor = () => {
                     <ChevronRight size={18} color="var(--text-muted)" />
                 </div>
 
-                <div className="flex-between">
-                    <div>
-                        <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
-                        {verSaldo ? (
-                            <h2 style={{ fontSize: '1.75rem', color: 'var(--success)' }}>
-                                R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </h2>
-                        ) : (
-                            <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
-                        )}
-                        <p style={{ fontSize: '0.8rem', marginTop: '10px' }}>
-                            Total Investido: <span style={{ fontWeight: 700 }}>R$ {totalInvestido.toLocaleString('pt-BR')}</span>
-                        </p>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                        {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
-                    </button>
-                </div>
+                {(() => {
+                    const totalRecebido = carteira.reduce((acc, item) => acc + (item.valor_recebido || 0), 0);
+                    const historicoRecente = [...historico].slice(0, 15).reverse();
+                    const maxVal = Math.max(...historicoRecente.map(i => Math.abs(i.valor || 0)), 1);
+                    return (
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div className="flex-between" style={{ alignItems: 'flex-start' }}>
+                                <div>
+                                    <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
+                                    {verSaldo ? (
+                                        <h2 style={{ fontSize: '1.75rem', color: 'var(--success)' }}>
+                                            R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </h2>
+                                    ) : (
+                                        <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
+                                    )}
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                            Total Investido: <strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>R$ {totalInvestido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                        </p>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                            Já Recebido: <strong style={{ color: 'var(--success)', fontSize: '0.85rem' }}>R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                        </p>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                            {(() => {
+                                                const lucro = totalRecebido - totalInvestido;
+                                                const perc = totalInvestido > 0 ? (lucro / totalInvestido) * 100 : 0;
+                                                const cor = perc > 0 ? 'var(--success)' : perc < 0 ? 'var(--danger)' : 'var(--text-muted)';
+                                                return (
+                                                    <>
+                                                        Retorno Constatado: <strong style={{ color: cor, fontSize: '0.85rem' }}>
+                                                            {perc > 0 ? '+' : ''}{perc.toFixed(1)}%
+                                                        </strong>
+                                                        <span style={{ fontSize: '0.65rem', marginLeft: '6px', opacity: 0.8, color: cor }}>
+                                                            ({lucro > 0 ? '+' : ''}R$ {lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                        </span>
+                                                    </>
+                                                );
+                                            })()}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                    {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
+                                </button>
+                            </div>
+
+                            {/* Enlarge Candlestick Chart Area (Agrupado por Dia) */}
+                            {historico.length > 0 && (() => {
+                                // Agrupar histórico por data (saldo líquido diário)
+                                const diasAgrupados = historico.reduce((acc, item) => {
+                                    if (!item.data) return acc;
+                                    const dia = new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                    const isNegativo = TIPOS_NEGATIVO.has(item.tipo);
+                                    const valorReal = isNegativo ? -Math.abs(item.valor || 0) : Math.abs(item.valor || 0);
+
+                                    if (!acc[dia]) acc[dia] = { dia, saldo: 0, operacoes: 0 };
+                                    acc[dia].saldo += valorReal;
+                                    acc[dia].operacoes += 1;
+                                    return acc;
+                                }, {});
+
+                                // Pegar os últimos 10 dias de pregão/movimentação, do mais antigo pro mais recente (left to right)
+                                const diasArray = Object.values(diasAgrupados).slice(0, 10).reverse();
+                                const maxValDia = Math.max(...diasArray.map(d => Math.abs(d.saldo)), 1);
+
+                                return (
+                                    <div style={{
+                                        marginTop: '20px',
+                                        paddingTop: '15px',
+                                        borderTop: '1px solid var(--border-color)',
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }}>
+                                        <div className="flex-between mb-1">
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>FLUXO RECENTE (Saldo Diário)</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Últimos {diasArray.length} dias</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '80px', gap: '8px' }}>
+                                            {diasArray.map((d, idx) => {
+                                                const isGreen = d.saldo >= 0;
+                                                const height = Math.max(10, (Math.abs(d.saldo) / maxValDia) * 80);
+                                                return (
+                                                    <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', group: 'true' }}>
+                                                        <div title={`${d.dia}\n${isGreen ? '+' : ''} R$ ${d.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n(${d.operacoes} transações)`} style={{
+                                                            width: '100%',
+                                                            maxWidth: '16px',
+                                                            height: `${height}px`,
+                                                            background: isGreen ? 'var(--success)' : 'var(--danger)',
+                                                            borderRadius: '4px',
+                                                            opacity: 0.9,
+                                                            transition: 'height 0.3s ease',
+                                                            cursor: 'pointer'
+                                                        }}></div>
+                                                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{d.dia.split('/')[0]}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    );
+                })()}
             </div>
 
-            {/* Action Mosaic */}
+            {/* Action Mosaic / Grid */}
             <div className="action-grid">
                 <div className="action-btn" onClick={() => setActiveView('mercado')}>
-                    <Search size={28} color="var(--primary)" />
-                    <span>Explorar</span>
+                    <TrendingUp size={28} color="var(--primary)" />
+                    <span>Oportunidades</span>
                 </div>
                 <div className="action-btn" onClick={() => setActiveView('depositar')}>
                     <ArrowUpCircle size={28} />
                     <span>Depositar</span>
                 </div>
-                <div className="action-btn" onClick={() => setActiveView('resgatar')}>
+                <div className="action-btn" onClick={() => setActiveView('saque')}>
                     <ArrowDownCircle size={28} />
-                    <span>Resgatar</span>
+                    <span>Sacar</span>
+                </div>
+                <div className="action-btn" onClick={() => setActiveView('historico')}>
+                    <History size={28} />
+                    <span>Histórico</span>
                 </div>
                 <div className="action-btn" onClick={() => setActiveView('carteira')}>
                     <Briefcase size={28} />
-                    <span>Ativos</span>
+                    <span>Carteira</span>
                 </div>
             </div>
 
@@ -220,7 +443,7 @@ const DashboardInvestidor = () => {
                     {mostrarAlertaRejeicao && historico.some(h => h.status === 'falhou') && (
                         <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', position: 'relative' }}>
                             <button
-                                onClick={() => setMostrarAlertaRejeicao(false)}
+                                onClick={fecharAlertaRejeicao}
                                 style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7 }}
                             >
                                 ✕
@@ -234,133 +457,79 @@ const DashboardInvestidor = () => {
                             </p>
                         </div>
                     )}
-                    <div className="grid-2">
-                        {/* Seção de Últimas Atividades (Histórico) */}
-                        <div className="card mt-1">
-                            <div className="flex-between mb-1">
-                                <h3>Últimas Atividades</h3>
-                                <History size={18} color="var(--text-muted)" />
-                            </div>
-                            {historico.length === 0 ? (
-                                <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
-                            ) : (
-                                <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {historico.slice((paginaHist - 1) * ITENS_POR_PAGINA, paginaHist * ITENS_POR_PAGINA).map(h => (
-                                            <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
-                                                <div className="flex-between">
-                                                    <div>
-                                                        <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
-                                                        <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
-                                                            {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
-                                                        </p>
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                            {h.status?.toUpperCase() || '-'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                {h.status === 'falhou' && h.detalhes && (
-                                                    <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                                        <AlertCircle size={14} color="var(--danger)" />
-                                                        <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
-                                                    </div>
+                </div>
+            )}
+
+            {activeView === 'historico' && (
+                <div className="card mt-1">
+                    <div className="flex-between mb-1">
+                        <h3>Últimas Atividades</h3>
+                        <History size={18} color="var(--text-muted)" />
+                    </div>
+                    {historico.length === 0 ? (
+                        <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {historico.slice((paginaHist - 1) * ITENS_POR_PAGINA, paginaHist * ITENS_POR_PAGINA).map(h => (
+                                    <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'falhou' ? 'var(--danger)' : h.status === 'pendente' ? 'var(--warning)' : (TIPOS_NEGATIVO.has(h.tipo) || h.tipo === 'saque' || h.tipo === 'investimento') ? 'var(--danger)' : 'var(--success)'}` }}>
+                                        <div className="flex-between">
+                                            <div>
+                                                <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{formatarTipo(h.tipo, h.detalhes)}</p>
+                                                <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p style={{ fontWeight: 800, color: corValor(h.tipo) }}>
+                                                    {prefixoValor(h.tipo)} R$ {h.valor?.toLocaleString('pt-BR')}
+                                                </p>
+                                                {(!TIPOS_NEGATIVO.has(h.tipo) || h.status !== 'concluido') && (
+                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
+                                                        {h.status?.toUpperCase() || '-'}
+                                                    </span>
                                                 )}
                                             </div>
-                                        ))}
-                                    </div>
-
-                                    {historico.length > ITENS_POR_PAGINA && (
-                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                                            <button
-                                                className="btn-outline"
-                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaHist === 1 ? 0.3 : 1, width: 'auto' }}
-                                                disabled={paginaHist === 1}
-                                                onClick={() => setPaginaHist(p => p - 1)}
-                                            >
-                                                Anterior
-                                            </button>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaHist} de {Math.ceil(historico.length / ITENS_POR_PAGINA)}</span>
-                                            <button
-                                                className="btn-outline"
-                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaHist * ITENS_POR_PAGINA) >= historico.length ? 0.3 : 1, width: 'auto' }}
-                                                disabled={(paginaHist * ITENS_POR_PAGINA) >= historico.length}
-                                                onClick={() => setPaginaHist(p => p + 1)}
-                                            >
-                                                Próxima
-                                            </button>
                                         </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-
-                        {/* Meus Investimentos (Contratos) na Home */}
-                        <div className="card mt-1">
-                            <div className="flex-between mb-1">
-                                <h3>Meus Contratos</h3>
-                                <Briefcase size={18} color="var(--primary)" />
+                                        {h.status === 'falhou' && h.detalhes && (
+                                            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                                <AlertCircle size={14} color="var(--danger)" />
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
 
-                            {carteira.length === 0 ? (
-                                <div className="card text-center text-muted" style={{ border: '2px dashed var(--border-color)', background: 'transparent', margin: 0 }}>Você ainda não investiu em ativos.</div>
-                            ) : (
-                                <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                        {carteira.slice((paginaCarteiraHome - 1) * ITENS_POR_PAGINA, paginaCarteiraHome * ITENS_POR_PAGINA).map(item => (
-                                            <div key={item.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-                                                <div className="flex-between mb-1">
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <h3 style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{item.tomador_nome}</h3>
-                                                        {item.tomador_is_verified && <span title="Verificado" style={{ color: 'var(--success)', fontSize: '0.8rem' }}>✅</span>}
-                                                    </div>
-                                                    <div className="badge badge-success" style={{ fontSize: '0.6rem' }}>RENTABILIZANDO</div>
-                                                </div>
-                                                <div className="grid-2" style={{ gap: '10px' }}>
-                                                    <div className="info-block" style={{ margin: 0, padding: '8px' }}>
-                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Aplicado</div>
-                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>R$ {item.valor_investido.toLocaleString('pt-BR')}</div>
-                                                    </div>
-                                                    <div className="info-block" style={{ margin: 0, padding: '8px' }}>
-                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Retorno</div>
-                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--success)' }}>R$ {item.valor_esperado.toLocaleString('pt-BR')}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {carteira.length > ITENS_POR_PAGINA && (
-                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                                            <button
-                                                className="btn-outline"
-                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaCarteiraHome === 1 ? 0.3 : 1, width: 'auto' }}
-                                                disabled={paginaCarteiraHome === 1}
-                                                onClick={() => setPaginaCarteiraHome(p => p - 1)}
-                                            >
-                                                Anterior
-                                            </button>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaCarteiraHome} de {Math.ceil(carteira.length / ITENS_POR_PAGINA)}</span>
-                                            <button
-                                                className="btn-outline"
-                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaCarteiraHome * ITENS_POR_PAGINA) >= carteira.length ? 0.3 : 1, width: 'auto' }}
-                                                disabled={(paginaCarteiraHome * ITENS_POR_PAGINA) >= carteira.length}
-                                                onClick={() => setPaginaCarteiraHome(p => p + 1)}
-                                            >
-                                                Próxima
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
+                            {historico.length > ITENS_POR_PAGINA && (
+                                <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                    <button
+                                        className="btn-outline"
+                                        style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaHist === 1 ? 0.3 : 1, width: 'auto' }}
+                                        disabled={paginaHist === 1}
+                                        onClick={() => setPaginaHist(p => p - 1)}
+                                    >
+                                        Anterior
+                                    </button>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaHist} de {Math.ceil(historico.length / ITENS_POR_PAGINA)}</span>
+                                    <button
+                                        className="btn-outline"
+                                        style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaHist * ITENS_POR_PAGINA) >= historico.length ? 0.3 : 1, width: 'auto' }}
+                                        disabled={(paginaHist * ITENS_POR_PAGINA) >= historico.length}
+                                        onClick={() => setPaginaHist(p => p + 1)}
+                                    >
+                                        Próxima
+                                    </button>
+                                </div>
                             )}
-                        </div>
+                        </>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
                 </div>
             )}
 
             {/* Market Opportunities Detail View */}
+
             {activeView === 'mercado' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
@@ -379,26 +548,35 @@ const DashboardInvestidor = () => {
                                             <div>
                                                 <div className="flex-between" style={{ gap: '8px' }}>
                                                     <h3 style={{ textTransform: 'capitalize' }}>{sol.nome || 'Dados Ocultos'}</h3>
-                                                    {sol.verified && <span title="Verificado" style={{ color: 'var(--success)' }}>✅</span>}
+                                                    {sol.verified && <CheckCircle2 size={16} color="var(--success)" title="Verificado" />}
                                                 </div>
                                                 <p className="text-muted" style={{ fontSize: '0.8rem' }}>Score Tomador: {sol.score}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.2rem' }}>{sol.taxa}% <span style={{ fontSize: '0.7rem' }}>a.m</span></p>
+                                                <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.2rem' }}>
+                                                    {sol.unlocked ? `${sol.taxa}%` : '●●●%'} <span style={{ fontSize: '0.7rem' }}>a.m</span>
+                                                </p>
                                             </div>
                                         </div>
+                                        {/* Temporizador */}
+                                        <TimerCard expira4h={sol.expira_4h} expira5d={sol.expira_5d} />
 
                                         <div className="info-block mb-1">
                                             <div className="flex-between" style={{ marginBottom: '8px' }}>
                                                 <span className="info-label">Meta</span>
-                                                <span style={{ fontWeight: 600 }}>R$ {sol.valor.toLocaleString('pt-BR')}</span>
+                                                <span style={{ fontWeight: 600 }}>{sol.unlocked ? `R$ ${sol.valor.toLocaleString('pt-BR')}` : 'R$ ●●●'}</span>
                                             </div>
                                             <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
                                                 <div style={{ width: `${(sol.valor_arrecadado / sol.valor) * 100}%`, height: '100%', background: 'var(--primary)' }} />
                                             </div>
                                             <div className="flex-between text-muted" style={{ fontSize: '0.7rem' }}>
-                                                <span>Faltam R$ {(sol.valor - sol.valor_arrecadado).toLocaleString('pt-BR')}</span>
-                                                <span>Prazo: {sol.parcelas}x</span>
+                                                <span>Valor Necessário: {sol.unlocked ? `R$ ${(sol.valor - sol.valor_arrecadado).toLocaleString('pt-BR')}` : 'R$ ●●●'}</span>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div>Prazo: {sol.unlocked ? `${sol.parcelas}x` : '●●●x'}</div>
+                                                    {sol.unlocked && (
+                                                        <div style={{ color: 'var(--success)', fontWeight: 600 }}>Total: R$ {(sol.valor * (1 + (sol.taxa / 100) * sol.parcelas)).toLocaleString('pt-BR')}</div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -422,15 +600,17 @@ const DashboardInvestidor = () => {
                                                         onChange={(e) => setAceiteRisco({ ...aceiteRisco, [sol.id]: e.target.checked })}
                                                     />
                                                     <label htmlFor={`risco-${sol.id}`} style={{ fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer' }}>
-                                                        Estou ciente que este é um investimento de risco (P2P) e a plataforma Peer não garante o pagamento em caso de inadimplência do tomador.
+                                                        Estou ciente que este é um investimento de risco (P2P), aceito as <strong>regras de taxas de performance</strong> (10%) e os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span>.
                                                     </label>
                                                 </div>
-                                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                                                    <div className="flex-between" style={{ gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                    <div className="flex-between" style={{ gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid var(--border-color)' }}>
                                                         <input
                                                             type="number"
                                                             className="input-field"
                                                             placeholder="Valor R$"
+                                                            min="0.01"
+                                                            step="0.01"
                                                             style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.75rem' }}
                                                             onChange={(e) => setValorInvestir({ ...valorInvestir, [sol.id]: e.target.value })}
                                                         />
@@ -453,6 +633,16 @@ const DashboardInvestidor = () => {
                                                             <ArrowRight size={22} />
                                                         </button>
                                                     </div>
+                                                    {valorInvestir[sol.id] > 0 && (
+                                                        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>
+                                                                Você receberá: R$ {(parseFloat(valorInvestir[sol.id]) * (1 + (sol.taxa / 100) * sol.parcelas)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                                                Lucro estimado: <strong style={{ color: 'var(--success)' }}>R$ {(parseFloat(valorInvestir[sol.id]) * (sol.taxa / 100) * sol.parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -502,18 +692,27 @@ const DashboardInvestidor = () => {
                                 <div className="flex-between mb-1">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <h3 style={{ fontSize: '1rem', textTransform: 'capitalize' }}>{item.tomador_nome}</h3>
-                                        {item.tomador_is_verified && <span title="Verificado" style={{ color: 'var(--success)', fontSize: '0.9rem' }}>✅</span>}
+                                        <span className="text-muted" style={{ fontSize: '0.8rem' }}># {item.solicitacao_id}</span>
+                                        {item.tomador_is_verified && <CheckCircle2 size={16} color="var(--success)" title="Verificado" />}
                                     </div>
-                                    <div className="badge badge-success">RENTABILIZANDO</div>
+                                    <div className={`badge ${item.status_emprestimo === 'concluido' ? 'badge-primary' : 'badge-success'}`}>
+                                        {item.status_emprestimo === 'concluido' ? 'CONCLUÍDO' : 'RENTABILIZANDO'}
+                                    </div>
                                 </div>
-                                <div className="grid-2" style={{ gap: '10px' }}>
+                                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                                        <span className="text-muted">VALOR MENSAL:</span>
+                                        <span style={{ fontWeight: 700 }}>R$ {item.valor_mensal.toLocaleString('pt-BR')}</span>
+                                    </div>
+                                </div>
+                                <div className="grid-2" style={{ gap: '10px', marginTop: '10px' }}>
                                     <div className="info-block" style={{ margin: 0 }}>
                                         <div className="info-label">Aplicado</div>
                                         <div style={{ fontWeight: 600 }}>R$ {item.valor_investido.toLocaleString('pt-BR')}</div>
                                     </div>
                                     <div className="info-block" style={{ margin: 0 }}>
-                                        <div className="info-label">Retorno Total</div>
-                                        <div style={{ fontWeight: 600, color: 'var(--success)' }}>R$ {item.valor_esperado.toLocaleString('pt-BR')}</div>
+                                        <div className="info-label">Restante</div>
+                                        <div style={{ fontWeight: 600, color: 'var(--success)' }}>R$ {item.valor_restante.toLocaleString('pt-BR')}</div>
                                     </div>
                                 </div>
                                 <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
@@ -543,6 +742,81 @@ const DashboardInvestidor = () => {
                             <button className="btn btn-primary" onClick={confirmarDesbloqueio}>Confirmar e Pagar</button>
                             <button className="btn btn-secondary" onClick={() => setModal({ ...modal, open: false })}>Cancelar</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal de Termos de Uso */}
+            {
+                activeView === 'depositar' && (
+                    <div className="card">
+                        <h2 className="mb-1">Adicionar Saldo (Investidor)</h2>
+                        <p className="mb-1">Transfira via PIX e informe o valor:</p>
+                        <div className="info-block mb-1 text-center">
+                            <div className="info-label">Chave PIX (E-mail)</div>
+                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>credpix@gmail.com</div>
+                        </div>
+                        <input
+                            type="number"
+                            className="input-field mb-1"
+                            placeholder="Valor R$"
+                            min="0.01"
+                            step="0.01"
+                            value={valorNotificacao}
+                            onChange={(e) => setValorNotificacao(e.target.value)}
+                        />
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleNotificarDeposito}>Informar Depósito</button>
+                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                activeView === 'saque' && (
+                    <div className="card">
+                        <h2 className="mb-1">Solicitar Saque (Investidor)</h2>
+                        {!usuario.two_factor_enabled ? (
+                            <p className="text-danger">Ative o 2FA para realizar saques.</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <input
+                                    type="number"
+                                    className="input-field"
+                                    placeholder="Valor R$ 0,00"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={valorSaque}
+                                    onChange={(e) => setValorSaque(e.target.value)}
+                                />
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    placeholder="Senha de Acesso"
+                                    value={senhaSaque}
+                                    onChange={(e) => setSenhaSaque(e.target.value)}
+                                />
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Código 2FA"
+                                    value={codigo2faSaque}
+                                    onChange={(e) => setCodigo2faSaque(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+
+            {showTermos && (
+                <div className="modal-overlay">
+                    <div className="modal-card" style={{ width: '90%', maxWidth: '500px' }}>
+                        <TermosUso onConfirm={() => setShowTermos(false)} />
                     </div>
                 </div>
             )}

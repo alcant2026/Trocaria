@@ -97,22 +97,6 @@ const App = () => {
                     <span>eer</span>
                 </a>
 
-                <div className="nav-links-desktop">
-                    <a href="#tomador" className={`nav-item ${page === 'tomador' ? 'active' : ''}`}>
-                        <ArrowDownUp size={18} /> Início
-                    </a>
-                    <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`}>
-                        <TrendingUp size={18} /> Investimentos
-                    </a>
-                    {user.is_admin && (
-                        <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`}>
-                            <Settings size={18} /> Admin
-                        </a>
-                    )}
-                    <a href="#seguranca" className={`nav-item ${page === 'seguranca' ? 'active' : ''}`} style={{ color: user.two_factor_enabled ? 'var(--success)' : 'var(--warning)' }}>
-                        <Shield size={18} /> Segurança
-                    </a>
-                </div>
 
                 <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)}>
                     {menuAberto ? <X size={28} /> : <Menu size={28} />}
@@ -122,6 +106,9 @@ const App = () => {
 
                 <div className={`mobile-drawer ${menuAberto ? 'open' : ''}`}>
                     <div className="nav-links">
+                        <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Menu</h2>
+                        </div>
                         <a href="#tomador" className={`nav-item ${page === 'tomador' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
                         </a>
@@ -224,6 +211,7 @@ const App = () => {
                 </div>
             )}
             {botaoWhatsapp}
+
         </div>
     );
 };

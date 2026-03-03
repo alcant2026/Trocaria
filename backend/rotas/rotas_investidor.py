@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
 from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, AcessoInvestidor, Investimento, Transacao, TipoTransacao, StatusSolicitacao
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
+from utils_data import adicionar_mes
+from utils_emprestimo import tentar_liberar_emprestimo
 
 router = APIRouter(prefix="/investidor", tags=["Investidor"])
 
 class InvestimentoRequest(BaseModel):
-    valor: Decimal
+    valor: Decimal = Field(gt=0)
     aceite_risco: bool # Novo campo obrigatório para blindagem jurídica
 
 @router.post("/desbloquear/{solicitacao_id}")
@@ -119,10 +121,14 @@ async def ver_carteira(db: Session = Depends(get_db), investidor: Usuario = Depe
     for inv in investimentos:
         s = inv.solicitacao
         
-        # Cálculo de retorno total esperado (Juros Simples Mensais)
+        # Cálculo de retorno total esperado (Líquido: Juros Brutos - 10% Performance + Principal)
         taxa_mensal = s.taxa_juros / 100
-        valor_bruto_esperado = inv.valor_investido * (1 + (taxa_mensal * s.prazo_meses))
-        lucro_esperado = valor_bruto_esperado - inv.valor_investido
+        lucro_bruto_total = inv.valor_investido * (taxa_mensal * s.prazo_meses)
+        lucro_liquido_total = lucro_bruto_total * Decimal("0.90")
+        valor_liquido_total_esperado = inv.valor_investido + lucro_liquido_total
+        
+        valor_mensal_liquido = valor_liquido_total_esperado / s.prazo_meses
+        valor_restante_liquido = max(0, valor_liquido_total_esperado - inv.pago_para_investidor)
         
         resultado.append({
             "id": inv.id,
@@ -131,8 +137,10 @@ async def ver_carteira(db: Session = Depends(get_db), investidor: Usuario = Depe
             "tomador_score": float(s.usuario.score),
             "tomador_is_verified": s.usuario.is_verified,
             "valor_investido": float(inv.valor_investido),
-            "valor_esperado": float(valor_bruto_esperado),
-            "lucro_esperado": float(lucro_esperado),
+            "valor_esperado": float(valor_liquido_total_esperado),
+            "valor_mensal": round(float(valor_mensal_liquido), 2),
+            "valor_restante": round(float(valor_restante_liquido), 2),
+            "lucro_esperado": float(lucro_liquido_total),
             "valor_recebido": float(inv.pago_para_investidor),
             "taxa_mensal": float(s.taxa_juros),
             "parcelas_pagas": s.parcelas_pagas,
@@ -145,7 +153,7 @@ async def ver_carteira(db: Session = Depends(get_db), investidor: Usuario = Depe
     return resultado
 
 @router.post("/investir/{solicitacao_id}")
-async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoRequest, db: Session = Depends(get_db), investidor: Usuario = Depends(obter_usuario_logado)):
+async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoRequest, request: Request, db: Session = Depends(get_db), investidor: Usuario = Depends(obter_usuario_logado)):
     valor = dados.valor
     if not dados.aceite_risco:
         raise HTTPException(status_code=400, detail="Você deve aceitar os riscos do investimento para prosseguir.")
@@ -174,7 +182,10 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
         investidor_id=investidor.id,
         solicitacao_id=solicitacao.id,
         valor_investido=valor,
-        ciencia_risco=dados.aceite_risco
+        ciencia_risco=dados.aceite_risco,
+        # Blindagem Jurídica
+        ip_aceite=request.client.host,
+        cpf_aceite=investidor.cpf
     )
 
     # Registrar transação
@@ -186,11 +197,12 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
         detalhes=f"Investimento no pedido ID {solicitacao_id}"
     )
 
-    # Se atingiu a meta, muda status (Simplificado: assumimos que o tomador recebe o valor agora ou após aprovação)
+    # Se atingiu a meta, tenta liberar (verifica garantias também)
+    print(f"DEBUG: Solicitacao {solicitacao.id} - Arrecadado: {solicitacao.valor_arrecadado} / Meta: {solicitacao.valor}")
     if solicitacao.valor_arrecadado == solicitacao.valor:
-        solicitacao.status = StatusSolicitacao.APROVADO
-        tomador = solicitacao.usuario
-        tomador.saldo += solicitacao.valor # Tomador recebe o valor total
+        print(f"DEBUG: Meta atingida! Chamando tentar_liberar_emprestimo...")
+        liberou = tentar_liberar_emprestimo(solicitacao.id, db)
+        print(f"DEBUG: Resultado da tentativa de liberação: {liberou}")
 
     db.add(novo_investimento)
     db.add(transacao)
@@ -202,44 +214,26 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
 async def processar_expiracoes_job(db: Session = Depends(get_db)):
     agora = datetime.datetime.utcnow()
     
-    # 1. Regra das 4h: Ninguém investiu nada
+    # 1. Regra das 4h: Ninguém investiu nada -> APAGAR
     expirados_4h = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
         SolicitacaoEmprestimo.valor_arrecadado == 0,
         SolicitacaoEmprestimo.data_expiracao_4h <= agora
     ).all()
 
+    count_4h = len(expirados_4h)
     for s in expirados_4h:
-        s.status = StatusSolicitacao.CANCELADO
+        db.delete(s)
 
-    # 2. Regra dos 5d: Tem investimentos mas não atingiu meta
+    # 2. Regra dos 5d: Tem investimentos mas não atingiu meta OU atingiu e não assinou
     expirados_5d = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
-        SolicitacaoEmprestimo.valor_arrecadado > 0,
         SolicitacaoEmprestimo.data_expiracao_5d <= agora
     ).all()
 
+    count_5d = len(expirados_5d)
     for s in expirados_5d:
-        # Estornar investidores
-        for inv in s.investimentos:
-            investidor = inv.investidor
-            investidor.saldo += inv.valor_investido
-            
-            # Registrar estorno
-            estorno = Transacao(
-                usuario_id=investidor.id,
-                valor=inv.valor_investido,
-                tipo=TipoTransacao.RECEBIMENTO,
-                status="concluido",
-                detalhes=f"Estorno por expiração do pedido ID {s.id}"
-            )
-            db.add(estorno)
-        
-        # Tomador perde score
-        tomador = s.usuario
-        tomador.score = max(Decimal("0"), tomador.score - Decimal("10")) # Exemplo de penalidade
-        
-        s.status = StatusSolicitacao.CANCELADO
+        estornar_e_limpar_solicitacao(s.id, db)
 
     db.commit()
-    return {"message": "Expirações processadas.", "cancelados_4h": len(expirados_4h), "estornados_5d": len(expirados_5d)}
+    return {"message": "Expirações processadas e limpeza realizada.", "removidos_4h": count_4h, "estornados_limpos_5d": count_5d}

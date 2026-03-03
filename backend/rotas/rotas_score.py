@@ -88,7 +88,7 @@ async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Dep
     db.add(nova_transacao)
     db.commit()
 
-    return {"message": "Solicitação registrada! O Admin analisará seus documentos.", "saldo": float(usuario.saldo)}
+    return {"message": "Solicitação enviada! O processamento é automático e o tempo varia conforme seu Score — quanto maior, mais rápido.", "saldo": float(usuario.saldo)}
 
 @router.post("/atualizar-decaimento")
 async def processar_decaimento_diario(db: Session = Depends(get_db)):

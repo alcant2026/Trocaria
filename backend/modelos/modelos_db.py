@@ -19,6 +19,8 @@ class TipoTransacao(enum.Enum):
     COMPRA_SCORE = "compra_score"
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
     TAXA_SAQUE = "taxa_saque"
+    TAXA_INTERMEDIACAO = "taxa_intermediacao"
+    APORTE_CAPITAL = "aporte_capital"
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -38,6 +40,10 @@ class Usuario(Base):
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True) # Para LGPD / Deleção lógica
     
+    # Localização do Usuário
+    cidade = Column(String, nullable=True)
+    estado = Column(String, nullable=True)
+    
     # Proteção Jurídica: Aceite de Termos de Uso (Intermediação SaaS)
     aceite_termos = Column(Boolean, default=False)
     data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
@@ -48,6 +54,7 @@ class Usuario(Base):
 
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
+    garantias_prestadas = relationship("GarantiaSocial", back_populates="garante")
 
 class SolicitacaoEmprestimo(Base):
     __tablename__ = "solicitacoes_emprestimo"
@@ -62,11 +69,22 @@ class SolicitacaoEmprestimo(Base):
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     data_expiracao_4h = Column(DateTime)
     data_expiracao_5d = Column(DateTime)
+    proximo_vencimento = Column(DateTime, nullable=True) # Data para cobrança de juros de mora
     parcelas_pagas = Column(Integer, default=0)
+    valor_amortizado = Column(Numeric(precision=20, scale=2), default=0) # Pagamentos de valor livre
+    taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0) # Taxas de R$ 1,50 acumuladas
+    
+    # Blindagem Jurídica: Rastreabilidade de Aceite
+    aceite_termos = Column(Boolean, default=False)
+    ip_aceite = Column(String, nullable=True)
+    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+    cpf_aceite = Column(String, nullable=True)
+    data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
 
     usuario = relationship("Usuario", back_populates="solicitacoes")
     acessos_investidores = relationship("AcessoInvestidor", back_populates="solicitacao")
     investimentos = relationship("Investimento", back_populates="solicitacao")
+    garantias_sociais = relationship("GarantiaSocial", back_populates="solicitacao", cascade="all, delete-orphan")
 
 class Investimento(Base):
     __tablename__ = "investimentos"
@@ -78,6 +96,11 @@ class Investimento(Base):
     pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0) # Total recebido de volta
     data_investimento = Column(DateTime, default=datetime.datetime.utcnow)
     ciencia_risco = Column(Boolean, default=False) # Blindagem jurídica: investidor deu aceite no risco
+    
+    # Blindagem Jurídica: Rastreabilidade
+    ip_aceite = Column(String, nullable=True)
+    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+    cpf_aceite = Column(String, nullable=True)
 
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
     investidor = relationship("Usuario")
@@ -106,3 +129,17 @@ class Transacao(Base):
     detalhes = Column(String, nullable=True) 
 
     usuario = relationship("Usuario", back_populates="transacoes")
+
+class GarantiaSocial(Base):
+    __tablename__ = "garantias_sociais"
+
+    id = Column(Integer, primary_key=True, index=True)
+    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id", ondelete="CASCADE"))
+    garante_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"))
+    aceito = Column(Boolean, default=False)
+    data_aceite = Column(DateTime, nullable=True)
+    ip_aceite = Column(String, nullable=True)
+    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+
+    solicitacao = relationship("SolicitacaoEmprestimo", back_populates="garantias_sociais")
+    garante = relationship("Usuario", back_populates="garantias_prestadas")

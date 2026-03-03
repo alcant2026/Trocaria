@@ -446,6 +446,11 @@ tr:last-child td {
   color: var(--primary);
 }
 
+.nav-item.active,
+.nav-item:hover {
+  color: var(--primary);
+}
+
 .mobile-menu-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
@@ -458,6 +463,11 @@ tr:last-child td {
   justify-content: center;
   z-index: 2000;
   transition: var(--transition);
+}
+
+.mobile-menu-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .mobile-menu-btn:active {
@@ -478,44 +488,21 @@ tr:last-child td {
     max-width: 1200px;
   }
 
-  .action-grid {
-    grid-template-columns: repeat(4, 170px);
-    justify-content: center;
-  }
-
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     align-items: start;
   }
-
-  /* Dashboard Adjustments */
-  .tomador-dashboard,
-  .investidor-dashboard {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-  }
-
-  .nav-links-desktop {
-    display: flex;
-  }
-
-  .mobile-menu-btn {
-    display: none;
-  }
 }
 
 /* Modal System */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -529,11 +516,20 @@ tr:last-child td {
   border-radius: var(--radius-lg);
   padding: 2.5rem 2rem;
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   border: 1px solid var(--border-color);
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.6);
   animation: modalSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  text-align: left;
 }
 
 .modal-icon {

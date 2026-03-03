@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from sqlalchemy import func
+from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
 from datetime import timezone, timedelta
@@ -10,10 +11,10 @@ from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 
 class NotificacaoDeposito(BaseModel):
-    valor: Decimal
+    valor: Decimal = Field(gt=0)
 
 class SolicitacaoSaque(BaseModel):
-    valor: Decimal
+    valor: Decimal = Field(gt=0)
     chave_pix: str
     senha: str
     codigo_2fa: str
@@ -211,7 +212,6 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     Retorna o resumo fiscal da plataforma para declaração: 
     Total sob custódia (saldo dos usuários) e Lucro da Plataforma (Taxas).
     """
-    from sqlalchemy import func
 
     # 1. Saldo Total Gerenciado (Passivo da plataforma = dinheiro dos usuários)
     # Soma o saldo de TODOS os usuários cadastrados (inclusive o próprio admin durante os testes)
@@ -224,7 +224,13 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
 
     # 2. Receitas da Plataforma (Lucro do Mês Atual)
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE]),
+        Transacao.tipo.in_([
+            TipoTransacao.COMPRA_SCORE, 
+            TipoTransacao.DESBLOQUEIO_DADOS, 
+            TipoTransacao.TAXA_SAQUE,
+            TipoTransacao.TAXA_INTERMEDIACAO,
+            TipoTransacao.APORTE_CAPITAL
+        ]),
         Transacao.status == "concluido"
     ).all()
 
@@ -241,26 +247,40 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     lucro_lgpd = sum(t.valor for t in receitas_mes if t.valor == Decimal("15.00"))
     lucro_kyc_score = sum(t.valor for t in receitas_mes if t.valor == Decimal("35.00"))
 
-    # Lucro Total Acumulado (histórico)
+    # Lucro Total Acumulado (histórico bruto)
     total_lucro_historico = sum(t.valor for t in todas_receitas)
 
+    # Saques de lucro já realizados pelo admin
+    saques_lucro_admin = db.query(Transacao).filter(
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.detalhes.like("Saque de lucro da plataforma%"),
+        Transacao.status == "concluido"
+    ).all()
+    total_sacado_admin = sum(t.valor for t in saques_lucro_admin)
+
+    # Lucro líquido disponível para saque
+    lucro_disponivel_liquido = total_lucro_historico - total_sacado_admin
+
     historico_mensal = {}
-    
+
     todas_transacoes = db.query(Transacao).filter(Transacao.status == "concluido").all()
-    
+
     for t in todas_transacoes:
-        # Ajuste para Horário de Brasília (UTC-3)
         data_brasilia = t.data_criacao - timedelta(hours=3)
         mes_ano = data_brasilia.strftime("%Y-%m")
-        
+
         if mes_ano not in historico_mensal:
-            historico_mensal[mes_ano] = {"depositos": Decimal("0.00"), "saques": Decimal("0.00"), "lucro": Decimal("0.00")}
-            
+            historico_mensal[mes_ano] = {"depositos": Decimal("0.00"), "saques": Decimal("0.00"), "lucro": Decimal("0.00"), "lucro_sacado": Decimal("0.00")}
+
         if t.tipo == TipoTransacao.DEPOSITO:
             historico_mensal[mes_ano]["depositos"] += t.valor
         elif t.tipo == TipoTransacao.SAQUE:
-            historico_mensal[mes_ano]["saques"] += t.valor
-        elif t.tipo in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE]:
+            # Separa saque de lucro do admin dos saques normais de usuários
+            if t.detalhes and t.detalhes.startswith("Saque de lucro da plataforma"):
+                historico_mensal[mes_ano]["lucro_sacado"] += t.valor
+            else:
+                historico_mensal[mes_ano]["saques"] += t.valor
+        elif t.tipo in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]:
             historico_mensal[mes_ano]["lucro"] += t.valor
 
     # Formatar resposta do histórico
@@ -270,18 +290,21 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             "mes": mes,
             "depositos": float(dados["depositos"]),
             "saques": float(dados["saques"]),
-            "lucro": float(dados["lucro"])
+            "lucro": float(dados["lucro"]),
+            "lucro_sacado": float(dados["lucro_sacado"])
         })
 
     return {
         "saldo_usuarios_gerenciado": float(saldo_usuarios),
         "lucro_plataforma_total": float(total_lucro_mes),
         "lucro_plataforma_historico": float(total_lucro_historico),
+        "lucro_disponivel": float(lucro_disponivel_liquido),
         "detalhamento_lucro": {
             "taxas_postagem": float(lucro_postagem),
             "desbloqueio_lgpd": float(lucro_lgpd),
             "kyc_e_score": float(lucro_kyc_score),
-            "taxas_saque_extra": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_SAQUE))
+            "taxas_saque_extra": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_SAQUE)),
+            "taxas_intermediacao_p2p": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_INTERMEDIACAO))
         },
         "fluxo_caixa_total": {
             "depositos_confirmados": sum(h["depositos"] for h in historico_formatado),
@@ -290,12 +313,112 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
         "historico_mensal": historico_formatado
     }
 
+
+class SaqueAdminRequest(BaseModel):
+    chave_pix: str
+    valor: Decimal = Field(gt=0)
+    motivo: str
+
+
+@router.post("/admin/sacar-lucro")
+async def sacar_lucro_plataforma(
+    dados: SaqueAdminRequest,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Permite ao admin resgatar parte do lucro acumulado da plataforma.
+    O valor é registrado como transação de auditoria e a chave PIX é exibida no painel.
+    """
+
+    if dados.valor <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="Valor inválido para o saque.")
+
+    # Calcula o lucro total disponível (histórico de taxas)
+    todas_receitas = db.query(Transacao).filter(
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]),
+        Transacao.status == "concluido"
+    ).all()
+    lucro_disponivel = sum(t.valor for t in todas_receitas)
+
+    # Subtrai saques anteriores do admin
+    saques_anteriores = db.query(Transacao).filter(
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.detalhes.like("Saque de lucro da plataforma%"),
+        Transacao.status == "concluido"
+    ).all()
+    total_sacado = sum(t.valor for t in saques_anteriores)
+
+    saldo_lucro_liquido = lucro_disponivel - total_sacado
+
+    if dados.valor > saldo_lucro_liquido:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Saldo de lucro insuficiente. Disponível: R$ {float(saldo_lucro_liquido):.2f}"
+        )
+
+    if not dados.motivo or len(dados.motivo.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Você deve fornecer uma justificativa clara (mínimo 5 caracteres) para o resgate de lucro.")
+
+    # Registra a transação de auditoria
+    transacao = Transacao(
+        usuario_id=admin.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.SAQUE,
+        status="concluido",
+        detalhes=f"RESGATE DE LUCRO → PIX: {dados.chave_pix} | MOTIVO: {dados.motivo}"
+    )
+    db.add(transacao)
+    db.commit()
+
+    return {
+        "message": f"Saque de R$ {float(dados.valor):.2f} registrado! Realize o PIX para a chave: {dados.chave_pix}",
+        "lucro_disponivel_restante": float(saldo_lucro_liquido - dados.valor)
+    }
+
+@router.post("/admin/aportar-lucro")
+async def aportar_lucro_plataforma(
+    dados: SaqueAdminRequest, # Reutilizando o schema pois os campos são os mesmos
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Permite ao admin injetar capital/lucro de fontes externas para o balanço da plataforma.
+    """
+    if dados.valor <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="Valor inválido para o aporte.")
+
+    if not dados.motivo or len(dados.motivo.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Forneça uma justificativa para o aporte (mínimo 5 caracteres).")
+
+    # Registra a transação de aporte (entrada no fiscal)
+    transacao = Transacao(
+        usuario_id=admin.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.APORTE_CAPITAL,
+        status="concluido",
+        detalhes=f"APORTE EXTERNO → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
+    )
+    db.add(transacao)
+    db.commit()
+
+    return {
+        "message": f"Aporte de R$ {float(dados.valor):.2f} registrado com sucesso!",
+        "novo_lucro_disponivel": float(db.query(func.sum(Transacao.valor)).filter(
+            Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]),
+            Transacao.status == "concluido"
+        ).scalar() or 0)
+    }
+
 @router.post("/depositar-manual")
 async def registrar_deposito_manual(usuario_id: int, valor: Decimal, db: Session = Depends(get_db)):
     """
     Função administrativa para registrar entrada de dinheiro
     (Processamento via pix manual pelo admin)
     """
+    if valor <= 0:
+        raise HTTPException(status_code=400, detail="O valor do depósito deve ser maior que zero.")
+    
     admin_id = 0 # Dummy admin logic
     
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()

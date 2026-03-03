@@ -26,6 +26,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from limitador import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi import _rate_limit_exceeded_handler
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 # Dependência do DB
 def get_db():
     db = SessionLocal()

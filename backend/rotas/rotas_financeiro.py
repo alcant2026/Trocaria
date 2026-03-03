@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from decimal import Decimal
+import datetime
 from datetime import timezone, timedelta
 import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
@@ -216,8 +217,9 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     # Soma o saldo de TODOS os usuários cadastrados (inclusive o próprio admin durante os testes)
     saldo_usuarios = db.query(func.sum(Usuario.saldo)).scalar() or Decimal("0.00")
 
-    from datetime import timedelta, datetime
-    agora_brasilia = datetime.utcnow() - timedelta(hours=3)
+    # 2. Receitas da Plataforma (Lucro do Mês Atual)
+    total_lucro_mes = Decimal("0.00")
+    agora_brasilia = datetime.datetime.utcnow() - timedelta(hours=3)
     mes_atual = agora_brasilia.strftime("%Y-%m")
 
     # 2. Receitas da Plataforma (Lucro do Mês Atual)
@@ -242,7 +244,6 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     # Lucro Total Acumulado (histórico)
     total_lucro_historico = sum(t.valor for t in todas_receitas)
 
-    from datetime import timedelta
     historico_mensal = {}
     
     todas_transacoes = db.query(Transacao).filter(Transacao.status == "concluido").all()

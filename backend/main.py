@@ -42,6 +42,18 @@ def startup_db_setup():
     # 2. Sincroniza colunas novas automaticamente (Auto-Sync)
     try:
         sincronizar_esquema(Base, engine)
+        
+        # 3. Garantir que os tipos ENUM no Postgres tenham os novos valores (taxa_saque)
+        with engine.connect() as conn:
+            if "sqlite" not in str(engine.url):
+                # O PostgreSQL exige que adicionemos novos valores ao tipo ENUM manualmente
+                try:
+                    conn.execute(text("ALTER TYPE tipotransacao ADD VALUE IF NOT EXISTS 'taxa_saque'"))
+                    conn.commit()
+                except Exception:
+                    # Pode falhar se já existir em versões muito antigas do Postgres que não suportam IF NOT EXISTS no ADD VALUE
+                    # Mas ignoramos pois o erro 500 é o que queremos evitar
+                    pass
     except Exception as e:
         print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")
 

@@ -528,7 +528,9 @@ const DashboardInvestidor = () => {
                         </div>
                         <h2>Confirmar Pagamento</h2>
                         <p>Deseja desbloquear os dados completos deste perfil por <strong>R$ 15,00</strong>?</p>
-                        <p style={{ fontSize: '0.8rem', marginTop: '-0.5rem' }}>O valor será debitado do seu saldo.</p>
+                        <p style={{ fontSize: '0.75rem', marginTop: '-0.5rem', color: 'var(--warning)', fontWeight: 600 }}>
+                            ⚠️ O desbloqueio permite sua análise, mas não garante o pagamento do empréstimo.
+                        </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '2rem' }}>
                             <button className="btn btn-primary" onClick={confirmarDesbloqueio}>Confirmar e Pagar</button>

@@ -636,10 +636,14 @@ const DashboardInvestidor = () => {
                                                     {valorInvestir[sol.id] > 0 && (
                                                         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                                                             <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>
-                                                                Você receberá: R$ {(parseFloat(valorInvestir[sol.id]) * (1 + (sol.taxa / 100) * sol.parcelas)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                Você receberá: R$ {(
+                                                                    parseFloat(valorInvestir[sol.id]) +
+                                                                    (parseFloat(valorInvestir[sol.id]) * (sol.taxa / 100) * sol.parcelas * 0.90)
+                                                                ).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </span>
                                                             <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                                                Lucro estimado: <strong style={{ color: 'var(--success)' }}>R$ {(parseFloat(valorInvestir[sol.id]) * (sol.taxa / 100) * sol.parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                                                Lucro Líquido: <strong style={{ color: 'var(--success)' }}>R$ {(parseFloat(valorInvestir[sol.id]) * (sol.taxa / 100) * sol.parcelas * 0.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                                                <span style={{ fontSize: '0.6rem', marginLeft: '4px', opacity: 0.7 }}>(pós taxa 10%)</span>
                                                             </span>
                                                         </div>
                                                     )}

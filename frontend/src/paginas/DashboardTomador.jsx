@@ -39,6 +39,7 @@ const DashboardTomador = () => {
     const [parcelas, setParcelas] = useState(1);
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
+    const [aceiteSolicitacao, setAceiteSolicitacao] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [kycDetails, setKycDetails] = useState('');
     const [historico, setHistorico] = useState([]);
@@ -70,6 +71,7 @@ const DashboardTomador = () => {
 
     const handleSolicitar = async (e) => {
         e.preventDefault();
+        if (!aceiteSolicitacao) return alert('Você deve aceitar os termos de intermediação.');
         try {
             await api.post('/emprestimos/solicitar', {
                 valor: parseFloat(valor),
@@ -345,8 +347,23 @@ const DashboardTomador = () => {
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                            <button type="submit" className="btn btn-primary" style={{ width: 'auto', minWidth: '220px', padding: '0.75rem 1.5rem' }}>Confirmar Pedido</button>
+                        <div style={{ padding: '15px', background: 'rgba(0, 230, 118, 0.05)', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.1)', maxWidth: '400px', margin: '1.5rem auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="aceite-solicitacao"
+                                    checked={aceiteSolicitacao}
+                                    onChange={(e) => setAceiteSolicitacao(e.target.checked)}
+                                    style={{ marginTop: '4px' }}
+                                />
+                                <label htmlFor="aceite-solicitacao" style={{ fontSize: '0.8rem', color: 'var(--text-main)', cursor: 'pointer' }}>
+                                    Estou ciente que esta é uma <strong>intermediação tecnológica</strong> e que estou firmando um contrato civil de mútuo com investidores particulares através da plataforma SaaS Peer.
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                            <button type="submit" className="btn btn-primary" style={{ width: 'auto', minWidth: '220px', padding: '0.75rem 1.5rem', opacity: aceiteSolicitacao ? 1 : 0.5 }} disabled={!aceiteSolicitacao}>Confirmar Pedido</button>
                             <button type="button" className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Cancelar</button>
                         </div>
                     </form>

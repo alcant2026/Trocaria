@@ -73,7 +73,7 @@ const Registro = () => {
                                 style={{ marginTop: '4px', cursor: 'pointer' }}
                             />
                             <label htmlFor="aceite" style={{ fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
-                                Concordo com os <button type="button" onClick={() => setShowTermos(false)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>Termos de Uso</button> e a política de intermediação tecnológica.
+                                Concordo com os <button type="button" onClick={() => setShowTermos(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>Termos de Uso</button> e a política de intermediação tecnológica.
                             </label>
                         </div>
 

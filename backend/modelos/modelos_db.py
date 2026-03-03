@@ -18,6 +18,7 @@ class TipoTransacao(enum.Enum):
     RECEBIMENTO = "recebimento"
     COMPRA_SCORE = "compra_score"
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
+    TAXA_SAQUE = "taxa_saque"
 
 class Usuario(Base):
     __tablename__ = "usuarios"

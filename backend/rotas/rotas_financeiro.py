@@ -61,10 +61,26 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
     if not totp.verify(dados.codigo_2fa):
         raise HTTPException(status_code=401, detail="Código 2FA (Authenticator) inválido ou expirado.")
 
-    # Deduzir saldo imediatamente (bloqueio para transação)
-    usuario.saldo -= valor
+    # Regra: 1º saque do dia grátis, demais R$ 5,00
+    hoje = datetime.datetime.now(TZ_BRASILIA).date()
+    inicio_dia = datetime.datetime.combine(hoje, datetime.time.min).replace(tzinfo=TZ_BRASILIA)
     
-    # Criar transação de saque pendente (para processamento manual do admin)
+    saques_hoje = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.data_criacao >= inicio_dia
+    ).count()
+
+    taxa = Decimal("0.00")
+    if saques_hoje >= 1:
+        taxa = Decimal("5.00")
+        if usuario.saldo < (valor + taxa):
+            raise HTTPException(status_code=400, detail=f"Saldo insuficiente para saque + taxa de R$ {taxa} (você já realizou {saques_hoje} saque(s) hoje).")
+
+    # Deduzir valor e taxa imediatamente
+    usuario.saldo -= (valor + taxa)
+    
+    # Criar transação de saque pendente
     nova_transacao = Transacao(
         usuario_id=usuario.id,
         valor=valor,
@@ -72,11 +88,26 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
         status="pendente",
         detalhes=f"Solicitação de saque para chave PIX: {chave_pix}"
     )
-
     db.add(nova_transacao)
+
+    # Se houver taxa, registrar como lucro da plataforma
+    if taxa > 0:
+        transacao_taxa = Transacao(
+            usuario_id=usuario.id,
+            valor=taxa,
+            tipo=TipoTransacao.TAXA_SAQUE,
+            status="concluido",
+            detalhes=f"Taxa de saque extra ({saques_hoje + 1}º saque no dia)"
+        )
+        db.add(transacao_taxa)
+
     db.commit()
     
-    return {"message": "Solicitação de saque registrada. Aguardando processamento manual."}
+    msg = "Solicitação de saque registrada." 
+    if taxa > 0:
+        msg += f" Taxa de R$ {taxa} aplicada por ser o seu {saques_hoje + 1}º saque hoje."
+    
+    return {"message": msg + " Aguardando processamento manual."}
 
 @router.post("/notificar-deposito")
 async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -191,7 +222,7 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
 
     # 2. Receitas da Plataforma (Lucro do Mês Atual)
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS]),
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE]),
         Transacao.status == "concluido"
     ).all()
 
@@ -228,7 +259,7 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             historico_mensal[mes_ano]["depositos"] += t.valor
         elif t.tipo == TipoTransacao.SAQUE:
             historico_mensal[mes_ano]["saques"] += t.valor
-        elif t.tipo in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS]:
+        elif t.tipo in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE]:
             historico_mensal[mes_ano]["lucro"] += t.valor
 
     # Formatar resposta do histórico
@@ -248,7 +279,8 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
         "detalhamento_lucro": {
             "taxas_postagem": float(lucro_postagem),
             "desbloqueio_lgpd": float(lucro_lgpd),
-            "kyc_e_score": float(lucro_kyc_score)
+            "kyc_e_score": float(lucro_kyc_score),
+            "taxas_saque_extra": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_SAQUE))
         },
         "fluxo_caixa_total": {
             "depositos_confirmados": sum(h["depositos"] for h in historico_formatado),

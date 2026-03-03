@@ -365,9 +365,13 @@ const AdminDashboard = () => {
                                 <span className="text-muted">Desbloqueio de Dados:</span>
                                 <strong>R$ {fiscal.detalhamento_lucro.desbloqueio_lgpd.toLocaleString('pt-BR')}</strong>
                             </div>
-                            <div className="flex-between">
+                            <div className="flex-between mb-1">
                                 <span className="text-muted">Taxas de Postagem:</span>
                                 <strong>R$ {fiscal.detalhamento_lucro.taxas_postagem.toLocaleString('pt-BR')}</strong>
+                            </div>
+                            <div className="flex-between">
+                                <span className="text-muted">Saques Extras (Taxas):</span>
+                                <strong>R$ {fiscal.detalhamento_lucro.taxas_saque_extra.toLocaleString('pt-BR')}</strong>
                             </div>
                         </div>
                     </div>

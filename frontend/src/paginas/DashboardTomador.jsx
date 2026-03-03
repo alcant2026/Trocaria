@@ -474,6 +474,23 @@ const DashboardTomador = () => {
                         <div className="card-minimal" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>✅ Verificação de Conta</h3>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sua privacidade é prioridade: não armazenamos fotos de documentos locais. Seus dados estão protegidos sob a LGPD.</p>
+
+                            {/* Novo: Exibir motivo de rejeição anterior se houver */}
+                            {(() => {
+                                const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
+                                if (kycRejeitado) {
+                                    return (
+                                        <div style={{ background: 'rgba(255, 61, 0, 0.1)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '12px', borderRadius: '12px', marginBottom: '1.5rem', width: '100%', maxWidth: '400px' }}>
+                                            <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                                <AlertCircle size={16} /> ÚLTIMA TENTATIVA REJEITADA
+                                            </p>
+                                            <p style={{ color: '#fff', fontSize: '0.85rem', marginTop: '6px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Como enviar: <br /> 1. Suba seus docs no Google Drive ou Imgur <br /> 2. Cole o link no campo abaixo <br /> 3. Ou descreva como nos enviou (ex: via WhatsApp).</p>
                             <textarea
                                 className="input-field mt-1"
@@ -482,7 +499,7 @@ const DashboardTomador = () => {
                                 value={kycDetails}
                                 onChange={(e) => setKycDetails(e.target.value)}
                             />
-                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={handleSolicitarVerificacao}>Verificar (R$ 35,00)</button>
+                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={handleSolicitarVerificacao}>Reenviar Docs (R$ 35,00)</button>
                         </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>

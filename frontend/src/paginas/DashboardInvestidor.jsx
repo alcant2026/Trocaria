@@ -316,6 +316,46 @@ const DashboardInvestidor = () => {
                         </div>
                         {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px', textAlign: 'center' }}>Copiado!</p>}
                     </div>
+
+                    {!usuario.is_verified && (
+                        <div className="card-minimal mt-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>✅ Verificação de Conta</h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sua privacidade é prioridade sob a LGPD.</p>
+
+                            {/* Motivo de rejeição no Investidor */}
+                            {(() => {
+                                const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
+                                if (kycRejeitado) {
+                                    return (
+                                        <div style={{ background: 'rgba(255, 61, 0, 0.1)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '12px', borderRadius: '12px', marginBottom: '1.5rem', width: '100%', maxWidth: '400px' }}>
+                                            <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                                <AlertCircle size={16} /> ÚLTIMA TENTATIVA REJEITADA
+                                            </p>
+                                            <p style={{ color: '#fff', fontSize: '0.85rem', marginTop: '6px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Cole o link dos documentos ou descreva o envio:</p>
+                            <textarea
+                                className="input-field mt-1"
+                                style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
+                                placeholder="Link do Google Drive/Imgur ou Informe o envio..."
+                                value={valorNotificacao} // Reaproveitando estado ou criando um específico? Vamos usar kycDetails no futuro, aqui simplificamos.
+                                onChange={(e) => setValorNotificacao(e.target.value)}
+                            />
+                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={async () => {
+                                if (!valorNotificacao) return alert('Informe os detalhes.');
+                                await api.post('/score/solicitar-verificacao', { detalhes: valorNotificacao });
+                                setMensagem('Solicitação enviada!');
+                                setValorNotificacao('');
+                                carregarDados();
+                            }}>Reenviar Docs (R$ 35,00)</button>
+                        </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <input

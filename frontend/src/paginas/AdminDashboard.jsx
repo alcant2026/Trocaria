@@ -13,7 +13,8 @@ import {
     Clock,
     ExternalLink,
     X,
-    AlertCircle
+    AlertCircle,
+    Undo2
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -24,6 +25,7 @@ const AdminDashboard = () => {
     const [showRejeitarModal, setShowRejeitarModal] = useState(false);
     const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
+    const [ultimasAcoes, setUltimasAcoes] = useState([]); // Log temporário de ações na sessão
 
     const formatarDataBrasilia = (valor) => {
         if (!valor) return '-';
@@ -69,6 +71,18 @@ const AdminDashboard = () => {
     const handleConfirmar = async (id, tipo) => {
         try {
             await api.post(`/financeiro/admin/confirmar/${id}`);
+
+            // Log local
+            const item = pendentes.find(p => p.transacao_id === id);
+            if (item) {
+                setUltimasAcoes(prev => [{
+                    nome: item.usuario_nome,
+                    tipo: item.tipo,
+                    status: 'APROVADO',
+                    timestamp: new Date().toLocaleTimeString('pt-BR')
+                }, ...prev].slice(0, 5));
+            }
+
             setMensagem(`${tipo === 'deposito' ? 'Depósito' : 'Saque'} confirmado!`);
             carregarPendentes();
             carregarFiscal();
@@ -80,6 +94,18 @@ const AdminDashboard = () => {
     const handleConfirmarVerificacao = async (id) => {
         try {
             await api.post(`/financeiro/admin/confirmar-verificacao/${id}`);
+
+            // Log local
+            const item = pendentes.find(p => p.transacao_id === id);
+            if (item) {
+                setUltimasAcoes(prev => [{
+                    nome: item.usuario_nome,
+                    tipo: 'KYC / VERIFICAÇÃO',
+                    status: 'APROVADO',
+                    timestamp: new Date().toLocaleTimeString('pt-BR')
+                }, ...prev].slice(0, 5));
+            }
+
             setMensagem('Identidade verificada com sucesso!');
             carregarPendentes();
             carregarFiscal();
@@ -100,6 +126,19 @@ const AdminDashboard = () => {
         setLoadingRejeicao(true);
         try {
             await api.post(`/financeiro/admin/rejeitar/${id}?motivo=${encodeURIComponent(motivo)}`);
+
+            // Adicionar ao log local
+            const item = pendentes.find(p => p.transacao_id === id);
+            if (item) {
+                setUltimasAcoes(prev => [{
+                    nome: item.usuario_nome,
+                    tipo: item.tipo,
+                    status: 'REJEITADO',
+                    motivo: motivo,
+                    timestamp: new Date().toLocaleTimeString('pt-BR')
+                }, ...prev].slice(0, 5));
+            }
+
             setMensagem('Transação rejeitada e notificação enviada.');
             setShowRejeitarModal(false);
             carregarPendentes();
@@ -285,6 +324,30 @@ const AdminDashboard = () => {
                             </div>
                         ))
                     )}
+
+                    {/* Log de Ações Recentes (Admin Feedback) */}
+                    {ultimasAcoes.length > 0 && (
+                        <div className="mt-2" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                            <div className="flex-between mb-1">
+                                <h4 className="text-muted" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Ações Recentes desta Sessão</h4>
+                                <Undo2 size={14} color="var(--text-muted)" />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {ultimasAcoes.map((acao, i) => (
+                                    <div key={i} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{acao.timestamp}</span>
+                                            <p style={{ fontSize: '0.85rem' }}><strong>{acao.nome}</strong>: {acao.tipo.toUpperCase()}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: acao.status === 'APROVADO' ? 'var(--success)' : 'var(--danger)' }}>{acao.status}</span>
+                                            {acao.motivo && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acao.motivo}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -362,7 +425,7 @@ const AdminDashboard = () => {
                     <div className="card" style={{
                         width: '100%',
                         maxWidth: '450px',
-                        animation: 'scaleUp 0.3s ease',
+                        animation: 'modalSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
                         border: '1px solid rgba(255, 61, 0, 0.2)'
                     }}>
                         <div className="flex-between mb-1">

@@ -523,15 +523,15 @@ const DashboardTomador = () => {
                                 <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
                                     <div className="flex-between">
                                         <div>
-                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo.replace('_', ' ')}</p>
-                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{new Date(h.data).toLocaleString('pt-BR')}</p>
+                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
+                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
                                         </div>
                                         <div className="text-right">
                                             <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
-                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor.toLocaleString('pt-BR')}
+                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
                                             </p>
                                             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                {h.status.toUpperCase()}
+                                                {h.status?.toUpperCase() || '-'}
                                             </span>
                                         </div>
                                     </div>

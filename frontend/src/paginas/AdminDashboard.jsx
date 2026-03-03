@@ -311,14 +311,14 @@ const AdminDashboard = () => {
                                         style={{ width: 'auto', minWidth: '120px', padding: '0.6rem 1rem', color: 'var(--danger)', borderColor: 'rgba(255, 61, 0, 0.2)' }}
                                         onClick={() => handleRejeitar(p.transacao_id)}
                                     >
-                                        Ignorar
+                                        Rejeitar
                                     </button>
                                     <button
                                         className="btn btn-primary"
                                         style={{ width: 'auto', minWidth: '180px', padding: '0.6rem 1.5rem' }}
                                         onClick={() => p.tipo === 'desbloqueio_dados' ? handleConfirmarVerificacao(p.transacao_id) : handleConfirmar(p.transacao_id, p.tipo)}
                                     >
-                                        Aprovar Agora
+                                        Aprovar
                                     </button>
                                 </div>
                             </div>

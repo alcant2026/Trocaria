@@ -6,18 +6,17 @@ from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_investidor, r
 from database import engine, SessionLocal, Base
 from utils_db import sincronizar_esquema
 
-# Criar tabelas iniciais
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Peer API P2P")
 
 # Configuração de CORS - Aceita Front de Produção ou Local
+frontend_url = os.getenv("FRONTEND_URL")
 origins = [
-    "https://peer-front.onrender.com",
     "http://localhost:3000",
     "http://localhost:5173", # Vite default
     "http://127.0.0.1:3000",
 ]
+if frontend_url:
+    origins.append(frontend_url)
 
 app.add_middleware(
     CORSMiddleware,

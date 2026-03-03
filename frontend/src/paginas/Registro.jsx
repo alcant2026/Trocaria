@@ -3,13 +3,50 @@ import api from '../api';
 import TermosUso from '../componentes/TermosUso';
 
 const Registro = () => {
-    const [formData, setFormData] = useState({ nome: '', email: '', cpf: '', chave_pix: '', senha: '' });
+    const [formData, setFormData] = useState({
+        nome: '',
+        email: '',
+        cpf: '',
+        chave_pix: '',
+        senha: '',
+        cidade: '',
+        estado: ''
+    });
+    const [estados, setEstados] = useState([]);
+    const [cidades, setCidades] = useState([]);
     const [aceiteTermos, setAceiteTermos] = useState(false);
     const [showTermos, setShowTermos] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [sucesso, setSucesso] = useState(false);
 
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Carregar estados do IBGE
+    React.useEffect(() => {
+        fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+            .then(res => res.json())
+            .then(data => setEstados(data))
+            .catch(err => console.error("Erro ao carregar estados:", err));
+    }, []);
+
+    // Carregar cidades quando o estado mudar
+    React.useEffect(() => {
+        if (formData.estado) {
+            fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${formData.estado}/municipios?orderBy=nome`)
+                .then(res => res.json())
+                .then(data => setCidades(data))
+                .catch(err => console.error("Erro ao carregar cidades:", err));
+        } else {
+            setCidades([]);
+        }
+    }, [formData.estado]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'estado') {
+            setFormData({ ...formData, [name]: value, cidade: '' });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -18,7 +55,7 @@ const Registro = () => {
             return;
         }
         try {
-            await api.post('/auth/registrar', { ...formData, aceite_termos: true });
+            await api.post('/auth/registrar', { ...formData });
             setMensagem('Conta criada com sucesso! Redirecionando...');
             setSucesso(true);
             setTimeout(() => window.location.hash = 'login', 2000);
@@ -56,6 +93,42 @@ const Registro = () => {
                             <div className="input-group">
                                 <label>Chave PIX</label>
                                 <input name="chave_pix" placeholder="CPF ou E-mail" onChange={handleChange} className="input-field" required />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', width: '100%' }}>
+                            <div className="input-group">
+                                <label>Estado (UF)</label>
+                                <select
+                                    name="estado"
+                                    value={formData.estado}
+                                    onChange={handleChange}
+                                    className="input-field"
+                                    required
+                                    style={{ background: 'var(--card-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                                >
+                                    <option value="">UF</option>
+                                    {estados.map(uf => (
+                                        <option key={uf.id} value={uf.sigla}>{uf.sigla}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label>Cidade</label>
+                                <select
+                                    name="cidade"
+                                    value={formData.cidade}
+                                    onChange={handleChange}
+                                    className="input-field"
+                                    required
+                                    disabled={!formData.estado}
+                                    style={{ background: 'var(--card-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                                >
+                                    <option value="">Selecione a cidade</option>
+                                    {cidades.map(cid => (
+                                        <option key={cid.id} value={cid.nome}>{cid.nome}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 

@@ -19,8 +19,8 @@ class RegistroUsuario(BaseModel):
     cpf: str
     senha: str 
     chave_pix: str
-    cidade: str
-    estado: str
+    cidade: str | None = None
+    estado: str | None = None
     aceite_termos: bool = False
 
 def get_password_hash(password):

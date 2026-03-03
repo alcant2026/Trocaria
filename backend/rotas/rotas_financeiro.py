@@ -163,8 +163,8 @@ async def rejeitar_transacao(transacao_id: int, motivo: str = "Dados inválidos 
 
     usuario = transacao.usuario
     
-    # Se for saque ou verificação (KYC), devolver o saldo (usando .value para maior compatibilidade)
-    if transacao.tipo.value in ["saque", "desbloqueio_dados"]:
+    # Só não estorna em DEPÓSITO (dinheiro ainda não entrou) e RECEBIMENTO (dinheiro vindo de fora)
+    if transacao.tipo.value not in ["deposito", "recebimento"]:
         usuario.saldo += transacao.valor
     
     transacao.status = "falhou"

@@ -39,6 +39,10 @@ const DashboardInvestidor = () => {
     const [mensagem, setMensagem] = useState('');
     const [historico, setHistorico] = useState([]);
     const [kycDetails, setKycDetails] = useState('');
+    const [paginaHist, setPaginaHist] = useState(1);
+    const [paginaCarteiraHome, setPaginaCarteiraHome] = useState(1);
+    const [paginaOportunidades, setPaginaOportunidades] = useState(1);
+    const ITENS_POR_PAGINA = 5;
 
     // Modal state
     const [modal, setModal] = useState({ open: false, type: '', data: null });
@@ -210,303 +214,274 @@ const DashboardInvestidor = () => {
             </div>
 
             {activeView === 'home' && (
-                <div className="card mt-1">
-                    <div className="flex-between mb-1">
-                        <h3>Últimas Atividades</h3>
-                        <History size={18} color="var(--text-muted)" />
-                    </div>
-                    {historico.length === 0 ? (
-                        <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {historico.map(h => (
-                                <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
-                                    <div className="flex-between">
-                                        <div>
-                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
-                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
-                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
-                                            </p>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                {h.status?.toUpperCase() || '-'}
-                                            </span>
-                                        </div>
+                <div className="home-content">
+                    {/* Alerta de Rejeição Recente */}
+                    {historico.some(h => h.status === 'falhou') && (
+                        <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <AlertCircle size={20} />
+                                <strong style={{ fontSize: '0.9rem' }}>Atenção: Você tem solicitações rejeitadas</strong>
+                            </div>
+                            <p style={{ margin: '8px 0 0 28px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                                Veja o motivo detalhado no seu histórico abaixo.
+                            </p>
+                        </div>
+                    )}
+                    <div className="grid-2">
+                        {/* Seção de Últimas Atividades (Histórico) */}
+                        <div className="card mt-1">
+                            <div className="flex-between mb-1">
+                                <h3>Últimas Atividades</h3>
+                                <History size={18} color="var(--text-muted)" />
+                            </div>
+                            {historico.length === 0 ? (
+                                <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {historico.slice((paginaHist - 1) * ITENS_POR_PAGINA, paginaHist * ITENS_POR_PAGINA).map(h => (
+                                            <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
+                                                <div className="flex-between">
+                                                    <div>
+                                                        <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
+                                                        <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
+                                                            {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
+                                                        </p>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
+                                                            {h.status?.toUpperCase() || '-'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {h.status === 'falhou' && h.detalhes && (
+                                                    <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                                        <AlertCircle size={14} color="var(--danger)" />
+                                                        <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                    {h.status === 'falhou' && h.detalhes && (
-                                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                            <AlertCircle size={14} color="var(--danger)" />
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+
+                                    {historico.length > ITENS_POR_PAGINA && (
+                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaHist === 1 ? 0.3 : 1, width: 'auto' }}
+                                                disabled={paginaHist === 1}
+                                                onClick={() => setPaginaHist(p => p - 1)}
+                                            >
+                                                Anterior
+                                            </button>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaHist} de {Math.ceil(historico.length / ITENS_POR_PAGINA)}</span>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaHist * ITENS_POR_PAGINA) >= historico.length ? 0.3 : 1, width: 'auto' }}
+                                                disabled={(paginaHist * ITENS_POR_PAGINA) >= historico.length}
+                                                onClick={() => setPaginaHist(p => p + 1)}
+                                            >
+                                                Próxima
+                                            </button>
                                         </div>
                                     )}
-                                </div>
-                            ))}
+                                </>
+                            )}
                         </div>
-                    )}
-                </div>
-            )}
 
-            {/* Views */}
-            {activeView === 'depositar' && (
-                <div className="card">
-                    <h2>Adicionar Fundos</h2>
-                    <p className="text-muted mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
-                    <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
-                        <div className="info-label">Chave PIX (E-mail)</div>
-                        <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            credpix@gmail.com
-                            <button
-                                onClick={copiarPix}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    transition: 'var(--transition)'
-                                }}
-                                title="Copiar chave PIX"
-                            >
-                                {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
-                            </button>
-                        </div>
-                        {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px', textAlign: 'center' }}>Copiado!</p>}
-                    </div>
+                        {/* Meus Investimentos (Contratos) na Home */}
+                        <div className="card mt-1">
+                            <div className="flex-between mb-1">
+                                <h3>Meus Contratos</h3>
+                                <Briefcase size={18} color="var(--primary)" />
+                            </div>
 
-                    {!usuario.is_verified && (
-                        <div className="card-minimal mt-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>✅ Verificação de Conta</h3>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sua privacidade é prioridade sob a LGPD.</p>
+                            {carteira.length === 0 ? (
+                                <div className="card text-center text-muted" style={{ border: '2px dashed var(--border-color)', background: 'transparent', margin: 0 }}>Você ainda não investiu em ativos.</div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                        {carteira.slice((paginaCarteiraHome - 1) * ITENS_POR_PAGINA, paginaCarteiraHome * ITENS_POR_PAGINA).map(item => (
+                                            <div key={item.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                                                <div className="flex-between mb-1">
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <h3 style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{item.tomador_nome}</h3>
+                                                        {item.tomador_is_verified && <span title="Verificado" style={{ color: 'var(--success)', fontSize: '0.8rem' }}>✅</span>}
+                                                    </div>
+                                                    <div className="badge badge-success" style={{ fontSize: '0.6rem' }}>RENTABILIZANDO</div>
+                                                </div>
+                                                <div className="grid-2" style={{ gap: '10px' }}>
+                                                    <div className="info-block" style={{ margin: 0, padding: '8px' }}>
+                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Aplicado</div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>R$ {item.valor_investido.toLocaleString('pt-BR')}</div>
+                                                    </div>
+                                                    <div className="info-block" style={{ margin: 0, padding: '8px' }}>
+                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Retorno</div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--success)' }}>R$ {item.valor_esperado.toLocaleString('pt-BR')}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
 
-                            {/* Motivo de rejeição no Investidor */}
-                            {(() => {
-                                const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
-                                if (kycRejeitado) {
-                                    return (
-                                        <div style={{ background: 'rgba(255, 61, 0, 0.1)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '12px', borderRadius: '12px', marginBottom: '1.5rem', width: '100%', maxWidth: '400px' }}>
-                                            <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                                <AlertCircle size={16} /> ÚLTIMA TENTATIVA REJEITADA
-                                            </p>
-                                            <p style={{ color: '#fff', fontSize: '0.85rem', marginTop: '6px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                    {carteira.length > ITENS_POR_PAGINA && (
+                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaCarteiraHome === 1 ? 0.3 : 1, width: 'auto' }}
+                                                disabled={paginaCarteiraHome === 1}
+                                                onClick={() => setPaginaCarteiraHome(p => p - 1)}
+                                            >
+                                                Anterior
+                                            </button>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaCarteiraHome} de {Math.ceil(carteira.length / ITENS_POR_PAGINA)}</span>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaCarteiraHome * ITENS_POR_PAGINA) >= carteira.length ? 0.3 : 1, width: 'auto' }}
+                                                disabled={(paginaCarteiraHome * ITENS_POR_PAGINA) >= carteira.length}
+                                                onClick={() => setPaginaCarteiraHome(p => p + 1)}
+                                            >
+                                                Próxima
+                                            </button>
                                         </div>
-                                    );
-                                }
-                                return null;
-                            })()}
-
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Cole o link dos documentos ou descreva o envio:</p>
-                            <textarea
-                                className="input-field mt-1"
-                                style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
-                                placeholder="Link do Google Drive/Imgur ou Informe o envio..."
-                                value={kycDetails}
-                                onChange={(e) => setKycDetails(e.target.value)}
-                            />
-                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={async () => {
-                                if (!kycDetails) return alert('Informe os detalhes.');
-                                try {
-                                    await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
-                                    setMensagem('Solicitação enviada!');
-                                    setKycDetails('');
-                                    carregarDados();
-                                } catch (err) {
-                                    setMensagem('Erro: ' + err.message);
-                                }
-                            }}>Reenviar Docs (R$ 35,00)</button>
+                                    )}
+                                </>
+                            )}
                         </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <input
-                                type="number"
-                                className="input-field"
-                                placeholder="Valor do Depósito R$"
-                                style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                value={valorNotificacao}
-                                onChange={(e) => setValorNotificacao(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                        <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px' }} onClick={handleNotificarDeposito}>Confirmar Depósito</button>
-                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
                 </div>
             )}
 
-            {activeView === 'resgatar' && (
-                <div className="card">
-                    <h2>Resgatar Saldo</h2>
-
-                    {!usuario.two_factor_enabled ? (
-                        <div className="text-center" style={{ padding: '1rem' }}>
-                            <div style={{ color: 'var(--warning)', marginBottom: '1rem' }}>🛡️</div>
-                            <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
-                            <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Por segurança, o 2FA é obrigatório para todos os resgates.</p>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                                <button className="btn btn-primary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
-                                <button className="btn btn-secondary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => setActiveView('home')}>Voltar</button>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <p className="text-muted mb-1">O valor cairá na sua chave cadastrada: <strong>{usuario.chave_pix}</strong></p>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '1.5rem' }}>
-                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Valor do Resgate</label>
-                                    <input
-                                        type="number"
-                                        className="input-field"
-                                        placeholder="R$ 0,00"
-                                        value={valorSaque}
-                                        onChange={(e) => setValorSaque(e.target.value)}
-                                        style={{ textAlign: 'center' }}
-                                    />
-                                </div>
-
-                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sua Senha de Acesso</label>
-                                    <input
-                                        type="password"
-                                        className="input-field"
-                                        placeholder="••••••••"
-                                        value={senhaSaque}
-                                        onChange={(e) => setSenhaSaque(e.target.value)}
-                                        style={{ textAlign: 'center' }}
-                                    />
-                                </div>
-
-                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Código 2FA (Authenticator)</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="000 000"
-                                        maxLength={6}
-                                        value={codigo2faSaque}
-                                        onChange={(e) => setCodigo2faSaque(e.target.value)}
-                                        style={{ textAlign: 'center', letterSpacing: '2px' }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '2rem' }}>
-                                <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px' }} onClick={handleSolicitarSaque}>Confirmar Resgate</button>
-                                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-
-            {/* Market / Opportunities */}
-            {(activeView === 'home' || activeView === 'mercado') && (
+            {/* Market Opportunities Detail View */}
+            {activeView === 'mercado' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
-                        <h3>Oportunidades</h3>
-                        <TrendingUp size={18} color="var(--primary)" />
+                        <h3>Oportunidades de Investimento</h3>
+                        <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
 
                     {solicitacoes.length === 0 ? (
                         <div className="card text-center text-muted">Aguardando novos pedidos...</div>
                     ) : (
-                        solicitacoes.map(sol => (
-                            <div key={sol.id} className="card">
-                                <div className="flex-between mb-1">
-                                    <div>
-                                        <div className="flex-between" style={{ gap: '8px' }}>
-                                            <h3 style={{ textTransform: 'capitalize' }}>{sol.nome || 'Dados Ocultos'}</h3>
-                                            {sol.verified && <span title="Verificado" style={{ color: 'var(--success)' }}>✅</span>}
-                                        </div>
-                                        <p className="text-muted" style={{ fontSize: '0.8rem' }}>Score Tomador: {sol.score}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.2rem' }}>{sol.taxa}% <span style={{ fontSize: '0.7rem' }}>a.m</span></p>
-                                    </div>
-                                </div>
-
-                                <div className="info-block mb-1">
-                                    <div className="flex-between" style={{ marginBottom: '8px' }}>
-                                        <span className="info-label">Meta</span>
-                                        <span style={{ fontWeight: 600 }}>R$ {sol.valor.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
-                                        <div style={{ width: `${(sol.valor_arrecadado / sol.valor) * 100}%`, height: '100%', background: 'var(--primary)' }} />
-                                    </div>
-                                    <div className="flex-between text-muted" style={{ fontSize: '0.7rem' }}>
-                                        <span>Faltam R$ {(sol.valor - sol.valor_arrecadado).toLocaleString('pt-BR')}</span>
-                                        <span>Prazo: {sol.parcelas}x</span>
-                                    </div>
-                                </div>
-
-                                {!sol.unlocked ? (
-                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                        <button
-                                            className="btn btn-outline"
-                                            style={{ borderStyle: 'dashed', width: 'auto', minWidth: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                                            onClick={() => handleDesbloquear(sol.id)}
-                                        >
-                                            <Lock size={16} /> Desbloquear Perfil (R$ 15)
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 61, 0, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                            <input
-                                                type="checkbox"
-                                                id={`risco-${sol.id}`}
-                                                style={{ marginTop: '4px' }}
-                                                onChange={(e) => setAceiteRisco({ ...aceiteRisco, [sol.id]: e.target.checked })}
-                                            />
-                                            <label htmlFor={`risco-${sol.id}`} style={{ fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer' }}>
-                                                Estou ciente que este é um investimento de risco (P2P) e a plataforma Peer não garante o pagamento em caso de inadimplência do tomador.
-                                            </label>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                                            <div className="flex-between" style={{ gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px' }}>
-                                                <input
-                                                    type="number"
-                                                    className="input-field"
-                                                    placeholder="Valor R$"
-                                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.75rem' }}
-                                                    onChange={(e) => setValorInvestir({ ...valorInvestir, [sol.id]: e.target.value })}
-                                                />
-                                                <button
-                                                    className="btn btn-primary"
-                                                    style={{
-                                                        width: '48px',
-                                                        height: '48px',
-                                                        borderRadius: '12px',
-                                                        padding: 0,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        opacity: aceiteRisco[sol.id] ? 1 : 0.3,
-                                                        cursor: aceiteRisco[sol.id] ? 'pointer' : 'not-allowed'
-                                                    }}
-                                                    onClick={() => handleInvestir(sol.id)}
-                                                    disabled={!aceiteRisco[sol.id]}
-                                                >
-                                                    <ArrowRight size={22} />
-                                                </button>
+                        <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {solicitacoes.slice((paginaOportunidades - 1) * ITENS_POR_PAGINA, paginaOportunidades * ITENS_POR_PAGINA).map(sol => (
+                                    <div key={sol.id} className="card">
+                                        <div className="flex-between mb-1">
+                                            <div>
+                                                <div className="flex-between" style={{ gap: '8px' }}>
+                                                    <h3 style={{ textTransform: 'capitalize' }}>{sol.nome || 'Dados Ocultos'}</h3>
+                                                    {sol.verified && <span title="Verificado" style={{ color: 'var(--success)' }}>✅</span>}
+                                                </div>
+                                                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Score Tomador: {sol.score}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.2rem' }}>{sol.taxa}% <span style={{ fontSize: '0.7rem' }}>a.m</span></p>
                                             </div>
                                         </div>
+
+                                        <div className="info-block mb-1">
+                                            <div className="flex-between" style={{ marginBottom: '8px' }}>
+                                                <span className="info-label">Meta</span>
+                                                <span style={{ fontWeight: 600 }}>R$ {sol.valor.toLocaleString('pt-BR')}</span>
+                                            </div>
+                                            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
+                                                <div style={{ width: `${(sol.valor_arrecadado / sol.valor) * 100}%`, height: '100%', background: 'var(--primary)' }} />
+                                            </div>
+                                            <div className="flex-between text-muted" style={{ fontSize: '0.7rem' }}>
+                                                <span>Faltam R$ {(sol.valor - sol.valor_arrecadado).toLocaleString('pt-BR')}</span>
+                                                <span>Prazo: {sol.parcelas}x</span>
+                                            </div>
+                                        </div>
+
+                                        {!sol.unlocked ? (
+                                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                <button
+                                                    className="btn btn-outline"
+                                                    style={{ borderStyle: 'dashed', width: 'auto', minWidth: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                    onClick={() => handleDesbloquear(sol.id)}
+                                                >
+                                                    <Lock size={16} /> Desbloquear Perfil (R$ 15)
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 61, 0, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`risco-${sol.id}`}
+                                                        style={{ marginTop: '4px' }}
+                                                        onChange={(e) => setAceiteRisco({ ...aceiteRisco, [sol.id]: e.target.checked })}
+                                                    />
+                                                    <label htmlFor={`risco-${sol.id}`} style={{ fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer' }}>
+                                                        Estou ciente que este é um investimento de risco (P2P) e a plataforma Peer não garante o pagamento em caso de inadimplência do tomador.
+                                                    </label>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                                                    <div className="flex-between" style={{ gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px' }}>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field"
+                                                            placeholder="Valor R$"
+                                                            style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.75rem' }}
+                                                            onChange={(e) => setValorInvestir({ ...valorInvestir, [sol.id]: e.target.value })}
+                                                        />
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            style={{
+                                                                width: '48px',
+                                                                height: '48px',
+                                                                borderRadius: '12px',
+                                                                padding: 0,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                opacity: aceiteRisco[sol.id] ? 1 : 0.3,
+                                                                cursor: aceiteRisco[sol.id] ? 'pointer' : 'not-allowed'
+                                                            }}
+                                                            onClick={() => handleInvestir(sol.id)}
+                                                            disabled={!aceiteRisco[sol.id]}
+                                                        >
+                                                            <ArrowRight size={22} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                ))}
                             </div>
-                        ))
+
+                            {solicitacoes.length > ITENS_POR_PAGINA && (
+                                <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                    <button
+                                        className="btn-outline"
+                                        style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaOportunidades === 1 ? 0.3 : 1, width: 'auto' }}
+                                        disabled={paginaOportunidades === 1}
+                                        onClick={() => setPaginaOportunidades(p => p - 1)}
+                                    >
+                                        Anterior
+                                    </button>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaOportunidades} de {Math.ceil(solicitacoes.length / ITENS_POR_PAGINA)}</span>
+                                    <button
+                                        className="btn-outline"
+                                        style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaOportunidades * ITENS_POR_PAGINA) >= solicitacoes.length ? 0.3 : 1, width: 'auto' }}
+                                        disabled={(paginaOportunidades * ITENS_POR_PAGINA) >= solicitacoes.length}
+                                        onClick={() => setPaginaOportunidades(p => p + 1)}
+                                    >
+                                        Próxima
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             )}
 
+
             {/* Wallet Detail View */}
-            {(activeView === 'carteira') && (
+            {activeView === 'carteira' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
                         <h3>Minha Carteira</h3>
@@ -525,11 +500,11 @@ const DashboardInvestidor = () => {
                                     <div className="badge badge-success">RENTABILIZANDO</div>
                                 </div>
                                 <div className="grid-2" style={{ gap: '10px' }}>
-                                    <div className="info-block">
+                                    <div className="info-block" style={{ margin: 0 }}>
                                         <div className="info-label">Aplicado</div>
                                         <div style={{ fontWeight: 600 }}>R$ {item.valor_investido.toLocaleString('pt-BR')}</div>
                                     </div>
-                                    <div className="info-block">
+                                    <div className="info-block" style={{ margin: 0 }}>
                                         <div className="info-label">Retorno Total</div>
                                         <div style={{ fontWeight: 600, color: 'var(--success)' }}>R$ {item.valor_esperado.toLocaleString('pt-BR')}</div>
                                     </div>
@@ -543,6 +518,7 @@ const DashboardInvestidor = () => {
                     )}
                 </div>
             )}
+
             {/* Modal de Confirmação */}
             {modal.open && (
                 <div className="modal-overlay">

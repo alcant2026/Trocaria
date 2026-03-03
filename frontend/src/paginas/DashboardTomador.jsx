@@ -42,6 +42,9 @@ const DashboardTomador = () => {
     const [mensagem, setMensagem] = useState('');
     const [kycDetails, setKycDetails] = useState('');
     const [historico, setHistorico] = useState([]);
+    const [paginaHist, setPaginaHist] = useState(1);
+    const [paginaContratos, setPaginaContratos] = useState(1);
+    const ITENS_POR_PAGINA = 5;
 
     const carregarDados = async () => {
         try {
@@ -508,146 +511,170 @@ const DashboardTomador = () => {
                 </div>
             )}
 
-            {/* Seção de Últimas Atividades (Histórico) - Visível apenas na Home */}
             {activeView === 'home' && (
-                <div className="card mt-1">
-                    <div className="flex-between mb-1">
-                        <h3>Últimas Atividades</h3>
-                        <History size={18} color="var(--text-muted)" />
-                    </div>
-                    {historico.length === 0 ? (
-                        <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {historico.map(h => (
-                                <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
-                                    <div className="flex-between">
-                                        <div>
-                                            <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
-                                            <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
-                                                {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
-                                            </p>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                {h.status?.toUpperCase() || '-'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {h.status === 'falhou' && h.detalhes && (
-                                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                            <AlertCircle size={14} color="var(--danger)" />
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                <>
+                    {/* Alerta de Rejeição Recente */}
+                    {historico.some(h => h.status === 'falhou') && (
+                        <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <AlertCircle size={20} />
+                                <strong style={{ fontSize: '0.9rem' }}>Atenção: Você tem solicitações rejeitadas</strong>
+                            </div>
+                            <p style={{ margin: '8px 0 0 28px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                                Verifique o motivo no histórico abaixo ou no detalhe da atividade.
+                            </p>
                         </div>
                     )}
-                </div>
-            )}
 
-            {/* Active Contracts Section */}
-            <div className="mt-1">
-                <div className="flex-between mb-1">
-                    <h3>Meus Contratos</h3>
-                    <LayoutDashboard size={18} color="var(--text-muted)" />
-                </div>
-
-                {meusEmprestimos.length === 0 ? (
-                    <div className="card text-center" style={{ border: '2px dashed var(--border-color)', background: 'transparent' }}>
-                        <p>Nenhum contrato ativo no momento.</p>
-                    </div>
-                ) : (
-                    meusEmprestimos.map(emp => (
-                        <div key={emp.id} className="card">
+                    <div className="grid-2">
+                        {/* Seção de Últimas Atividades (Histórico) */}
+                        <div className="card mt-1">
                             <div className="flex-between mb-1">
-                                <div>
-                                    <span className={`badge ${emp.status === 'aprovado' ? 'badge-success' : 'badge-warning'}`}>
-                                        {emp.status.toUpperCase()}
-                                    </span>
-                                    <h3 className="mt-1">Empréstimo #{emp.id}</h3>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-muted" style={{ fontSize: '0.7rem' }}>VALOR MENSAL</p>
-                                    <p style={{ fontWeight: 700, color: 'var(--success)' }}>R$ {emp.valor_parcela.toLocaleString('pt-BR')}</p>
-                                </div>
+                                <h3>Últimas Atividades</h3>
+                                <History size={18} color="var(--text-muted)" />
                             </div>
+                            {historico.length === 0 ? (
+                                <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {historico.slice((paginaHist - 1) * ITENS_POR_PAGINA, paginaHist * ITENS_POR_PAGINA).map(h => (
+                                            <div key={h.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', borderLeft: `3px solid ${h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)'}` }}>
+                                                <div className="flex-between">
+                                                    <div>
+                                                        <p style={{ fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase' }}>{h.tipo?.replace('_', ' ') || 'TRANSAÇÃO'}</p>
+                                                        <p className="text-muted" style={{ fontSize: '0.7rem' }}>{h.data ? new Date(h.data).toLocaleString('pt-BR') : '-'}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p style={{ fontWeight: 800, color: h.tipo === 'deposito' ? 'var(--success)' : 'var(--text-main)' }}>
+                                                            {h.tipo === 'deposito' ? '+' : '-'} R$ {h.valor?.toLocaleString('pt-BR')}
+                                                        </p>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
+                                                            {h.status?.toUpperCase() || '-'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {h.status === 'falhou' && h.detalhes && (
+                                                    <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                                        <AlertCircle size={14} color="var(--danger)" />
+                                                        <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
 
-                            {/* Countdown Timer */}
-                            {emp.status === 'pendente' && (
-                                <div style={{ background: 'rgba(255, 61, 0, 0.05)', padding: '8px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid rgba(255, 61, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Clock size={14} color="var(--danger)" />
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>
-                                        {(() => {
-                                            const agora = new Date();
-                                            const expira = emp.valor_arrecadado === 0
-                                                ? new Date(emp.data_expiracao_4h + 'Z')
-                                                : new Date(emp.data_expiracao_5d + 'Z');
-                                            const diff = expira - agora;
-
-                                            if (diff <= 0) return "Expirando...";
-
-                                            const horas = Math.floor(diff / (1000 * 60 * 60));
-                                            const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-                                            if (horas > 24) {
-                                                const dias = Math.floor(horas / 24);
-                                                return `Expira em ${dias}d ${horas % 24}h`;
-                                            }
-                                            return `Expira em ${horas}h ${minutos}m`;
-                                        })()}
-                                    </span>
-                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                        {emp.valor_arrecadado === 0 ? "(Regra 4h sem aporte)" : "(Regra 5 dias p/ meta)"}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="mb-1">
-                                <div className="flex-between" style={{ fontSize: '0.8rem', marginBottom: '5px' }}>
-                                    <span className="text-muted">Progresso Arrecadação</span>
-                                    <span>{Math.round((emp.valor_arrecadado / emp.valor) * 100)}%</span>
-                                </div>
-                                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${(emp.valor_arrecadado / emp.valor) * 100}%`, height: '100%', background: 'var(--primary)' }} />
-                                </div>
-                            </div>
-
-                            <div className="info-block mb-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <div>
-                                    <div className="info-label">Parcelas</div>
-                                    <div style={{ fontWeight: 600 }}>{emp.parcelas_pagas} / {emp.parcelas}</div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="info-label">Total Restante</div>
-                                    <div style={{ fontWeight: 600 }}>R$ {emp.valor_total_restante.toLocaleString('pt-BR')}</div>
-                                </div>
-                            </div>
-
-                            {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1rem' }}>
-                                    <button className="btn btn-primary" style={{ width: 'auto', minWidth: '140px' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}>Pagar Parcela</button>
-                                    <button className="btn btn-outline" style={{ width: 'auto', minWidth: '100px' }} onClick={() => handleQuitar(emp.id)}>Quitar</button>
-                                </div>
-                            )}
-
-                            {(emp.status === 'aprovado' || emp.status === 'concluido') && (
-                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                                    <button
-                                        className="btn btn-secondary"
-                                        style={{ width: 'auto', minWidth: '240px', padding: '0.6rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                                        onClick={() => handleBaixarContrato(emp.id)}
-                                    >
-                                        <FileText size={18} /> Baixar Contrato de Mútuo
-                                    </button>
-                                </div>
+                                    {historico.length > ITENS_POR_PAGINA && (
+                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaHist === 1 ? 0.3 : 1, width: 'auto' }}
+                                                disabled={paginaHist === 1}
+                                                onClick={() => setPaginaHist(p => p - 1)}
+                                            >
+                                                Anterior
+                                            </button>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaHist} de {Math.ceil(historico.length / ITENS_POR_PAGINA)}</span>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaHist * ITENS_POR_PAGINA) >= historico.length ? 0.3 : 1, width: 'auto' }}
+                                                disabled={(paginaHist * ITENS_POR_PAGINA) >= historico.length}
+                                                onClick={() => setPaginaHist(p => p + 1)}
+                                            >
+                                                Próxima
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
-                    ))
-                )}
-            </div>
+
+                        {/* Active Contracts Section */}
+                        <div className="card mt-1">
+                            <div className="flex-between mb-1">
+                                <h3>Meus Contratos</h3>
+                                <LayoutDashboard size={18} color="var(--text-muted)" />
+                            </div>
+
+                            {meusEmprestimos.length === 0 ? (
+                                <div className="card text-center" style={{ border: '2px dashed var(--border-color)', background: 'transparent', margin: 0 }}>
+                                    <p>Nenhum contrato ativo no momento.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                        {meusEmprestimos.slice((paginaContratos - 1) * ITENS_POR_PAGINA, paginaContratos * ITENS_POR_PAGINA).map(emp => (
+                                            <div key={emp.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                                                <div className="flex-between mb-1">
+                                                    <div>
+                                                        <span className={`badge ${emp.status === 'aprovado' ? 'badge-success' : 'badge-warning'}`}>
+                                                            {emp.status.toUpperCase()}
+                                                        </span>
+                                                        <h3 className="mt-1" style={{ fontSize: '0.9rem' }}>Empréstimo #{emp.id}</h3>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-muted" style={{ fontSize: '0.6rem' }}>VALOR MENSAL</p>
+                                                        <p style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.9rem' }}>R$ {emp.valor_parcela.toLocaleString('pt-BR')}</p>
+                                                    </div>
+                                                </div>
+
+                                                {emp.status === 'pendente' && (
+                                                    <div style={{ background: 'rgba(255, 61, 0, 0.05)', padding: '6px', borderRadius: '8px', marginBottom: '0.75rem', border: '1px solid rgba(255, 61, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <Clock size={12} color="var(--danger)" />
+                                                        <span style={{ fontSize: '0.65rem', color: 'var(--danger)', fontWeight: 600 }}>
+                                                            Expira em {Math.floor((new Date(emp.data_expiracao_4h + 'Z') - new Date()) / (1000 * 60 * 60))}h
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <div className="info-block mb-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '0.75rem' }}>
+                                                    <div>
+                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Parcelas</div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{emp.parcelas_pagas} / {emp.parcelas}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Restante</div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>R$ {emp.valor_total_restante.toLocaleString('pt-BR')}</div>
+                                                    </div>
+                                                </div>
+
+                                                {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
+                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                                                        <button className="btn-primary" style={{ height: '32px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}>Pagar</button>
+                                                        <button className="btn-outline" style={{ height: '32px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => handleQuitar(emp.id)}>Quitar</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {meusEmprestimos.length > ITENS_POR_PAGINA && (
+                                        <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaContratos === 1 ? 0.3 : 1, width: 'auto' }}
+                                                disabled={paginaContratos === 1}
+                                                onClick={() => setPaginaContratos(p => p - 1)}
+                                            >
+                                                Anterior
+                                            </button>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaContratos} de {Math.ceil(meusEmprestimos.length / ITENS_POR_PAGINA)}</span>
+                                            <button
+                                                className="btn-outline"
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaContratos * ITENS_POR_PAGINA) >= meusEmprestimos.length ? 0.3 : 1, width: 'auto' }}
+                                                disabled={(paginaContratos * ITENS_POR_PAGINA) >= meusEmprestimos.length}
+                                                onClick={() => setPaginaContratos(p => p + 1)}
+                                            >
+                                                Próxima
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
             {/* Modal de Confirmação */}
             {modal.open && (
                 <div className="modal-overlay">

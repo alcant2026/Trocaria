@@ -179,7 +179,7 @@ const AdminDashboard = () => {
                                         <div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <p style={{ fontWeight: 600 }}>{p.usuario_nome}</p>
-                                                {p.usuario_verificado && (
+                                                {p.usuario_verificado ? (
                                                     <span style={{
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
@@ -193,6 +193,21 @@ const AdminDashboard = () => {
                                                         textTransform: 'uppercase'
                                                     }}>
                                                         <CheckCircle size={10} /> Verificado
+                                                    </span>
+                                                ) : (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: 'rgba(255, 145, 0, 0.1)',
+                                                        color: '#ff9100',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 700,
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        <Clock size={10} /> Pendente (KYC)
                                                     </span>
                                                 )}
                                             </div>

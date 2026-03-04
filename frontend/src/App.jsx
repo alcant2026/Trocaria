@@ -7,6 +7,7 @@ import AdminDashboard from './paginas/AdminDashboard';
 import Seguranca from './paginas/Seguranca';
 import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield } from 'lucide-react';
 import './index.css';
+import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 
 const App = () => {
     const whatsappLink = 'https://wa.me/5591980177874';
@@ -211,7 +212,7 @@ const App = () => {
                 </div>
             )}
             {botaoWhatsapp}
-
+            <TemporizadorInatividade aoDeslogar={logout} />
         </div>
     );
 };

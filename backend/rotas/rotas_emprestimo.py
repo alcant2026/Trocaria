@@ -111,6 +111,7 @@ async def criar_solicitacao(
         # Blindagem Jurídica
         aceite_termos=True,
         ip_aceite=request.client.host,
+        municipio_aceite=f"{usuario.cidade}/{usuario.estado}" if usuario.cidade else "Localização não informada",
         cpf_aceite=usuario.cpf,
         data_aceite=agora
     )

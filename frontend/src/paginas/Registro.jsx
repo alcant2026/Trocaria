@@ -56,12 +56,12 @@ const Registro = () => {
             return;
         }
         try {
-            await api.post('/auth/registrar', { ...formData });
+            await api.post('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
             setMensagem('Conta criada com sucesso! Redirecionando...');
             setSucesso(true);
             setTimeout(() => window.location.hash = 'login', 2000);
         } catch (err) {
-            setMensagem(err.message || 'Erro ao criar conta. Verifique os dados.');
+            setMensagem(err.response?.data?.detail || err.message || 'Erro ao criar conta. Verifique os dados.');
         }
     };
 

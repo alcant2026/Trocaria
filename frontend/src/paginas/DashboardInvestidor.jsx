@@ -157,7 +157,7 @@ const DashboardInvestidor = () => {
             }
             if (res.investidor) {
                 setSolicitacoes(res.investidor.solicitacoes_disponiveis || []);
-                setInvestimentos(res.investidor.carteira || []);
+                setCarteira(res.investidor.carteira || []);
             }
             if (res.historico) {
                 setHistorico(res.historico);

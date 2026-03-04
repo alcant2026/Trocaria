@@ -10,7 +10,7 @@ import datetime
 from datetime import timezone, timedelta
 import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
-from database import get_db
+from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 
 class NotificacaoDeposito(BaseModel):

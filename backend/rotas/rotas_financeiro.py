@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case, and_
+import logging
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime

@@ -4,6 +4,7 @@ import uvicorn
 import os
 from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_investidor, rotas_financeiro
 from database import engine, SessionLocal, Base
+from sqlalchemy import text
 from utils_db import sincronizar_esquema
 
 app = FastAPI(title="Peer API P2P")

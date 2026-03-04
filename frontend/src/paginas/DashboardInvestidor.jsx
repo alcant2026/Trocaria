@@ -165,6 +165,14 @@ const DashboardInvestidor = () => {
         }
     };
 
+    // Polling Automático (30s)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            carregarDados();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     useEffect(() => {
         carregarDados();
     }, [activeView]);

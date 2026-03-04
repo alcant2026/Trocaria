@@ -167,9 +167,28 @@ const DashboardTomador = () => {
         }
     };
 
+    const carregarPendentes = async () => {
+        try {
+            const pendencias = await api.get('/emprestimos/garantias-pendentes');
+            setGarantiasPendentes(pendencias);
+        } catch (err) {
+            console.error('Erro ao carregar pendências:', err);
+        }
+    };
+
+    // Polling Automático (30s)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            carregarDados();
+            carregarPendentes();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [carregarDados]);
+
     useEffect(() => {
         carregarDados();
-    }, [activeView]);
+        carregarPendentes();
+    }, [activeView, carregarDados]);
 
     const handleSolicitar = async (e) => {
         e.preventDefault();
@@ -384,9 +403,9 @@ const DashboardTomador = () => {
         setTimeout(() => setCopiadoPix(false), 2000);
     };
 
-    const carregarPendentes = async () => {
+    const baixarContrato = async (id) => {
         try {
-            const blob = await api.getBlob(`/ emprestimos / contrato / pdf / ${id} `);
+            const blob = await api.getBlob(`/emprestimos/contrato/pdf/${id}`);
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -394,9 +413,8 @@ const DashboardTomador = () => {
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
         } catch (err) {
-            alert('Erro ao baixar contrato: ' + err.message);
+            console.error('Erro ao baixar contrato:', err);
         }
     };
 

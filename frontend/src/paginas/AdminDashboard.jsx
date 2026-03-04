@@ -318,9 +318,20 @@ const AdminDashboard = () => {
             const data = await api.get('/financeiro/admin/fiscal');
             setFiscal(data);
         } catch (err) {
-            console.error(err);
+            console.error('Erro ao carregar dados fiscais:', err);
+            // Não bloqueia a tela, apenas loga. O polling tentará novamente.
         }
     };
+
+    // Polling Automático (30s)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            carregarPendentes();
+            carregarFiscal();
+        }, 30000); // 30 segundos
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         carregarPendentes();

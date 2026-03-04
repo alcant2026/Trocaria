@@ -211,107 +211,96 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     """
     Retorna o resumo fiscal da plataforma para declaração: 
     Total sob custódia (saldo dos usuários) e Lucro da Plataforma (Taxas).
+    Versão Otimizada (SQL-Aggregated).
     """
+    try:
+        # 1. Saldo Total Gerenciado (Passivo da plataforma)
+        saldo_usuarios = db.query(func.sum(Usuario.saldo)).scalar() or Decimal("0.00")
 
-    # 1. Saldo Total Gerenciado (Passivo da plataforma = dinheiro dos usuários)
-    # Soma o saldo de TODOS os usuários cadastrados (inclusive o próprio admin durante os testes)
-    saldo_usuarios = db.query(func.sum(Usuario.saldo)).scalar() or Decimal("0.00")
+        # 2. Configurações de tempo
+        agora_brasilia = datetime.datetime.now(TZ_BRASILIA)
+        mes_atual_str = agora_brasilia.strftime("%Y-%m")
 
-    # 2. Receitas da Plataforma (Lucro do Mês Atual)
-    total_lucro_mes = Decimal("0.00")
-    agora_brasilia = datetime.datetime.utcnow() - timedelta(hours=3)
-    mes_atual = agora_brasilia.strftime("%Y-%m")
-
-    # 2. Receitas da Plataforma (Lucro do Mês Atual)
-    todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([
+        # 3. Tipos de Receita
+        tipos_receita = [
             TipoTransacao.COMPRA_SCORE, 
             TipoTransacao.DESBLOQUEIO_DADOS, 
             TipoTransacao.TAXA_SAQUE,
             TipoTransacao.TAXA_INTERMEDIACAO,
             TipoTransacao.APORTE_CAPITAL
-        ]),
-        Transacao.status == "concluido"
-    ).all()
+        ]
 
-    # Filtrar apenas o que pertence ao mês atual para os cards de destaque
-    receitas_mes = [
-        t for t in todas_receitas 
-        if (t.data_criacao - timedelta(hours=3)).strftime("%Y-%m") == mes_atual
-    ]
+        # 4. Lucro Total Histórico (Agregado no SQL)
+        total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.tipo.in_(tipos_receita),
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
 
-    total_lucro_mes = sum(t.valor for t in receitas_mes)
-    
-    # Detalhamento do lucro NO MÊS ATUAL
-    lucro_postagem = sum(t.valor for t in receitas_mes if t.valor == Decimal("4.00"))
-    lucro_lgpd = sum(t.valor for t in receitas_mes if t.valor == Decimal("15.00"))
-    lucro_kyc_score = sum(t.valor for t in receitas_mes if t.valor == Decimal("35.00"))
+        # 5. Saques de lucro do admin
+        total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.tipo == TipoTransacao.SAQUE,
+            Transacao.detalhes.like("RESGATE DE LUCRO %"),
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
 
-    # Lucro Total Acumulado (histórico bruto)
-    total_lucro_historico = sum(t.valor for t in todas_receitas)
+        # 6. Detalhes do Mês Atual (Agregado)
+        primerio_dia_mes = agora_brasilia.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Filtro de receitas do mês atual
+        receitas_mes_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
+            Transacao.tipo.in_(tipos_receita),
+            Transacao.status == "concluido",
+            Transacao.data_criacao >= primerio_dia_mes
+        ).group_by(Transacao.tipo).all()
 
-    # Saques de lucro já realizados pelo admin
-    saques_lucro_admin = db.query(Transacao).filter(
-        Transacao.tipo == TipoTransacao.SAQUE,
-        Transacao.detalhes.like("Saque de lucro da plataforma%"),
-        Transacao.status == "concluido"
-    ).all()
-    total_sacado_admin = sum(t.valor for t in saques_lucro_admin)
+        detalhamento_mes = {t.name.lower(): Decimal("0.00") for t in tipos_receita}
+        for tipo, soma in receitas_mes_query:
+            detalhamento_mes[tipo.value] = soma
 
-    # Lucro líquido disponível para saque
-    lucro_disponivel_liquido = total_lucro_historico - total_sacado_admin
+        total_lucro_mes = sum(detalhamento_mes.values())
 
-    historico_mensal = {}
+        # 7. Histórico Mensal Otimizado
+        # Agrupa por mês usando truncamento de data (Postgres/SQLite compatível)
+        if "sqlite" in str(engine.url):
+            trunc_fn = func.strftime('%Y-%m', Transacao.data_criacao)
+        else:
+            trunc_fn = func.to_char(Transacao.data_criacao, 'YYYY-MM')
 
-    todas_transacoes = db.query(Transacao).filter(Transacao.status == "concluido").all()
+        historico_raw = db.query(
+            trunc_fn.label("mes"),
+            func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO, Transacao.valor), else_=0)).label("depositos"),
+            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
+            func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro"),
+            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
+        ).filter(Transacao.status == "concluido").group_by("mes").order_by(text("mes DESC")).limit(12).all()
 
-    for t in todas_transacoes:
-        data_brasilia = t.data_criacao - timedelta(hours=3)
-        mes_ano = data_brasilia.strftime("%Y-%m")
+        historico_formatado = []
+        for h in historico_raw:
+            historico_formatado.append({
+                "mes": h.mes,
+                "depositos": float(h.depositos or 0),
+                "saques": float(h.saques or 0),
+                "lucro": float(h.lucro or 0),
+                "lucro_sacado": float(h.lucro_sacado or 0)
+            })
 
-        if mes_ano not in historico_mensal:
-            historico_mensal[mes_ano] = {"depositos": Decimal("0.00"), "saques": Decimal("0.00"), "lucro": Decimal("0.00"), "lucro_sacado": Decimal("0.00")}
-
-        if t.tipo == TipoTransacao.DEPOSITO:
-            historico_mensal[mes_ano]["depositos"] += t.valor
-        elif t.tipo == TipoTransacao.SAQUE:
-            # Separa saque de lucro do admin dos saques normais de usuários
-            if t.detalhes and t.detalhes.startswith("Saque de lucro da plataforma"):
-                historico_mensal[mes_ano]["lucro_sacado"] += t.valor
-            else:
-                historico_mensal[mes_ano]["saques"] += t.valor
-        elif t.tipo in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]:
-            historico_mensal[mes_ano]["lucro"] += t.valor
-
-    # Formatar resposta do histórico
-    historico_formatado = []
-    for mes, dados in sorted(historico_mensal.items(), reverse=True):
-        historico_formatado.append({
-            "mes": mes,
-            "depositos": float(dados["depositos"]),
-            "saques": float(dados["saques"]),
-            "lucro": float(dados["lucro"]),
-            "lucro_sacado": float(dados["lucro_sacado"])
-        })
-
-    return {
-        "saldo_usuarios_gerenciado": float(saldo_usuarios),
-        "lucro_plataforma_total": float(total_lucro_mes),
-        "lucro_plataforma_historico": float(total_lucro_historico),
-        "lucro_disponivel": float(lucro_disponivel_liquido),
-        "detalhamento_lucro": {
-            "taxas_postagem": float(lucro_postagem),
-            "desbloqueio_lgpd": float(lucro_lgpd),
-            "kyc_e_score": float(lucro_kyc_score),
-            "taxas_saque_extra": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_SAQUE)),
-            "taxas_intermediacao_p2p": float(sum(t.valor for t in receitas_mes if t.tipo == TipoTransacao.TAXA_INTERMEDIACAO))
-        },
-        "fluxo_caixa_total": {
-            "depositos_confirmados": sum(h["depositos"] for h in historico_formatado),
-            "saques_confirmados": sum(h["saques"] for h in historico_formatado)
-        },
-        "historico_mensal": historico_formatado
-    }
+        return {
+            "saldo_usuarios_gerenciado": float(saldo_usuarios),
+            "lucro_plataforma_total": float(total_lucro_mes),
+            "lucro_plataforma_historico": float(total_lucro_historico),
+            "lucro_disponivel": float(total_lucro_historico - total_sacado_admin),
+            "detalhamento_lucro": {
+                "taxas_postagem": float(detalhamento_mes.get('taxa_intermediacao', 0)), # Referência simplificada
+                "desbloqueio_lgpd": float(detalhamento_mes.get('desbloqueio_dados', 0)),
+                "kyc_e_score": float(detalhamento_mes.get('compra_score', 0)),
+                "taxas_saque_extra": float(detalhamento_mes.get('taxa_saque', 0)),
+                "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0))
+            },
+            "historico_mensal": historico_formatado
+        }
+    except Exception as e:
+        logger.error(f"Erro no relatório fiscal: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao gerar relatório fiscal.")
 
 
 class SaqueAdminRequest(BaseModel):

@@ -1033,3 +1033,18 @@ async def verificar_inadimplencia(db: Session = Depends(get_db), admin: Usuario 
     
     db.commit()
     return {"message": f"Verificação concluída. {len(atrasados)} empréstimos em atraso encontrados. {penalizados} garantidores penalizados com score 0."}
+
+@router.post("/admin/liberar-especial/{solicitacao_id}")
+async def liberacao_especial_admin(solicitacao_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """
+    Liberação de FORÇA BRUTA pelo Admin.
+    Ignora a necessidade de 2 garantidores, mas ainda exige 100% de arrecadação.
+    """
+    try:
+        sucesso = tentar_liberar_emprestimo(solicitacao_id, db, ignore_guarantors=True)
+        if sucesso:
+            return {"message": "Empréstimo liberado com sucesso (Bypass de Garantidores)!"}
+        else:
+            raise HTTPException(status_code=400, detail="Não foi possível liberar. Verifique se a meta de 100% foi atingida.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

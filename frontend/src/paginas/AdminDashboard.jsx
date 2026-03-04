@@ -272,6 +272,7 @@ const AdminDashboard = () => {
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
     const [ultimasAcoes, setUltimasAcoes] = useState([]);
     const [pixCopiado, setPixCopiado] = useState(null); // id da transacao com pix copiado
+    const [stuckLoans, setStuckLoans] = useState([]);
 
     const extrairChavePix = (detalhes) => {
         if (!detalhes) return null;
@@ -310,6 +311,7 @@ const AdminDashboard = () => {
             if (res.admin) {
                 setPendentes(res.admin.pendentes || []);
                 setFiscal(res.admin.fiscal);
+                setStuckLoans(res.admin.emprestimos_para_liberar || []);
             }
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
@@ -407,6 +409,17 @@ const AdminDashboard = () => {
             setMensagem('Erro: ' + err.message);
         } finally {
             setLoadingRejeicao(false);
+        }
+    };
+
+    const handleLiberarEspecial = async (id) => {
+        if (!window.confirm("Deseja realmente LIBERAR este empréstimo SEM garantidores?")) return;
+        try {
+            await api.post(`/emprestimos/admin/liberar-especial/${id}`);
+            setMensagem("Empréstimo liberado com sucesso!");
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + err.message);
         }
     };
 
@@ -600,6 +613,37 @@ const AdminDashboard = () => {
                                 </div>
                             </div>
                         ))
+                    )}
+
+                    {/* Nova Seção: Empréstimos que bateram a meta mas faltam garantidores */}
+                    {stuckLoans.length > 0 && (
+                        <div className="mt-2">
+                            <h3 className="mb-1" style={{ fontSize: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={18} /> Aguardando Garantidores (Bateram a Meta)
+                            </h3>
+                            {stuckLoans.map(loan => (
+                                <div key={`stuck-${loan.id}`} className="card mb-1" style={{ borderLeft: '4px solid var(--warning)' }}>
+                                    <div className="flex-between">
+                                        <div>
+                                            <p style={{ fontWeight: 700 }}>{loan.tomador} (ID #{loan.id})</p>
+                                            <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                                                Arrecadado: R$ {loan.arrecadado.toLocaleString('pt-BR')} / R$ {loan.valor.toLocaleString('pt-BR')}
+                                            </p>
+                                            <p className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                Status: <span style={{ color: 'var(--warning)', fontWeight: 600 }}>Meta Batida</span> • {loan.garantidores_atuais} / 2 Garantidores
+                                            </p>
+                                        </div>
+                                        <button
+                                            className="btn btn-primary"
+                                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+                                            onClick={() => handleLiberarEspecial(loan.id)}
+                                        >
+                                            Liberar Manualmente
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
 
                     {/* Log de Ações Recentes (Admin Feedback) */}

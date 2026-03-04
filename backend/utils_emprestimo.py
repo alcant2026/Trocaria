@@ -4,12 +4,12 @@ from decimal import Decimal
 import datetime
 from utils_data import adicionar_mes
 
-def tentar_liberar_emprestimo(solicitacao_id: int, db: Session):
+def tentar_liberar_emprestimo(solicitacao_id: int, db: Session, ignore_guarantors: bool = False):
     """
     Tenta liberar o valor do empréstimo para o tomador.
     Verifica se:
     1. A arrecadação atingiu 100%.
-    2. Todos os garantidores aceitaram a garantia social.
+    2. Todos os garantidores aceitaram a garantia social (pulado se ignore_guarantors=True).
     """
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
@@ -23,24 +23,27 @@ def tentar_liberar_emprestimo(solicitacao_id: int, db: Session):
     if solicitacao.valor_arrecadado < solicitacao.valor:
         return False
 
-    # 2. Verificar Garantidores
-    garantias = db.query(GarantiaSocial).filter(
-        GarantiaSocial.solicitacao_id == solicitacao_id
-    ).all()
-    
-    print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidores encontrados: {len(garantias)}")
-
-    # Exigamos exatamente 2 garantidores conforme a regra de negócio
-    if len(garantias) < 2:
-        print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Menos de 2 garantidores ({len(garantias)}).")
-        return False
+    # 2. Verificar Garantidores (Pular se for liberação especial de Admin)
+    if not ignore_guarantors:
+        garantias = db.query(GarantiaSocial).filter(
+            GarantiaSocial.solicitacao_id == solicitacao_id
+        ).all()
         
-    for g in garantias:
-        print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidor ID {g.garante_id}: Aceito={g.aceito}")
+        print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidores encontrados: {len(garantias)}")
 
-    if any(not g.aceito for g in garantias):
-        print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Nem todos os garantidores aceitaram.")
-        return False
+        # Exigamos exatamente 2 garantidores conforme a regra de negócio
+        if len(garantias) < 2:
+            print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Menos de 2 garantidores ({len(garantias)}).")
+            return False
+            
+        for g in garantias:
+            print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidor ID {g.garante_id}: Aceito={g.aceito}")
+
+        if any(not g.aceito for g in garantias):
+            print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Nem todos os garantidores aceitaram.")
+            return False
+    else:
+        print(f"DEBUG: [Liberacao #{solicitacao_id}] BYPASS - Ignorando garantidores por ordem administrativa.")
 
     # Se chegou aqui, libera!
     print(f"DEBUG: [Liberacao #{solicitacao_id}] SUCESSO! Liberando empréstimo...")

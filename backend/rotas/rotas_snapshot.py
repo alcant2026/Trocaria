@@ -160,8 +160,24 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0))
                     },
                     "historico_mensal": historico_mes
-                }
+                },
+                "emprestimos_para_liberar": []
             }
+
+            # 6. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)
+            stuck_loans = db.query(SolicitacaoEmprestimo).filter(
+                SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
+                SolicitacaoEmprestimo.valor_arrecadado >= SolicitacaoEmprestimo.valor
+            ).all()
+
+            for sl in stuck_loans:
+                snapshot["admin"]["emprestimos_para_liberar"].append({
+                    "id": sl.id,
+                    "tomador": sl.usuario.nome,
+                    "valor": float(sl.valor),
+                    "arrecadado": float(sl.valor_arrecadado),
+                    "garantidores_atuais": len(sl.garantias_sociais)
+                })
 
         # --- TOMADOR DATA ---
         solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.usuario_id == usuario.id).all()

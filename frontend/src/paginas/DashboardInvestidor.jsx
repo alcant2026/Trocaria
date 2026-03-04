@@ -61,10 +61,11 @@ const TIPOS_LABEL = {
     taxa_saque: 'Taxa de Saque',
     taxa_intermediacao: 'Taxa de Intermediação',
     taxa_conveniencia: 'Taxa de Conveniência',
+    pagamento_parcela: 'Pagamento de Parcela',
 };
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento']);
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela']);
 const TIPOS_ENTRADA = new Set(['deposito', 'recebimento']);
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela']);
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
         if (detalhes?.toLowerCase().includes('empr')) return 'Taxa de Solicitação';
@@ -117,7 +118,16 @@ const DashboardInvestidor = () => {
     const [aceiteRisco, setAceiteRisco] = useState({}); // Controle por ID de solicitação
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
-    const [mensagem, setMensagem] = useState('');
+    const [mensagem, setMensagem] = useState(null);
+
+    useEffect(() => {
+        if (mensagem) {
+            const timer = setTimeout(() => {
+                setMensagem(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [mensagem]);
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_investidor') !== 'fechado'
     );

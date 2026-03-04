@@ -49,14 +49,16 @@ const TIPOS_LABEL = {
     taxa_saque: 'Taxa de Saque',
     taxa_intermediacao: 'Taxa de Intermediação',
     taxa_conveniencia: 'Taxa de Conveniência',
+    pagamento_parcela: 'Pagamento de Parcela',
+    taxa_postagem: 'Taxa de Postagem',
 };
 
 // Tipos que são saídas do tipo "taxa/pagamento"
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento']);
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela']);
 // Tipos que são entradas (positivos)
 const TIPOS_ENTRADA = new Set(['deposito', 'recebimento']);
 // Todos os tipos negativos (sem badge CONCLUIDO)
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -91,7 +93,8 @@ import {
     Gift,
     ArrowLeft,
     Users,
-    UserPlus
+    UserPlus,
+    X
 } from 'lucide-react';
 
 import TermosUso from '../componentes/TermosUso';
@@ -120,7 +123,16 @@ const DashboardTomador = () => {
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [aceiteSolicitacao, setAceiteSolicitacao] = useState(false);
-    const [mensagem, setMensagem] = useState('');
+    const [mensagem, setMensagem] = useState(null);
+
+    useEffect(() => {
+        if (mensagem) {
+            const timer = setTimeout(() => {
+                setMensagem(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [mensagem]);
     const [kycDetails, setKycDetails] = useState('');
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
@@ -929,299 +941,210 @@ const DashboardTomador = () => {
 
                         {meusEmprestimos.length === 0 ? (
                             <div className="card text-center" style={{ border: '2px dashed var(--border-color)', background: 'transparent', margin: 0 }}>
-                                <p>Nenhum contrato ativo no momento.</p>
+                                <p>Nenhum contrato encontrado.</p>
                             </div>
                         ) : (
                             <>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    {meusEmprestimos.slice((paginaContratos - 1) * ITENS_POR_PAGINA, paginaContratos * ITENS_POR_PAGINA).map(emp => (
-                                        <div key={emp.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-                                            <div className="flex-between mb-1">
+                                {(() => {
+                                    const ativos = meusEmprestimos.filter(e => ['aprovado', 'pendente'].includes(e.status));
+                                    const concluidos = meusEmprestimos.filter(e => ['concluido', 'rejeitado', 'falhou'].includes(e.status));
+
+                                    return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            {/* SEÇÃO: EMPRÉSTIMOS ATIVOS */}
+                                            {ativos.length > 0 && (
                                                 <div>
-                                                    <span className={`badge ${emp.status === 'aprovado' ? 'badge-success' : 'badge-warning'} `}>
-                                                        {emp.status.toUpperCase()}
-                                                    </span>
-                                                    <h3 className="mt-1" style={{ fontSize: '0.9rem' }}>Empréstimo #{emp.id}</h3>
-                                                    <div className="text-muted" style={{ fontSize: '0.65rem', marginTop: '2px' }}>
-                                                        Você recebe: <strong style={{ color: 'var(--text-main)' }}>R$ {emp.valor.toLocaleString('pt-BR')}</strong>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-muted" style={{ fontSize: '0.6rem' }}>VALOR MENSAL</p>
-                                                    <p style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.9rem' }}>
-                                                        R$ {emp.valor_parcela.toLocaleString('pt-BR')}
-                                                    </p>
-                                                    {emp.status === 'aprovado' && emp.proximo_vencimento && (
-                                                        <div className="text-muted" style={{ fontSize: '0.6rem', marginTop: '4px' }}>
-                                                            Vencimento: <span style={{ fontWeight: 600 }}>{new Date(emp.proximo_vencimento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
-                                                        </div>
-                                                    )}
-                                                    {emp.status === 'aprovado' && emp.proximo_vencimento && new Date() > new Date(emp.proximo_vencimento) && (
-                                                        <div style={{ color: 'var(--danger)', fontSize: '0.6rem', fontWeight: 600 }}>
-                                                            + Juros de Mora
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {emp.status === 'aprovado' && emp.proximo_vencimento && new Date() > new Date(emp.proximo_vencimento) && (
-                                                <div className="info-block mb-1" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem' }}>
-                                                    <div className="flex-between">
-                                                        <span style={{ fontSize: '0.65rem', color: 'var(--danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <TriangleAlert size={12} /> EM ATRASO
-                                                        </span>
-                                                        <span style={{ fontSize: '0.65rem', color: 'var(--danger)' }}>
-                                                            {Math.floor((new Date() - new Date(emp.proximo_vencimento)) / (1000 * 60 * 60 * 24))} dias
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex-between mt-1" style={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                                                        <span>Valor Total Devido:</span>
-                                                        <span style={{ fontWeight: 700, color: 'var(--danger)' }}>
-                                                            R$ {(emp.valor_parcela + (emp.valor_parcela * 0.02) + (emp.valor_parcela * 0.001 * Math.max(0, Math.floor((new Date() - new Date(emp.proximo_vencimento)) / (1000 * 60 * 60 * 24))))).toLocaleString('pt-BR')}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {emp.status === 'pendente' && (
-                                                <>
-                                                    <ContractTimer expira4h={emp.data_expiracao_4h} expira5d={emp.data_expiracao_5d} arrecadado={emp.valor_arrecadado} />
-                                                    <div style={{ marginBottom: '1rem' }}>
-                                                        <div className="flex-between mb-1" style={{ fontSize: '0.75rem' }}>
-                                                            <span className="text-muted">Arrecadado</span>
-                                                            <span style={{ fontWeight: 700 }}>R$ {emp.valor_arrecadado.toLocaleString('pt-BR')} / R$ {emp.valor.toLocaleString('pt-BR')}</span>
-                                                        </div>
-                                                        <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
-                                                            <div style={{
-                                                                width: `${Math.min(100, (emp.valor_arrecadado / emp.valor) * 100)}%`,
-                                                                height: '100%',
-                                                                background: 'var(--success)',
-                                                                transition: 'width 1s ease-in-out'
-                                                            }}></div>
-                                                        </div>
-
-                                                        {/* Status da Garantia Social ou Formulário de Vinculação */}
-                                                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '12px', marginTop: '10px' }}>
-                                                            <p style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                                Garantia Social (Assinaturas)
-                                                            </p>
-
-                                                            {emp.garantidores && emp.garantidores.length > 0 ? (
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                    {emp.garantidores.map((g, idx) => (
-                                                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                                                                            <span style={{ color: 'var(--text-main)' }}>{g.nome}</span>
-                                                                            <span style={{
-                                                                                color: g.aceito ? 'var(--success)' : 'var(--warning)',
-                                                                                fontWeight: 700,
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px'
-                                                                            }}>
-                                                                                {g.aceito ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                                                                                {g.aceito ? 'Assinado' : 'Pendente'}
+                                                    <h4 style={{ fontSize: '0.75rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <TrendingUp size={14} /> Empréstimos Ativos
+                                                    </h4>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        {ativos.map(emp => (
+                                                            <div key={emp.id} style={{ background: 'rgba(var(--primary-rgb), 0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(var(--primary-rgb), 0.2)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                                                                <div className="flex-between mb-1">
+                                                                    <div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <span className={`badge ${emp.status === 'aprovado' ? 'badge-success' : 'badge-warning'} `}>
+                                                                                {emp.status.toUpperCase()}
                                                                             </span>
+                                                                            <button onClick={() => baixarContrato(emp.id)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}>
+                                                                                <FileText size={12} /> Contrato PDF
+                                                                            </button>
                                                                         </div>
-                                                                    ))}
-                                                                    {emp.garantidores.every(g => g.aceito) && emp.valor_arrecadado >= emp.valor && (
-                                                                        <div style={{ marginTop: '10px', padding: '8px', background: 'rgba(var(--success-rgb), 0.1)', borderRadius: '8px', border: '1px solid var(--success)', textAlign: 'center' }}>
-                                                                            <p style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 700 }}>Liberação em processamento...</p>
+                                                                        <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Empréstimo #{emp.id}</h3>
+                                                                        <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                                                            Você recebe: <strong style={{ color: 'var(--text-main)' }}>R$ {emp.valor.toLocaleString('pt-BR')}</strong>
                                                                         </div>
-                                                                    )}
-                                                                </div>
-                                                            ) : emp.valor_arrecadado >= emp.valor ? (
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '10px' }}>
-                                                                    <p style={{ fontSize: '0.75rem', color: 'var(--warning)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                        <CheckCircle2 size={16} /> Meta atingida!
-                                                                    </p>
-                                                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                                                        Indique 2 amigos (ID no perfil deles) para assinar como garantidores:
-                                                                    </p>
-
-                                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                                                        <input
-                                                                            type="number"
-                                                                            className="input-field"
-                                                                            placeholder="ID Amigo 1"
-                                                                            style={{ fontSize: '0.85rem', padding: '10px 12px', textAlign: 'center' }}
-                                                                            value={idAmigo1}
-                                                                            min="1"
-                                                                            onChange={(e) => setIdAmigo1(e.target.value)}
-                                                                        />
-                                                                        <input
-                                                                            type="number"
-                                                                            className="input-field"
-                                                                            placeholder="ID Amigo 2"
-                                                                            style={{ fontSize: '0.85rem', padding: '10px 12px', textAlign: 'center' }}
-                                                                            value={idAmigo2}
-                                                                            min="1"
-                                                                            onChange={(e) => setIdAmigo2(e.target.value)}
-                                                                        />
                                                                     </div>
-
-                                                                    <button
-                                                                        className="btn btn-primary"
-                                                                        style={{
-                                                                            marginTop: '10px',
-                                                                            padding: '10px 24px',
-                                                                            fontSize: '0.85rem',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center',
-                                                                            gap: '8px',
-                                                                            fontWeight: 700,
-                                                                            width: 'auto',
-                                                                            alignSelf: 'center'
-                                                                        }}
-                                                                        onClick={() => handleVincularGarantidores(emp.id)}
-                                                                    >
-                                                                        <UserPlus size={18} /> Vincular Amigos
-                                                                    </button>
+                                                                    <div className="text-right">
+                                                                        <p className="text-muted" style={{ fontSize: '0.6rem' }}>VALOR MENSAL</p>
+                                                                        <p style={{ fontWeight: 800, color: 'var(--success)', fontSize: '1rem' }}>
+                                                                            R$ {emp.valor_parcela.toLocaleString('pt-BR')}
+                                                                        </p>
+                                                                        {emp.status === 'aprovado' && emp.proximo_vencimento && (
+                                                                            <div className="text-muted" style={{ fontSize: '0.65rem', marginTop: '4px' }}>
+                                                                                Vencimento: <span style={{ fontWeight: 700, color: 'var(--warning)' }}>{new Date(emp.proximo_vencimento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            ) : (
-                                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Os garantidores serão solicitados após atingir 100% da meta.</p>
-                                                            )}
-                                                        </div>
+
+                                                                {emp.status === 'pendente' && (
+                                                                    <>
+                                                                        <ContractTimer expira4h={emp.data_expiracao_4h} expira5d={emp.data_expiracao_5d} arrecadado={emp.valor_arrecadado} />
+                                                                        <div style={{ marginBottom: '1rem' }}>
+                                                                            <div className="flex-between mb-1" style={{ fontSize: '0.75rem' }}>
+                                                                                <span className="text-muted">Arrecadado</span>
+                                                                                <span style={{ fontWeight: 700 }}>R$ {emp.valor_arrecadado.toLocaleString('pt-BR')} / R$ {emp.valor.toLocaleString('pt-BR')}</span>
+                                                                            </div>
+                                                                            <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+                                                                                <div style={{
+                                                                                    width: `${Math.min(100, (emp.valor_arrecadado / emp.valor) * 100)}%`,
+                                                                                    height: '100%',
+                                                                                    background: 'var(--primary)',
+                                                                                    boxShadow: '0 0 10px var(--primary)',
+                                                                                    transition: 'width 1s ease-in-out'
+                                                                                }}></div>
+                                                                            </div>
+
+                                                                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
+                                                                                <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Assinaturas de Garantia</p>
+                                                                                {emp.garantidores && emp.garantidores.length > 0 ? (
+                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                                        {emp.garantidores.map((g, idx) => (
+                                                                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                                                                                                <span>{g.nome}</span>
+                                                                                                <span style={{ color: g.aceito ? 'var(--success)' : 'var(--warning)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                                                    {g.aceito ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                                                                    {g.aceito ? 'Assinado' : 'Pendente'}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                ) : emp.valor_arrecadado >= emp.valor ? (
+                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Indique 2 amigos via ID para assinar:</p>
+                                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                                                                            <input type="number" className="input-field" placeholder="ID 1" style={{ fontSize: '0.8rem', textAlign: 'center' }} value={idAmigo1} onChange={e => setIdAmigo1(e.target.value)} />
+                                                                                            <input type="number" className="input-field" placeholder="ID 2" style={{ fontSize: '0.8rem', textAlign: 'center' }} value={idAmigo2} onChange={e => setIdAmigo2(e.target.value)} />
+                                                                                        </div>
+                                                                                        <button className="btn btn-primary" style={{ padding: '8px', fontSize: '0.75rem' }} onClick={() => handleVincularGarantidores(emp.id)}>Vincular Amigos</button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Garantidores necessários após 100% da meta.</p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+
+                                                                <div className="info-block" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginTop: '10px' }}>
+                                                                    <div>
+                                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Parcelas</div>
+                                                                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{emp.parcelas_pagas} / {emp.parcelas}</div>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className="info-label" style={{ fontSize: '0.6rem' }}>Restante</div>
+                                                                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--danger)' }}>R$ {emp.valor_total_restante.toLocaleString('pt-BR')}</div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
+                                                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}>Pagar Parcela</button>
+                                                                            <button className="btn btn-outline" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handleQuitar(emp.id)}>Quitar Tudo</button>
+                                                                        </div>
+
+                                                                        {showAvulsoPorId[emp.id] ? (
+                                                                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', border: '1px solid var(--primary-low)' }}>
+                                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                                    <div style={{ position: 'relative', flex: 1 }}>
+                                                                                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', opacity: 0.6 }}>R$</span>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            className="input-field"
+                                                                                            placeholder="0,00"
+                                                                                            style={{ paddingLeft: '30px', fontSize: '0.85rem' }}
+                                                                                            value={valorAvulsoPorId[emp.id] || ''}
+                                                                                            onChange={(e) => setValorAvulsoPorId(prev => ({ ...prev, [emp.id]: e.target.value }))}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <button className="btn btn-primary" style={{ padding: '0 15px', fontSize: '0.75rem', width: 'auto' }} onClick={() => handlePagamentoAvulso(emp.id)}>Pagar</button>
+                                                                                    <button className="btn btn-secondary" style={{ padding: '0 10px', width: 'auto' }} onClick={() => { setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: false })); setValorAvulsoPorId(prev => ({ ...prev, [emp.id]: '' })); }}><X size={14} /></button>
+                                                                                </div>
+                                                                                <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>Adiciona taxa de R$ 1,50 ao contrato.</p>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button
+                                                                                style={{
+                                                                                    fontSize: '0.75rem',
+                                                                                    color: '#FFD600',
+                                                                                    background: 'rgba(0,0,0,0.85)',
+                                                                                    padding: '8px 16px',
+                                                                                    textAlign: 'center',
+                                                                                    width: '100%',
+                                                                                    border: '1px solid rgba(255,214,0,0.3)',
+                                                                                    borderRadius: '10px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontWeight: 700,
+                                                                                    letterSpacing: '0.3px',
+                                                                                    transition: 'var(--transition)'
+                                                                                }}
+                                                                                onClick={() => setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: true }))}
+                                                                            >
+                                                                                Pagar outro valor
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                </>
+                                                </div>
                                             )}
 
-                                            <div className="info-block mb-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '0.75rem' }}>
+                                            {/* SEÇÃO: HISTÓRICO DE CONTRATOS */}
+                                            {concluidos.length > 0 && (
                                                 <div>
-                                                    <div className="info-label" style={{ fontSize: '0.6rem' }}>Parcelas</div>
-                                                    <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{emp.parcelas_pagas} / {emp.parcelas}</div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="info-label" style={{ fontSize: '0.6rem' }}>Restante</div>
-                                                    <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>R$ {emp.valor_total_restante.toLocaleString('pt-BR')}</div>
-                                                </div>
-                                            </div>
-
-                                            {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '0.5rem' }}>
-                                                    <button
-                                                        className="btn btn-primary"
-                                                        style={{ padding: '0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                                        onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}
-                                                    >
-                                                        <Wallet size={16} />
-                                                        {emp.proximo_vencimento && new Date() > new Date(emp.proximo_vencimento) ? 'Pagar com Juros' : 'Pagar Parcela'}
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-outline"
-                                                        style={{ padding: '0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                                        onClick={() => handleQuitar(emp.id)}
-                                                    >
-                                                        <HandCoins size={16} /> Quitar Tudo
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                                    {!showAvulsoPorId[emp.id] ? (
-                                                        <button
-                                                            className="btn btn-outline"
-                                                            style={{
-                                                                width: 'fit-content',
-                                                                padding: '0.45rem 1.2rem',
-                                                                fontSize: '0.7rem',
-                                                                borderStyle: 'dashed',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '8px',
-                                                                background: 'rgba(var(--primary-rgb), 0.03)',
-                                                                borderRadius: '20px'
-                                                            }}
-                                                            onClick={() => setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: true }))}
-                                                        >
-                                                            <PlusCircle size={14} /> Pagar outro valor
-                                                        </button>
-                                                    ) : (
-                                                        <div className="card-minimal" style={{
-                                                            background: 'rgba(255,255,255,0.01)',
-                                                            margin: 0,
-                                                            padding: '16px',
-                                                            border: '1px solid var(--border-color)',
-                                                            width: '100%',
-                                                            borderRadius: '16px',
-                                                            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
-                                                        }}>
-                                                            <div className="flex-column" style={{ gap: '12px' }}>
-                                                                <div style={{
-                                                                    background: 'rgba(255,255,255,0.03)',
-                                                                    padding: '2px',
-                                                                    borderRadius: '12px',
-                                                                    border: '1px solid var(--border-color)',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center'
-                                                                }}>
-                                                                    <span style={{ paddingLeft: '12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>R$</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="input-field"
-                                                                        placeholder="0,00"
-                                                                        style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.7rem 0.5rem', textAlign: 'left', width: '100%', fontSize: '1rem', fontWeight: 800, color: '#fff' }}
-                                                                        value={valorAvulsoPorId[emp.id] || ''}
-                                                                        min="0.01"
-                                                                        step="0.01"
-                                                                        onChange={(e) => setValorAvulsoPorId(prev => ({ ...prev, [emp.id]: e.target.value }))}
-                                                                    />
-                                                                </div>
-
-                                                                <div style={{ padding: '8px 12px', background: 'rgba(255, 145, 0, 0.05)', borderRadius: '10px', border: '1px solid rgba(255, 145, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                    <AlertCircle size={14} color="var(--warning)" />
-                                                                    <p style={{ fontSize: '0.7rem', color: 'var(--warning)', fontWeight: 600, margin: 0 }}>
-                                                                        + Taxa de serviço: R$ 1,50
-                                                                    </p>
-                                                                </div>
-
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                                                                    <button
-                                                                        className="btn btn-primary"
-                                                                        style={{ width: '100%', padding: '0.7rem', fontSize: '0.85rem' }}
-                                                                        onClick={() => handlePagamentoAvulso(emp.id)}
-                                                                    >
-                                                                        Confirmar Pagamento
-                                                                    </button>
-                                                                    <button
-                                                                        className="btn btn-secondary"
-                                                                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.75rem' }}
-                                                                        onClick={() => setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: false }))}
-                                                                    >
-                                                                        Cancelar
-                                                                    </button>
+                                                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <History size={14} /> Histórico de Contratos
+                                                    </h4>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        {concluidos.slice((paginaContratos - 1) * ITENS_POR_PAGINA, paginaContratos * ITENS_POR_PAGINA).map(emp => (
+                                                            <div key={emp.id} style={{ background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', opacity: 0.7 }}>
+                                                                <div className="flex-between">
+                                                                    <div>
+                                                                        <span className={`badge ${emp.status === 'concluido' ? 'badge-secondary' : 'badge-danger'}`} style={{ fontSize: '0.55rem' }}>
+                                                                            {emp.status.toUpperCase()}
+                                                                        </span>
+                                                                        <p style={{ fontSize: '0.8rem', fontWeight: 600, marginTop: '4px' }}>Empréstimo #{emp.id}</p>
+                                                                        <p className="text-muted" style={{ fontSize: '0.65rem' }}>Total: R$ {emp.valor.toLocaleString('pt-BR')}</p>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: emp.status === 'concluido' ? 'var(--success)' : 'var(--danger)' }}>
+                                                                            {emp.status === 'concluido' ? 'QUITADO' : 'ENCERRADO'}
+                                                                        </p>
+                                                                        <button onClick={() => baixarContrato(emp.id)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline', marginTop: '4px' }}>
+                                                                            Baixar Contrato
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {concluidos.length > ITENS_POR_PAGINA && (
+                                                        <div className="flex-between mt-1">
+                                                            <button className="btn-outline" style={{ padding: '2px 8px', fontSize: '0.65rem' }} disabled={paginaContratos === 1} onClick={() => setPaginaContratos(p => p - 1)}>Anterior</button>
+                                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{paginaContratos} / {Math.ceil(concluidos.length / ITENS_POR_PAGINA)}</span>
+                                                            <button className="btn-outline" style={{ padding: '2px 8px', fontSize: '0.65rem' }} disabled={(paginaContratos * ITENS_POR_PAGINA) >= concluidos.length} onClick={() => setPaginaContratos(p => p + 1)}>Próxima</button>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
-                                    ))}
-                                </div>
-
-                                {meusEmprestimos.length > ITENS_POR_PAGINA && (
-                                    <div className="flex-between mt-1" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                                        <button
-                                            className="btn-outline"
-                                            style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: paginaContratos === 1 ? 0.3 : 1, width: 'auto' }}
-                                            disabled={paginaContratos === 1}
-                                            onClick={() => setPaginaContratos(p => p - 1)}
-                                        >
-                                            Anterior
-                                        </button>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Página {paginaContratos} de {Math.ceil(meusEmprestimos.length / ITENS_POR_PAGINA)}</span>
-                                        <button
-                                            className="btn-outline"
-                                            style={{ padding: '4px 10px', fontSize: '0.7rem', opacity: (paginaContratos * ITENS_POR_PAGINA) >= meusEmprestimos.length ? 0.3 : 1, width: 'auto' }}
-                                            disabled={(paginaContratos * ITENS_POR_PAGINA) >= meusEmprestimos.length}
-                                            onClick={() => setPaginaContratos(p => p + 1)}
-                                        >
-                                            Próxima
-                                        </button>
-                                    </div>
-                                )}
+                                    );
+                                })()}
                             </>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>

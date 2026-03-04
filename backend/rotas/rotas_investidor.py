@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
-from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, AcessoInvestidor, Investimento, Transacao, TipoTransacao, StatusSolicitacao
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, AcessoInvestidor, Investimento, Transacao, TipoTransacao, StatusSolicitacao, RegistroAuditoria
 from database import get_db
-from rotas.rotas_auth import obter_usuario_logado
+from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_data import adicionar_mes
 from utils_emprestimo import tentar_liberar_emprestimo
 
@@ -17,9 +17,6 @@ class InvestimentoRequest(BaseModel):
 
 @router.post("/desbloquear/{solicitacao_id}")
 async def desbloquear_solicitacao(solicitacao_id: int, db: Session = Depends(get_db), investidor: Usuario = Depends(obter_usuario_logado)):
-    if not investidor:
-        raise HTTPException(status_code=404, detail="Investidor não encontrado")
-    
     if not investidor:
         raise HTTPException(status_code=404, detail="Investidor não encontrado")
 
@@ -163,7 +160,7 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
 
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
     ).first()
 
     if not solicitacao:
@@ -178,13 +175,26 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
     investidor.saldo -= valor
     solicitacao.valor_arrecadado += valor
     
+    # Criar registro de auditoria
+    agora_reg = datetime.datetime.utcnow()
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        municipio=f"{investidor.cidade}/{investidor.estado}" if investidor.cidade else "Localização não informada",
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora_reg
+    )
+    db.add(auditoria)
+    db.flush()
+
     novo_investimento = Investimento(
         investidor_id=investidor.id,
         solicitacao_id=solicitacao.id,
         valor_investido=valor,
+        pago_para_investidor=Decimal("0.00"),
+        data_investimento=agora_reg,
         ciencia_risco=dados.aceite_risco,
         # Blindagem Jurídica
-        ip_aceite=request.client.host,
+        auditoria_id=auditoria.id,
         cpf_aceite=investidor.cpf
     )
 
@@ -211,23 +221,24 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
     return {"message": "Investimento realizado com sucesso!", "valor_pago": valor}
 
 @router.post("/processar-expiracoes")
-async def processar_expiracoes_job(db: Session = Depends(get_db)):
+async def processar_expiracoes_job(db: Session = Depends(get_db), _: Usuario = Depends(exigir_admin)):
+    """Rota administrativa para processar expirações de 4h e 5d."""
     agora = datetime.datetime.utcnow()
     
     # 1. Regra das 4h: Ninguém investiu nada -> APAGAR
     expirados_4h = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
         SolicitacaoEmprestimo.valor_arrecadado == 0,
         SolicitacaoEmprestimo.data_expiracao_4h <= agora
     ).all()
 
     count_4h = len(expirados_4h)
     for s in expirados_4h:
-        db.delete(s)
+        estornar_e_limpar_solicitacao(s.id, db)
 
     # 2. Regra dos 5d: Tem investimentos mas não atingiu meta OU atingiu e não assinou
     expirados_5d = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
         SolicitacaoEmprestimo.data_expiracao_5d <= agora
     ).all()
 

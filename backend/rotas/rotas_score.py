@@ -62,7 +62,7 @@ async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Dep
 
     pagamento_anterior = db.query(Transacao).filter(
         Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS.value
+        Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS
     ).first()
 
     custo = Decimal("35.00")

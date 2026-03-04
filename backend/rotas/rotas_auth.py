@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import bcrypt
 import pyotp
-from modelos.modelos_db import Usuario
+from modelos.modelos_db import Usuario, RegistroAuditoria
 from database import get_db
 import qrcode
 import io
@@ -91,6 +91,17 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             detail="Você precisa aceitar os Termos de Uso e Política de Privacidade para se cadastrar."
         )
 
+    # Criar registro de auditoria para o aceite de termos
+    agora = datetime.utcnow()
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        municipio=f"{dados.cidade}/{dados.estado}" if dados.cidade else "Localização não informada",
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora
+    )
+    db.add(auditoria)
+    db.flush()
+
     # Criar novo usuário com senha hashed
     novo_usuario = Usuario(
         nome=dados.nome,
@@ -101,7 +112,7 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         cidade=dados.cidade,
         estado=dados.estado,
         aceite_termos=dados.aceite_termos,
-        data_aceite=datetime.utcnow(),
+        auditoria_id=auditoria.id,
         saldo=0,
         score=0
     )

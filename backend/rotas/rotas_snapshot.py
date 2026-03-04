@@ -71,7 +71,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # Pendências
             pendentes_raw = db.query(Transacao).join(Usuario).filter(
                 Transacao.status == "pendente",
-                Transacao.tipo.in_([TipoTransacao.DEPOSITO.value, TipoTransacao.SAQUE.value, TipoTransacao.DESBLOQUEIO_DADOS.value])
+                Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS])
             ).all()
             
             pendentes_list = []
@@ -93,18 +93,26 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 TipoTransacao.DESBLOQUEIO_DADOS, 
                 TipoTransacao.TAXA_SAQUE, 
                 TipoTransacao.TAXA_INTERMEDIACAO,
-                TipoTransacao.APORTE_CAPITAL
+                TipoTransacao.APORTE_CAPITAL,
+                TipoTransacao.TAXA_POSTAGEM,
+                TipoTransacao.RETORNO_INVESTIMENTO
             ]
 
             saldo_usuarios = db.query(func.sum(Usuario.saldo)).scalar() or Decimal("0.00")
             total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
-                Transacao.tipo.in_([t.value for t in tipos_receita]),
+                Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
             total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
-                Transacao.tipo == TipoTransacao.SAQUE.value,
+                Transacao.tipo == TipoTransacao.SAQUE,
                 Transacao.detalhes.like("RESGATE DE LUCRO %"),
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+
+            total_investido_institucional = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo == TipoTransacao.INVESTIMENTO,
+                Transacao.detalhes.like("%LUCRO%"),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
@@ -112,7 +120,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             primeiro_dia_mes = agora_br.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
             receitas_mes_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
-                Transacao.tipo.in_([t.value for t in tipos_receita]),
+                Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido",
                 Transacao.data_criacao >= primeiro_dia_mes
             ).group_by(Transacao.tipo).all()
@@ -129,10 +137,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             historico_raw = db.query(
                 trunc_fn.label("mes"),
-                func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO.value, Transacao.valor), else_=0)).label("depositos"),
-                func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE.value, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
-                func.sum(case((Transacao.tipo.in_([t.value for t in tipos_receita]), Transacao.valor), else_=0)).label("lucro"),
-                func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE.value, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
+                func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO, Transacao.valor), else_=0)).label("depositos"),
+                func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
+                func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro"),
+                func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
             ).filter(Transacao.status == "concluido").group_by("mes").order_by(text("mes DESC")).limit(12).all()
 
             historico_mes = []
@@ -151,9 +159,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_usuarios_gerenciado": float(saldo_usuarios),
                     "lucro_plataforma_total": float(sum(detalhamento_mes.values())),
                     "lucro_plataforma_historico": float(total_lucro_historico),
-                    "lucro_disponivel": float(total_lucro_historico - total_sacado_admin),
+                    "lucro_disponivel": float(total_lucro_historico - total_sacado_admin - total_investido_institucional),
                     "detalhamento_lucro": {
-                        "taxas_postagem": float(detalhamento_mes.get('taxa_intermediacao', 0)),
+                        "taxas_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
                         "desbloqueio_lgpd": float(detalhamento_mes.get('desbloqueio_dados', 0)),
                         "kyc_e_score": float(detalhamento_mes.get('compra_score', 0)),
                         "taxas_saque_extra": float(detalhamento_mes.get('taxa_saque', 0)),
@@ -161,12 +169,29 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     },
                     "historico_mensal": historico_mes
                 },
-                "emprestimos_para_liberar": []
+                "emprestimos_para_liberar": [],
+                "solicitacoes_ativas": []
             }
+
+            # 6. Todas as Solicitações Ativas (Para investimento institucional)
+            solicitacoes_ativas = db.query(SolicitacaoEmprestimo).filter(
+                SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+            ).all()
+
+            for sa in solicitacoes_ativas:
+                snapshot["admin"]["solicitacoes_ativas"].append({
+                    "id": sa.id,
+                    "tomador": sa.usuario.nome,
+                    "valor": float(sa.valor),
+                    "valor_arrecadado": float(sa.valor_arrecadado),
+                    "score": float(sa.usuario.score),
+                    "taxa": float(sa.taxa_juros),
+                    "parcelas": sa.prazo_meses
+                })
 
             # 6. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)
             stuck_loans = db.query(SolicitacaoEmprestimo).filter(
-                SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
+                SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
                 SolicitacaoEmprestimo.valor_arrecadado >= SolicitacaoEmprestimo.valor
             ).all()
 
@@ -229,7 +254,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         }
 
         # --- INVESTIDOR DATA ---
-        solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value).all()
+        solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE).all()
         
         # Obter IDs de solicitações já desbloqueadas por este investidor
         desbloqueadas_ids = {a.solicitacao_id for a in db.query(AcessoInvestidor.solicitacao_id).filter(AcessoInvestidor.investidor_id == usuario.id).all()}

@@ -21,6 +21,18 @@ class TipoTransacao(enum.Enum):
     TAXA_SAQUE = "taxa_saque"
     TAXA_INTERMEDIACAO = "taxa_intermediacao"
     APORTE_CAPITAL = "aporte_capital"
+    PAGAMENTO_PARCELA = "pagamento_parcela"
+    TAXA_POSTAGEM = "taxa_postagem"
+    RETORNO_INVESTIMENTO = "retorno_investimento"
+
+class RegistroAuditoria(Base):
+    __tablename__ = "registros_auditoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip = Column(String, nullable=False)
+    municipio = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    data_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -46,7 +58,9 @@ class Usuario(Base):
     
     # Proteção Jurídica: Aceite de Termos de Uso (Intermediação SaaS)
     aceite_termos = Column(Boolean, default=False)
-    data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
+    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
+    
+    auditoria = relationship("RegistroAuditoria")
 
     # Autenticação de Dois Fatores (2FA)
     totp_secret = Column(String, nullable=True)
@@ -76,10 +90,11 @@ class SolicitacaoEmprestimo(Base):
     
     # Blindagem Jurídica: Rastreabilidade de Aceite
     aceite_termos = Column(Boolean, default=False)
-    ip_aceite = Column(String, nullable=True)
-    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String, nullable=True)
     data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
+
+    auditoria = relationship("RegistroAuditoria")
 
     usuario = relationship("Usuario", back_populates="solicitacoes")
     acessos_investidores = relationship("AcessoInvestidor", back_populates="solicitacao")
@@ -98,10 +113,11 @@ class Investimento(Base):
     ciencia_risco = Column(Boolean, default=False) # Blindagem jurídica: investidor deu aceite no risco
     
     # Blindagem Jurídica: Rastreabilidade
-    ip_aceite = Column(String, nullable=True)
-    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String, nullable=True)
+    is_institutional = Column(Boolean, default=False)
 
+    auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
     investidor = relationship("Usuario")
 
@@ -138,8 +154,8 @@ class GarantiaSocial(Base):
     garante_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"))
     aceito = Column(Boolean, default=False)
     data_aceite = Column(DateTime, nullable=True)
-    ip_aceite = Column(String, nullable=True)
-    municipio_aceite = Column(String, nullable=True) # Cidade/UF no momento do aceite
+    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
+    auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="garantias_sociais")
     garante = relationship("Usuario", back_populates="garantias_prestadas")

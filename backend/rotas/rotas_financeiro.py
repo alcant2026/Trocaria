@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
 import logging
@@ -12,6 +12,7 @@ import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
+from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -72,7 +73,7 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
     
     saques_hoje = db.query(Transacao).filter(
         Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.SAQUE.value,
+        Transacao.tipo == TipoTransacao.SAQUE,
         Transacao.data_criacao >= inicio_dia
     ).count()
 
@@ -133,7 +134,7 @@ async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(g
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     pendentes = db.query(Transacao).join(Usuario).filter(
         Transacao.status == "pendente",
-        Transacao.tipo.in_([TipoTransacao.DEPOSITO.value, TipoTransacao.SAQUE.value, TipoTransacao.DESBLOQUEIO_DADOS.value])
+        Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS])
     ).all()
     
     resultado = []
@@ -230,28 +231,46 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             TipoTransacao.DESBLOQUEIO_DADOS, 
             TipoTransacao.TAXA_SAQUE,
             TipoTransacao.TAXA_INTERMEDIACAO,
-            TipoTransacao.APORTE_CAPITAL
+            TipoTransacao.APORTE_CAPITAL,
+            TipoTransacao.TAXA_POSTAGEM,
+            TipoTransacao.RETORNO_INVESTIMENTO
         ]
 
         # 4. Lucro Total Histórico (Agregado no SQL)
         total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
-            Transacao.tipo.in_([t.value for t in tipos_receita]),
+            Transacao.tipo.in_(tipos_receita),
             Transacao.status == "concluido"
         ).scalar() or Decimal("0.00")
 
-        # 5. Saques de lucro do admin
+        # 5. Saques de lucro do admin + investimentos institucionais
         total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
-            Transacao.tipo == TipoTransacao.SAQUE.value,
+            Transacao.tipo == TipoTransacao.SAQUE,
             Transacao.detalhes.like("RESGATE DE LUCRO %"),
             Transacao.status == "concluido"
         ).scalar() or Decimal("0.00")
 
-        # 6. Detalhes do Mês Atual (Agregado)
+        total_investido_institucional = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.tipo == TipoTransacao.INVESTIMENTO,
+            Transacao.detalhes.like("%INSTITUCIONAL%LUCRO%"),
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
+
+        lucro_disponivel = total_lucro_historico - total_sacado_admin - total_investido_institucional
+
+        # 6. Detalhamento Histórico (sem filtro de mês — bate com o Bruto)
+        receitas_historico_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
+            Transacao.tipo.in_(tipos_receita),
+            Transacao.status == "concluido"
+        ).group_by(Transacao.tipo).all()
+
+        detalhamento_historico = {t.name.lower(): Decimal("0.00") for t in tipos_receita}
+        for tipo, soma in receitas_historico_query:
+            detalhamento_historico[tipo.value] = soma
+
+        # 6b. Detalhes do Mês Atual (para o histórico mensal)
         primerio_dia_mes = agora_brasilia.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
-        # Filtro de receitas do mês atual
         receitas_mes_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
-            Transacao.tipo.in_([t.value for t in tipos_receita]),
+            Transacao.tipo.in_(tipos_receita),
             Transacao.status == "concluido",
             Transacao.data_criacao >= primerio_dia_mes
         ).group_by(Transacao.tipo).all()
@@ -271,10 +290,10 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
 
         historico_raw = db.query(
             trunc_fn.label("mes"),
-            func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO.value, Transacao.valor), else_=0)).label("depositos"),
-            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE.value, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
-            func.sum(case((Transacao.tipo.in_([t.value for t in tipos_receita]), Transacao.valor), else_=0)).label("lucro"),
-            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE.value, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
+            func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO, Transacao.valor), else_=0)).label("depositos"),
+            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
+            func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro"),
+            func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
         ).filter(Transacao.status == "concluido").group_by("mes").order_by(text("mes DESC")).limit(12).all()
 
         historico_formatado = []
@@ -291,13 +310,15 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             "saldo_usuarios_gerenciado": float(saldo_usuarios),
             "lucro_plataforma_total": float(total_lucro_mes),
             "lucro_plataforma_historico": float(total_lucro_historico),
-            "lucro_disponivel": float(total_lucro_historico - total_sacado_admin),
+            "lucro_disponivel": float(lucro_disponivel),
             "detalhamento_lucro": {
-                "taxas_postagem": float(detalhamento_mes.get('taxa_intermediacao', 0)), # Referência simplificada
-                "desbloqueio_lgpd": float(detalhamento_mes.get('desbloqueio_dados', 0)),
-                "kyc_e_score": float(detalhamento_mes.get('compra_score', 0)),
-                "taxas_saque_extra": float(detalhamento_mes.get('taxa_saque', 0)),
-                "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0))
+                "taxas_postagem": float(detalhamento_historico.get('taxa_postagem', 0)),
+                "desbloqueio_lgpd": float(detalhamento_historico.get('desbloqueio_dados', 0)),
+                "kyc_e_score": float(detalhamento_historico.get('compra_score', 0)),
+                "taxas_saque_extra": float(detalhamento_historico.get('taxa_saque', 0)),
+                "taxas_intermediacao_p2p": float(detalhamento_historico.get('taxa_intermediacao', 0)),
+                "aportes_externos": float(detalhamento_historico.get('aporte_capital', 0)),
+                "retorno_investimento": float(detalhamento_historico.get('retorno_investimento', 0))
             },
             "historico_mensal": historico_formatado
         }
@@ -328,14 +349,14 @@ async def sacar_lucro_plataforma(
 
     # Calcula o lucro total disponível (histórico de taxas)
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([t.value for t in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]]),
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
         Transacao.status == "concluido"
     ).all()
     lucro_disponivel = sum(t.valor for t in todas_receitas)
 
     # Subtrai saques anteriores do admin
     saques_anteriores = db.query(Transacao).filter(
-        Transacao.tipo == TipoTransacao.SAQUE.value,
+        Transacao.tipo == TipoTransacao.SAQUE,
         Transacao.detalhes.like("Saque de lucro da plataforma%"),
         Transacao.status == "concluido"
     ).all()
@@ -351,6 +372,9 @@ async def sacar_lucro_plataforma(
 
     if not dados.motivo or len(dados.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="Você deve fornecer uma justificativa clara (mínimo 5 caracteres) para o resgate de lucro.")
+
+    # DEDUZIR DO SALDO REAL DO ADMIN
+    admin.saldo -= dados.valor
 
     # Registra a transação de auditoria
     transacao = Transacao(
@@ -384,6 +408,7 @@ async def aportar_lucro_plataforma(
         raise HTTPException(status_code=400, detail="Forneça uma justificativa para o aporte (mínimo 5 caracteres).")
 
     # Registra a transação de aporte (entrada no fiscal)
+    admin.saldo += dados.valor
     transacao = Transacao(
         usuario_id=admin.id,
         valor=dados.valor,
@@ -397,10 +422,108 @@ async def aportar_lucro_plataforma(
     return {
         "message": f"Aporte de R$ {float(dados.valor):.2f} registrado com sucesso!",
         "novo_lucro_disponivel": float(db.query(func.sum(Transacao.valor)).filter(
-            Transacao.tipo.in_([t.value for t in [TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]]),
+            Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]),
             Transacao.status == "concluido"
         ).scalar() or 0)
     }
+
+class InvestimentoAdminRequest(BaseModel):
+    solicitacao_id: int
+    valor: Decimal = Field(gt=0)
+    motivo: str
+
+@router.post("/admin/investir-lucro")
+async def investir_lucro_plataforma(
+    dados: InvestimentoAdminRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Permite ao admin investir o lucro acumulado em solicitações de empréstimo.
+    """
+    valor = dados.valor
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == dados.solicitacao_id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+    ).first()
+
+    if not solicitacao:
+        raise HTTPException(status_code=404, detail="Solicitação não encontrada ou não está mais pendente.")
+
+    # Calcula o lucro total disponível (histórico de taxas)
+    todas_receitas = db.query(Transacao).filter(
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
+        Transacao.status == "concluido"
+    ).all()
+    lucro_total = sum(t.valor for t in todas_receitas)
+
+    # Subtrai saques anteriores e investimentos institucionais anteriores (detalhes específicos)
+    saidas_lucro = db.query(Transacao).filter(
+        Transacao.tipo.in_([TipoTransacao.SAQUE, TipoTransacao.INVESTIMENTO]),
+        Transacao.detalhes.like("%LUCRO%"),
+        Transacao.status == "concluido"
+    ).all()
+    total_saido = sum(t.valor for t in saidas_lucro)
+
+    saldo_lucro_liquido = lucro_total - total_saido
+
+    if valor > saldo_lucro_liquido:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Saldo de lucro insuficiente. Disponível: R$ {float(saldo_lucro_liquido):.2f}"
+        )
+
+    # Validar meta
+    restante = solicitacao.valor - solicitacao.valor_arrecadado
+    if valor > restante:
+         raise HTTPException(status_code=400, detail=f"Valor excede o necessário. Faltam apenas R$ {restante}")
+
+    # Processar investimento (Não tira do saldo pessoal do admin, é institucional)
+    solicitacao.valor_arrecadado += valor
+
+    # Criar registro de auditoria
+    agora = datetime.datetime.utcnow()
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        municipio=f"{admin.cidade}/{admin.estado}" if admin.cidade else "Localização Admin",
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora
+    )
+    db.add(auditoria)
+    db.flush()
+
+    novo_investimento = Investimento(
+        investidor_id=admin.id,
+        solicitacao_id=solicitacao.id,
+        valor_investido=valor,
+        pago_para_investidor=Decimal("0.00"),
+        data_investimento=agora,
+        ciencia_risco=True,
+        auditoria_id=auditoria.id,
+        cpf_aceite=admin.cpf,
+        is_institutional=True
+    )
+
+    # Registrar transação
+    transacao = Transacao(
+        usuario_id=admin.id,
+        valor=valor,
+        tipo=TipoTransacao.INVESTIMENTO,
+        status="concluido",
+        detalhes=f"INVESTIMENTO INSTITUCIONAL (LUCRO) -> Pedido #{solicitacao.id} | MOTIVO: {dados.motivo}"
+    )
+
+    # Se atingiu a meta, tenta liberar
+    from utils_emprestimo import tentar_liberar_emprestimo
+    if solicitacao.valor_arrecadado == solicitacao.valor:
+        tentar_liberar_emprestimo(solicitacao.id, db)
+
+    db.add(novo_investimento)
+    db.add(transacao)
+    db.commit()
+
+    return {"message": "Investimento de lucro realizado com sucesso!", "valor": float(valor)}
 
 @router.post("/depositar-manual")
 async def registrar_deposito_manual(usuario_id: int, valor: Decimal, db: Session = Depends(get_db)):

@@ -30,10 +30,12 @@ const TIPOS_LABEL = {
     taxa_intermediacao: 'Taxa de Intermediação',
     taxa_conveniencia: 'Taxa de Conveniência',
     aporte_capital: 'Aporte de Capital',
+    taxa_postagem: 'Taxa de Postagem',
+    retorno_investimento: 'Retorno de Investimento',
 };
 
 // Tipos que para o Admin são ENTRADA de lucro
-const TIPOS_ENTRADA_ADMIN = new Set(['deposito', 'recebimento', 'taxa_intermediacao', 'taxa_conveniencia', 'taxa_saque', 'compra_score', 'desbloqueio_dados', 'aporte_capital']);
+const TIPOS_ENTRADA_ADMIN = new Set(['deposito', 'recebimento', 'taxa_intermediacao', 'taxa_conveniencia', 'taxa_saque', 'compra_score', 'desbloqueio_dados', 'aporte_capital', 'taxa_postagem']);
 
 const formatarTipoAdmin = (tipo) => TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
 
@@ -265,14 +267,32 @@ const AporteLucroCard = ({ onMensagem }) => {
 const AdminDashboard = () => {
     const [pendentes, setPendentes] = useState([]);
     const [fiscal, setFiscal] = useState(null);
-    const [mensagem, setMensagem] = useState('');
-    const [activeTab, setActiveTab] = useState('pendentes'); // 'pendentes', 'fiscal'
+    const [mensagem, setMensagem] = useState(null);
+
+    useEffect(() => {
+        if (mensagem) {
+            const timer = setTimeout(() => {
+                setMensagem(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [mensagem]);
+    const [stuckLoans, setStuckLoans] = useState([]);
+    const [solicitacoesAtivas, setSolicitacoesAtivas] = useState([]);
+    const [activeTab, setActiveTab] = useState('pendentes'); // 'pendentes', 'fiscal', 'emprestimos'
     const [showRejeitarModal, setShowRejeitarModal] = useState(false);
     const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
     const [ultimasAcoes, setUltimasAcoes] = useState([]);
-    const [pixCopiado, setPixCopiado] = useState(null); // id da transacao com pix copiado
-    const [stuckLoans, setStuckLoans] = useState([]);
+    const [pixCopiado, setPixCopiado] = useState(null);
+    const [showLiberarModal, setShowLiberarModal] = useState(false);
+    const [liberacaoId, setLiberacaoId] = useState(null);
+    const [loadingLiberacao, setLoadingLiberacao] = useState(false);
+
+    // Investimento Institucional
+    const [showInvestirModal, setShowInvestirModal] = useState(false);
+    const [investirData, setInvestirData] = useState({ id: null, valor: '', motivo: '', tomador: '' });
+    const [loadingInvestir, setLoadingInvestir] = useState(false);
 
     const extrairChavePix = (detalhes) => {
         if (!detalhes) return null;
@@ -312,6 +332,7 @@ const AdminDashboard = () => {
                 setPendentes(res.admin.pendentes || []);
                 setFiscal(res.admin.fiscal);
                 setStuckLoans(res.admin.emprestimos_para_liberar || []);
+                setSolicitacoesAtivas(res.admin.solicitacoes_ativas || []);
             }
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
@@ -412,14 +433,63 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleLiberarEspecial = async (id) => {
-        if (!window.confirm("Deseja realmente LIBERAR este empréstimo SEM garantidores?")) return;
+    const handleLiberarEspecial = (id) => {
+        setLiberacaoId(id);
+        setShowLiberarModal(true);
+    };
+
+    const confirmarLiberarEspecial = async () => {
+        setLoadingLiberacao(true);
         try {
-            await api.post(`/emprestimos/admin/liberar-especial/${id}`);
-            setMensagem("Empréstimo liberado com sucesso!");
+            const res = await api.post(`/emprestimos/admin/liberar-especial/${liberacaoId}`);
+            setMensagem(res.message || "Empréstimo liberado com sucesso!");
+            setShowLiberarModal(false);
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro: ' + err.message);
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingLiberacao(false);
+        }
+    };
+
+    const handleInvestirLucro = (loan) => {
+        const restante = loan.valor - loan.valor_arrecadado;
+        setInvestirData({
+            id: loan.id,
+            tomador: loan.tomador,
+            valor: '',
+            restante: restante,
+            motivo: 'Aporte institucional para fomento de crédito.'
+        });
+        setShowInvestirModal(true);
+    };
+
+    const confirmarInvestirLucro = async () => {
+        const { id, valor, motivo } = investirData;
+        const valorNumerico = parseFloat(valor);
+
+        if (!id) return alert("Erro: Solicitação inválida selecionada.");
+        if (Number.isNaN(valorNumerico) || valorNumerico <= 0) {
+            return alert("Por favor, insira um valor numérico válido e maior que zero.");
+        }
+        if (!motivo || motivo.length < 5) {
+            return alert("Insira uma justificativa detalhada para a auditoria (mín. 5 carac.).");
+        }
+
+        setLoadingInvestir(true);
+        try {
+            const res = await api.post('/financeiro/admin/investir-lucro', {
+                solicitacao_id: id,
+                valor: parseFloat(valor),
+                motivo: motivo
+            });
+            setMensagem(res.message || "Investimento realizado!");
+            setShowInvestirModal(false);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingInvestir(false);
         }
     };
 
@@ -444,7 +514,7 @@ const AdminDashboard = () => {
 
             {/* Quick Summary Section */}
             {fiscal && (
-                <div className="grid-2 mt-1 mb-1">
+                <div className="grid-2-mobile mt-1 mb-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                     <div className="card">
                         <p className="info-label">Custódia (Passivo)</p>
                         <h2 className="mt-1">R$ {fiscal.saldo_usuarios_gerenciado.toLocaleString('pt-BR')}</h2>
@@ -465,21 +535,28 @@ const AdminDashboard = () => {
             )}
 
             {/* Tabs */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '4px', display: 'flex', gap: '4px', width: 'fit-content' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '8px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '4px', display: 'flex', gap: '4px', width: 'fit-content', minWidth: 'max-content' }}>
                     <button
                         className={`btn ${activeTab === 'pendentes' ? 'btn-primary' : ''}`}
-                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1.5rem', width: 'auto', fontSize: '0.9rem' }}
+                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
                         onClick={() => setActiveTab('pendentes')}
                     >
                         Fila de Aprovação
                     </button>
                     <button
                         className={`btn ${activeTab === 'fiscal' ? 'btn-primary' : ''}`}
-                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1.5rem', width: 'auto', fontSize: '0.9rem' }}
+                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
                         onClick={() => setActiveTab('fiscal')}
                     >
                         Relatório Fiscal
+                    </button>
+                    <button
+                        className={`btn ${activeTab === 'emprestimos' ? 'btn-primary' : ''}`}
+                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1.5rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        onClick={() => setActiveTab('emprestimos')}
+                    >
+                        Empréstimos
                     </button>
                 </div>
             </div>
@@ -672,7 +749,62 @@ const AdminDashboard = () => {
                 </div>
             )}
 
-            {/* Content View: Fiscal */}
+            {/* Content View: Empréstimos Ativos (Para Investimento Institucional) */}
+            {activeTab === 'emprestimos' && (
+                <div className="animate-fade-in">
+                    <div className="flex-between mb-1">
+                        <h3>Solicitações Ativas</h3>
+                        <TrendingUp size={18} color="var(--primary)" />
+                    </div>
+
+                    {solicitacoesAtivas.length === 0 ? (
+                        <div className="card text-center text-muted py-2">Nenhuma solicitação ativa para investimento no momento.</div>
+                    ) : (
+                        <div className="grid-2">
+                            {solicitacoesAtivas.map(sa => (
+                                <div key={sa.id} className="card">
+                                    <div className="flex-between mb-1">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                                <User size={18} color="var(--primary)" />
+                                            </div>
+                                            <div>
+                                                <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>{sa.tomador}</p>
+                                                <p className="text-muted" style={{ fontSize: '0.7rem' }}>Pedido #{sa.id}</p>
+                                            </div>
+                                        </div>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}>
+                                            Score: {sa.score}
+                                        </span>
+                                    </div>
+
+                                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                                        <div className="flex-between mb-1">
+                                            <span className="text-muted" style={{ fontSize: '0.75rem' }}>Arrecadado:</span>
+                                            <span style={{ fontWeight: 600 }}>R$ {sa.valor_arrecadado.toLocaleString('pt-BR')} / R$ {sa.valor.toLocaleString('pt-BR')}</span>
+                                        </div>
+                                        <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                            <div style={{ width: `${(sa.valor_arrecadado / sa.valor) * 100}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.4s ease' }} />
+                                        </div>
+                                        <div className="flex-between mt-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                            <span>Juros: {sa.taxa}% a.m</span>
+                                            <span>{sa.parcelas} Meses</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        className="btn btn-primary"
+                                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.8rem', background: 'rgba(var(--primary-rgb), 0.15)', color: 'var(--primary)', border: '1px solid var(--primary)' }}
+                                        onClick={() => handleInvestirLucro(sa)}
+                                    >
+                                        Investir Lucro
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
             {activeTab === 'fiscal' && fiscal && (
                 <div className="animate-fade-in">
                     <div className="card mb-1">
@@ -694,9 +826,20 @@ const AdminDashboard = () => {
                                 <span className="text-muted">Saques Extras (Taxas):</span>
                                 <strong>R$ {fiscal.detalhamento_lucro.taxas_saque_extra.toLocaleString('pt-BR')}</strong>
                             </div>
-                            <div className="flex-between">
+                            <div className="flex-between mb-1">
                                 <span className="text-muted">Intermediação P2P (10%):</span>
                                 <strong>R$ {fiscal.detalhamento_lucro.taxas_intermediacao_p2p.toLocaleString('pt-BR')}</strong>
+                            </div>
+
+                            <div style={{ borderTop: '1px solid var(--border-color)', margin: '8px 0', opacity: 0.3 }} />
+
+                            <div className="flex-between mb-1">
+                                <span className="text-muted">📥 Aportes Externos:</span>
+                                <strong style={{ color: 'var(--success)' }}>R$ {(fiscal.detalhamento_lucro.aportes_externos || 0).toLocaleString('pt-BR')}</strong>
+                            </div>
+                            <div className="flex-between">
+                                <span className="text-muted">🔁 Retorno Investimento:</span>
+                                <strong style={{ color: 'var(--success)' }}>R$ {(fiscal.detalhamento_lucro.retorno_investimento || 0).toLocaleString('pt-BR')}</strong>
                             </div>
                         </div>
                     </div>
@@ -792,6 +935,120 @@ const AdminDashboard = () => {
                                 disabled={loadingRejeicao || !rejeicaoData.motivo}
                             >
                                 {loadingRejeicao ? 'Processando...' : 'Confirmar Rejeição'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Liberação Especial */}
+            {showLiberarModal && (
+                <div className="modal-overlay" onClick={() => setShowLiberarModal(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ border: '1px solid rgba(255, 145, 0, 0.2)', textAlign: 'left' }}>
+                        <div className="modal-header">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--warning)', marginBottom: 0 }}>
+                                <ShieldCheck size={20} /> Liberação Especial
+                            </h3>
+                            <button
+                                onClick={() => setShowLiberarModal(false)}
+                                className="modal-close"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-1" style={{ background: 'rgba(255, 145, 0, 0.05)', borderRadius: '12px', border: '1px solid rgba(255, 145, 0, 0.1)', marginBottom: '1.5rem' }}>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <AlertCircle size={18} color="var(--warning)" /> Atenção Administrador
+                            </p>
+                            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '6px' }}>
+                                Esta ação libera o valor para o tomador **SEM a necessidade de garantidores**. Use apenas em casos excepcionais onde a garantia foi validada externamente.
+                            </p>
+                        </div>
+
+                        <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                            Deseja realmente prosseguir com a liberação manual do empréstimo **#{liberacaoId}**?
+                        </p>
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                                className="btn btn-secondary"
+                                style={{ flex: 1 }}
+                                onClick={() => setShowLiberarModal(false)}
+                                disabled={loadingLiberacao}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                style={{ flex: 2, background: 'var(--warning)', color: '#111' }}
+                                onClick={confirmarLiberarEspecial}
+                                disabled={loadingLiberacao}
+                            >
+                                {loadingLiberacao ? 'Liberando...' : 'Sim, Liberar Agora'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Investimento Institucional */}
+            {showInvestirModal && (
+                <div className="modal-overlay" onClick={() => setShowInvestirModal(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ border: '1px solid var(--primary)', textAlign: 'left' }}>
+                        <div className="modal-header">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', marginBottom: 0 }}>
+                                <TrendingUp size={20} /> Investimento Institucional
+                            </h3>
+                            <button onClick={() => setShowInvestirModal(false)} className="modal-close">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-1 mb-1" style={{ background: 'rgba(83,130,255,0.05)', borderRadius: '12px', border: '1px solid rgba(83,130,255,0.1)' }}>
+                            <p style={{ fontSize: '0.85rem' }}>Tomador: <strong>{investirData.tomador}</strong></p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Utilizando o lucro disponível da plataforma para fomentar o crédito.</p>
+                        </div>
+
+                        <div className="input-group mb-1">
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Valor do Investimento (R$)</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="number"
+                                    className="input-field"
+                                    placeholder="0,00"
+                                    min="0.01"
+                                    step="0.01"
+                                    style={{ flex: 1 }}
+                                    value={investirData.valor}
+                                    onChange={e => setInvestirData({ ...investirData, valor: e.target.value })}
+                                />
+                                <button
+                                    className="btn btn-secondary"
+                                    style={{ width: 'auto', padding: '0 1rem', fontSize: '0.75rem' }}
+                                    onClick={() => setInvestirData({ ...investirData, valor: investirData.restante.toString() })}
+                                >
+                                    Total (R$ {investirData.restante?.toLocaleString('pt-BR')})
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="input-group mb-1">
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Justificativa Auditoria</label>
+                            <textarea
+                                className="input-field mt-1"
+                                style={{ minHeight: '80px' }}
+                                value={investirData.motivo}
+                                onChange={e => setInvestirData({ ...investirData, motivo: e.target.value })}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowInvestirModal(false)} disabled={loadingInvestir}>
+                                Cancelar
+                            </button>
+                            <button className="btn btn-primary" style={{ flex: 2 }} onClick={confirmarInvestirLucro} disabled={loadingInvestir || !investirData.valor}>
+                                {loadingInvestir ? 'Processando...' : 'Confirmar Investimento'}
                             </button>
                         </div>
                     </div>

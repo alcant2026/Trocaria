@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
-from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Investimento, AcessoInvestidor, GarantiaSocial
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Investimento, AcessoInvestidor, GarantiaSocial, RegistroAuditoria
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_data import adicionar_mes
@@ -99,6 +99,16 @@ async def criar_solicitacao(
 
     usuario.saldo -= custo_pedido
 
+    # Criar registro de auditoria
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        municipio=f"{usuario.cidade}/{usuario.estado}" if usuario.cidade else "Localização não informada",
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora
+    )
+    db.add(auditoria)
+    db.flush()
+
     nova_solicitacao = SolicitacaoEmprestimo(
         usuario_id=usuario.id,
         valor=valor,
@@ -110,8 +120,7 @@ async def criar_solicitacao(
         data_expiracao_5d=agora + datetime.timedelta(days=5),
         # Blindagem Jurídica
         aceite_termos=True,
-        ip_aceite=request.client.host,
-        municipio_aceite=f"{usuario.cidade}/{usuario.estado}" if usuario.cidade else "Localização não informada",
+        auditoria_id=auditoria.id,
         cpf_aceite=usuario.cpf,
         data_aceite=agora
     )
@@ -122,7 +131,7 @@ async def criar_solicitacao(
         transacao_custo = Transacao(
             usuario_id=usuario.id,
             valor=custo_pedido,
-            tipo=TipoTransacao.DESBLOQUEIO_DADOS,
+            tipo=TipoTransacao.TAXA_POSTAGEM,
             status="concluido",
             detalhes="Taxa de postagem de empréstimo (2º+ pedido do mês)"
         )
@@ -229,11 +238,20 @@ async def aceitar_garantia(
     if garantia.aceito:
         return {"message": "Você já aceitou esta garantia."}
 
-    # Registrar aceite
+    # Registrar aceite via auditoria
+    agora = datetime.datetime.utcnow()
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        municipio=f"{usuario.cidade}/{usuario.estado}" if usuario.cidade else "Localização não informada",
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora
+    )
+    db.add(auditoria)
+    db.flush()
+
     garantia.aceito = True
-    garantia.data_aceite = datetime.datetime.utcnow()
-    garantia.ip_aceite = request.client.host
-    garantia.municipio_aceite = f"{usuario.cidade}/{usuario.estado}" if usuario.cidade else "Localização não informada"
+    garantia.data_aceite = agora
+    garantia.auditoria_id = auditoria.id
 
     db.commit()
 
@@ -295,7 +313,7 @@ async def rejeitar_garantia(solicitacao_id: int, db: Session = Depends(get_db), 
 async def listar_solicitacoes(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     # Listagem simplificada para investidores (sem dados sensíveis)
     solicitacoes = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
     ).all()
     
     # Buscar IDs de solicitações que este investidor já desbloqueou
@@ -427,7 +445,7 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO.value
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
     ).first()
 
     if not solicitacao or solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
@@ -554,7 +572,7 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     db.add(Transacao(
         usuario_id=usuario.id,
         valor=valor_total_devido,
-        tipo=TipoTransacao.RECEBIMENTO,
+        tipo=TipoTransacao.PAGAMENTO_PARCELA,
         status="concluido",
         detalhes=f"Pagamento de parcela #{solicitacao.parcelas_pagas} - Pedido #{solicitacao_id}"
     ))
@@ -575,7 +593,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO.value
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
     ).first()
     
     if not solicitacao:
@@ -640,12 +658,19 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
         investidor.saldo += valor_liquido_investidor
         inv.pago_para_investidor += valor_liquido_investidor
         
+        tipo_trans = TipoTransacao.RECEBIMENTO
+        detalhes_trans = f"Quitação Total (Net) - Pedido #{solicitacao_id}"
+        
+        if hasattr(inv, 'is_institutional') and inv.is_institutional:
+            tipo_trans = TipoTransacao.RETORNO_INVESTIMENTO
+            detalhes_trans = f"RETORNO INVESTIMENTO (LUCRO) - Pedido #{solicitacao_id}"
+
         db.add(Transacao(
             usuario_id=investidor.id,
             valor=valor_liquido_investidor,
-            tipo=TipoTransacao.RECEBIMENTO,
+            tipo=tipo_trans,
             status="concluido",
-            detalhes=f"Quitação Total (Net) - Pedido #{solicitacao_id}"
+            detalhes=detalhes_trans
         ))
 
     # 5. Registro Empresa e Tomador
@@ -661,7 +686,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     db.add(Transacao(
         usuario_id=usuario.id,
         valor=total_final_devedor,
-        tipo=TipoTransacao.RECEBIMENTO,
+        tipo=TipoTransacao.PAGAMENTO_PARCELA,
         status="concluido",
         detalhes=f"Quitação Integral do Empréstimo #{solicitacao_id}"
     ))
@@ -766,33 +791,43 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
             lucro_performance_total += taxa_perf
             p["valor_liquido"] += (fatia_juros_bruta - taxa_perf)
 
-    # Efetivar pagamentos aos investidores
+    # 4. Efetivar pagamentos aos investidores (Capital + Juros Líquidos)
     for p in pagamentos_investidores:
         inv = p["investimento"]
         investidor = inv.investidor
         valor_final = p["valor_liquido"]
         
-        investidor.saldo += valor_final
-        inv.pago_para_investidor += valor_final
-        
-        db.add(Transacao(
-            usuario_id=investidor.id,
-            valor=valor_final,
-            tipo=TipoTransacao.RECEBIMENTO,
-            status="concluido",
-            detalhes=f"Recebimento Avulso (Net) - Pedido #{solicitacao_id}"
-        ))
+        if valor_final > 0:
+            investidor.saldo += valor_final
+            inv.pago_para_investidor += valor_final
+            
+            tipo_trans = TipoTransacao.RECEBIMENTO
+            detalhes_trans = f"Recebimento Avulso (Net) - Pedido #{solicitacao_id}"
+            
+            if hasattr(inv, 'is_institutional') and inv.is_institutional:
+                tipo_trans = TipoTransacao.RETORNO_INVESTIMENTO
+                detalhes_trans = f"RETORNO INVESTIMENTO (LUCRO) - Pedido #{solicitacao_id}"
 
-    # 3. Creditar Taxa de Performance ao Admin
-    if admin and lucro_performance_total > 0:
-        admin.saldo += lucro_performance_total
-        db.add(Transacao(
-            usuario_id=admin.id,
-            valor=lucro_performance_total,
-            tipo=TipoTransacao.TAXA_INTERMEDIACAO,
-            status="concluido",
-            detalhes=f"Performance Fee Pagto Avulso - Pedido #{solicitacao_id} (Tomador: {usuario.nome})"
-        ))
+            db.add(Transacao(
+                usuario_id=investidor.id,
+                valor=valor_final,
+                tipo=tipo_trans,
+                status="concluido",
+                detalhes=detalhes_trans
+            ))
+
+    # 5. Creditar Taxas à Plataforma Admin
+    if admin:
+        total_taxas_admin = lucro_conveniencia_total + lucro_performance_total
+        if total_taxas_admin > 0:
+            admin.saldo += total_taxas_admin
+            db.add(Transacao(
+                usuario_id=admin.id,
+                valor=total_taxas_admin,
+                tipo=TipoTransacao.TAXA_INTERMEDIACAO,
+                status="concluido",
+                detalhes=f"Taxas Intermediação (Conven+Perf) Pagto Avulso - Pedido #{solicitacao_id} (Tomador: {usuario.nome})"
+            ))
 
     # 4. Amortizar Dívida Principal (Líquido)
     # A dívida total diminui pelo valor bruto pago menos apenas a taxa de conveniência da plataforma
@@ -802,7 +837,7 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
     db.add(Transacao(
         usuario_id=usuario.id,
         valor=valor_pago,
-        tipo=TipoTransacao.RECEBIMENTO,
+        tipo=TipoTransacao.PAGAMENTO_PARCELA,
         status="concluido",
         detalhes=f"Pagamento Avulso (Livre) - Pedido #{solicitacao_id}"
     ))
@@ -855,131 +890,167 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     if not e_tomador and not investimento_usuario:
         raise HTTPException(status_code=403, detail="Você não tem permissão para acessar este contrato.")
 
-    if solicitacao.status not in [StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
-        raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos aprovados ou concluídos.")
+    # Permitir PENDENTE se for o tomador (Contrato de Solicitação)
+    if solicitacao.status not in [StatusSolicitacao.PENDENTE, StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
+        raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos ativos, concluídos ou em captação.")
+
+    # Função auxiliar para limpar strings (o PDF padrão só aceita latin-1)
+    def limpar(txt):
+        if not txt: return ""
+        return str(txt).encode('latin-1', 'replace').decode('latin-1')
 
     # Ajuste de data para Brasília
     data_brasilia = solicitacao.data_criacao - timedelta(hours=3)
     data_formatada = data_brasilia.strftime('%d/%m/%Y %H:%M')
-    agora_brasilia = (datetime.datetime.utcnow() - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M')
-
+    
     # Configuração do PDF
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
+    pdf.set_font("helvetica", "B", 16)
     
     # Cabeçalho
-    pdf.cell(0, 10, "PEER - INTERMEDIAÇÃO FINANCEIRA", ln=True, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(0, 5, "Sistema de Empréstimos Peer-to-Peer (P2P)", ln=True, align="C")
+    pdf.cell(0, 10, limpar("PEER - INTERMEDIAÇÃO FINANCEIRA"), ln=True, align="C")
+    pdf.set_font("helvetica", "", 10)
+    pdf.cell(0, 5, limpar("Sistema de Empréstimos Peer-to-Peer (P2P)"), ln=True, align="C")
     pdf.ln(10)
     
     # Título do Contrato
-    pdf.set_font("Arial", "B", 12)
+    pdf.set_font("helvetica", "B", 12)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(0, 10, f"CONTRATO DE MÚTUO FINANCEIRO - ID #{solicitacao.id}", ln=True, align="L", fill=True)
+    pdf.cell(0, 10, limpar(f"CONTRATO DE MÚTUO FINANCEIRO - ID #{solicitacao.id}"), ln=True, align="L", fill=True)
     pdf.ln(5)
     
     # Seção 1: Partes
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 7, "1. PARTES", ln=True)
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 7, limpar("1. PARTES"), ln=True)
+    pdf.set_font("helvetica", "", 10)
     
     tomador = solicitacao.usuario
+    garantidores_nomes = ", ".join([g.garante.nome for g in solicitacao.garantias_sociais if g.garante]) or "NENHUM"
+    
     if e_tomador:
-        # Tomador vê a lista de quem o financiou
-        investidores_nomes = ", ".join([inv.investidor.nome for inv in solicitacao.investimentos])
+        nomes_investidores = []
+        for inv in solicitacao.investimentos:
+            if inv.investidor:
+                if hasattr(inv, 'is_institutional') and inv.is_institutional:
+                    nomes_investidores.append("Peer Tecnologia Ltda. (Institucional)")
+                else:
+                    nomes_investidores.append(inv.investidor.nome)
+        investidores_nomes = ", ".join(nomes_investidores)
+        if not investidores_nomes and solicitacao.status == StatusSolicitacao.PENDENTE:
+            investidores_nomes = "EM CAPTAÇÃO"
+            
         texto_partes = (
             f"MUTUÁRIO (TOMADOR): {tomador.nome}\n"
             f"CPF: {tomador.cpf}\n"
             f"MUTUANTES (INVESTIDORES): {investidores_nomes}\n"
+            f"GARANTIDORES: {garantidores_nomes}\n"
             f"INTERMEDIADORA: Peer Tecnologia Ltda."
         )
     else:
-        # Investidor vê apenas o Tomador e ele mesmo
+        # Se investidor está vendo seu contrato
+        nome_investidor_pdf = usuario.nome
+        if investimento_usuario and hasattr(investimento_usuario, 'is_institutional') and investimento_usuario.is_institutional:
+            nome_investidor_pdf = "Peer Tecnologia Ltda. (Institucional)"
+        
         texto_partes = (
             f"MUTUÁRIO (TOMADOR): {tomador.nome}\n"
-            f"MUTUANTE (INVESTIDOR): {usuario.nome}\n"
+            f"MUTUANTE (INVESTIDOR): {nome_investidor_pdf}\n"
             f"CPF INVESTIDOR: {usuario.cpf}\n"
+            f"GARANTIDORES: {garantidores_nomes}\n"
             f"INTERMEDIADORA: Peer Tecnologia Ltda."
         )
     
-    pdf.multi_cell(0, 5, texto_partes)
+    pdf.multi_cell(0, 5, limpar(texto_partes))
     pdf.ln(5)
     
     # Seção 2: Objeto
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 7, "2. OBJETO E CONDIÇÕES", ln=True)
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 7, limpar("2. OBJETO E CONDIÇÕES"), ln=True)
+    pdf.set_font("helvetica", "", 10)
     
-    valor_contrato = solicitacao.valor if e_tomador else investimento_usuario.valor_investido
+    valor_contrato = float(solicitacao.valor) if e_tomador else float(investimento_usuario.valor_investido)
     texto_objeto = (
         f"VALOR APORTADO: R$ {valor_contrato:,.2f}\n"
         f"TAXA DE JUROS: {solicitacao.taxa_juros}% ao mês (Juros Simples)\n"
         f"PRAZO TOTAL: {solicitacao.prazo_meses} meses\n"
         f"DATA DE ORIGINAÇÃO: {data_formatada}"
     )
-    pdf.multi_cell(0, 5, texto_objeto)
+    pdf.multi_cell(0, 5, limpar(texto_objeto))
     pdf.ln(5)
     
     # Seção 3: Cláusulas
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 7, "3. CLÁUSULAS DE SEGURANÇA", ln=True)
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 7, limpar("3. CLÁUSULAS DE SEGURANÇA"), ln=True)
+    pdf.set_font("helvetica", "", 9)
     clausulas = (
         "O MUTUÁRIO declara-se ciente que o não pagamento de parcelas acarretará em redução do score interno "
         "e restrições de novos créditos. O MUTUANTE declara ciência dos riscos inerentes ao investimento P2P. "
         "A plataforma Peer atua apenas como facilitadora técnica e intermediadora."
     )
-    pdf.multi_cell(0, 5, clausulas)
+    pdf.multi_cell(0, 5, limpar(clausulas))
     pdf.ln(10)
     
     # Seção 4: Assinaturas Eletrônicas (Auditoria)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 7, "4. ASSINATURAS E RASTREABILIDADE", ln=True)
-    pdf.set_font("Arial", "", 8)
+    pdf.set_font("helvetica", "B", 10)
+    pdf.cell(0, 7, limpar("4. ASSINATURAS E RASTREABILIDADE"), ln=True)
+    pdf.set_font("helvetica", "", 8)
     pdf.set_text_color(0, 0, 0)
 
+    # Helper: converter UTC -> Brasília
+    def fmt_brasilia(dt):
+        if not dt: return "PENDENTE"
+        return (dt - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M')
+
     # 4.1 Tomador
-    pdf.set_font("Arial", "B", 8)
-    pdf.cell(0, 5, f"TOMADOR: {tomador.nome} ({tomador.cpf})", ln=True)
-    pdf.set_font("Arial", "", 8)
-    pdf.cell(0, 4, f"Status: ASSINADO em {solicitacao.municipio_aceite} via IP {solicitacao.ip_aceite} às {solicitacao.data_aceite.strftime('%d/%m/%Y %H:%M')}", ln=True)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.cell(0, 5, limpar(f"TOMADOR: {tomador.nome} ({tomador.cpf})"), ln=True)
+    pdf.set_font("helvetica", "", 8)
+    data_aceite = fmt_brasilia(solicitacao.data_aceite)
+    pdf.cell(0, 4, limpar(f"Status: ASSINADO em {solicitacao.auditoria.municipio if solicitacao.auditoria else 'N/A'} via IP {solicitacao.auditoria.ip if solicitacao.auditoria else 'N/A'} às {data_aceite}"), ln=True)
     pdf.ln(2)
 
     # 4.2 Garantidores
     from modelos.modelos_db import GarantiaSocial
     garantias = db.query(GarantiaSocial).filter(GarantiaSocial.solicitacao_id == solicitacao.id).all()
     for g in garantias:
-        pdf.set_font("Arial", "B", 8)
-        pdf.cell(0, 5, f"GARANTIDOR: {g.garante.nome} ({g.garante.cpf})", ln=True)
-        pdf.set_font("Arial", "", 8)
-        status_g = f"ASSINADO em {g.municipio_aceite} via IP {g.ip_aceite} às {g.data_aceite.strftime('%d/%m/%Y %H:%M')}" if g.aceito else "PENDENTE"
-        pdf.cell(0, 4, f"Status: {status_g}", ln=True)
+        if not g.garante: continue
+        pdf.set_font("helvetica", "B", 8)
+        pdf.cell(0, 5, limpar(f"GARANTIDOR: {g.garante.nome} ({g.garante.cpf})"), ln=True)
+        pdf.set_font("helvetica", "", 8)
+        data_g = fmt_brasilia(g.data_aceite)
+        status_g = f"ASSINADO em {g.auditoria.municipio if g.auditoria else 'N/A'} via IP {g.auditoria.ip if g.auditoria else 'N/A'} às {data_g}" if g.aceito else "PENDENTE"
+        pdf.cell(0, 4, limpar(f"Status: {status_g}"), ln=True)
         pdf.ln(2)
 
     # 4.3 Investidores
     for inv in solicitacao.investimentos:
-        pdf.set_font("Arial", "B", 8)
-        pdf.cell(0, 5, f"INVESTIDOR: {inv.investidor.nome} ({inv.investidor.cpf})", ln=True)
-        pdf.set_font("Arial", "", 8)
-        status_i = f"ASSINADO em {inv.municipio_aceite} via IP {inv.ip_aceite} às {inv.data_investimento.strftime('%d/%m/%Y %H:%M')}"
-        pdf.cell(0, 4, f"Status: {status_i}", ln=True)
+        if not inv.investidor: continue
+        pdf.set_font("helvetica", "B", 8)
+        if hasattr(inv, 'is_institutional') and inv.is_institutional:
+            pdf.cell(0, 5, limpar(f"INVESTIDOR: Peer Tecnologia Ltda. (Institucional)"), ln=True)
+        else:
+            pdf.cell(0, 5, limpar(f"INVESTIDOR: {inv.investidor.nome} ({inv.investidor.cpf})"), ln=True)
+        pdf.set_font("helvetica", "", 8)
+        data_i = fmt_brasilia(inv.data_investimento)
+        status_i = f"ASSINADO em {inv.auditoria.municipio if inv.auditoria else 'N/A'} via IP {inv.auditoria.ip if inv.auditoria else 'N/A'} às {data_i}"
+        pdf.cell(0, 4, limpar(f"Status: {status_i}"), ln=True)
         pdf.ln(2)
 
     pdf.ln(5)
     
     # Selo de Autenticidade
+    agora_brasilia = (datetime.datetime.utcnow() - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M')
     pdf.set_draw_color(0, 200, 0)
     pdf.set_line_width(0.5)
     pdf.rect(10, pdf.get_y(), 190, 20)
     pdf.set_xy(15, pdf.get_y() + 3)
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("helvetica", "B", 10)
     pdf.set_text_color(0, 150, 0)
-    pdf.cell(0, 5, "DOCUMENTO AUTENTICADO DIGITALMENTE", ln=True)
-    pdf.set_font("Arial", "", 8)
-    pdf.cell(0, 4, f"Hash de Segurança: {hash(str(solicitacao.id) + str(solicitacao.data_criacao))}", ln=True)
-    pdf.cell(0, 4, f"Emissão do Documento: {agora_brasilia} (Horário de Brasília)", ln=True)
+    pdf.cell(0, 5, limpar("DOCUMENTO AUTENTICADO DIGITALMENTE"), ln=True)
+    pdf.set_font("helvetica", "", 8)
+    pdf.cell(0, 4, limpar(f"Hash de Segurança: {hash(str(solicitacao.id) + str(solicitacao.data_criacao))}"), ln=True)
+    pdf.cell(0, 4, limpar(f"Emissão do Documento: {agora_brasilia} (Horário de Brasília)"), ln=True)
     
     # Saída
     pdf_content = bytes(pdf.output())

@@ -65,7 +65,7 @@ class SolicitacaoEmprestimo(Base):
     valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
-    status = Column(Enum(StatusSolicitacao), default=StatusSolicitacao.PENDENTE)
+    status = Column(Enum(StatusSolicitacao), default=StatusSolicitacao.PENDENTE, index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     data_expiracao_4h = Column(DateTime)
     data_expiracao_5d = Column(DateTime)
@@ -121,8 +121,8 @@ class Transacao(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
-    tipo = Column(Enum(TipoTransacao), nullable=False)
-    status = Column(String, default="pendente") # pendente, concluido, falhou
+    tipo = Column(Enum(TipoTransacao), nullable=False, index=True)
+    status = Column(String, default="pendente", index=True) # pendente, concluido, falhou
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Para saques, armazenar a chave pix usada no momento

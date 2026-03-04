@@ -11,13 +11,25 @@ router = APIRouter(tags=["Snapshot"])
 
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
+# Cache Level 1 (Em Memória) para reduzir carga no DB Neon
+# Estrutura: {usuario_id: (timestamp_validade, dados_json)}
+cache_snapshot_data = {}
+CACHE_TTL_SEG = 15 # 15 segundos de "paz" para o banco de dados
+
 @router.get("/snapshot")
 @router.get("/snapshot/")
 async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """
-    Endpoint de Snapshot Autocontido.
-    Retorna tudo o que o dashboard precisa em uma única requisição.
+    Endpoint de Snapshot Autocontido com Cache de 15s.
     """
+    agora_ts = datetime.utcnow().timestamp()
+    
+    # Verificar Cache
+    if usuario.id in cache_snapshot_data:
+        validade, dados = cache_snapshot_data[usuario.id]
+        if agora_ts < validade:
+            return dados
+
     try:
         # 1. Perfil Básico (Sempre retorna)
         snapshot = {
@@ -240,6 +252,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             "carteira": carteira_list
         }
 
+        # Salvar no Cache antes de retornar
+        cache_snapshot_data[usuario.id] = (agora_ts + CACHE_TTL_SEG, snapshot)
+        
         return snapshot
 
     except Exception as e:

@@ -316,11 +316,13 @@ const AdminDashboard = () => {
         }
     };
 
-    // Polling Automático (30s)
+    // Smart Polling (60s) - Só roda se a aba estiver visível
     useEffect(() => {
         const interval = setInterval(() => {
-            carregarSnapshot();
-        }, 30000);
+            if (!document.hidden) {
+                carregarSnapshot();
+            }
+        }, 60000);
 
         return () => clearInterval(interval);
     }, []);

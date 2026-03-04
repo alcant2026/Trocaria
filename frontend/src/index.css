@@ -696,13 +696,131 @@ select.input-field:focus option {
 }
 
 /* Custom Highlight for Selection */
+select.input-field {
+  color-scheme: dark;
+  accent-color: var(--primary);
+}
+
 select.input-field:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.2);
 }
 
-/* Note: Styling individual options hover/selection is limited by browsers, 
-   but we can style the select state itself */
+/* Note: Selection color styling for native options is limited by browsers */
+select.input-field option:checked,
+select.input-field option:hover {
+  background-color: var(--primary) !important;
+  color: #000 !important;
+}
+
+/* For some browsers that support it */
+::selection {
+  background-color: var(--primary);
+  color: #000;
+}
+
 select.input-field:valid {
   border-color: var(--primary);
+}
+
+/* Custom Select Component Styles */
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.custom-select-trigger {
+  width: 100%;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-size: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.custom-select-trigger:hover,
+.custom-select-trigger.open {
+  border-color: var(--primary);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.custom-select-trigger .chevron {
+  transition: transform 0.3s ease;
+  color: var(--text-muted);
+}
+
+.custom-select-trigger .chevron.rotate {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+.custom-select-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #1C1C1E;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: modalFadeIn 0.2s ease;
+}
+
+.custom-select-option {
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.custom-select-option:hover {
+  background-color: var(--primary);
+  color: #000;
+  font-weight: 600;
+}
+
+.custom-select-option.selected {
+  background-color: rgba(255, 204, 0, 0.1);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.custom-select-no-data {
+  padding: 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Custom Scrollbar for Options */
+.custom-select-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-select-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-select-options::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }

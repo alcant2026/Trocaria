@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import TermosUso from '../componentes/TermosUso';
+import SeletorCustom from '../componentes/SeletorCustom';
 
 const Registro = () => {
     const [formData, setFormData] = useState({
@@ -97,37 +98,21 @@ const Registro = () => {
                         </div>
 
                         <div className="input-row input-row-state-city">
-                            <div className="input-group">
-                                <label>UF</label>
-                                <select
-                                    name="estado"
-                                    value={formData.estado}
-                                    onChange={handleChange}
-                                    className="input-field"
-                                    required
-                                >
-                                    <option value="">UF</option>
-                                    {estados.map(uf => (
-                                        <option key={uf.id} value={uf.sigla}>{uf.sigla}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="input-group">
-                                <label>Cidade</label>
-                                <select
-                                    name="cidade"
-                                    value={formData.cidade}
-                                    onChange={handleChange}
-                                    className="input-field"
-                                    required
-                                    disabled={!formData.estado}
-                                >
-                                    <option value="">Selecione a cidade</option>
-                                    {cidades.map(cid => (
-                                        <option key={cid.id} value={cid.nome}>{cid.nome}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <SeletorCustom
+                                label="UF"
+                                options={estados}
+                                value={formData.estado}
+                                onChange={handleChange}
+                                placeholder="UF"
+                            />
+                            <SeletorCustom
+                                label="Cidade"
+                                options={cidades}
+                                value={formData.cidade}
+                                onChange={handleChange}
+                                placeholder="Selecione a cidade"
+                                disabled={!formData.estado}
+                            />
                         </div>
 
                         <div className="input-group">

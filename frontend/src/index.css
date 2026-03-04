@@ -680,4 +680,17 @@ select.input-field {
   background-position: right 1rem center;
   background-size: 1.2rem;
   padding-right: 2.5rem;
+  cursor: pointer;
+}
+
+select.input-field option {
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  padding: 1rem;
+}
+
+/* Chrome/Safari specific fix for dark mode options */
+select.input-field:focus option {
+  background: var(--card-bg);
+  color: var(--text-main);
 }

@@ -294,7 +294,7 @@ async def rejeitar_garantia(solicitacao_id: int, db: Session = Depends(get_db), 
 async def listar_solicitacoes(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     # Listagem simplificada para investidores (sem dados sensíveis)
     solicitacoes = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value
     ).all()
     
     # Buscar IDs de solicitações que este investidor já desbloqueou
@@ -426,7 +426,7 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO.value
     ).first()
 
     if not solicitacao or solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
@@ -574,7 +574,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO.value
     ).first()
     
     if not solicitacao:

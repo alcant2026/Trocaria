@@ -163,7 +163,7 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
 
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value
     ).first()
 
     if not solicitacao:
@@ -216,7 +216,7 @@ async def processar_expiracoes_job(db: Session = Depends(get_db)):
     
     # 1. Regra das 4h: Ninguém investiu nada -> APAGAR
     expirados_4h = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
         SolicitacaoEmprestimo.valor_arrecadado == 0,
         SolicitacaoEmprestimo.data_expiracao_4h <= agora
     ).all()
@@ -227,7 +227,7 @@ async def processar_expiracoes_job(db: Session = Depends(get_db)):
 
     # 2. Regra dos 5d: Tem investimentos mas não atingiu meta OU atingiu e não assinou
     expirados_5d = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE.value,
         SolicitacaoEmprestimo.data_expiracao_5d <= agora
     ).all()
 

@@ -60,10 +60,9 @@ async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Dep
     if usuario.is_verified:
         raise HTTPException(status_code=400, detail="Sua conta já está verificada.")
 
-    # Verificar se o usuário já pagou pela verificação anteriormente
     pagamento_anterior = db.query(Transacao).filter(
         Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS
+        Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS.value
     ).first()
 
     custo = Decimal("35.00")

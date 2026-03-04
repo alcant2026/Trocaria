@@ -51,6 +51,16 @@ EMAILS_TEMPORARIOS = {'mailinator.com', 'yopmail.com', 'tempmail.com', 'guerrill
 @limiter.limit("3/minute")
 async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Session = Depends(get_db)):
     
+    # >>> TRAVA BETA: Limite de 100 usuários (remova este bloco para escalar) <<<
+    LIMITE_BETA = 100
+    total_usuarios = db.query(Usuario).count()
+    if total_usuarios >= LIMITE_BETA:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Plataforma em fase beta. Limite de {LIMITE_BETA} usuários atingido. Em breve abriremos mais vagas!"
+        )
+    # >>> FIM TRAVA BETA <<<
+
     # Validação 1: Nome Completo (Mínimo 2 palavras e sem caracteres especiais)
     nome_limpo = dados.nome.strip()
     if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ]+\s+[A-Za-zÀ-ÖØ-öø-ÿ]+", nome_limpo):

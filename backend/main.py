@@ -53,17 +53,20 @@ def startup_db_setup():
     try:
         sincronizar_esquema(Base, engine)
         
-        # 3. Garantir que os tipos ENUM no Postgres tenham os novos valores (taxa_saque)
-        with engine.connect() as conn:
-            if "sqlite" not in str(engine.url):
-                # O PostgreSQL exige que adicionemos novos valores ao tipo ENUM manualmente
-                try:
-                    conn.execute(text("ALTER TYPE tipotransacao ADD VALUE IF NOT EXISTS 'taxa_saque'"))
-                    conn.commit()
-                except Exception:
-                    # Pode falhar se já existir em versões muito antigas do Postgres que não suportam IF NOT EXISTS no ADD VALUE
-                    # Mas ignoramos pois o erro 500 é o que queremos evitar
-                    pass
+        # 3. Garantir que os tipos ENUM no Postgres tenham os novos valores
+        if "sqlite" not in str(engine.url):
+            from modelos.modelos_db import TipoTransacao, StatusSolicitacao
+            with engine.connect() as conn:
+                for enum_class, type_name in [(TipoTransacao, "tipotransacao"), (StatusSolicitacao, "statussolicitacao")]:
+                    for member in enum_class:
+                        try:
+                            # Tenta adicionar o valor minúsculo (padrão do código)
+                            conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.value}'"))
+                            # Tenta adicionar o valor maiúsculo (legado/segurança)
+                            conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.name}'"))
+                            conn.commit()
+                        except Exception:
+                            pass
     except Exception as e:
         print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")
 

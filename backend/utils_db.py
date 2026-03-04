@@ -53,4 +53,28 @@ def sincronizar_esquema(Base, engine):
                     except Exception as e:
                         logger.error(f"❌ Erro ao criar coluna '{column.name}': {e}")
         
+        # --- Sincronização de Índices ---
+        logger.info("Verificando consistência de índices...")
+        for table_name, table in Base.metadata.tables.items():
+            indices_existentes = [idx["name"] for idx in inspector.get_indexes(table_name)]
+            
+            for index in table.indexes:
+                if index.name not in indices_existentes:
+                    logger.info(f"Detectado novo índice: {table_name}.{index.name}")
+                    
+                    # Gerar SQL de criação de índice
+                    colunas_str = ", ".join([c.name for c in index.columns])
+                    sql_index = f"CREATE INDEX {index.name} ON {table_name} ({colunas_str})"
+                    
+                    # Postgres suporta IF NOT EXISTS
+                    if "postgresql" in str(engine.url):
+                        sql_index = f"CREATE INDEX IF NOT EXISTS {index.name} ON {table_name} ({colunas_str})"
+                    
+                    try:
+                        conn.execute(text(sql_index))
+                        conn.commit()
+                        logger.info(f"✅ Índice '{index.name}' criado com sucesso.")
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao criar índice '{index.name}': {e}")
+
         logger.info("Sincronização concluída.")

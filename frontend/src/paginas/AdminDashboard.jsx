@@ -306,7 +306,7 @@ const AdminDashboard = () => {
 
     const carregarSnapshot = async () => {
         try {
-            const res = await api.get('/auth/snapshot');
+            const res = await api.get('/snapshot');
             if (res.admin) {
                 setPendentes(res.admin.pendentes || []);
                 setFiscal(res.admin.fiscal);

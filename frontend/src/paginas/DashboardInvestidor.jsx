@@ -150,7 +150,7 @@ const DashboardInvestidor = () => {
 
     const carregarSnapshot = async () => {
         try {
-            const res = await api.get('/auth/snapshot');
+            const res = await api.get('/snapshot');
             if (res.perfil) {
                 setUsuario(res.perfil);
                 localStorage.setItem('usuario', JSON.stringify(res.perfil));

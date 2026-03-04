@@ -145,50 +145,36 @@ const DashboardTomador = () => {
     const [paginaContratos, setPaginaContratos] = useState(1);
     const ITENS_POR_PAGINA = 5;
 
-    const carregarDados = async () => {
+    const carregarSnapshot = async () => {
         try {
-            const dadosServer = await api.get('/auth/perfil');
-            if (dadosServer) {
-                setUsuario(dadosServer);
-                localStorage.setItem('usuario', JSON.stringify(dadosServer));
+            const res = await api.get('/auth/snapshot');
+            if (res.perfil) {
+                setUsuario(res.perfil);
+                localStorage.setItem('usuario', JSON.stringify(res.perfil));
             }
-            const lista = await api.get('/emprestimos/meus-emprestimos');
-            setMeusEmprestimos(lista);
-
-            // Novo: Carregar histórico para ver motivos de rejeição
-            const hist = await api.get('/financeiro/meu-historico');
-            setHistorico(hist);
-
-            // Novo: Buscar garantias onde fui convidado
-            const pendencias = await api.get('/emprestimos/garantias-pendentes');
-            setGarantiasPendentes(pendencias);
+            if (res.tomador) {
+                setMeusEmprestimos(res.tomador.meus_emprestimos || []);
+                setGarantiasPendentes(res.tomador.garantias_pendentes || []);
+            }
+            if (res.historico) {
+                setHistorico(res.historico);
+            }
         } catch (err) {
-            console.error('Erro ao carregar dados:', err);
-        }
-    };
-
-    const carregarPendentes = async () => {
-        try {
-            const pendencias = await api.get('/emprestimos/garantias-pendentes');
-            setGarantiasPendentes(pendencias);
-        } catch (err) {
-            console.error('Erro ao carregar pendências:', err);
+            console.error('Erro ao carregar snapshot:', err);
         }
     };
 
     // Polling Automático (30s)
     useEffect(() => {
         const interval = setInterval(() => {
-            carregarDados();
-            carregarPendentes();
+            carregarSnapshot();
         }, 30000);
         return () => clearInterval(interval);
-    }, [carregarDados]);
+    }, []);
 
     useEffect(() => {
-        carregarDados();
-        carregarPendentes();
-    }, [activeView, carregarDados]);
+        carregarSnapshot();
+    }, [activeView]);
 
     const handleSolicitar = async (e) => {
         e.preventDefault();
@@ -214,7 +200,7 @@ const DashboardTomador = () => {
             setActiveView('home');
             setValor(''); setTaxa(''); setParcelas(1);
             setIdAmigo1(''); setIdAmigo2('');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
@@ -224,7 +210,7 @@ const DashboardTomador = () => {
         try {
             const res = await api.post(`/emprestimos/pagar-parcela/${id}`, { valor_pagamento: valorParcela });
             setMensagem(res.message);
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao pagar: ' + err.message);
         }
@@ -239,7 +225,7 @@ const DashboardTomador = () => {
             setMensagem(res.message);
             setValorAvulsoPorId(prev => ({ ...prev, [id]: '' }));
             setShowAvulsoPorId(prev => ({ ...prev, [id]: false }));
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro no pagamento avulso: ' + err.message);
         }
@@ -259,7 +245,7 @@ const DashboardTomador = () => {
             setMensagem(res.message);
             setIdAmigo1('');
             setIdAmigo2('');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao vincular amigos: ' + err.message);
         }
@@ -280,7 +266,7 @@ const DashboardTomador = () => {
         try {
             await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
             setMensagem('Empréstimo quitado com sucesso!');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao quitar: ' + err.message);
         }
@@ -296,7 +282,7 @@ const DashboardTomador = () => {
             await api.post('/financeiro/notificar-deposito', { valor: v });
             setMensagem('Notificação enviada! O administrador creditará seu saldo em breve.');
             setValorNotificacao('');
-            carregarDados();
+            carregarSnapshot();
             setActiveView('home');
         } catch (err) {
             setMensagem('Erro ao notificar: ' + err.message);
@@ -325,7 +311,7 @@ const DashboardTomador = () => {
             setSenhaSaque('');
             setCodigo2faSaque('');
             setActiveView('home');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao solicitar saque: ' + err.message);
         }
@@ -345,7 +331,7 @@ const DashboardTomador = () => {
         try {
             const res = await api.post(`/emprestimos/aceitar-garantia/${id}`);
             setMensagem(res.message);
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao aceitar garantia: ' + err.message);
         }
@@ -356,7 +342,7 @@ const DashboardTomador = () => {
         try {
             const res = await api.post(`/emprestimos/rejeitar-garantia/${id}`);
             setMensagem(res.message);
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao rejeitar garantia: ' + err.message);
         }
@@ -367,7 +353,7 @@ const DashboardTomador = () => {
         try {
             const res = await api.post('/score/comprar');
             setMensagem(res.message);
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao comprar score: ' + err.message);
         }
@@ -391,7 +377,7 @@ const DashboardTomador = () => {
             setMensagem(res.message);
             setKycDetails('');
             setActiveView('home');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro ao solicitar verificação: ' + err.message);
         }

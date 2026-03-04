@@ -304,38 +304,29 @@ const AdminDashboard = () => {
         });
     };
 
-    const carregarPendentes = async () => {
+    const carregarSnapshot = async () => {
         try {
-            const data = await api.get('/financeiro/admin/pendentes');
-            setPendentes(data);
+            const res = await api.get('/auth/snapshot');
+            if (res.admin) {
+                setPendentes(res.admin.pendentes || []);
+                setFiscal(res.admin.fiscal);
+            }
         } catch (err) {
-            setMensagem('Erro ao carregar: ' + err.message);
-        }
-    };
-
-    const carregarFiscal = async () => {
-        try {
-            const data = await api.get('/financeiro/admin/fiscal');
-            setFiscal(data);
-        } catch (err) {
-            console.error('Erro ao carregar dados fiscais:', err);
-            // Não bloqueia a tela, apenas loga. O polling tentará novamente.
+            console.error('Erro ao carregar snapshot:', err);
         }
     };
 
     // Polling Automático (30s)
     useEffect(() => {
         const interval = setInterval(() => {
-            carregarPendentes();
-            carregarFiscal();
-        }, 30000); // 30 segundos
+            carregarSnapshot();
+        }, 30000);
 
         return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
-        carregarPendentes();
-        carregarFiscal();
+        carregarSnapshot();
     }, [activeTab]);
 
     const handleConfirmar = async (id, tipo) => {
@@ -354,8 +345,7 @@ const AdminDashboard = () => {
             }
 
             setMensagem(`${tipo === 'deposito' ? 'Depósito' : 'Saque'} confirmado!`);
-            carregarPendentes();
-            carregarFiscal();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
@@ -377,8 +367,7 @@ const AdminDashboard = () => {
             }
 
             setMensagem('Identidade verificada com sucesso!');
-            carregarPendentes();
-            carregarFiscal();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
@@ -411,8 +400,7 @@ const AdminDashboard = () => {
 
             setMensagem('Transação rejeitada e notificação enviada.');
             setShowRejeitarModal(false);
-            carregarPendentes();
-            carregarFiscal();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         } finally {
@@ -668,10 +656,10 @@ const AdminDashboard = () => {
                     </div>
 
                     {/* Card: Resgatar Lucro */}
-                    <SaqueLucroCard onMensagem={(msg) => { setMensagem(msg); carregarFiscal(); }} lucroDisponivel={fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico} />
+                    <SaqueLucroCard onMensagem={(msg) => { setMensagem(msg); carregarSnapshot(); }} lucroDisponivel={fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico} />
 
                     {/* NOVO: Card de Aporte de Lucro */}
-                    <AporteLucroCard onMensagem={(msg) => { setMensagem(msg); carregarFiscal(); }} />
+                    <AporteLucroCard onMensagem={(msg) => { setMensagem(msg); carregarSnapshot(); }} />
 
                     <div className="card">
                         <div className="flex-between mb-1">

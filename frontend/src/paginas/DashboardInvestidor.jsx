@@ -148,33 +148,35 @@ const DashboardInvestidor = () => {
         setTimeout(() => setCopiadoId(false), 2000);
     };
 
-    const carregarDados = async () => {
+    const carregarSnapshot = async () => {
         try {
-            const perfil = await api.get('/auth/perfil');
-            setUsuario(perfil);
-            const lista = await api.get('/emprestimos/listar');
-            setSolicitacoes(lista);
-            const minhaCarteira = await api.get('/investidor/carteira');
-            setCarteira(minhaCarteira);
-
-            // Carregar histórico
-            const hist = await api.get('/financeiro/meu-historico');
-            setHistorico(hist);
+            const res = await api.get('/auth/snapshot');
+            if (res.perfil) {
+                setUsuario(res.perfil);
+                localStorage.setItem('usuario', JSON.stringify(res.perfil));
+            }
+            if (res.investidor) {
+                setSolicitacoes(res.investidor.solicitacoes_disponiveis || []);
+                setInvestimentos(res.investidor.carteira || []);
+            }
+            if (res.historico) {
+                setHistorico(res.historico);
+            }
         } catch (err) {
-            console.error('Erro ao carregar dados:', err);
+            console.error('Erro ao carregar snapshot:', err);
         }
     };
 
     // Polling Automático (30s)
     useEffect(() => {
         const interval = setInterval(() => {
-            carregarDados();
+            carregarSnapshot();
         }, 30000);
         return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
-        carregarDados();
+        carregarSnapshot();
     }, [activeView]);
 
     const handleInvestir = async (solicitacaoId) => {
@@ -191,7 +193,7 @@ const DashboardInvestidor = () => {
                 aceite_risco: true
             });
             setMensagem('Investimento realizado com sucesso!');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
@@ -207,7 +209,7 @@ const DashboardInvestidor = () => {
             await api.post('/financeiro/notificar-deposito', { valor: v });
             setMensagem('Notificação enviada!');
             setValorNotificacao('');
-            carregarDados();
+            carregarSnapshot();
             setActiveView('home');
         } catch (err) {
             setMensagem('Erro: ' + err.message);
@@ -236,7 +238,7 @@ const DashboardInvestidor = () => {
             setSenhaSaque('');
             setCodigo2faSaque('');
             setActiveView('home');
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
@@ -256,7 +258,7 @@ const DashboardInvestidor = () => {
         try {
             const res = await api.post(`/emprestimos/desbloquear-dados/${id}`);
             setMensagem(res.message);
-            carregarDados();
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }

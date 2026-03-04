@@ -694,3 +694,15 @@ select.input-field:focus option {
   background: var(--card-bg);
   color: var(--text-main);
 }
+
+/* Custom Highlight for Selection */
+select.input-field:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.2);
+}
+
+/* Note: Styling individual options hover/selection is limited by browsers, 
+   but we can style the select state itself */
+select.input-field:valid {
+  border-color: var(--primary);
+}

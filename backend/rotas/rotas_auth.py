@@ -61,13 +61,34 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         )
     # >>> FIM TRAVA BETA <<<
 
-    # Validação 1: Nome Completo (Mínimo 2 palavras e sem caracteres especiais)
-    nome_limpo = dados.nome.strip()
-    if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ]+\s+[A-Za-zÀ-ÖØ-öø-ÿ]+", nome_limpo):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Informe seu nome completo (Nome e Sobrenome) sem números ou caracteres especiais."
-        )
+    # Validação 1: Nome Completo (rigorosa — sem empresa por trás, precisamos confiar no nome)
+    nome_limpo = " ".join(dados.nome.strip().split())  # Remove espaços duplos
+    partes_nome = nome_limpo.split()
+
+    # 1a. Mínimo 2 palavras
+    if len(partes_nome) < 2:
+        raise HTTPException(status_code=400, detail="Informe nome e sobrenome completos.")
+
+    # 1b. Cada parte deve ter pelo menos 2 letras (bloqueia "A Silva", "J Santos")
+    for parte in partes_nome:
+        if len(parte) < 2:
+            raise HTTPException(status_code=400, detail="Cada parte do nome deve ter pelo menos 2 letras.")
+
+    # 1c. Só letras e acentos (sem números, @, #, etc.)
+    if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", nome_limpo):
+        raise HTTPException(status_code=400, detail="Nome não pode conter números ou caracteres especiais.")
+
+    # 1d. Nome total mínimo 5 caracteres
+    if len(nome_limpo) < 5:
+        raise HTTPException(status_code=400, detail="Nome muito curto. Informe seu nome completo.")
+
+    # 1e. Sem repetição suspeita (ex: "aaa aaa", "teste teste")
+    if len(set(p.lower() for p in partes_nome)) == 1:
+        raise HTTPException(status_code=400, detail="Nome inválido. Informe seu nome real.")
+
+    # 1f. Normalizar capitalização (Ex: "ROMARIO DANTAS" -> "Romario Dantas")
+    nome_limpo = nome_limpo.title()
+    dados.nome = nome_limpo
 
     # Validação 2: Email Temporário Descartável
     dominio_email = dados.email.split('@')[-1].lower()

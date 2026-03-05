@@ -32,6 +32,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
     try:
         # 1. Perfil Básico (Sempre retorna)
+        print(f"[DEBUG SNAPSHOT] Iniciando perfil para usuario {usuario.id}")
         snapshot = {
             "perfil": {
                 "id": usuario.id,
@@ -51,6 +52,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         }
 
         # 2. Histórico (Top 10)
+        print(f"[DEBUG SNAPSHOT] Buscando histórico")
         transacoes = db.query(Transacao).filter(Transacao.usuario_id == usuario.id).order_by(Transacao.data_criacao.desc()).limit(10).all()
         for t in transacoes:
             data_t = t.data_criacao
@@ -69,6 +71,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         
         # --- ADMIN DATA ---
         if usuario.is_admin:
+            print(f"[DEBUG SNAPSHOT] Iniciando bloco ADMIN")
             # Pendências
             pendentes_raw = db.query(Transacao).join(Usuario).filter(
                 Transacao.status == "pendente",
@@ -133,6 +136,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 detalhamento_mes[tipo.value] = soma
 
             # Histórico Mensal
+            print(f"[DEBUG SNAPSHOT] Buscando histórico mensal (GROUP BY)")
             if "sqlite" in str(engine.url):
                 trunc_fn = func.strftime('%Y-%m', Transacao.data_criacao)
             else:
@@ -212,6 +216,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 })
 
         # --- TOMADOR DATA ---
+        print(f"[DEBUG SNAPSHOT] Iniciando bloco TOMADOR")
         solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.usuario_id == usuario.id).all()
         meus_emp_list = []
         for s in solicitacoes_tomador:
@@ -261,6 +266,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         }
 
         # --- INVESTIDOR DATA ---
+        print(f"[DEBUG SNAPSHOT] Iniciando bloco INVESTIDOR")
         solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE).all()
         
         # Obter IDs de solicitações já desbloqueadas por este investidor
@@ -283,6 +289,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "expira_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None
             })
             
+        print(f"[DEBUG SNAPSHOT] Buscando carteira do investidor")
         carteira_raw = db.query(Investimento).filter(Investimento.investidor_id == usuario.id).all()
         carteira_list = []
         for i in carteira_raw:
@@ -317,6 +324,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         }
 
         # Salvar no Cache antes de retornar
+        print(f"[DEBUG SNAPSHOT] Finalizado com sucesso para {usuario.id}")
         cache_snapshot_data[usuario.id] = (agora_ts + CACHE_TTL_SEG, snapshot)
         
         return snapshot

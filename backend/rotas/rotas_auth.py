@@ -67,23 +67,28 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
 
     # 1a. Mínimo 2 palavras
     if len(partes_nome) < 2:
+        print(f"DEBUG REGISTRO: Nome inválido (partes < 2): {dados.nome}")
         raise HTTPException(status_code=400, detail="Informe nome e sobrenome completos.")
 
     # 1b. Cada parte deve ter pelo menos 2 letras (bloqueia "A Silva", "J Santos")
     for parte in partes_nome:
         if len(parte) < 2:
+            print(f"DEBUG REGISTRO: Parte do nome muito curta: {parte}")
             raise HTTPException(status_code=400, detail="Cada parte do nome deve ter pelo menos 2 letras.")
 
     # 1c. Só letras e acentos (sem números, @, #, etc.)
     if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$", nome_limpo):
+        print(f"DEBUG REGISTRO: Nome com caracteres inválidos: {dados.nome}")
         raise HTTPException(status_code=400, detail="Nome não pode conter números ou caracteres especiais.")
 
     # 1d. Nome total mínimo 5 caracteres
     if len(nome_limpo) < 5:
+        print(f"DEBUG REGISTRO: Nome total muito curto (<5): {dados.nome}")
         raise HTTPException(status_code=400, detail="Nome muito curto. Informe seu nome completo.")
 
     # 1e. Sem repetição suspeita (ex: "aaa aaa", "teste teste")
     if len(set(p.lower() for p in partes_nome)) == 1:
+        print(f"DEBUG REGISTRO: Nome com partes repetidas: {dados.nome}")
         raise HTTPException(status_code=400, detail="Nome inválido. Informe seu nome real.")
 
     # 1f. Normalizar capitalização (Ex: "ROMARIO DANTAS" -> "Romario Dantas")
@@ -93,6 +98,7 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
     # Validação 2: Email Temporário Descartável
     dominio_email = dados.email.split('@')[-1].lower()
     if dominio_email in EMAILS_TEMPORARIOS:
+        print(f"DEBUG REGISTRO: Email temporário detectado: {dados.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Domínios de e-mail temporário não são permitidos por motivos de segurança."
@@ -100,6 +106,7 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
 
     # Validação 3: Cálculo Estrutural do CPF (Dígito Verificador)
     if not validar_cpf(dados.cpf):
+        print(f"DEBUG REGISTRO: CPF inválido: {dados.cpf}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CPF inválido. Verifique o número digitado."
@@ -111,12 +118,14 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
     ).first()
     
     if usuario_existente:
+        print(f"DEBUG REGISTRO: Email ou CPF já cadastrados: {dados.email} / {dados.cpf}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email ou CPF já cadastrados."
         )
 
     if not dados.aceite_termos:
+        print(f"DEBUG REGISTRO: Falta aceite de termos.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Você precisa aceitar os Termos de Uso e Política de Privacidade para se cadastrar."

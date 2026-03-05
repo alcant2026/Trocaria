@@ -10,14 +10,24 @@ from utils_db import sincronizar_esquema
 app = FastAPI(title="Peer API P2P")
 
 # Configuração de CORS - Aceita Front de Produção ou Local
-frontend_url = os.getenv("FRONTEND_URL")
+frontend_url = os.getenv("FRONTEND_URL", "")
 origins = [
     "http://localhost:3000",
-    "http://localhost:5173", # Vite default
+    "http://localhost:5173",
     "http://127.0.0.1:3000",
+    "https://cred30.site",
+    "https://www.cred30.site",
 ]
+
 if frontend_url:
-    origins.append(frontend_url)
+    # Suporte a múltiplas URLs separadas por vírgula
+    for url in frontend_url.split(","):
+        clean_url = url.strip().rstrip("/")
+        if clean_url:
+            origins.append(clean_url)
+
+# Remover duplicatas mantendo a ordem
+origins = list(dict.fromkeys(origins))
 
 app.add_middleware(
     CORSMiddleware,

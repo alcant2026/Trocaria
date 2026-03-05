@@ -1,5 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
+import {
+    HandCoins,
+    PlusCircle,
+    ArrowUpCircle,
+    ArrowDownCircle,
+    ShieldCheck,
+    LayoutDashboard,
+    History,
+    ChevronRight,
+    TrendingUp,
+    Eye,
+    EyeOff,
+    FileText,
+    Clock,
+    Wallet,
+    ShieldAlert,
+    Copy,
+    Check,
+    CheckCircle2,
+    AlertCircle,
+    Users,
+    UserPlus,
+    X,
+    Gift,
+    ArrowLeft
+} from 'lucide-react';
+import ModalPremium from '../componentes/ModalPremium';
+import TermosUso from '../componentes/TermosUso';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -70,35 +98,6 @@ const formatarTipo = (tipo, detalhes) => {
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
-import {
-    HandCoins,
-    PlusCircle,
-    ArrowUpCircle,
-    ArrowDownCircle,
-    ShieldCheck,
-    LayoutDashboard,
-    History,
-    ChevronRight,
-    TrendingUp,
-    Eye,
-    EyeOff,
-    FileText,
-    Clock,
-    Wallet,
-    ShieldAlert,
-    Copy,
-    Check,
-    CheckCircle2,
-    AlertCircle,
-    Gift,
-    ArrowLeft,
-    Users,
-    UserPlus,
-    X
-} from 'lucide-react';
-
-import TermosUso from '../componentes/TermosUso';
-
 const DashboardTomador = () => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
     const [meusEmprestimos, setMeusEmprestimos] = useState([]);
@@ -109,7 +108,21 @@ const DashboardTomador = () => {
     const [copiadoPix, setCopiadoPix] = useState(false);
     const [copiadoId, setCopiadoId] = useState(false);
 
-    // Modal state
+    // Modal Premium State
+    const [modalPremium, setModalPremium] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'info',
+        onConfirm: null,
+        confirmText: 'Confirmar'
+    });
+    const [loadingAction, setLoadingAction] = useState(false);
+
+    const closeModal = () => setModalPremium(prev => ({ ...prev, isOpen: false }));
+    const showModal = (config) => setModalPremium({ ...config, isOpen: true });
+
+    // Modal state legado (quitar, score, kyc) - vou manter por enquanto mas adaptar para o Premium
     const [modal, setModal] = useState({ open: false, type: '', data: null });
 
     // Forms state
@@ -133,6 +146,7 @@ const DashboardTomador = () => {
             return () => clearTimeout(timer);
         }
     }, [mensagem]);
+
     const [kycDetails, setKycDetails] = useState('');
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
@@ -199,7 +213,7 @@ const DashboardTomador = () => {
         }
         if (!taxa || !parcelas) return;
         if (!aceiteTermos) {
-            alert("Você deve aceitar os termos de uso e taxas da plataforma para continuar.");
+            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso e taxas da plataforma para continuar.', type: 'warning' });
             return;
         }
 
@@ -232,7 +246,7 @@ const DashboardTomador = () => {
 
     const handlePagamentoAvulso = async (id) => {
         const val = parseFloat(valorAvulsoPorId[id]);
-        if (!val || val <= 0) return alert('Informe um valor válido.');
+        if (!val || val <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor válido para o pagamento mensal.', type: 'error' });
 
         try {
             const res = await api.post(`/emprestimos/pagamento-avulso/${id}`, { valor_pagamento: val });
@@ -249,7 +263,7 @@ const DashboardTomador = () => {
         const id1 = parseInt(idAmigo1);
         const id2 = parseInt(idAmigo2);
         if (!id1 || id1 <= 0 || !id2 || id2 <= 0) {
-            alert("Os IDs dos amigos devem ser números positivos.");
+            showModal({ title: 'IDs Inválidos', message: 'Os IDs dos amigos devem ser números positivos.', type: 'error' });
             return;
         }
         try {
@@ -266,30 +280,31 @@ const DashboardTomador = () => {
     };
 
     const handleQuitar = (emprestimoId) => {
-        setModal({
-            open: true,
-            type: 'quitar',
+        showModal({
             title: 'Quitar Empréstimo',
-            message: 'Deseja quitar o valor integral do empréstimo agora? Esta ação liquidará todas as parcelas restantes.',
-            action: () => confirmarQuitar(emprestimoId)
+            message: 'Deseja quitar o valor integral do empréstimo agora? \nEsta ação liquidará todas as parcelas restantes.',
+            type: 'finance',
+            onConfirm: async () => {
+                closeModal();
+                setLoadingAction(true);
+                try {
+                    await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
+                    showModal({ title: 'Sucesso!', message: 'Empréstimo quitado com sucesso!', type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro ao quitar: ' + err.message);
+                } finally {
+                    setLoadingAction(false);
+                }
+            }
         });
     };
 
-    const confirmarQuitar = async (emprestimoId) => {
-        setModal({ ...modal, open: false });
-        try {
-            await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
-            setMensagem('Empréstimo quitado com sucesso!');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao quitar: ' + err.message);
-        }
-    };
 
     const handleNotificarDeposito = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
-            alert('Informe um valor de depósito maior que zero.');
+            showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
             return;
         }
         try {
@@ -332,12 +347,23 @@ const DashboardTomador = () => {
     };
 
     const handleComprarScore = () => {
-        setModal({
-            open: true,
-            type: 'score',
+        showModal({
             title: 'Aumentar Score',
             message: 'Deseja comprar +1.5 de Score por R$ 35,00?',
-            action: confirmarCompraScore
+            type: 'pool',
+            onConfirm: async () => {
+                closeModal();
+                setLoadingAction(true);
+                try {
+                    const res = await api.post('/score/comprar');
+                    showModal({ title: 'Score Atualizado', message: res.message, type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro ao comprar score: ' + err.message);
+                } finally {
+                    setLoadingAction(false);
+                }
+            }
         });
     };
 
@@ -352,50 +378,51 @@ const DashboardTomador = () => {
     };
 
     const handleRejeitarGarantia = async (id) => {
-        if (!window.confirm("Se você recusar, o empréstimo do seu amigo será cancelado e os valores devolvidos aos investidores. Confirmar?")) return;
-        try {
-            const res = await api.post(`/emprestimos/rejeitar-garantia/${id}`);
-            setMensagem(res.message);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao rejeitar garantia: ' + err.message);
-        }
-    };
-
-    const confirmarCompraScore = async () => {
-        setModal({ ...modal, open: false });
-        try {
-            const res = await api.post('/score/comprar');
-            setMensagem(res.message);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao comprar score: ' + err.message);
-        }
-    };
-
-    const handleSolicitarVerificacao = () => {
-        if (!kycDetails) return alert('Informe os detalhes do envio.');
-        setModal({
-            open: true,
-            type: 'kyc',
-            title: 'Solicitar Verificação',
-            message: 'Taxa de análise humana: R$ 35,00. Deseja prosseguir?',
-            action: confirmarSolicitarVerificacao
+        showModal({
+            title: 'Rejeitar Garantia',
+            message: 'Se você recusar, o empréstimo do seu amigo será cancelado e os valores devolvidos aos investidores. \n\nConfirmar rejeição?',
+            type: 'warning',
+            onConfirm: async () => {
+                closeModal();
+                setLoadingAction(true);
+                try {
+                    const res = await api.post(`/emprestimos/rejeitar-garantia/${id}`);
+                    setMensagem(res.message);
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro ao rejeitar garantia: ' + err.message);
+                } finally {
+                    setLoadingAction(false);
+                }
+            }
         });
     };
 
-    const confirmarSolicitarVerificacao = async () => {
-        setModal({ ...modal, open: false });
-        try {
-            const res = await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
-            setMensagem(res.message);
-            setKycDetails('');
-            setActiveView('home');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao solicitar verificação: ' + err.message);
-        }
+
+    const handleSolicitarVerificacao = () => {
+        if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
+        showModal({
+            title: 'Solicitar Verificação',
+            message: 'Taxa de análise humana: R$ 35,00. \nDeseja prosseguir com a solicitação?',
+            type: 'info',
+            onConfirm: async () => {
+                closeModal();
+                setLoadingAction(true);
+                try {
+                    const res = await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
+                    showModal({ title: 'Solicitação Enviada', message: res.message, type: 'success' });
+                    setKycDetails('');
+                    setActiveView('home');
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro ao solicitar verificação: ' + err.message);
+                } finally {
+                    setLoadingAction(false);
+                }
+            }
+        });
     };
+
 
     const copiarPix = () => {
         navigator.clipboard.writeText('credpix@gmail.com');
@@ -461,67 +488,84 @@ const DashboardTomador = () => {
                 </div>
             )}
 
-            {/* Nova Seção: Garantias Sociais Pendentes */}
-            {garantiasPendentes.length > 0 && (
-                <div className="card mb-1" style={{ border: '2px dashed var(--warning)', background: 'rgba(255, 145, 0, 0.03)' }}>
-                    <h3 style={{ fontSize: '0.9rem', color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                        <Users size={18} /> Convites de Garantia
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {garantiasPendentes.map(p => (
-                            <div key={p.solicitacao_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <p style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.tomador} te convidou</p>
-                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Valor: R$ {p.valor.toLocaleString('pt-BR')}</p>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                        onClick={() => handleAceitarGarantia(p.solicitacao_id)}
-                                        className="btn btn-primary"
-                                        style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)', borderColor: 'var(--success)' }}
-                                    >
-                                        Aceitar
-                                    </button>
-                                    <button
-                                        onClick={() => handleRejeitarGarantia(p.solicitacao_id)}
-                                        className="btn btn-outline"
-                                        style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                                    >
-                                        Recusar
-                                    </button>
-                                </div>
+            {/* Top Grid for PC: Balance and Pending Actions */}
+            <div className="grid-2">
+                <div>
+                    {/* Alertas de Garantia */}
+                    {garantiasPendentes.length > 0 && (
+                        <div className="card animate-slide-up" style={{ borderColor: 'var(--primary)', background: 'rgba(255,204,0,0.02)' }}>
+                            <div className="flex-between mb-1">
+                                <h3 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Bell size={18} className="text-primary" />
+                                    Pedindo sua Garantia
+                                </h3>
+                                <span className="badge badge-warning">{garantiasPendentes.length}</span>
                             </div>
-                        ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {garantiasPendentes.map(p => (
+                                    <div key={p.solicitacao_id} className="info-block flex-between" style={{ padding: '10px', background: 'rgba(255,255,255,0.03)' }}>
+                                        <div>
+                                            <p style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>{p.tomador} te convidou</p>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>R$ {p.valor.toLocaleString('pt-BR')}</p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button onClick={() => handleAceitarGarantia(p.solicitacao_id)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)', borderColor: 'var(--success)', width: 'auto' }}>Aceitar</button>
+                                            <button onClick={() => handleRejeitarGarantia(p.solicitacao_id)} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--danger)', borderColor: 'var(--danger)', width: 'auto' }}>Recusar</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Main Balance Card - Nubank Style */}
+                    <div className="card card-actionable" onClick={() => setActiveView('home')}>
+                        <div className="flex-between mb-1" style={{ width: '100%' }}>
+                            <div className="flex-between" style={{ gap: '10px' }}>
+                                <HandCoins size={20} color="var(--primary)" />
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Minha Conta</span>
+                            </div>
+                            <ChevronRight size={18} color="var(--text-muted)" />
+                        </div>
+
+                        <div className="flex-between">
+                            <div>
+                                {verSaldo ? (
+                                    <h2 style={{ fontSize: '2.25rem' }}>
+                                        R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </h2>
+                                ) : (
+                                    <div style={{ height: '40px', width: '180px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+                                )}
+                                <p style={{ fontSize: '0.85rem', marginTop: '12px' }}>
+                                    Score Financeiro: <span className="text-primary" style={{ fontWeight: 800 }}>{(usuario.score || 0).toFixed(1)}</span>
+                                </p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}>
+                                {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            )}
 
-            {/* Main Balance Card - Nubank Style */}
-            <div className="card card-actionable" onClick={() => setActiveView('home')}>
-                <div className="flex-between mb-1" style={{ width: '100%' }}>
-                    <div className="flex-between" style={{ gap: '10px' }}>
-                        <HandCoins size={20} color="var(--primary)" />
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Conta</span>
+                <div className="hide-on-mobile">
+                    {/* PC-only Widget: Resumo Financeiro ou Info */}
+                    <div className="card" style={{ height: '100%' }}>
+                        <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Atividade</h3>
+                        <div className="grid-2" style={{ gap: '10px' }}>
+                            <div className="info-block">
+                                <div className="info-label">Dívida Total</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}</div>
+                            </div>
+                            <div className="info-block">
+                                <div className="info-label">Garantias</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{usuario.total_garantias || 0} Ativas</div>
+                            </div>
+                        </div>
+                        <div className="mt-1 p-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.8rem' }}>
+                            <p style={{ margin: 0 }}>Lembre-se: manter seu Score acima de 600 libera taxas de juros reduzidas em até 2%.</p>
+                        </div>
                     </div>
-                    <ChevronRight size={18} color="var(--text-muted)" />
-                </div>
-
-                <div className="flex-between">
-                    <div>
-                        {verSaldo ? (
-                            <h2 style={{ fontSize: '1.75rem' }}>
-                                R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </h2>
-                        ) : (
-                            <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
-                        )}
-                        <p style={{ fontSize: '0.8rem', marginTop: '8px' }}>
-                            Score Financeiro: <span className="text-primary" style={{ fontWeight: 800 }}>{(usuario.score || 0).toFixed(1)}</span>
-                        </p>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                        {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
-                    </button>
                 </div>
             </div>
 
@@ -1153,27 +1197,17 @@ const DashboardTomador = () => {
                     </div>
                 )
             }
-            {/* Modal de Confirmação */}
-            {
-                modal.open && (
-                    <div className="modal-overlay">
-                        <div className="modal-card">
-                            <div className="modal-icon">
-                                {modal.type === 'score' ? <TrendingUp size={32} /> :
-                                    modal.type === 'quitar' ? <HandCoins size={32} /> :
-                                        <ShieldCheck size={32} />}
-                            </div>
-                            <h2>{modal.title}</h2>
-                            <p>{modal.message}</p>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '2rem' }}>
-                                <button className="btn btn-primary" onClick={modal.action}>Confirmar e Pagar</button>
-                                <button className="btn btn-secondary" onClick={() => setModal({ ...modal, open: false })}>Cancelar</button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {/* Modal Premium Unificado */}
+            <ModalPremium
+                isOpen={modalPremium.isOpen}
+                onClose={closeModal}
+                title={modalPremium.title}
+                message={modalPremium.message}
+                type={modalPremium.type}
+                onConfirm={modalPremium.onConfirm}
+                confirmText={modalPremium.confirmText}
+                loading={loadingAction}
+            />
         </div >
     );
 };

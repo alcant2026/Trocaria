@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
@@ -118,12 +119,22 @@ async def criar_solicitacao(
         data_criacao=agora,
         data_expiracao_4h=agora + datetime.timedelta(hours=4),
         data_expiracao_5d=agora + datetime.timedelta(days=5),
-        # Blindagem Jurídica
         aceite_termos=True,
         auditoria_id=auditoria.id,
         cpf_aceite=usuario.cpf,
         data_aceite=agora
     )
+
+    # Lógica de Sugestão de Aporte do Pool (Caixa) baseada em Score/KYC
+    sugestao_percentual = Decimal("0.10") # 10% base
+    if usuario.is_verified:
+        sugestao_percentual = Decimal("0.30") # 30% se verificado
+        if usuario.score >= Decimal("600"):
+            sugestao_percentual = Decimal("0.50") # 50% se verificado e score bom
+        if usuario.score >= Decimal("900"):
+            sugestao_percentual = Decimal("0.80") # 80% se verificado e score excelente
+    
+    nova_solicitacao.sugestao_pool = valor * sugestao_percentual
 
     # Registrar custo apenas se houver cobânça
     transacao_custo = None
@@ -472,11 +483,37 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     
     # Incrementar parcelas e aumentar score
     solicitacao.parcelas_pagas += 1
+    
+    # BÔNUS CAIXA: Se o tomador tem saldo no Caixa (Pool), ganha um incentivo por pagar em dia
+    bonus_caixa = Decimal("0.00")
+    if multa_atraso == 0 and usuario.saldo_caixa > 0:
+        # Dá 0.1% do valor da parcela como bônus direto no Caixa dele
+        bonus_caixa = valor_pagamento * Decimal("0.001")
+        usuario.saldo_caixa += bonus_caixa
+        db.add(Transacao(
+            usuario_id=usuario.id,
+            valor=bonus_caixa,
+            tipo=TipoTransacao.BONUS_PAGADOR_CAIXA,
+            status="concluido",
+            detalhes=f"Bônus pontualidade no seu Caixa - Pedido #{solicitacao_id}"
+        ))
+
     if multa_atraso == 0:
         usuario.score = min(Decimal("1000"), usuario.score + Decimal("2.0"))
     else:
-        # Atraso penaliza o ganho de score
-        usuario.score = min(Decimal("1000"), usuario.score + Decimal("0.5"))
+        # Atraso penaliza o ganho de score, mas se ele pagou, recupera o score anterior se estava zerado
+        if usuario.score == 0 and usuario.score_anterior > 0:
+            usuario.score = usuario.score_anterior
+            usuario.score_anterior = Decimal("0") # Limpa a memória
+        else:
+            usuario.score = min(Decimal("1000"), usuario.score + Decimal("0.5"))
+            
+        # RESTAURA SCORE DOS GARANTIDORES: Se o tomador pagou o atraso, os amigos voltam ao patamar original
+        for g in solicitacao.garantias_sociais:
+            garante = g.garante
+            if garante.score == 0 and garante.score_anterior > 0:
+                garante.score = garante.score_anterior
+                garante.score_anterior = Decimal("0") # Limpa a memória
 
     # Atualizar próximo vencimento (Mantendo o dia fixo do mês)
     if solicitacao.proximo_vencimento:
@@ -547,16 +584,41 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
         investidor = inv.investidor
         valor_final = p["valor_liquido"]
         
-        investidor.saldo += valor_final
-        inv.pago_para_investidor += valor_final
-        
-        db.add(Transacao(
-            usuario_id=investidor.id,
-            valor=valor_final,
-            tipo=TipoTransacao.RECEBIMENTO,
-            status="concluido",
-            detalhes=f"Recebimento de parcela do pedido ID {solicitacao_id} (Net)"
-        ))
+        # LÓGICA DE DESTINO: Se for Pool, distribui o LUCRO para todos e o CAPITAL volta ao caixa disponível
+        if hasattr(inv, 'is_pool') and inv.is_pool:
+            # 1. Separar o Capital do Lucro neste pagamento
+            fatia_principal = p["valor_liquido"] # No pagar_parcela, o passo 1 já calculou o principal pro-rata
+            lucro_liquido_desta_parcela = valor_final - fatia_principal
+            
+            # 2. O Capital volta para o balcão (Admin) para novos empréstimos
+            admin.saldo_caixa += fatia_principal
+            
+            # 3. O Lucro aumenta o patrimônio de todos os investidores do Caixa (Crescimento do Pool)
+            if lucro_liquido_desta_parcela > 0:
+                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
+                for p_caixa in participantes_caixa:
+                    # O "bolo" de todo mundo aumenta proporcionalmente ao que cada um tem
+                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_desta_parcela
+                
+            inv.pago_para_investidor += valor_final
+            db.add(Transacao(
+                usuario_id=admin.id,
+                valor=valor_final,
+                tipo=TipoTransacao.RETORNO_POOL,
+                status="concluido",
+                detalhes=f"Retorno Pool (Cap: {fatia_principal} | Lucro: {lucro_liquido_desta_parcela}) - Pedido #{solicitacao_id}"
+            ))
+        else:
+            investidor.saldo += valor_final
+            inv.pago_para_investidor += valor_final
+            db.add(Transacao(
+                usuario_id=investidor.id,
+                valor=valor_final,
+                tipo=TipoTransacao.RECEBIMENTO,
+                status="concluido",
+                detalhes=f"Recebimento de parcela do pedido ID {solicitacao_id} (Net)"
+            ))
 
     # 3. Creditar Taxa de Performance ao Admin
     if admin and lucro_performance_total > 0:
@@ -610,6 +672,12 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
         
     valor_quitação_base = valor_parcela_base * parcelas_restantes
 
+    # Buscar usuário admin para operações de Pool
+    admin = db.query(Usuario).filter(Usuario.is_admin == True).first()
+    if not admin:
+        # Fallback caso não exista admin marcado (puxa o primeiro ou o com ID 1)
+        admin = db.query(Usuario).order_by(Usuario.id).first()
+
     # 2. Lógica de Mora (Apenas sobre a parcela atual se estiver atrasada)
     agora = datetime.datetime.utcnow()
     mora_atraso = Decimal("0.00")
@@ -626,7 +694,20 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
 
     # 3. Processar Pagamento
     usuario.saldo -= total_final_devedor
-    usuario.score = min(Decimal("1000"), usuario.score + Decimal("5.0")) # Bônus por quitação
+    
+    # Restaura score original se estava penalizado
+    if usuario.score == 0 and usuario.score_anterior > 0:
+        usuario.score = usuario.score_anterior
+        usuario.score_anterior = Decimal("0")
+    else:
+        usuario.score = min(Decimal("1000"), usuario.score + Decimal("5.0")) # Bônus por quitação
+        
+    # RESTAURA SCORE DOS GARANTIDORES
+    for g in solicitacao.garantias_sociais:
+        garante = g.garante
+        if garante.score == 0 and garante.score_anterior > 0:
+            garante.score = garante.score_anterior
+            garante.score_anterior = Decimal("0")
     
     # Salvar fotos antes da mudança
     parcelas_pagas_antes = solicitacao.parcelas_pagas
@@ -655,18 +736,39 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
 
         # Pagar investidor
         investidor = inv.investidor
-        investidor.saldo += valor_liquido_investidor
-        inv.pago_para_investidor += valor_liquido_investidor
         
-        tipo_trans = TipoTransacao.RECEBIMENTO
-        detalhes_trans = f"Quitação Total (Net) - Pedido #{solicitacao_id}"
-        
-        if hasattr(inv, 'is_institutional') and inv.is_institutional:
-            tipo_trans = TipoTransacao.RETORNO_INVESTIMENTO
-            detalhes_trans = f"RETORNO INVESTIMENTO (LUCRO) - Pedido #{solicitacao_id}"
+        if hasattr(inv, 'is_pool') and inv.is_pool:
+            # Separar capital de lucro na quitação
+            capital_no_pool = principal_pendente
+            lucro_liquido_no_pool = valor_liquido_investidor - capital_no_pool
+            
+            # Capital volta ao caixa disponível
+            admin.saldo_caixa += capital_no_pool
+            
+            # Lucro aumenta o saldo de todos os investidores do Caixa
+            if lucro_liquido_no_pool > 0:
+                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
+                for p_caixa in participantes_caixa:
+                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_no_pool
+            
+            inv.pago_para_investidor += valor_liquido_investidor
+            tipo_trans = TipoTransacao.RETORNO_POOL
+            detalhes_trans = f"Quitação Distribuída Pool (Cap: {capital_no_pool} | Lucro: {lucro_liquido_no_pool}) - Pedido #{solicitacao_id}"
+            u_id = admin.id
+        else:
+            investidor.saldo += valor_liquido_investidor
+            inv.pago_para_investidor += valor_liquido_investidor
+            u_id = investidor.id
+            tipo_trans = TipoTransacao.RECEBIMENTO
+            detalhes_trans = f"Quitação Total (Net) - Pedido #{solicitacao_id}"
+            
+            if hasattr(inv, 'is_institutional') and inv.is_institutional:
+                tipo_trans = TipoTransacao.RETORNO_INVESTIMENTO
+                detalhes_trans = f"RETORNO INVESTIMENTO (LUCRO) - Pedido #{solicitacao_id}"
 
         db.add(Transacao(
-            usuario_id=investidor.id,
+            usuario_id=u_id,
             valor=valor_liquido_investidor,
             tipo=tipo_trans,
             status="concluido",
@@ -723,8 +825,20 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
     usuario.saldo -= valor_pago
     solicitacao.taxas_adicionais += taxa_conveniencia
     
-    # Bônus de score proporcional (menor que parcela cheia)
-    usuario.score = min(Decimal("1000"), usuario.score + Decimal("0.5"))
+    # Bônus de score proporcional ou restauração se estava zerado
+    if usuario.score == 0 and usuario.score_anterior > 0:
+        usuario.score = usuario.score_anterior
+        usuario.score_anterior = Decimal("0")
+    else:
+        usuario.score = min(Decimal("1000"), usuario.score + Decimal("0.5"))
+        
+    # RESTAURA SCORE DOS GARANTIDORES (Se o valor pago for suficiente para cobrir o atraso ou amortizar significativamente)
+    # Por segurança, restauramos sempre que houver um pagamento avulso em conta zerada
+    for g in solicitacao.garantias_sociais:
+        garante = g.garante
+        if garante.score == 0 and garante.score_anterior > 0:
+            garante.score = garante.score_anterior
+            garante.score_anterior = Decimal("0")
 
     # 2. Rateio com Investidores (Proteção de Principal Pró-rata)
     total_emprestado = solicitacao.valor
@@ -797,10 +911,30 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
         investidor = inv.investidor
         valor_final = p["valor_liquido"]
         
-        if valor_final > 0:
+        if hasattr(inv, 'is_pool') and inv.is_pool:
+            # Separar capital de lucro no pagamento avulso
+            # Como p["valor_liquido"] no avulso já acumulou capital e lucro, precisamos identificar
+            # O capital_no_pool já foi calculado proporcionalmente na lógica anterior do avulso
+            # Para simplificar o rateio do lucro no avulso:
+            fatia_principal_avulso = valor_capital_no_pagamento * p["proporcao"]
+            lucro_liquido_avulso = valor_final - fatia_principal_avulso
+            
+            admin.saldo_caixa += fatia_principal_avulso
+            
+            if lucro_liquido_avulso > 0:
+                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
+                for p_caixa in participantes_caixa:
+                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_avulso
+
+            inv.pago_para_investidor += valor_final
+            tipo_trans = TipoTransacao.RETORNO_POOL
+            detalhes_trans = f"Retorno Avulso Pool (Cap: {fatia_principal_avulso} | Lucro: {lucro_liquido_avulso}) - Pedido #{solicitacao_id}"
+            u_id = admin.id
+        else:
             investidor.saldo += valor_final
             inv.pago_para_investidor += valor_final
-            
+            u_id = investidor.id
             tipo_trans = TipoTransacao.RECEBIMENTO
             detalhes_trans = f"Recebimento Avulso (Net) - Pedido #{solicitacao_id}"
             
@@ -808,13 +942,13 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
                 tipo_trans = TipoTransacao.RETORNO_INVESTIMENTO
                 detalhes_trans = f"RETORNO INVESTIMENTO (LUCRO) - Pedido #{solicitacao_id}"
 
-            db.add(Transacao(
-                usuario_id=investidor.id,
-                valor=valor_final,
-                tipo=tipo_trans,
-                status="concluido",
-                detalhes=detalhes_trans
-            ))
+        db.add(Transacao(
+            usuario_id=u_id,
+            valor=valor_final,
+            tipo=tipo_trans,
+            status="concluido",
+            detalhes=detalhes_trans
+        ))
 
     # 5. Creditar Taxas à Plataforma Admin
     if admin:
@@ -1094,12 +1228,15 @@ async def verificar_inadimplencia(db: Session = Depends(get_db), admin: Usuario 
     for s in atrasados:
         tomador = s.usuario
         # Penaliza Tomador
-        tomador.score = Decimal("0")
+        if tomador.score > 0:
+            tomador.score_anterior = tomador.score
+            tomador.score = Decimal("0")
         
         # Penaliza Garantidores
         for g in s.garantias_sociais:
             garante = g.garante
             if garante.score > 0:
+                garante.score_anterior = garante.score
                 garante.score = Decimal("0")
                 penalizados += 1
     
@@ -1120,3 +1257,58 @@ async def liberacao_especial_admin(solicitacao_id: int, db: Session = Depends(ge
             raise HTTPException(status_code=400, detail="Não foi possível liberar. Verifique se a meta de 100% foi atingida.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/confirmar-pool/{solicitacao_id}")
+async def confirmar_aporte_pool(
+    solicitacao_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Rota Administrativa para confirmar o aporte sugerido pelo sistema usando o saldo do Pool.
+    """
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.id == solicitacao_id).first()
+    if not solicitacao or solicitacao.status != StatusSolicitacao.PENDENTE:
+        raise HTTPException(status_code=404, detail="Solicitação pendente não encontrada.")
+
+    valor_aporte = solicitacao.sugestao_pool
+    if valor_aporte <= 0:
+        raise HTTPException(status_code=400, detail="Não há sugestão de aporte válida para este pedido.")
+
+    # Verificar se o Pool tem saldo (soma total do saldo_caixa dos usuários)
+    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+    
+    if total_pool < valor_aporte:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente no Pool (Disponível: R$ {total_pool})")
+
+    # Registrar o Investimento Automático do Pool
+    novo_investimento = Investimento(
+        investidor_id=admin.id, # O Admin atua em nome do fundo no MVP
+        solicitacao_id=solicitacao.id,
+        valor_investido=valor_aporte,
+        is_institutional=True,
+        is_pool=True,
+        data_investimento=datetime.datetime.utcnow(),
+        ciencia_risco=True
+    )
+
+    # Deduzimos o valor do saldo_caixa do admin (como proxy do fundo centralizado)
+    # No futuro, isso pode ser distribuído pro-rata entre todos os investidores do caixa
+    admin.saldo_caixa -= valor_aporte
+    solicitacao.valor_arrecadado += valor_aporte
+    
+    # Zerar a sugestão após o uso
+    solicitacao.sugestao_pool = Decimal("0.00")
+
+    db.add(novo_investimento)
+    db.add(Transacao(
+        usuario_id=admin.id,
+        valor=valor_aporte,
+        tipo=TipoTransacao.INVESTIMENTO,
+        status="concluido",
+        detalhes=f"Aporte Pool Aprovado - Pedido #{solicitacao_id}"
+    ))
+
+    db.commit()
+    
+    return {"message": f"Aporte do Pool de R$ {valor_aporte} confirmado!"}

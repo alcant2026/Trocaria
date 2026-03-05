@@ -44,7 +44,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "chave_pix": usuario.chave_pix,
                 "cidade": usuario.cidade,
                 "estado": usuario.estado,
-                "two_factor_enabled": usuario.two_factor_enabled
+                "two_factor_enabled": usuario.two_factor_enabled,
+                "saldo_caixa": float(usuario.saldo_caixa or 0)
             },
             "historico": []
         }
@@ -104,6 +105,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
+            saldo_pool_caixa = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+
             total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo == TipoTransacao.SAQUE,
                 Transacao.detalhes.like("RESGATE DE LUCRO %"),
@@ -160,12 +163,15 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "lucro_plataforma_total": float(sum(detalhamento_mes.values())),
                     "lucro_plataforma_historico": float(total_lucro_historico),
                     "lucro_disponivel": float(total_lucro_historico - total_sacado_admin - total_investido_institucional),
+                    "saldo_pool_caixa": float(saldo_pool_caixa),
                     "detalhamento_lucro": {
                         "taxas_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
                         "desbloqueio_lgpd": float(detalhamento_mes.get('desbloqueio_dados', 0)),
                         "kyc_e_score": float(detalhamento_mes.get('compra_score', 0)),
                         "taxas_saque_extra": float(detalhamento_mes.get('taxa_saque', 0)),
-                        "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0))
+                        "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0)),
+                        "aportes_externos": float(detalhamento_mes.get('aporte_capital', 0)),
+                        "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0))
                     },
                     "historico_mensal": historico_mes
                 },
@@ -186,7 +192,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "valor_arrecadado": float(sa.valor_arrecadado),
                     "score": float(sa.usuario.score),
                     "taxa": float(sa.taxa_juros),
-                    "parcelas": sa.prazo_meses
+                    "parcelas": sa.prazo_meses,
+                    "sugestao_pool": float(sa.sugestao_pool or 0)
                 })
 
             # 6. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)
@@ -279,13 +286,29 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         carteira_raw = db.query(Investimento).filter(Investimento.investidor_id == usuario.id).all()
         carteira_list = []
         for i in carteira_raw:
+            s = i.solicitacao
+            taxa_mensal = s.taxa_juros / 100
+            valor_total_ativo = i.valor_investido * (Decimal("1") + (taxa_mensal * s.prazo_meses))
+            valor_mensal = valor_total_ativo / s.prazo_meses
+            
+            valor_recebido = i.pago_para_investidor
+            valor_restante = max(0, float(valor_total_ativo - valor_recebido))
+            if s.status == StatusSolicitacao.CONCLUIDO:
+                valor_restante = 0.0
+
             carteira_list.append({
                 "id": i.id,
+                "solicitacao_id": s.id,
                 "valor_investido": float(i.valor_investido),
-                "status_emprestimo": i.solicitacao.status.value,
-                "tomador_nome": i.solicitacao.usuario.nome.split()[0],
-                "taxa": float(i.solicitacao.taxa_juros),
-                "pago_para_investidor": float(i.pago_para_investidor)
+                "valor_mensal": round(float(valor_mensal), 2),
+                "valor_recebido": float(valor_recebido),
+                "valor_restante": round(valor_restante, 2),
+                "status_emprestimo": s.status.value,
+                "tomador_nome": s.usuario.nome.split()[0],
+                "tomador_is_verified": s.usuario.is_verified,
+                "taxa": float(s.taxa_juros),
+                "parcelas_pagas": s.parcelas_pagas,
+                "total_parcelas": s.prazo_meses
             })
 
         snapshot["investidor"] = {

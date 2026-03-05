@@ -93,13 +93,15 @@ import {
     ShieldAlert,
     Copy,
     Check,
-    CheckCircle2,
-    History,
     AlertCircle,
-    FileText
+    FileText,
+    CheckCircle2,
+    History
 } from 'lucide-react';
+import ModalPremium from '../componentes/ModalPremium';
 
 import TermosUso from '../componentes/TermosUso';
+import CaixaInvestidor from './CaixaInvestidor';
 
 const DashboardInvestidor = () => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
@@ -143,7 +145,21 @@ const DashboardInvestidor = () => {
     const [paginaOportunidades, setPaginaOportunidades] = useState(1);
     const ITENS_POR_PAGINA = 5;
 
-    // Modal state
+    // Modal Premium State
+    const [modalPremium, setModalPremium] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'info',
+        onConfirm: null,
+        confirmText: 'Confirmar'
+    });
+    const [loadingAction, setLoadingAction] = useState(false);
+
+    const closeModal = () => setModalPremium(prev => ({ ...prev, isOpen: false }));
+    const showModal = (config) => setModalPremium({ ...config, isOpen: true });
+
+    // Modal state legado
     const [modal, setModal] = useState({ open: false, type: '', data: null });
 
     const copiarPix = () => {
@@ -196,8 +212,8 @@ const DashboardInvestidor = () => {
         const aceite = aceiteRisco[solicitacaoId];
 
         const v = parseFloat(valor);
-        if (!v || v <= 0) return alert('Digite um valor de investimento maior que zero.');
-        if (!aceite) return alert('Você deve aceitar os riscos do investimento para continuar.');
+        if (!v || v <= 0) return showModal({ title: 'Valor Inválido', message: 'Digite um valor de investimento maior que zero.', type: 'error' });
+        if (!aceite) return showModal({ title: 'Aviso de Risco', message: 'Você deve aceitar os riscos do investimento para continuar.', type: 'warning' });
 
         try {
             await api.post(`/investidor/investir/${solicitacaoId}`, {
@@ -214,7 +230,7 @@ const DashboardInvestidor = () => {
     const handleNotificarDeposito = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
-            alert('Informe um valor de depósito maior que zero.');
+            showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
             return;
         }
         try {
@@ -257,24 +273,26 @@ const DashboardInvestidor = () => {
     };
 
     const handleDesbloquear = (solicitacaoId) => {
-        setModal({
-            open: true,
-            type: 'desbloquear',
-            data: { id: solicitacaoId }
+        showModal({
+            title: 'Desbloquear Perfil',
+            message: 'Deseja desbloquear os dados completos deste perfil por R$ 15,00? \n\n⚠️ O desbloqueio permite sua análise detalhada, mas não garante o pagamento do empréstimo.',
+            type: 'finance',
+            onConfirm: async () => {
+                closeModal();
+                setLoadingAction(true);
+                try {
+                    const res = await api.post(`/emprestimos/desbloquear-dados/${solicitacaoId}`);
+                    showModal({ title: 'Sucesso!', message: res.message, type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao desbloquear.', type: 'error' });
+                } finally {
+                    setLoadingAction(false);
+                }
+            }
         });
     };
 
-    const confirmarDesbloqueio = async () => {
-        const id = modal.data.id;
-        setModal({ ...modal, open: false });
-        try {
-            const res = await api.post(`/emprestimos/desbloquear-dados/${id}`);
-            setMensagem(res.message);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
-        }
-    };
 
     const totalInvestido = carteira.reduce((acc, item) => acc + item.valor_investido, 0);
 
@@ -283,30 +301,32 @@ const DashboardInvestidor = () => {
             <header className="mb-1">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h1>Painel Investidor</h1>
-                    <div
-                        onClick={handleCopiarId}
-                        style={{
-                            fontSize: '0.65rem',
-                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15), rgba(var(--success-rgb), 0.15))',
-                            padding: '6px 14px',
-                            borderRadius: '30px',
-                            border: '1px solid rgba(var(--primary-rgb), 0.3)',
-                            color: copiadoId ? 'var(--success)' : 'var(--text-main)',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
-                            transform: copiadoId ? 'scale(0.95)' : 'scale(1)'
-                        }}
-                    >
-                        {copiadoId ? <Check size={14} /> : <Copy size={14} />}
-                        <span style={{ letterSpacing: '1px' }}>{usuario.id}</span>
+                    <div className="hide-on-mobile">
+                        <div
+                            onClick={handleCopiarId}
+                            style={{
+                                fontSize: '0.65rem',
+                                background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15), rgba(var(--success-rgb), 0.15))',
+                                padding: '6px 14px',
+                                borderRadius: '30px',
+                                border: '1px solid rgba(var(--primary-rgb), 0.3)',
+                                color: copiadoId ? 'var(--success)' : 'var(--text-main)',
+                                fontWeight: 800,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+                                transform: copiadoId ? 'scale(0.95)' : 'scale(1)'
+                            }}
+                        >
+                            {copiadoId ? <Check size={14} /> : <Copy size={14} />}
+                            <span style={{ letterSpacing: '1px' }}>ID: {usuario.id}</span>
+                        </div>
                     </div>
                 </div>
-                <p className="text-muted">Multiplique seu capital com segurança.</p>
+                <p className="text-muted">Gestão estratégica de capital e ativos P2P.</p>
             </header>
 
             {mensagem && (
@@ -316,123 +336,113 @@ const DashboardInvestidor = () => {
                 </div>
             )}
 
-            {/* Wallet Overview Card */}
-            <div className="card card-actionable" onClick={() => setActiveView('home')}>
-                <div className="flex-between mb-1">
-                    <div className="flex-between" style={{ gap: '10px' }}>
-                        <Wallet size={20} color="var(--success)" />
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Minha Carteira</span>
+            {/* Top Grid for PC: Balance and Action Quick Links */}
+            <div className="grid-2">
+                {/* Wallet Overview Card */}
+                <div className="card card-actionable" onClick={() => setActiveView('home')}>
+                    <div className="flex-between mb-1">
+                        <div className="flex-between" style={{ gap: '10px' }}>
+                            <Wallet size={20} color="var(--success)" />
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Ativos e Saldo</span>
+                        </div>
+                        <ChevronRight size={18} color="var(--text-muted)" />
                     </div>
-                    <ChevronRight size={18} color="var(--text-muted)" />
-                </div>
 
-                {(() => {
-                    const totalRecebido = carteira.reduce((acc, item) => acc + (item.valor_recebido || 0), 0);
-                    const historicoRecente = [...historico].slice(0, 15).reverse();
-                    const maxVal = Math.max(...historicoRecente.map(i => Math.abs(i.valor || 0)), 1);
-                    return (
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div className="flex-between" style={{ alignItems: 'flex-start' }}>
-                                <div>
-                                    <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
-                                    {verSaldo ? (
-                                        <h2 style={{ fontSize: '1.75rem', color: 'var(--success)' }}>
-                                            R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </h2>
-                                    ) : (
-                                        <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
-                                    )}
+                    {(() => {
+                        const totalRecebido = carteira.reduce((acc, item) => acc + (item.valor_recebido || 0), 0);
+                        const historicoRecente = [...historico].slice(0, 15).reverse();
+                        const maxVal = Math.max(...historicoRecente.map(i => Math.abs(i.valor || 0)), 1);
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div className="flex-between" style={{ alignItems: 'flex-start' }}>
+                                    <div>
+                                        <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
+                                        {verSaldo ? (
+                                            <h2 style={{ fontSize: '2rem', color: 'var(--success)' }}>
+                                                R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </h2>
+                                        ) : (
+                                            <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
+                                        )}
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                            Total Investido: <strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>R$ {totalInvestido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-                                        </p>
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                            Já Recebido: <strong style={{ color: 'var(--success)', fontSize: '0.85rem' }}>R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-                                        </p>
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                            {(() => {
-                                                const lucro = totalRecebido - totalInvestido;
-                                                const perc = totalInvestido > 0 ? (lucro / totalInvestido) * 100 : 0;
-                                                const cor = perc > 0 ? 'var(--success)' : perc < 0 ? 'var(--danger)' : 'var(--text-muted)';
-                                                return (
-                                                    <>
-                                                        Retorno Constatado: <strong style={{ color: cor, fontSize: '0.85rem' }}>
-                                                            {perc > 0 ? '+' : ''}{perc.toFixed(1)}%
-                                                        </strong>
-                                                        <span style={{ fontSize: '0.65rem', marginLeft: '6px', opacity: 0.8, color: cor }}>
-                                                            ({lucro > 0 ? '+' : ''}R$ {lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                                        </span>
-                                                    </>
-                                                );
-                                            })()}
-                                        </p>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                Total Investido: <strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>R$ {totalInvestido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                            </p>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                Já Recebido: <strong style={{ color: 'var(--success)', fontSize: '0.85rem' }}>R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                            </p>
+                                        </div>
                                     </div>
+
+                                    <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}>
+                                        {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
+                                    </button>
                                 </div>
 
-                                <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                                    {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
-                                </button>
+                                {/* Enlarge Candlestick Chart Area (Agrupado por Dia) */}
+                                {historico.length > 0 && (() => {
+                                    const diasAgrupados = historico.reduce((acc, item) => {
+                                        if (!item.data) return acc;
+                                        const dia = new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                        const isNegativo = TIPOS_NEGATIVO.has(item.tipo);
+                                        const valorReal = isNegativo ? -Math.abs(item.valor || 0) : Math.abs(item.valor || 0);
+                                        if (!acc[dia]) acc[dia] = { dia, saldo: 0, operacoes: 0 };
+                                        acc[dia].saldo += valorReal;
+                                        acc[dia].operacoes += 1;
+                                        return acc;
+                                    }, {});
+                                    const diasArray = Object.values(diasAgrupados).slice(0, 10).reverse();
+                                    const maxValDia = Math.max(...diasArray.map(d => Math.abs(d.saldo)), 1);
+                                    return (
+                                        <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                                            <div className="flex-between mb-1">
+                                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fluxo Recente</span>
+                                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{diasArray.length} Dias</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '60px', gap: '6px' }}>
+                                                {diasArray.map((d, idx) => {
+                                                    const isGreen = d.saldo >= 0;
+                                                    const height = Math.max(8, (Math.abs(d.saldo) / maxValDia) * 60);
+                                                    return (
+                                                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                                            <div title={`${d.dia}\n${isGreen ? '+' : ''} R$ ${d.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} style={{ width: '100%', maxWidth: '12px', height: `${height}px`, background: isGreen ? 'var(--success)' : 'var(--danger)', borderRadius: '3px', opacity: 0.8 }}></div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
+                        );
+                    })()}
+                </div>
 
-                            {/* Enlarge Candlestick Chart Area (Agrupado por Dia) */}
-                            {historico.length > 0 && (() => {
-                                // Agrupar histórico por data (saldo líquido diário)
-                                const diasAgrupados = historico.reduce((acc, item) => {
-                                    if (!item.data) return acc;
-                                    const dia = new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                                    const isNegativo = TIPOS_NEGATIVO.has(item.tipo);
-                                    const valorReal = isNegativo ? -Math.abs(item.valor || 0) : Math.abs(item.valor || 0);
-
-                                    if (!acc[dia]) acc[dia] = { dia, saldo: 0, operacoes: 0 };
-                                    acc[dia].saldo += valorReal;
-                                    acc[dia].operacoes += 1;
-                                    return acc;
-                                }, {});
-
-                                // Pegar os últimos 10 dias de pregão/movimentação, do mais antigo pro mais recente (left to right)
-                                const diasArray = Object.values(diasAgrupados).slice(0, 10).reverse();
-                                const maxValDia = Math.max(...diasArray.map(d => Math.abs(d.saldo)), 1);
-
-                                return (
-                                    <div style={{
-                                        marginTop: '20px',
-                                        paddingTop: '15px',
-                                        borderTop: '1px solid var(--border-color)',
-                                        display: 'flex',
-                                        flexDirection: 'column'
-                                    }}>
-                                        <div className="flex-between mb-1">
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>FLUXO RECENTE (Saldo Diário)</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Últimos {diasArray.length} dias</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '80px', gap: '8px' }}>
-                                            {diasArray.map((d, idx) => {
-                                                const isGreen = d.saldo >= 0;
-                                                const height = Math.max(10, (Math.abs(d.saldo) / maxValDia) * 80);
-                                                return (
-                                                    <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', group: 'true' }}>
-                                                        <div title={`${d.dia}\n${isGreen ? '+' : ''} R$ ${d.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n(${d.operacoes} transações)`} style={{
-                                                            width: '100%',
-                                                            maxWidth: '16px',
-                                                            height: `${height}px`,
-                                                            background: isGreen ? 'var(--success)' : 'var(--danger)',
-                                                            borderRadius: '4px',
-                                                            opacity: 0.9,
-                                                            transition: 'height 0.3s ease',
-                                                            cursor: 'pointer'
-                                                        }}></div>
-                                                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{d.dia.split('/')[0]}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                <div className="hide-on-mobile">
+                    {/* PC-only Widget: Resumo de Performance */}
+                    <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <h3 className="mb-1" style={{ fontSize: '1rem' }}>Performance da Carteira</h3>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '15px' }}>
+                            <div className="info-block">
+                                <div className="info-label">Rentabilidade Média</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>
+                                    {totalInvestido > 0 ? (((carteira.reduce((a, i) => a + (i.pago_para_investidor || 0), 0) - totalInvestido) / totalInvestido) * 100).toFixed(1) : '0.0'}%
+                                </div>
+                            </div>
+                            <div className="grid-2" style={{ gap: '10px' }}>
+                                <div className="info-block">
+                                    <div className="info-label">Ativos</div>
+                                    <div style={{ fontWeight: 700 }}>{carteira.length} Contratos</div>
+                                </div>
+                                <div className="info-block">
+                                    <div className="info-label">Recebível</div>
+                                    <div style={{ fontWeight: 700 }}>R$ {carteira.reduce((a, i) => a + (i.valor_restante || 0), 0).toLocaleString('pt-BR')}</div>
+                                </div>
+                            </div>
                         </div>
-                    );
-                })()}
+                    </div>
+                </div>
             </div>
 
             {/* Action Mosaic / Grid */}
@@ -456,6 +466,10 @@ const DashboardInvestidor = () => {
                 <div className="action-btn" onClick={() => setActiveView('carteira')}>
                     <Briefcase size={28} />
                     <span>Carteira</span>
+                </div>
+                <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ border: '1px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                    <TrendingUp size={28} color="var(--primary)" />
+                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Caixa (Pool)</span>
                 </div>
             </div>
 
@@ -703,7 +717,6 @@ const DashboardInvestidor = () => {
             )}
 
 
-            {/* Wallet Detail View */}
             {activeView === 'carteira' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
@@ -751,26 +764,32 @@ const DashboardInvestidor = () => {
                 </div>
             )}
 
-            {/* Modal de Confirmação */}
-            {modal.open && (
-                <div className="modal-overlay">
-                    <div className="modal-card">
-                        <div className="modal-icon">
-                            <Lock size={32} />
-                        </div>
-                        <h2>Confirmar Pagamento</h2>
-                        <p>Deseja desbloquear os dados completos deste perfil por <strong>R$ 15,00</strong>?</p>
-                        <p style={{ fontSize: '0.75rem', marginTop: '-0.5rem', color: 'var(--warning)', fontWeight: 600 }}>
-                            ⚠️ O desbloqueio permite sua análise, mas não garante o pagamento do empréstimo.
-                        </p>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '2rem' }}>
-                            <button className="btn btn-primary" onClick={confirmarDesbloqueio}>Confirmar e Pagar</button>
-                            <button className="btn btn-secondary" onClick={() => setModal({ ...modal, open: false })}>Cancelar</button>
-                        </div>
+            {activeView === 'caixa' && (
+                <div className="mt-1">
+                    <div className="flex-between mb-1">
+                        <h3>Gestão do Caixa</h3>
+                        <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
+                    <CaixaInvestidor
+                        usuario={usuario}
+                        onUpdate={carregarSnapshot}
+                        showModal={showModal}
+                        closeModal={closeModal}
+                    />
                 </div>
             )}
+
+            {/* Modal Premium Unificado */}
+            <ModalPremium
+                isOpen={modalPremium.isOpen}
+                onClose={closeModal}
+                title={modalPremium.title}
+                message={modalPremium.message}
+                type={modalPremium.type}
+                onConfirm={modalPremium.onConfirm}
+                confirmText={modalPremium.confirmText}
+                loading={loadingAction}
+            />
             {/* Modal de Termos de Uso */}
             {
                 activeView === 'depositar' && (

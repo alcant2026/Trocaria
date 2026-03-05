@@ -370,18 +370,24 @@ tr:last-child td {
 
 .nav-links-desktop {
   display: none;
-  gap: 1.5rem;
-  margin: 0 auto;
+  gap: 2rem;
+  align-items: center;
 }
 
 .nav-links-desktop .nav-item {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.nav-links-desktop .nav-item:hover,
 .nav-links-desktop .nav-item.active {
   color: var(--primary);
-  font-weight: 600;
 }
 
 /* Mobile Drawer (Universal Structure) */
@@ -481,18 +487,68 @@ tr:last-child td {
   padding-top: 1.5rem;
 }
 
+/* Visibility Utils */
+.hide-on-pc {
+  display: block;
+}
+
+.hide-on-mobile {
+  display: none;
+}
+
 /* Desktop Overrides */
 @media (min-width: 768px) {
   .main-content {
     padding-top: 7rem;
     max-width: 1200px;
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+    gap: 1.5rem;
     align-items: start;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .mobile-menu-btn {
+    display: none;
+  }
+
+  .nav-links-desktop {
+    display: flex;
+  }
+
+  .hide-on-pc {
+    display: none !important;
+  }
+
+  .hide-on-mobile {
+    display: flex !important;
+  }
+
+  /* Specific Card Adjustments for PC */
+  .card {
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .action-grid {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 

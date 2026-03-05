@@ -18,6 +18,7 @@ import {
     Copy,
     Check
 } from 'lucide-react';
+import ModalPremium from '../componentes/ModalPremium';
 
 const TIPOS_LABEL = {
     deposito: 'Depósito',
@@ -294,6 +295,11 @@ const AdminDashboard = () => {
     const [investirData, setInvestirData] = useState({ id: null, valor: '', motivo: '', tomador: '' });
     const [loadingInvestir, setLoadingInvestir] = useState(false);
 
+    // Confirmação de Aporte Sugerido do Pool
+    const [showConfirmPoolModal, setShowConfirmPoolModal] = useState(false);
+    const [confirmPoolData, setConfirmPoolData] = useState({ id: null, valor: 0 });
+    const [loadingPool, setLoadingPool] = useState(false);
+
     const extrairChavePix = (detalhes) => {
         if (!detalhes) return null;
         // Detecta padrão: "Solicitação de saque para chave PIX: XXXXX"
@@ -452,6 +458,26 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleConfirmarAportePool = (id, valor) => {
+        setConfirmPoolData({ id, valor });
+        setShowConfirmPoolModal(true);
+    };
+
+    const executarAportePool = async () => {
+        const { id } = confirmPoolData;
+        setLoadingPool(true);
+        try {
+            const res = await api.post(`/emprestimos/confirmar-pool/${id}`);
+            setMensagem(res.message);
+            setShowConfirmPoolModal(false);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro no Pool: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingPool(false);
+        }
+    };
+
     const handleInvestirLucro = (loan) => {
         const restante = loan.valor - loan.valor_arrecadado;
         setInvestirData({
@@ -514,7 +540,7 @@ const AdminDashboard = () => {
 
             {/* Quick Summary Section */}
             {fiscal && (
-                <div className="grid-2-mobile mt-1 mb-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div className="grid-3 mb-1">
                     <div className="card">
                         <p className="info-label">Custódia (Passivo)</p>
                         <h2 className="mt-1">R$ {fiscal.saldo_usuarios_gerenciado.toLocaleString('pt-BR')}</h2>
@@ -523,12 +549,20 @@ const AdminDashboard = () => {
                             <Landmark size={14} />
                         </div>
                     </div>
-                    <div className="card" style={{ borderLeft: '4px solid var(--success)' }}>
-                        <p className="info-label text-success">Lucro Disponível</p>
+                    <div className="card" style={{ borderLeft: '4px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.02)' }}>
+                        <p className="info-label text-primary">Saldo do Pool (Caixa)</p>
+                        <h2 className="mt-1 text-primary">R$ {(fiscal.saldo_pool_caixa || 0).toLocaleString('pt-BR')}</h2>
+                        <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.72rem' }}>
+                            <span>Fundo dos Investidores</span>
+                            <TrendingUp size={14} color="var(--primary)" />
+                        </div>
+                    </div>
+                    <div className="card" style={{ borderLeft: '4px solid var(--success)', background: 'rgba(var(--success-rgb), 0.02)' }}>
+                        <p className="info-label text-success">Lucro da Plataforma</p>
                         <h2 className="mt-1 text-success">R$ {(fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico).toLocaleString('pt-BR')}</h2>
                         <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.72rem' }}>
-                            <span>Bruto: R$ {fiscal.lucro_plataforma_historico?.toLocaleString('pt-BR')}</span>
-                            <TrendingUp size={14} color="var(--success)" />
+                            <span>Operacional</span>
+                            <Landmark size={14} color="var(--success)" />
                         </div>
                     </div>
                 </div>
@@ -792,12 +826,28 @@ const AdminDashboard = () => {
                                         </div>
                                     </div>
 
+                                    <div className="flex-between mb-1" style={{ padding: '8px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '8px', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
+                                        <div>
+                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sugestão Pool (Score)</p>
+                                            <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.9rem' }}>R$ {sa.sugestao_pool?.toLocaleString('pt-BR') || '0,00'}</p>
+                                        </div>
+                                        {sa.sugestao_pool > 0 && (
+                                            <button
+                                                className="btn btn-primary"
+                                                style={{ width: 'auto', padding: '4px 12px', fontSize: '0.7rem', height: 'auto' }}
+                                                onClick={() => handleConfirmarAportePool(sa.id, sa.sugestao_pool)}
+                                            >
+                                                Aprovar Aporte
+                                            </button>
+                                        )}
+                                    </div>
+
                                     <button
                                         className="btn btn-primary"
                                         style={{ width: '100%', padding: '0.6rem', fontSize: '0.8rem', background: 'rgba(var(--primary-rgb), 0.15)', color: 'var(--primary)', border: '1px solid var(--primary)' }}
                                         onClick={() => handleInvestirLucro(sa)}
                                     >
-                                        Investir Lucro
+                                        Investir via Pool (Manual)
                                     </button>
                                 </div>
                             ))}
@@ -807,254 +857,183 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'fiscal' && fiscal && (
                 <div className="animate-fade-in">
-                    <div className="card mb-1">
-                        <h3>Detalhes da Receita</h3>
-                        <div className="info-block mt-1">
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Ações de KYC/Score:</span>
-                                <strong>R$ {fiscal.detalhamento_lucro.kyc_e_score.toLocaleString('pt-BR')}</strong>
-                            </div>
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Desbloqueio de Dados:</span>
-                                <strong>R$ {fiscal.detalhamento_lucro.desbloqueio_lgpd.toLocaleString('pt-BR')}</strong>
-                            </div>
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Taxas de Postagem:</span>
-                                <strong>R$ {fiscal.detalhamento_lucro.taxas_postagem.toLocaleString('pt-BR')}</strong>
-                            </div>
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Saques Extras (Taxas):</span>
-                                <strong>R$ {fiscal.detalhamento_lucro.taxas_saque_extra.toLocaleString('pt-BR')}</strong>
-                            </div>
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Intermediação P2P (10%):</span>
-                                <strong>R$ {fiscal.detalhamento_lucro.taxas_intermediacao_p2p.toLocaleString('pt-BR')}</strong>
+                    <div className="grid-2">
+                        <div className="card">
+                            <h3 className="mb-1">📊 Detalhes da Receita</h3>
+                            <div className="info-block" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div className="flex-between">
+                                    <span className="info-label">Ações de KYC/Score:</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.kyc_score || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">Desbloqueio de Dados:</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.desbloqueio_dados || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">Taxas de Postagem:</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxas_postagem || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">Saques Extras (Taxas):</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxas_saque || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">Intermediação P2P (10%):</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxa_intermediacao || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">📥 Aportes Externos:</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.aportes_externos || 0).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="flex-between">
+                                    <span className="info-label">🔁 Retorno Investimento:</span>
+                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.retorno_investimento || 0).toLocaleString('pt-BR')}</span>
+                                </div>
                             </div>
 
-                            <div style={{ borderTop: '1px solid var(--border-color)', margin: '8px 0', opacity: 0.3 }} />
-
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">📥 Aportes Externos:</span>
-                                <strong style={{ color: 'var(--success)' }}>R$ {(fiscal.detalhamento_lucro.aportes_externos || 0).toLocaleString('pt-BR')}</strong>
-                            </div>
-                            <div className="flex-between">
-                                <span className="text-muted">🔁 Retorno Investimento:</span>
-                                <strong style={{ color: 'var(--success)' }}>R$ {(fiscal.detalhamento_lucro.retorno_investimento || 0).toLocaleString('pt-BR')}</strong>
+                            <div className="mt-2">
+                                <SaqueLucroCard
+                                    onMensagem={(m) => { setMensagem(m); carregarSnapshot(); }}
+                                    lucroDisponivel={fiscal.lucro_disponivel}
+                                />
+                                <AporteLucroCard
+                                    onMensagem={(m) => { setMensagem(m); carregarSnapshot(); }}
+                                />
                             </div>
                         </div>
-                    </div>
 
-                    {/* Card: Resgatar Lucro */}
-                    <SaqueLucroCard onMensagem={(msg) => { setMensagem(msg); carregarSnapshot(); }} lucroDisponivel={fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico} />
-
-                    {/* NOVO: Card de Aporte de Lucro */}
-                    <AporteLucroCard onMensagem={(msg) => { setMensagem(msg); carregarSnapshot(); }} />
-
-                    <div className="card">
-                        <div className="flex-between mb-1">
-                            <h3>Histórico Mensal</h3>
-                            <CalendarDays size={18} color="var(--primary)" />
-                        </div>
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', fontSize: '0.85rem' }}>
-                                <thead>
-                                    <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
-                                        <th style={{ padding: '0.5rem 0', textAlign: 'left' }}>Mês</th>
-                                        <th style={{ padding: '0.5rem 0', textAlign: 'center' }}>Fluxo (In/Out)</th>
-                                        <th style={{ padding: '0.5rem 0', textAlign: 'right' }}>Receita</th>
-                                        <th style={{ padding: '0.5rem 0', textAlign: 'right' }}>Sacado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {fiscal.historico_mensal.map((h, i) => (
-                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <td style={{ padding: '1rem 0', fontWeight: 600 }}>{new Date(h.mes + '-01T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</td>
-                                            <td style={{ padding: '1rem 0', textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                    <span style={{ color: 'var(--success)', fontSize: '0.7rem' }}>+{h.depositos}</span>
-                                                    <span style={{ color: 'var(--danger)', fontSize: '0.7rem' }}>-{h.saques}</span>
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>R$ {h.lucro.toLocaleString('pt-BR')}</td>
-                                            <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 700, color: h.lucro_sacado > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                                                {h.lucro_sacado > 0 ? `- R$ ${h.lucro_sacado.toLocaleString('pt-BR')}` : '—'}
-                                            </td>
+                        <div className="card">
+                            <h3 className="mb-1">📅 Histórico Mensal</h3>
+                            <div className="table-responsive">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Mês</th>
+                                            <th>Fluxo (In/Out)</th>
+                                            <th>Receita</th>
+                                            <th>Sacado</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {fiscal.historico_mensal.map((h, i) => (
+                                            <tr key={i}>
+                                                <td>{new Date(h.mes).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</td>
+                                                <td>
+                                                    <span style={{ color: 'var(--success)', fontSize: '0.75rem', display: 'block' }}>+{h.total_entrada.toLocaleString('pt-BR')}</span>
+                                                    <span style={{ color: 'var(--danger)', fontSize: '0.75rem', display: 'block' }}>-{h.total_saida.toLocaleString('pt-BR')}</span>
+                                                </td>
+                                                <td style={{ fontWeight: 600 }}>R$ {h.receita_plataforma.toLocaleString('pt-BR')}</td>
+                                                <td>{h.total_sacado > 0 ? `R$ ${h.total_sacado.toLocaleString('pt-BR')}` : '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal de Rejeição Customizado */}
-            {showRejeitarModal && (
-                <div className="modal-overlay" onClick={() => setShowRejeitarModal(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ border: '1px solid rgba(255, 61, 0, 0.2)', textAlign: 'left' }}>
-                        <div className="modal-header">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)', marginBottom: 0 }}>
-                                <AlertCircle size={20} /> Rejeitar Solicitação
-                            </h3>
-                            <button
-                                onClick={() => setShowRejeitarModal(false)}
-                                className="modal-close"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                            Informe o motivo do cancelamento. Esta mensagem será enviada para o cliente.
-                        </p>
-
-                        <div className="input-group">
-                            <label>Motivo da Rejeição</label>
-                            <textarea
-                                className="input-field mt-1"
-                                placeholder="Ex: Documento vencido ou CPF inválido..."
-                                style={{ width: '100%', minHeight: '100px' }}
-                                value={rejeicaoData.motivo}
-                                onChange={(e) => setRejeicaoData({ ...rejeicaoData, motivo: e.target.value })}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                            <button
-                                className="btn btn-secondary"
-                                style={{ flex: 1 }}
-                                onClick={() => setShowRejeitarModal(false)}
-                                disabled={loadingRejeicao}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                style={{ flex: 2, background: 'var(--danger)', color: '#fff' }}
-                                onClick={confirmarRejeicao}
-                                disabled={loadingRejeicao || !rejeicaoData.motivo}
-                            >
-                                {loadingRejeicao ? 'Processando...' : 'Confirmar Rejeição'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal de Rejeição */}
+            <ModalPremium
+                isOpen={showRejeitarModal}
+                onClose={() => setShowRejeitarModal(false)}
+                title="Rejeitar Solicitação"
+                message={`Deseja realmente rejeitar a solicitação #${rejeicaoData.id}? Informe o motivo para o usuário.`}
+                type="error"
+                onConfirm={confirmarRejeicao}
+                confirmText="Confirmar Rejeição"
+                loading={loadingRejeicao}
+            >
+                <textarea
+                    className="input-field mt-1"
+                    placeholder="Ex: Documento vencido ou CPF inválido..."
+                    style={{ width: '100%', minHeight: '100px' }}
+                    value={rejeicaoData.motivo}
+                    onChange={(e) => setRejeicaoData({ ...rejeicaoData, motivo: e.target.value })}
+                />
+            </ModalPremium>
 
             {/* Modal de Liberação Especial */}
-            {showLiberarModal && (
-                <div className="modal-overlay" onClick={() => setShowLiberarModal(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ border: '1px solid rgba(255, 145, 0, 0.2)', textAlign: 'left' }}>
-                        <div className="modal-header">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--warning)', marginBottom: 0 }}>
-                                <ShieldCheck size={20} /> Liberação Especial
-                            </h3>
-                            <button
-                                onClick={() => setShowLiberarModal(false)}
-                                className="modal-close"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="p-1" style={{ background: 'rgba(255, 145, 0, 0.05)', borderRadius: '12px', border: '1px solid rgba(255, 145, 0, 0.1)', marginBottom: '1.5rem' }}>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <AlertCircle size={18} color="var(--warning)" /> Atenção Administrador
-                            </p>
-                            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '6px' }}>
-                                Esta ação libera o valor para o tomador **SEM a necessidade de garantidores**. Use apenas em casos excepcionais onde a garantia foi validada externamente.
-                            </p>
-                        </div>
-
-                        <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-                            Deseja realmente prosseguir com a liberação manual do empréstimo **#{liberacaoId}**?
-                        </p>
-
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <button
-                                className="btn btn-secondary"
-                                style={{ flex: 1 }}
-                                onClick={() => setShowLiberarModal(false)}
-                                disabled={loadingLiberacao}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                style={{ flex: 2, background: 'var(--warning)', color: '#111' }}
-                                onClick={confirmarLiberarEspecial}
-                                disabled={loadingLiberacao}
-                            >
-                                {loadingLiberacao ? 'Liberando...' : 'Sim, Liberar Agora'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ModalPremium
+                isOpen={showLiberarModal}
+                onClose={() => setShowLiberarModal(false)}
+                title="Liberação Especial"
+                message={`Esta ação libera o valor para o tomador SEM a necessidade de garantidores. \nUse apenas em casos excepcionais onde a garantia foi validada externamente.\nDeseja prosseguir com a liberação manual do empréstimo #${liberacaoId}?`}
+                type="warning"
+                onConfirm={confirmarLiberarEspecial}
+                confirmText="Sim, Liberar Agora"
+                loading={loadingLiberacao}
+            />
 
             {/* Modal de Investimento Institucional */}
-            {showInvestirModal && (
-                <div className="modal-overlay" onClick={() => setShowInvestirModal(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ border: '1px solid var(--primary)', textAlign: 'left' }}>
-                        <div className="modal-header">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', marginBottom: 0 }}>
-                                <TrendingUp size={20} /> Investimento Institucional
-                            </h3>
-                            <button onClick={() => setShowInvestirModal(false)} className="modal-close">
-                                <X size={20} />
-                            </button>
-                        </div>
+            <ModalPremium
+                isOpen={showInvestirModal}
+                onClose={() => setShowInvestirModal(false)}
+                title="Investimento Institucional"
+                message="Utilizando o saldo do Pool (Caixa) para financiar este pedido."
+                type="pool"
+                onConfirm={confirmarInvestirLucro}
+                confirmText="Confirmar Investimento"
+                loading={loadingInvestir}
+            >
+                <div className="p-1 mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
+                    <p style={{ fontSize: '0.85rem' }}>Tomador: <strong>{investirData.tomador}</strong></p>
+                </div>
 
-                        <div className="p-1 mb-1" style={{ background: 'rgba(83,130,255,0.05)', borderRadius: '12px', border: '1px solid rgba(83,130,255,0.1)' }}>
-                            <p style={{ fontSize: '0.85rem' }}>Tomador: <strong>{investirData.tomador}</strong></p>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Utilizando o lucro disponível da plataforma para fomentar o crédito.</p>
-                        </div>
-
-                        <div className="input-group mb-1">
-                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Valor do Investimento (R$)</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    placeholder="0,00"
-                                    min="0.01"
-                                    step="0.01"
-                                    style={{ flex: 1 }}
-                                    value={investirData.valor}
-                                    onChange={e => setInvestirData({ ...investirData, valor: e.target.value })}
-                                />
-                                <button
-                                    className="btn btn-secondary"
-                                    style={{ width: 'auto', padding: '0 1rem', fontSize: '0.75rem' }}
-                                    onClick={() => setInvestirData({ ...investirData, valor: investirData.restante.toString() })}
-                                >
-                                    Total (R$ {investirData.restante?.toLocaleString('pt-BR')})
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="input-group mb-1">
-                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Justificativa Auditoria</label>
-                            <textarea
-                                className="input-field mt-1"
-                                style={{ minHeight: '80px' }}
-                                value={investirData.motivo}
-                                onChange={e => setInvestirData({ ...investirData, motivo: e.target.value })}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowInvestirModal(false)} disabled={loadingInvestir}>
-                                Cancelar
-                            </button>
-                            <button className="btn btn-primary" style={{ flex: 2 }} onClick={confirmarInvestirLucro} disabled={loadingInvestir || !investirData.valor}>
-                                {loadingInvestir ? 'Processando...' : 'Confirmar Investimento'}
-                            </button>
-                        </div>
+                <div className="input-group mb-1">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Valor do Investimento (R$)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                            type="number"
+                            className="input-field"
+                            placeholder="0,00"
+                            min="0.01"
+                            step="0.01"
+                            style={{ flex: 1 }}
+                            value={investirData.valor}
+                            onChange={e => setInvestirData({ ...investirData, valor: e.target.value })}
+                        />
+                        <button
+                            className="btn btn-secondary"
+                            style={{ width: 'auto', padding: '0 1rem', fontSize: '0.75rem' }}
+                            onClick={() => setInvestirData({ ...investirData, valor: investirData.restante.toString() })}
+                        >
+                            Total (R$ {investirData.restante?.toLocaleString('pt-BR')})
+                        </button>
                     </div>
                 </div>
-            )}
-        </div>
+
+                <div className="input-group mb-1">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Justificativa Auditoria</label>
+                    <textarea
+                        className="input-field mt-1"
+                        style={{ minHeight: '80px' }}
+                        value={investirData.motivo}
+                        onChange={e => setInvestirData({ ...investirData, motivo: e.target.value })}
+                    />
+                </div>
+            </ModalPremium>
+
+            {/* Modal de Confirmação de Aporte do Pool */}
+            <ModalPremium
+                isOpen={showConfirmPoolModal}
+                onClose={() => setShowConfirmPoolModal(false)}
+                title="Confirmar Aporte do Pool"
+                message="Este valor será deduzido do Caixa Coletivo e injetado na solicitação de empréstimo."
+                type="pool"
+                onConfirm={executarAportePool}
+                confirmText="Sim, Confirmar Aporte"
+                loading={loadingPool}
+            >
+                <div className="p-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px' }}>
+                    <p className="text-muted" style={{ fontSize: '0.85rem' }}>Valor Sugerido (Baseado no Score):</p>
+                    <h2 style={{ fontSize: '2rem', color: 'var(--primary)', margin: '0.5rem 0' }}>
+                        R$ {confirmPoolData.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </h2>
+                </div>
+            </ModalPremium>
+        </div >
     );
 };
 

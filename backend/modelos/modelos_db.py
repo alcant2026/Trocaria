@@ -24,6 +24,10 @@ class TipoTransacao(enum.Enum):
     PAGAMENTO_PARCELA = "pagamento_parcela"
     TAXA_POSTAGEM = "taxa_postagem"
     RETORNO_INVESTIMENTO = "retorno_investimento"
+    APORTE_CAIXA = "aporte_caixa"
+    RESGATE_CAIXA = "resgate_caixa"
+    BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
+    RETORNO_POOL = "retorno_pool"
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
@@ -44,7 +48,9 @@ class Usuario(Base):
     senha_hash = Column(String, nullable=False)
     chave_pix = Column(String, nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
+    saldo_caixa = Column(Numeric(precision=20, scale=2), default=0) # Saldo no Pool de Investimentos
     score = Column(Numeric(precision=6, scale=1), default=0)
+    score_anterior = Column(Numeric(precision=6, scale=1), default=0) # Memória para restaurar após calote
     ultima_solicitacao = Column(DateTime, nullable=True)
     solicitacoes_hoje = Column(Integer, default=0)
     ultima_atualizacao_score = Column(DateTime, default=datetime.datetime.utcnow)
@@ -87,6 +93,7 @@ class SolicitacaoEmprestimo(Base):
     parcelas_pagas = Column(Integer, default=0)
     valor_amortizado = Column(Numeric(precision=20, scale=2), default=0) # Pagamentos de valor livre
     taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0) # Taxas de R$ 1,50 acumuladas
+    sugestao_pool = Column(Numeric(precision=20, scale=2), default=0) # Valor sugerido pelo sistema para o Pool investir
     
     # Blindagem Jurídica: Rastreabilidade de Aceite
     aceite_termos = Column(Boolean, default=False)
@@ -116,6 +123,7 @@ class Investimento(Base):
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String, nullable=True)
     is_institutional = Column(Boolean, default=False)
+    is_pool = Column(Boolean, default=False) # Se o dinheiro veio do Pool (Caixa)
 
     auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
@@ -143,7 +151,9 @@ class Transacao(Base):
     
     # Para saques, armazenar a chave pix usada no momento
     detalhes = Column(String, nullable=True) 
+    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
+    auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="transacoes")
 
 class GarantiaSocial(Base):

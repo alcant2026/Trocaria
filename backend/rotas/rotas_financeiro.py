@@ -23,6 +23,12 @@ class SolicitacaoSaque(BaseModel):
     senha: str
     codigo_2fa: str
 
+class AporteCaixaRequest(BaseModel):
+    valor: Decimal = Field(gt=0)
+    senha: str
+    codigo_2fa: str = ""
+    aceite_termos: bool = False
+
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
@@ -114,6 +120,95 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
         msg += f" Taxa de R$ {taxa} aplicada por ser o seu {saques_hoje + 1}º saque hoje."
     
     return {"message": msg + " Aguardando processamento manual."}
+
+@router.post("/caixa/aporte")
+async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Move saldo da conta principal para o Caixa com blindagem jurídica."""
+    if not verify_password(dados.senha, usuario.senha_hash):
+        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
+    
+    if not dados.aceite_termos:
+        raise HTTPException(status_code=400, detail="Você deve aceitar os termos de ciência de risco e regras do Pool.")
+
+    if usuario.saldo < dados.valor:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente para aporte no Caixa.")
+    
+    # Registro de Auditoria (IP/Device)
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=datetime.datetime.utcnow()
+    )
+    db.add(auditoria)
+    db.flush()
+
+    usuario.saldo -= dados.valor
+    usuario.saldo_caixa += dados.valor
+    
+    transacao = Transacao(
+        usuario_id=usuario.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.APORTE_CAIXA,
+        status="concluido",
+        detalhes="Aporte no Pool (Aceite de Termos e Risco Confirmado)",
+        auditoria_id=auditoria.id
+    )
+    db.add(transacao)
+    db.commit()
+    return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
+
+@router.post("/caixa/resgate")
+async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Resgata saldo do Caixa com blindagem e auditoria."""
+    if not verify_password(dados.senha, usuario.senha_hash):
+        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
+
+    agora = datetime.datetime.now(TZ_BRASILIA)
+    # REGRA: Apenas entre 19 e 21 de dezembro
+    if not (agora.month == 12 and 19 <= agora.day <= 21):
+         raise HTTPException(
+            status_code=403, 
+            detail="Resgate bloqueado: O saldo do Caixa só pode ser resgatado entre 19 e 21 de Dezembro."
+        )
+
+    # NOVO: Chave Anticalote - Bloqueia resgate se houver empréstimo ativo
+    emprestimo_ativo = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.usuario_id == usuario.id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
+    
+    if emprestimo_ativo:
+        raise HTTPException(
+            status_code=403,
+            detail="Saque Negado: Você possui um empréstimo ativo. O resgate do Caixa está bloqueado até a quitação total da dívida."
+        )
+
+    if usuario.saldo_caixa < dados.valor:
+        raise HTTPException(status_code=400, detail="Saldo no Caixa insuficiente para resgate.")
+    
+    # Registro de Auditoria
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=datetime.datetime.utcnow()
+    )
+    db.add(auditoria)
+    db.flush()
+
+    usuario.saldo_caixa -= dados.valor
+    usuario.saldo += dados.valor
+    
+    transacao = Transacao(
+        usuario_id=usuario.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.RESGATE_CAIXA,
+        status="concluido",
+        detalhes="Resgate do Pool (Autenticado via Senha/IP)",
+        auditoria_id=auditoria.id
+    )
+    db.add(transacao)
+    db.commit()
+    return {"message": f"Resgate de R$ {dados.valor:.2f} realizado!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/notificar-deposito")
 async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -320,6 +415,7 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
                 "aportes_externos": float(detalhamento_historico.get('aporte_capital', 0)),
                 "retorno_investimento": float(detalhamento_historico.get('retorno_investimento', 0))
             },
+            "saldo_pool_caixa": float(db.query(func.sum(Usuario.saldo_caixa)).scalar() or 0),
             "historico_mensal": historico_formatado
         }
     except Exception as e:
@@ -451,27 +547,13 @@ async def investir_lucro_plataforma(
     if not solicitacao:
         raise HTTPException(status_code=404, detail="Solicitação não encontrada ou não está mais pendente.")
 
-    # Calcula o lucro total disponível (histórico de taxas)
-    todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
-        Transacao.status == "concluido"
-    ).all()
-    lucro_total = sum(t.valor for t in todas_receitas)
+    # Calcula o saldo total disponível no Pool (Soma do saldo_caixa de todos os usuários)
+    saldo_pool_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
 
-    # Subtrai saques anteriores e investimentos institucionais anteriores (detalhes específicos)
-    saidas_lucro = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.SAQUE, TipoTransacao.INVESTIMENTO]),
-        Transacao.detalhes.like("%LUCRO%"),
-        Transacao.status == "concluido"
-    ).all()
-    total_saido = sum(t.valor for t in saidas_lucro)
-
-    saldo_lucro_liquido = lucro_total - total_saido
-
-    if valor > saldo_lucro_liquido:
+    if valor > saldo_pool_global:
         raise HTTPException(
             status_code=400, 
-            detail=f"Saldo de lucro insuficiente. Disponível: R$ {float(saldo_lucro_liquido):.2f}"
+            detail=f"Saldo do Pool insuficiente para este investimento. Disponível: R$ {float(saldo_pool_global):.2f}"
         )
 
     # Validar meta
@@ -502,7 +584,8 @@ async def investir_lucro_plataforma(
         ciencia_risco=True,
         auditoria_id=auditoria.id,
         cpf_aceite=admin.cpf,
-        is_institutional=True
+        is_institutional=True,
+        is_pool=True
     )
 
     # Registrar transação
@@ -519,11 +602,17 @@ async def investir_lucro_plataforma(
     if solicitacao.valor_arrecadado == solicitacao.valor:
         tentar_liberar_emprestimo(solicitacao.id, db)
 
+    # Deduzir do Pool (Como é um pool, o Admin "gerencia", mas o dinheiro sai da soma dos saldos_caixa)
+    # Para manter a integridade, vamos distribuir a dedução pro-rata ou apenas registrar a saída global.
+    # No modelo simples, deduzimos do saldo_caixa de um "Usuário Sistema" ou apenas registramos a transação.
+    # Aqui, vamos deduzir do saldo_caixa do admin (que atua como garantidor do pool) ou criar um ajuste global.
+    admin.saldo_caixa -= valor
+
     db.add(novo_investimento)
     db.add(transacao)
     db.commit()
 
-    return {"message": "Investimento de lucro realizado com sucesso!", "valor": float(valor)}
+    return {"message": "Investimento realizado com sucesso usando o saldo do Pool (Caixa)!", "valor": float(valor)}
 
 @router.post("/depositar-manual")
 async def registrar_deposito_manual(usuario_id: int, valor: Decimal, db: Session = Depends(get_db)):
@@ -579,3 +668,63 @@ async def meu_historico(db: Session = Depends(get_db), usuario: Usuario = Depend
         })
     
     return resultado
+@router.post("/admin/liquidar-caixa")
+async def liquidar_caixa_devedores(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """
+    Chave de Liquidação: Em dezembro, o sistema identifica investidores que possuem saldo no Caixa 
+    mas estão inadimplentes ou com empréstimos ativos. 
+    O saldo deles é confiscado e rateado entre os investidores adimplentes.
+    """
+    agora = datetime.datetime.now(TZ_BRASILIA)
+    if agora.month != 12:
+        raise HTTPException(status_code=400, detail="A Liquidação Compulsória só pode ser executada em Dezembro.")
+
+    # 1. Identificar Devedores que possuem saldo no Caixa
+    devedores = db.query(Usuario).join(SolicitacaoEmprestimo).filter(
+        Usuario.saldo_caixa > 0,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).all()
+
+    total_confiscado = Decimal("0.00")
+    for dev in devedores:
+        valor_confisco = dev.saldo_caixa
+        total_confiscado += valor_confisco
+        dev.saldo_caixa = Decimal("0.00")
+        
+        db.add(Transacao(
+            usuario_id=dev.id,
+            valor=valor_confisco,
+            tipo=TipoTransacao.RESGATE_CAIXA, # Usando tipo existente para fluxo
+            status="falhou",
+            detalhes=f"LIQUIDAÇÃO COMPULSÓRIA: Saldo confiscado por dívida ativa em {agora.year}."
+        ))
+
+    # 2. Ratear entre Investidores Adimplentes (quem tem saldo_caixa > 0 e NÃO é devedor)
+    if total_confiscado > 0:
+        # Subquery para excluir devedores do rateio
+        ids_devedores = [d.id for d in devedores]
+        investidores_bons = db.query(Usuario).filter(
+            Usuario.saldo_caixa > 0,
+            ~Usuario.id.in_(ids_devedores)
+        ).all()
+
+        total_caixa_bom = sum(u.saldo_caixa for u in investidores_bons) or Decimal("1.00")
+        
+        for inv in investidores_bons:
+            fatia = (inv.saldo_caixa / total_caixa_bom) * total_confiscado
+            inv.saldo_caixa += fatia
+            
+            db.add(Transacao(
+                usuario_id=inv.id,
+                valor=fatia,
+                tipo=TipoTransacao.RETORNO_POOL,
+                status="concluido",
+                detalhes=f"BÔNUS DE LIQUIDAÇÃO: Rateio de devedores em {agora.year}."
+            ))
+
+    db.commit()
+    return {
+        "message": "Liquidação concluída com sucesso.",
+        "devedores_afetados": len(devedores),
+        "total_confiscado_e_rateado": float(total_confiscado)
+    }

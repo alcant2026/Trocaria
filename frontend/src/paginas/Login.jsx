@@ -25,11 +25,11 @@ const Login = ({ onLogin }) => {
             <div className="auth-overlay"></div>
             <div className="auth-content">
                 <div className="text-center mb-1">
-                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '20px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)' }}>
-                        <img src="/favicon.svg" alt="P Logo" style={{ width: '40px', height: '40px' }} />
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)', boxShadow: '0 0 40px rgba(255, 204, 0, 0.15)' }}>
+                        <img src="/favicon.svg" alt="P Logo" style={{ width: '48px', height: '48px' }} />
                     </div>
-                    <h1>Bem-vindo ao Peer</h1>
-                    <p>Acesse sua conta para continuar</p>
+                    <h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Bem-vindo ao Peer</h1>
+                    <p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Gestão Financeira Descentralizada</p>
                 </div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>

@@ -794,24 +794,52 @@ const DashboardInvestidor = () => {
             {
                 activeView === 'depositar' && (
                     <div className="card">
-                        <h2 className="mb-1">Adicionar Saldo (Investidor)</h2>
-                        <p className="mb-1">Transfira via PIX e informe o valor:</p>
-                        <div className="info-block mb-1 text-center">
+                        <h2 className="mb-1">Adicionar Saldo</h2>
+                        <p className="mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
+                        <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
                             <div className="info-label">Chave PIX (E-mail)</div>
-                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>credpix@gmail.com</div>
+                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                91980177874
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText('91980177874');
+                                        setCopiadoPix(true);
+                                        setTimeout(() => setCopiadoPix(false), 2000);
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        transition: 'var(--transition)'
+                                    }}
+                                    title="Copiar chave PIX"
+                                >
+                                    {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                                </button>
+                            </div>
+                            {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                         </div>
-                        <input
-                            type="number"
-                            className="input-field mb-1"
-                            placeholder="Valor R$"
-                            min="0.01"
-                            step="0.01"
-                            value={valorNotificacao}
-                            onChange={(e) => setValorNotificacao(e.target.value)}
-                        />
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleNotificarDeposito}>Informar Depósito</button>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <input
+                                    type="number"
+                                    className="input-field"
+                                    placeholder="Valor do Depósito R$"
+                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
+                                    value={valorNotificacao}
+                                    min="0.01"
+                                    step="0.01"
+                                    onChange={(e) => setValorNotificacao(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
+                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleNotificarDeposito}>Informar Depósito</button>
+                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
                     </div>
                 )

@@ -72,6 +72,7 @@ class Usuario(Base):
     # Autenticação de Dois Fatores (2FA)
     totp_secret = Column(String, nullable=True)
     two_factor_enabled = Column(Boolean, default=False)
+    ultima_alteracao_2fa = Column(DateTime, nullable=True) # Trava de 48h para saques
 
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")

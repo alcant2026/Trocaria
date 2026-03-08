@@ -322,6 +322,7 @@ async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logad
     totp = pyotp.TOTP(usuario.totp_secret)
     if totp.verify(codigo):
         usuario.two_factor_enabled = True
+        usuario.ultima_alteracao_2fa = datetime.utcnow()
         db.commit()
         return {"message": "2FA ativado com sucesso!"}
     else:
@@ -339,6 +340,7 @@ async def desativar_2fa(senha: str, codigo: str, usuario: Usuario = Depends(obte
     
     usuario.two_factor_enabled = False
     usuario.totp_secret = None
+    usuario.ultima_alteracao_2fa = datetime.utcnow()
     db.commit()
     return {"message": "2FA desativado."}
 

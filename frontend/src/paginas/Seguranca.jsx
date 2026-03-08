@@ -9,6 +9,9 @@ const Seguranca = () => {
     const [mensagem, setMensagem] = useState('');
     const [loading, setLoading] = useState(false);
     const [copiado, setCopiado] = useState(false);
+    const [senhaParaDesativar, setSenhaParaDesativar] = useState('');
+    const [codigoParaDesativar, setCodigoParaDesativar] = useState('');
+    const [showDesativarForm, setShowDesativarForm] = useState(false);
 
     useEffect(() => {
         carregarStatus();
@@ -55,11 +58,31 @@ const Seguranca = () => {
             setStatus2fa(true);
             setSecretData(null);
             // Atualizar localStorage
-            const user = JSON.parse(localStorage.getItem('usuario'));
+            const user = JSON.parse(localStorage.getItem('usuario')) || {};
             user.two_factor_enabled = true;
             localStorage.setItem('usuario', JSON.stringify(user));
         } catch (err) {
-            setMensagem(err.message || "Código inválido.");
+            setMensagem(err.response?.data?.detail || "Código inválido.");
+        }
+        setLoading(false);
+    };
+
+    const desativar2fa = async () => {
+        if (!senhaParaDesativar || !codigoParaDesativar) return;
+        setLoading(true);
+        try {
+            await api.post(`/auth/2fa/desativar?senha=${senhaParaDesativar}&codigo=${codigoParaDesativar}`);
+            setMensagem("2FA desativado com sucesso.");
+            setStatus2fa(false);
+            setSenhaParaDesativar('');
+            setCodigoParaDesativar('');
+            setShowDesativarForm(false);
+            // Atualizar localStorage
+            const user = JSON.parse(localStorage.getItem('usuario')) || {};
+            user.two_factor_enabled = false;
+            localStorage.setItem('usuario', JSON.stringify(user));
+        } catch (err) {
+            setMensagem(err.response?.data?.detail || "Senha ou código incorretos.");
         }
         setLoading(false);
     };
@@ -157,23 +180,35 @@ const Seguranca = () => {
                             {copiado && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                         </div>
 
+                        <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'left' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700, margin: '0 0 5px 0' }}>
+                                ⚠️ IMPORTANTE: Salve esta chave manual agora!
+                            </p>
+                            <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>
+                                Se você quiser colocar o 2FA no seu celular depois, você vai precisar dessa mesma chave. Anote-a em um lugar seguro.
+                            </p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '8px', fontWeight: 600 }}>
+                                * Após ativar o 2FA, saques ficam bloqueados por 48 horas para sua segurança.
+                            </p>
+                        </div>
+
                         <div style={{ textAlign: 'left', background: 'rgba(255, 214, 0, 0.05)', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(255, 214, 0, 0.2)' }}>
                             <p style={{ fontSize: '0.9rem', color: 'var(--warning)', fontWeight: 700, marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Smartphone size={18} /> Recomendações (Sincronização Nuvem + PC)
                             </p>
                             
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1rem' }}>
-                                <a href="https://2fas.com/" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-                                    📱 <strong>2FAS (Celular)</strong>
+                                <a href="https://chrome.google.com/webstore/detail/authenticator/bhghoamapcdpbohphigoooaddinpkbai" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,145,0,0.4)', textAlign: 'center' }}>
+                                    <strong>Authenticator (100% PC - Sem Celular)</strong>
                                 </a>
                                 <a href="https://2fas.com/browser-extension/" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-                                    💻 <strong>2FAS (PC/Extensão)</strong>
+                                    <strong>2FAS (Celular + PC)</strong>
                                 </a>
                                 <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-                                    🤖 <strong>Google Auth</strong>
+                                    <strong>Google Auth</strong>
                                 </a>
                                 <a href="https://www.microsoft.com/pt-br/security/mobile-authenticator-app" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-                                    🪟 <strong>Microsoft Auth</strong>
+                                    <strong>Microsoft Auth</strong>
                                 </a>
                             </div>
 
@@ -189,6 +224,8 @@ const Seguranca = () => {
                         <div className="input-group">
                             <input
                                 type="text"
+                                name="two-factor-code"
+                                autocomplete="one-time-code"
                                 placeholder="Código de 6 dígitos"
                                 className="input-field"
                                 value={codigo}
@@ -205,12 +242,62 @@ const Seguranca = () => {
                 )}
 
                 {status2fa && (
-                    <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                         <div style={{ color: 'var(--success)', marginBottom: '1rem' }}>
                             <Lock size={48} style={{ margin: '0 auto' }} />
                         </div>
                         <p style={{ color: '#fff', fontWeight: 600 }}>Sua conta está totalmente protegida.</p>
-                        <p style={{ fontSize: '0.85rem' }}>O código 2FA será solicitado em cada pedido de saque junto com sua senha.</p>
+                        <p style={{ fontSize: '0.85rem', marginBottom: '2rem' }}>O código 2FA será solicitado em cada pedido de saque junto com sua senha.</p>
+                        
+                        {!showDesativarForm ? (
+                            <button 
+                                className="btn btn-outline" 
+                                style={{ width: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.8rem' }}
+                                onClick={() => setShowDesativarForm(true)}
+                            >
+                                Desativar 2FA
+                            </button>
+                        ) : (
+                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'left' }}>
+                                <h4 style={{ marginBottom: '1rem', color: 'var(--danger)' }}>Confirmar Desativação</h4>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginBottom: '1rem' }}>
+                                    Atenção: Ao desativar ou reativar o 2FA, os saques serão bloqueados por mais 48 horas.
+                                </p>
+                                <div className="input-group">
+                                     <input 
+                                        type="password" 
+                                        name="password"
+                                        autocomplete="current-password"
+                                        placeholder="Sua senha de acesso" 
+                                        className="input-field"
+                                        value={senhaParaDesativar}
+                                        onChange={(e) => setSenhaParaDesativar(e.target.value)}
+                                        style={{ marginBottom: '10px' }}
+                                    />
+                                </div>
+                                <div className="input-group">
+                                    <input 
+                                        type="text" 
+                                        name="disable-2fa-code"
+                                        autocomplete="one-time-code"
+                                        placeholder="Código 2FA atual" 
+                                        className="input-field"
+                                        value={codigoParaDesativar}
+                                        onChange={(e) => setCodigoParaDesativar(e.target.value)}
+                                        maxLength={6}
+                                        style={{ marginBottom: '10px' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button className="btn btn-danger" style={{ flex: 1 }} onClick={desativar2fa} disabled={loading}>
+                                        {loading ? "Desativando..." : "Sim, Desativar"}
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowDesativarForm(false)}>
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -15,7 +15,7 @@ def sincronizar_esquema(Base, engine):
     is_postgres = "postgresql" in str(engine.url)
     
     with engine.connect() as conn:
-        logger.info("Verificando consistência de colunas com os modelos...")
+        logger.debug("Verificando consistência de colunas com os modelos...")
         
         # Iterar sobre todas as tabelas definidas nos nossos modelos
         for table_name, table in Base.metadata.tables.items():
@@ -57,7 +57,7 @@ def sincronizar_esquema(Base, engine):
 
         # --- Sincronização de Enums (PostgreSQL/Neon) ---
         if is_postgres:
-            logger.info("Verificando consistência de tipos ENUM no PostgreSQL...")
+            logger.debug("Verificando consistência de tipos ENUM no PostgreSQL...")
             
             # Coletar todos os tipos Enum usados nos modelos
             enums_modelo = {}
@@ -98,8 +98,7 @@ def sincronizar_esquema(Base, engine):
                     # Tipo enum pode não existir ainda (tabela nova) — será criado pelo create_all
                     logger.warning(f"⚠️ Enum '{pg_type_name}' não encontrado no banco (será criado automaticamente): {e}")
         
-        # --- Sincronização de Índices ---
-        logger.info("Verificando consistência de índices...")
+        logger.debug("Verificando consistência de índices...")
         for table_name, table in Base.metadata.tables.items():
             indices_existentes = [idx["name"] for idx in inspector.get_indexes(table_name)]
             
@@ -122,5 +121,5 @@ def sincronizar_esquema(Base, engine):
                     except Exception as e:
                         logger.error(f"❌ Erro ao criar índice '{index.name}': {e}")
 
-        logger.info("Sincronização concluída.")
+        logger.debug("Sincronização concluída.")
 

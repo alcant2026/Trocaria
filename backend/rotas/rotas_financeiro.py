@@ -73,6 +73,19 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
     if not totp.verify(dados.codigo_2fa):
         raise HTTPException(status_code=401, detail="Código 2FA (Authenticator) inválido ou expirado.")
 
+    # TRAVA DE SEGURANÇA: 48 HORAS APÓS MUDANÇA DE 2FA
+    if usuario.ultima_alteracao_2fa:
+        # Garantir que estamos comparando offset-naive UTC times
+        agora_utc = datetime.datetime.utcnow()
+        tempo_decorrido = agora_utc - usuario.ultima_alteracao_2fa
+        
+        if tempo_decorrido < timedelta(hours=48):
+            horas_restantes = 48 - (tempo_decorrido.total_seconds() / 3600)
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Saque Bloqueado: Por medida de segurança, após alterar o 2FA, os saques ficam suspensos por 48 horas. Tente novamente em aproximadamente {int(horas_restantes)} horas."
+            )
+
     # Regra: 1º saque do dia grátis, demais R$ 5,00
     hoje = datetime.datetime.now(TZ_BRASILIA).date()
     inicio_dia = datetime.datetime.combine(hoje, datetime.time.min).replace(tzinfo=TZ_BRASILIA)

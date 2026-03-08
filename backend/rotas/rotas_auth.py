@@ -143,7 +143,15 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
     db.flush()
 
     # Criar novo usuário com senha hashed
+    from utils_data import gerar_id_customizado
+    
+    novo_id = gerar_id_customizado()
+    # Garantir unicidade do ID (simples check)
+    while db.query(Usuario).filter(Usuario.id == novo_id).first():
+        novo_id = gerar_id_customizado()
+
     novo_usuario = Usuario(
+        id=novo_id,
         nome=dados.nome,
         email=dados.email,
         cpf=dados.cpf,
@@ -186,7 +194,7 @@ async def obter_usuario_logado(token: str = Depends(oauth2_scheme), db: Session 
         if not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.")
         
-        usuario = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
+        usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
         if not usuario:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
         return usuario

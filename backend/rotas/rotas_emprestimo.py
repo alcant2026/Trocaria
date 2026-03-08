@@ -249,6 +249,20 @@ async def aceitar_garantia(
     if garantia.aceito:
         return {"message": "Você já aceitou esta garantia."}
 
+    # NOVA REGRA: Bloqueio de 50% do valor do empréstimo no saldo do garantidor
+    solicitacao = garantia.solicitacao
+    valor_bloqueio = solicitacao.valor * Decimal("0.50")
+
+    if usuario.saldo < valor_bloqueio:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Saldo insuficiente para ser garantidor. Você precisa de pelo menos R$ {valor_bloqueio:,.2f} em conta (50% do valor do empréstimo)."
+        )
+
+    # Bloquear o saldo
+    usuario.saldo -= valor_bloqueio
+    usuario.saldo_bloqueado += valor_bloqueio
+
     # Registrar aceite via auditoria
     agora = datetime.datetime.utcnow()
     auditoria = RegistroAuditoria(
@@ -639,9 +653,17 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
         detalhes=f"Pagamento de parcela #{solicitacao.parcelas_pagas} - Pedido #{solicitacao_id}"
     ))
 
-    # Se todas as parcelas foram pagas, marcar como CONCLUIDO
+    # Se todas as parcelas foram pagas, marcar como CONCLUIDO e DESBLOQUEAR garantidores
     if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
         solicitacao.status = StatusSolicitacao.CONCLUIDO
+        
+        # Desbloquear Garantidores
+        valor_bloqueio = solicitacao.valor * Decimal("0.50")
+        for g in solicitacao.garantias_sociais:
+            if g.aceito:
+                garante = g.garante
+                garante.saldo_bloqueado -= valor_bloqueio
+                garante.saldo += valor_bloqueio
 
     db.commit()
     return {
@@ -714,6 +736,14 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     solicitacao.parcelas_pagas = solicitacao.prazo_meses
     solicitacao.status = StatusSolicitacao.CONCLUIDO
     solicitacao.valor_amortizado += total_final_devedor
+    
+    # DESBLOQUEAR Garantidores na quitação total
+    valor_bloqueio = solicitacao.valor * Decimal("0.50")
+    for g in solicitacao.garantias_sociais:
+        if g.aceito:
+            garante = g.garante
+            garante.saldo_bloqueado -= valor_bloqueio
+            garante.saldo += valor_bloqueio
     
     # 4. Rateio com Investidores
     total_emprestado = solicitacao.valor

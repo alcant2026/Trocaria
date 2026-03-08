@@ -41,13 +41,14 @@ class RegistroAuditoria(Base):
 class Usuario(Base):
     __tablename__ = "usuarios"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    cpf = Column(String, unique=True, index=True, nullable=False)
-    senha_hash = Column(String, nullable=False)
-    chave_pix = Column(String, nullable=False)
+    id = Column(String(5), primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    cpf = Column(String(14), unique=True, index=True, nullable=False)
+    senha_hash = Column(String(200), nullable=False)
+    chave_pix = Column(String(100), nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
+    saldo_bloqueado = Column(Numeric(precision=20, scale=2), default=0) # NOVO: Para garantidores
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0) # Saldo no Pool de Investimentos
     score = Column(Numeric(precision=6, scale=1), default=0)
     score_anterior = Column(Numeric(precision=6, scale=1), default=0) # Memória para restaurar após calote
@@ -80,12 +81,12 @@ class SolicitacaoEmprestimo(Base):
     __tablename__ = "solicitacoes_emprestimo"
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
-    status = Column(Enum(StatusSolicitacao), default=StatusSolicitacao.PENDENTE, index=True)
+    status = Column(Enum(StatusSolicitacao, values_callable=lambda x: [e.value for e in x]), default=StatusSolicitacao.PENDENTE, index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     data_expiracao_4h = Column(DateTime)
     data_expiracao_5d = Column(DateTime)
@@ -112,7 +113,7 @@ class Investimento(Base):
     __tablename__ = "investimentos"
 
     id = Column(Integer, primary_key=True, index=True)
-    investidor_id = Column(Integer, ForeignKey("usuarios.id"))
+    investidor_id = Column(String(5), ForeignKey("usuarios.id"))
     solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"))
     valor_investido = Column(Numeric(precision=20, scale=2), nullable=False)
     pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0) # Total recebido de volta
@@ -133,7 +134,7 @@ class AcessoInvestidor(Base):
     __tablename__ = "acessos_investidores"
 
     id = Column(Integer, primary_key=True, index=True)
-    investidor_id = Column(Integer, ForeignKey("usuarios.id"))
+    investidor_id = Column(String(5), ForeignKey("usuarios.id"))
     solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"))
     data_acesso = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -143,9 +144,9 @@ class Transacao(Base):
     __tablename__ = "transacoes"
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
-    tipo = Column(Enum(TipoTransacao), nullable=False, index=True)
+    tipo = Column(Enum(TipoTransacao, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     status = Column(String, default="pendente", index=True) # pendente, concluido, falhou
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
@@ -161,7 +162,7 @@ class GarantiaSocial(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id", ondelete="CASCADE"))
-    garante_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"))
+    garante_id = Column(String(5), ForeignKey("usuarios.id", ondelete="CASCADE"))
     aceito = Column(Boolean, default=False)
     data_aceite = Column(DateTime, nullable=True)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)

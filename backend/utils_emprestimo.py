@@ -93,7 +93,19 @@ def estornar_e_limpar_solicitacao(solicitacao_id: int, db: Session):
             detalhes=f"Estorno: Pedido #{solicitacao_id} cancelado/rejeitado."
         ))
 
-    # 2. Limpeza Agressiva (Economia de BD)
+    # 2. Devolver Saldo Bloqueado aos Garantidores
+    garantias = db.query(GarantiaSocial).filter(GarantiaSocial.solicitacao_id == solicitacao_id).all()
+    valor_bloqueio = solicitacao.valor * Decimal("0.50")
+    
+    for g in garantias:
+        if g.aceito:
+            garante = g.garante
+            if garante.saldo_bloqueado >= valor_bloqueio:
+                garante.saldo_bloqueado -= valor_bloqueio
+                garante.saldo += valor_bloqueio
+                print(f"DEBUG: [Estorno #{solicitacao_id}] Saldo devolvido para garantidor {garante.id}")
+
+    # 3. Limpeza Agressiva (Economia de BD)
     # Deletar acessos de dados
     db.query(AcessoInvestidor).filter(AcessoInvestidor.solicitacao_id == solicitacao_id).delete()
     

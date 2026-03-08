@@ -425,7 +425,7 @@ const DashboardTomador = () => {
 
 
     const copiarPix = () => {
-        navigator.clipboard.writeText('credpix@gmail.com');
+        navigator.clipboard.writeText('91980177874');
         setCopiadoPix(true);
         setTimeout(() => setCopiadoPix(false), 2000);
     };
@@ -719,7 +719,7 @@ const DashboardTomador = () => {
                         <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
                             <div className="info-label">Chave PIX (E-mail)</div>
                             <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                credpix@gmail.com
+                                91980177874
                                 <button
                                     onClick={copiarPix}
                                     style={{

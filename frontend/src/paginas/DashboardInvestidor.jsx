@@ -163,7 +163,7 @@ const DashboardInvestidor = () => {
     const [modal, setModal] = useState({ open: false, type: '', data: null });
 
     const copiarPix = () => {
-        navigator.clipboard.writeText('credpix@gmail.com');
+        navigator.clipboard.writeText('91980177874');
         setCopiadoPix(true);
         setTimeout(() => setCopiadoPix(false), 2000);
     };

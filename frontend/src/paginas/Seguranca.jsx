@@ -157,17 +157,32 @@ const Seguranca = () => {
                             {copiado && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                         </div>
 
-                        <div style={{ textAlign: 'left', background: 'rgba(255, 214, 0, 0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(255, 214, 0, 0.2)' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--warning)', fontWeight: 600, marginBottom: '0.5rem' }}>
-                                <Smartphone size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                                Sem celular? Não tem problema!
+                        <div style={{ textAlign: 'left', background: 'rgba(255, 214, 0, 0.05)', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(255, 214, 0, 0.2)' }}>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--warning)', fontWeight: 700, marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Smartphone size={18} /> Recomendações (Sincronização Nuvem + PC)
                             </p>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                                Você pode instalar a extensão <strong>"Authenticator"</strong> no seu navegador (Chrome/Edge/Firefox) e colar a <strong>Chave Manual</strong> acima para gerar os códigos direto no seu PC.
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1rem' }}>
+                                <a href="https://2fas.com/" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                                    📱 <strong>2FAS (Celular)</strong>
+                                </a>
+                                <a href="https://2fas.com/browser-extension/" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                                    💻 <strong>2FAS (PC/Extensão)</strong>
+                                </a>
+                                <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                                    🤖 <strong>Google Auth</strong>
+                                </a>
+                                <a href="https://www.microsoft.com/pt-br/security/mobile-authenticator-app" target="_blank" rel="noreferrer" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                                    🪟 <strong>Microsoft Auth</strong>
+                                </a>
+                            </div>
+
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '0.8rem', lineHeight: '1.4' }}>
+                                <strong>Dica:</strong> O <strong>2FAS</strong> permite enviar o código do celular pro PC com um clique. A <strong>Chave Manual</strong> acima é o que você cola no app para ativar.
                             </p>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0' }}>
-                                <Key size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                                Depois de parear, digite o código de 6 dígitos abaixo:
+                            
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                                <Key size={16} /> Digite o código de 6 dígitos gerado:
                             </p>
                         </div>
 

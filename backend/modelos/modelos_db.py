@@ -87,7 +87,7 @@ class SolicitacaoEmprestimo(Base):
     valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
-    status = Column(Enum(StatusSolicitacao, values_callable=lambda x: [e.value for e in x]), default=StatusSolicitacao.PENDENTE, index=True)
+    status = Column(Enum(StatusSolicitacao, name="status_solicitacao", values_callable=lambda x: [e.value for e in x]), default=StatusSolicitacao.PENDENTE, index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     data_expiracao_4h = Column(DateTime)
     data_expiracao_5d = Column(DateTime)
@@ -147,7 +147,7 @@ class Transacao(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
-    tipo = Column(Enum(TipoTransacao, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
+    tipo = Column(Enum(TipoTransacao, name="tipo_transacao", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     status = Column(String, default="pendente", index=True) # pendente, concluido, falhou
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     

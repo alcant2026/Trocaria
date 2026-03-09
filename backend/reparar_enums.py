@@ -22,40 +22,48 @@ def reparar():
         "tipotransacao": [
             "deposito", "saque", "investimento", "recebimento", 
             "compra_score", "desbloqueio_dados", "taxa_saque", 
-            "taxa_intermediacao", "aporte_capital"
+            "taxa_intermediacao", "aporte_capital", "pagamento_parcela",
+            "taxa_postagem", "retorno_investimento", "aporte_caixa",
+            "resgate_caixa", "bonus_pagador_caixa", "retorno_pool"
+        ],
+        "tipo_transacao": [
+            "deposito", "saque", "investimento", "recebimento", 
+            "compra_score", "desbloqueio_dados", "taxa_saque", 
+            "taxa_intermediacao", "aporte_capital", "pagamento_parcela",
+            "taxa_postagem", "retorno_investimento", "aporte_caixa",
+            "resgate_caixa", "bonus_pagador_caixa", "retorno_pool"
         ],
         "statussolicitacao": [
+            "pendente", "aprovado", "rejeitado", "cancelado", "concluido"
+        ],
+        "status_solicitacao": [
             "pendente", "aprovado", "rejeitado", "cancelado", "concluido"
         ]
     }
 
-    with engine.connect() as conn:
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         for tipo_nome, valores in enums_para_reparar.items():
             print(f"\nReparando tipo Enum: {tipo_nome}")
             
             # Tentar adicionar cada valor
             for valor in valores:
                 try:
-                    # Postgres não permite ALTER TYPE ... ADD VALUE dentro de blocos de transação (COMMIT implícito)
-                    # No SQLAlchemy, podemos usar execution_options(isolation_level="AUTOCOMMIT")
                     sql = f"ALTER TYPE {tipo_nome} ADD VALUE IF NOT EXISTS '{valor}'"
-                    conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(sql))
+                    conn.execute(text(sql))
                     print(f"  [OK] Valor '{valor}' verificado/adicionado.")
                 except Exception as e:
-                    # Se falhar porque o valor já existe (em versões antigas do Postgres < 9.1 que não tem IF NOT EXISTS)
-                    # ou outros erros, apenas logamos.
                     if "already exists" in str(e).lower():
                         print(f"  [SKIP] Valor '{valor}' já existe.")
                     else:
                         print(f"  [ERRO] Falha ao adicionar '{valor}': {e}")
             
-            # Adicionar também as versões em MAIÚSCULO para segurança, caso o banco tenha sido criado assim
+            # Adicionar também as versões em MAIÚSCULO para segurança
             for valor in valores:
                 valor_up = valor.upper()
                 if valor_up == valor: continue
                 try:
                     sql = f"ALTER TYPE {tipo_nome} ADD VALUE IF NOT EXISTS '{valor_up}'"
-                    conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(sql))
+                    conn.execute(text(sql))
                     print(f"  [OK] Valor '{valor_up}' (UPPER) verificado/adicionado.")
                 except:
                     pass

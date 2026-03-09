@@ -17,6 +17,7 @@ origins = [
     "http://127.0.0.1:3000",
     "https://cred30.site",
     "https://www.cred30.site",
+    "https://peer-front.onrender.com",
 ]
 
 if frontend_url:
@@ -66,17 +67,20 @@ def startup_db_setup():
         # 3. Garantir que os tipos ENUM no Postgres tenham os novos valores
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao
-            with engine.connect() as conn:
-                for enum_class, type_name in [(TipoTransacao, "tipotransacao"), (StatusSolicitacao, "statussolicitacao")]:
-                    for member in enum_class:
-                        try:
-                            # Tenta adicionar o valor minúsculo (padrão do código)
-                            conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.value}'"))
-                            # Tenta adicionar o valor maiúsculo (legado/segurança)
-                            conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.name}'"))
-                            conn.commit()
-                        except Exception:
-                            pass
+            # Usar conexão direta com AUTOCOMMIT para ALTER TYPE
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                # Sincronizar TODAS as variantes de nome possíveis para evitar DatatypeMismatch
+                for enum_class, type_names in [(TipoTransacao, ["tipo_transacao", "tipotransacao"]), 
+                                             (StatusSolicitacao, ["status_solicitacao", "statussolicitacao"])]:
+                    for type_name in type_names:
+                        for member in enum_class:
+                            try:
+                                # Tenta adicionar o valor minúsculo (padrão do código)
+                                conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.value}'"))
+                                # Tenta adicionar o valor maiúsculo (legado/segurança)
+                                conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.name}'"))
+                            except Exception:
+                                pass
     except Exception as e:
         print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")
 

@@ -1010,9 +1010,11 @@ const DashboardTomador = () => {
                                                                             <span className={`badge ${emp.status === 'aprovado' ? 'badge-success' : 'badge-warning'} `}>
                                                                                 {emp.status.toUpperCase()}
                                                                             </span>
-                                                                            <button onClick={() => baixarContrato(emp.id)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}>
-                                                                                <FileText size={12} /> Contrato PDF
-                                                                            </button>
+                                                                            {emp.status !== 'pendente' && (
+                                                                                <button onClick={() => baixarContrato(emp.id)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}>
+                                                                                    <FileText size={12} /> Contrato PDF
+                                                                                </button>
+                                                                            )}
                                                                         </div>
                                                                         <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Empréstimo #{emp.id}</h3>
                                                                         <div className="text-muted" style={{ fontSize: '0.7rem' }}>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
 import logging
@@ -528,13 +528,105 @@ async def aportar_lucro_plataforma(
     db.add(transacao)
     db.commit()
 
-    return {
-        "message": f"Aporte de R$ {float(dados.valor):.2f} registrado com sucesso!",
-        "novo_lucro_disponivel": float(db.query(func.sum(Transacao.valor)).filter(
-            Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL]),
-            Transacao.status == "concluido"
-        ).scalar() or 0)
-    }
+@router.post("/admin/reinvestir-lucro-pool")
+async def reinvestir_lucro_pool(
+    dados: Decimal = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Move valor do Lucro Disponível diretamente para o Pool (Caixa).
+    """
+    if dados <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="Valor inválido.")
+
+    # 1. Calcular Lucro Disponível (Histórico - Sacado)
+    # Nota: Usamos a mesma lógica do snapshot para consistência
+    tipos_receita = [
+        TipoTransacao.COMPRA_SCORE, 
+        TipoTransacao.DESBLOQUEIO_DADOS, 
+        TipoTransacao.TAXA_SAQUE, 
+        TipoTransacao.TAXA_INTERMEDIACAO,
+        TipoTransacao.APORTE_CAPITAL,
+        TipoTransacao.TAXA_POSTAGEM,
+        TipoTransacao.RETORNO_INVESTIMENTO
+    ]
+    
+    total_receita = db.query(func.sum(Transacao.valor)).filter(
+        Transacao.tipo.in_(tipos_receita),
+        Transacao.status == "concluido"
+    ).scalar() or Decimal("0.00")
+
+    total_sacado = db.query(func.sum(Transacao.valor)).filter(
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.detalhes.like("RESGATE DE LUCRO %"),
+        Transacao.status == "concluido"
+    ).scalar() or Decimal("0.00")
+
+    lucro_disponivel = total_receita - total_sacado
+
+    if dados > lucro_disponivel:
+        raise HTTPException(status_code=400, detail="Lucro insuficiente.")
+
+    # 2. Executar Movimentação
+    admin.saldo_caixa += dados
+    
+    # Registro de Saída do Lucro
+    db.add(Transacao(
+        usuario_id=admin.id,
+        valor=dados,
+        tipo=TipoTransacao.SAQUE,
+        status="concluido",
+        detalhes=f"RESGATE DE LUCRO PARA REINVESTIMENTO NO POOL (ID ADMIN: {admin.id})"
+    ))
+
+    # Registro de Entrada no Pool
+    db.add(Transacao(
+        usuario_id=admin.id,
+        valor=dados,
+        tipo=TipoTransacao.APORTE_CAIXA,
+        status="concluido",
+        detalhes=f"REINVESTIMENTO INSTITUCIONAL NO POOL (ORIGEM: LUCRO PLATAFORMA)"
+    ))
+
+    db.commit()
+    return {"message": "Sucesso! Lucro reinvestido no Pool.", "novo_saldo_pool": float(admin.saldo_caixa)}
+
+@router.post("/admin/resgatar-pool-para-lucro")
+async def resgatar_pool_para_lucro(
+    dados: Decimal = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    Retira valor do Pool (Capital + Juros) e devolve para o Lucro da plataforma.
+    """
+    if dados <= Decimal("0") or dados > admin.saldo_caixa:
+        raise HTTPException(status_code=400, detail="Saldo no Pool insuficiente ou valor inválido.")
+
+    # 1. Executar Movimentação
+    admin.saldo_caixa -= dados
+
+    # Registro de Saída do Pool
+    db.add(Transacao(
+        usuario_id=admin.id,
+        valor=dados,
+        tipo=TipoTransacao.RESGATE_CAIXA,
+        status="concluido",
+        detalhes=f"RESGATE DO POOL PARA RETORNO AO LUCRO (CAPITAL + JUROS)"
+    ))
+
+    # Registro de Entrada no Balanço de Lucro (Aporte de Capital)
+    db.add(Transacao(
+        usuario_id=admin.id,
+        valor=dados,
+        tipo=TipoTransacao.APORTE_CAPITAL,
+        status="concluido",
+        detalhes=f"RETORNO DE REINVESTIMENTO DO POOL (ID ADMIN: {admin.id})"
+    ))
+
+    db.commit()
+    return {"message": "Sucesso! Capital e juros retornaram ao Lucro.", "novo_saldo_pool": float(admin.saldo_caixa)}
 
 class InvestimentoAdminRequest(BaseModel):
     solicitacao_id: int
@@ -607,7 +699,7 @@ async def investir_lucro_plataforma(
         valor=valor,
         tipo=TipoTransacao.INVESTIMENTO,
         status="concluido",
-        detalhes=f"INVESTIMENTO INSTITUCIONAL (LUCRO) -> Pedido #{solicitacao.id} | MOTIVO: {dados.motivo}"
+        detalhes=f"INVESTIMENTO INSTITUCIONAL (POOL) -> Pedido #{solicitacao.id} | MOTIVO: {dados.motivo}"
     )
 
     # Se atingiu a meta, tenta liberar
@@ -615,11 +707,13 @@ async def investir_lucro_plataforma(
     if solicitacao.valor_arrecadado == solicitacao.valor:
         tentar_liberar_emprestimo(solicitacao.id, db)
 
-    # Deduzir do Pool (Como é um pool, o Admin "gerencia", mas o dinheiro sai da soma dos saldos_caixa)
-    # Para manter a integridade, vamos distribuir a dedução pro-rata ou apenas registrar a saída global.
-    # No modelo simples, deduzimos do saldo_caixa de um "Usuário Sistema" ou apenas registramos a transação.
-    # Aqui, vamos deduzir do saldo_caixa do admin (que atua como garantidor do pool) ou criar um ajuste global.
-    admin.saldo_caixa -= valor
+    # Deduzir do Pool de forma pro-rata entre todos os participantes
+    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+    participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
+    
+    for p_caixa in participantes_caixa:
+        fatia_debito = (p_caixa.saldo_caixa / total_pool) * valor
+        p_caixa.saldo_caixa -= fatia_debito
 
     db.add(novo_investimento)
     db.add(transacao)

@@ -598,30 +598,31 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
         investidor = inv.investidor
         valor_final = p["valor_liquido"]
         
-        # LÓGICA DE DESTINO: Se for Pool, distribui o LUCRO para todos e o CAPITAL volta ao caixa disponível
+        # LÓGICA DE DESTINO: Se for Pool, distribui o CAPITAL e o LUCRO pro-rata para todos
         if hasattr(inv, 'is_pool') and inv.is_pool:
-            # 1. Separar o Capital do Lucro neste pagamento
-            fatia_principal = p["valor_liquido"] # No pagar_parcela, o passo 1 já calculou o principal pro-rata
-            lucro_liquido_desta_parcela = valor_final - fatia_principal
+            # 1. Identificar o valor total a ser distribuído (Principal + Juros Líquidos)
+            valor_final_pool = p["valor_liquido"]
+            fatia_principal = p["principal_devido"]
+            lucro_liquido_desta_parcela = valor_final_pool - fatia_principal
             
-            # 2. O Capital volta para o balcão (Admin) para novos empréstimos
-            admin.saldo_caixa += fatia_principal
+            # 2. Rateio Proporcional entre todos os participantes do Pool
+            total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+            participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
             
-            # 3. O Lucro aumenta o patrimônio de todos os investidores do Caixa (Crescimento do Pool)
-            if lucro_liquido_desta_parcela > 0:
-                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
-                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-                for p_caixa in participantes_caixa:
-                    # O "bolo" de todo mundo aumenta proporcionalmente ao que cada um tem
-                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_desta_parcela
+            for p_caixa in participantes_caixa:
+                # Cada um recebe sua fatia proporcional do retorno total (Cap + Juros)
+                fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_final_pool
+                p_caixa.saldo_caixa += fatia
                 
-            inv.pago_para_investidor += valor_final
+            inv.pago_para_investidor += valor_final_pool
+            
+            # 3. Registro de Auditoria (Admin atua como gerente)
             db.add(Transacao(
                 usuario_id=admin.id,
-                valor=valor_final,
+                valor=valor_final_pool,
                 tipo=TipoTransacao.RETORNO_POOL,
                 status="concluido",
-                detalhes=f"Retorno Pool (Cap: {fatia_principal} | Lucro: {lucro_liquido_desta_parcela}) - Pedido #{solicitacao_id}"
+                detalhes=f"Retorno Pro-rata Pool | Total: {valor_final_pool} | Capital: {fatia_principal} | Juros: {lucro_liquido_desta_parcela} | Pedido #{solicitacao_id}"
             ))
         else:
             investidor.saldo += valor_final
@@ -768,23 +769,23 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
         investidor = inv.investidor
         
         if hasattr(inv, 'is_pool') and inv.is_pool:
-            # Separar capital de lucro na quitação
-            capital_no_pool = principal_pendente
-            lucro_liquido_no_pool = valor_liquido_investidor - capital_no_pool
+            # Rateio Proporcional Integral (Capital + Juros) na Quitação
+            total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+            participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
             
-            # Capital volta ao caixa disponível
-            admin.saldo_caixa += capital_no_pool
+            for p_caixa in participantes_caixa:
+                fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_liquido_investidor
+                p_caixa.saldo_caixa += fatia
             
-            # Lucro aumenta o saldo de todos os investidores do Caixa
-            if lucro_liquido_no_pool > 0:
-                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
-                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-                for p_caixa in participantes_caixa:
-                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_no_pool
-            
+            # Cálculo de juros para o log administrativo (baseado na proporção do admin)
+            lucro_pool_global = valor_liquido_investidor - principal_pendente
+            proporcao_admin = admin.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
+            juros_admin_quitacao = lucro_pool_global * proporcao_admin
+            capital_admin_quitacao = principal_pendente * proporcao_admin
+
             inv.pago_para_investidor += valor_liquido_investidor
             tipo_trans = TipoTransacao.RETORNO_POOL
-            detalhes_trans = f"Quitação Distribuída Pool (Cap: {capital_no_pool} | Lucro: {lucro_liquido_no_pool}) - Pedido #{solicitacao_id}"
+            detalhes_trans = f"Quitação Pro-rata Pool | Total: {valor_liquido_investidor} | Juros Est. Admin: {juros_admin_quitacao} | Pedido #{solicitacao_id}"
             u_id = admin.id
         else:
             investidor.saldo += valor_liquido_investidor
@@ -949,17 +950,21 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
             fatia_principal_avulso = valor_capital_no_pagamento * p["proporcao"]
             lucro_liquido_avulso = valor_final - fatia_principal_avulso
             
-            admin.saldo_caixa += fatia_principal_avulso
+            # 1. Rateio Proporcional Integral (Capital + Juros) no Avulso
+            total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+            participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
             
-            if lucro_liquido_avulso > 0:
-                total_caixa_global = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
-                participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-                for p_caixa in participantes_caixa:
-                    p_caixa.saldo_caixa += (p_caixa.saldo_caixa / total_caixa_global) * lucro_liquido_avulso
+            for p_caixa in participantes_caixa:
+                fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_final
+                p_caixa.saldo_caixa += fatia
+            
+            # Cálculo de juros estimados para o admin (transparência)
+            proporcao_admin = admin.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
+            juros_admin_avulso = lucro_liquido_avulso * proporcao_admin
 
             inv.pago_para_investidor += valor_final
             tipo_trans = TipoTransacao.RETORNO_POOL
-            detalhes_trans = f"Retorno Avulso Pool (Cap: {fatia_principal_avulso} | Lucro: {lucro_liquido_avulso}) - Pedido #{solicitacao_id}"
+            detalhes_trans = f"Retorno Avulso Pro-rata Pool | Total: {valor_final} | Juros Est. Admin: {juros_admin_avulso} | Pedido #{solicitacao_id}"
             u_id = admin.id
         else:
             investidor.saldo += valor_final
@@ -1054,9 +1059,9 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     if not e_tomador and not investimento_usuario:
         raise HTTPException(status_code=403, detail="Você não tem permissão para acessar este contrato.")
 
-    # Permitir PENDENTE se for o tomador (Contrato de Solicitação)
-    if solicitacao.status not in [StatusSolicitacao.PENDENTE, StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
-        raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos ativos, concluídos ou em captação.")
+    # Só gerar se estiver APROVADO ou CONCLUIDO (Dívida em aberto ou encerrada)
+    if solicitacao.status not in [StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
+        raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos ativos ou concluídos.")
 
     # Função auxiliar para limpar strings (o PDF padrão só aceita latin-1)
     def limpar(txt):
@@ -1322,9 +1327,14 @@ async def confirmar_aporte_pool(
         ciencia_risco=True
     )
 
-    # Deduzimos o valor do saldo_caixa do admin (como proxy do fundo centralizado)
-    # No futuro, isso pode ser distribuído pro-rata entre todos os investidores do caixa
-    admin.saldo_caixa -= valor_aporte
+    # Deduzimos o valor de forma pro-rata de todos os participantes do Pool
+    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("1.00")
+    participantes_caixa = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
+    
+    for p_caixa in participantes_caixa:
+        fatia_debito = (p_caixa.saldo_caixa / total_pool) * valor_aporte
+        p_caixa.saldo_caixa -= fatia_debito
+
     solicitacao.valor_arrecadado += valor_aporte
     
     # Zerar a sugestão após o uso

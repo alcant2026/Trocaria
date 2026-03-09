@@ -154,11 +154,49 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             for h in historico_raw:
                 historico_mes.append({
                     "mes": h.mes,
-                    "depositos": float(h.depositos or 0),
-                    "saques": float(h.saques or 0),
-                    "lucro": float(h.lucro or 0),
-                    "lucro_sacado": float(h.lucro_sacado or 0)
+                    "total_entrada": float(h.depositos or 0),
+                    "total_saida": float(h.saques or 0),
+                    "receita_plataforma": float(h.lucro or 0),
+                    "total_sacado": float(h.lucro_sacado or 0)
                 })
+
+            # Calcular Juros Acumulados no Pool para o Admin (Lógica Híbrida)
+            # 1. Total Aportado pelo Admin ao Pool (Reinvestimentos)
+            total_aportado_pool = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.usuario_id == usuario.id,
+                Transacao.tipo == TipoTransacao.APORTE_CAIXA,
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+
+            # 2. Total Resgatado pelo Admin do Pool
+            total_resgatado_pool = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.usuario_id == usuario.id,
+                Transacao.tipo == TipoTransacao.RESGATE_CAIXA,
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+
+            # 3. Juros Calculados via Logs (Novas Transações)
+            transacoes_pool_logs = db.query(Transacao.detalhes).filter(
+                Transacao.usuario_id == usuario.id,
+                Transacao.tipo == TipoTransacao.RETORNO_POOL,
+                Transacao.status == "concluido"
+            ).all()
+            
+            juros_via_logs = Decimal("0.00")
+            import re
+            for t in transacoes_pool_logs:
+                if t.detalhes:
+                    match = re.search(r"Juros(?: Est\. Admin)?: ([\d\.]+)", t.detalhes)
+                    if match:
+                        juros_via_logs += Decimal(match.group(1))
+
+            # 4. Reconciliação Híbrida:
+            # Se o saldo atual é maior que (Aportes - Resgates), a diferença é lucro histórico (antes dos logs detalhados)
+            capital_liquido_investido = total_aportado_pool - total_resgatado_pool
+            lucro_reconciliado = max(Decimal("0.00"), usuario.saldo_caixa - capital_liquido_investido)
+            
+            # Usamos o maior entre a reconciliação e a soma dos logs (para evitar duplicidade ou perdas)
+            juros_acumulados_pool = max(lucro_reconciliado, juros_via_logs)
 
             snapshot["admin"] = {
                 "pendentes": pendentes_list,
@@ -166,14 +204,16 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_usuarios_gerenciado": float(saldo_usuarios),
                     "lucro_plataforma_total": float(sum(detalhamento_mes.values())),
                     "lucro_plataforma_historico": float(total_lucro_historico),
-                    "lucro_disponivel": float(total_lucro_historico - total_sacado_admin - total_investido_institucional),
+                    "lucro_disponivel": float(total_lucro_historico - total_sacado_admin),
                     "saldo_pool_caixa": float(saldo_pool_caixa),
+                    "meu_saldo_pool": float(usuario.saldo_caixa),
+                    "lucro_acumulado_pool": float(juros_acumulados_pool),
                     "detalhamento_lucro": {
                         "taxas_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
-                        "desbloqueio_lgpd": float(detalhamento_mes.get('desbloqueio_dados', 0)),
-                        "kyc_e_score": float(detalhamento_mes.get('compra_score', 0)),
-                        "taxas_saque_extra": float(detalhamento_mes.get('taxa_saque', 0)),
-                        "taxas_intermediacao_p2p": float(detalhamento_mes.get('taxa_intermediacao', 0)),
+                        "desbloqueio_dados": float(detalhamento_mes.get('desbloqueio_dados', 0)),
+                        "kyc_score": float(detalhamento_mes.get('compra_score', 0)),
+                        "taxas_saque": float(detalhamento_mes.get('taxa_saque', 0)),
+                        "taxa_intermediacao": float(detalhamento_mes.get('taxa_intermediacao', 0)),
                         "aportes_externos": float(detalhamento_mes.get('aporte_capital', 0)),
                         "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0))
                     },
@@ -242,6 +282,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "valor_total_restante": round(valor_total_restante, 2),
                 "status": s.status.value,
                 "proximo_vencimento": s.proximo_vencimento.isoformat() if s.proximo_vencimento else None,
+                "data_expiracao_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
+                "data_expiracao_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None,
                 "garantidores": [
                     {
                         "nome": g.garante.nome.split()[0],

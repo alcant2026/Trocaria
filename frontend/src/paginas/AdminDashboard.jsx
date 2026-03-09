@@ -213,7 +213,6 @@ const AporteLucroCard = ({ onMensagem }) => {
 
             {aberto && (
                 <form onSubmit={handleAportar} style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '480px', margin: '1.2rem auto 0' }}>
-
                     <div>
                         <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Valor do Aporte</label>
                         <input
@@ -227,7 +226,6 @@ const AporteLucroCard = ({ onMensagem }) => {
                             style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '12px', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, outline: 'none', boxSizing: 'border-box' }}
                         />
                     </div>
-
                     <div>
                         <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Origem (Conta/PIX)</label>
                         <input
@@ -239,7 +237,6 @@ const AporteLucroCard = ({ onMensagem }) => {
                             style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '12px', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
                         />
                     </div>
-
                     <div>
                         <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Justificativa do Aporte</label>
                         <textarea
@@ -258,6 +255,126 @@ const AporteLucroCard = ({ onMensagem }) => {
                         disabled={loading}
                     >
                         {loading ? 'Processando...' : `Confirmar Aporte${valor ? ' de R$ ' + parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''}`}
+                    </button>
+                </form>
+            )}
+        </div>
+    );
+};
+
+// Componente de Gestão de Reinvestimento do Lucro no Pool (Aumento de Patrimônio)
+const ReinvestimentoPoolCard = ({ onMensagem, lucroDisponivel, meuSaldoPool, lucroAcumuladoPool }) => {
+    const [valor, setValor] = useState('');
+    const [tipo, setTipo] = useState('reinvestir'); // 'reinvestir' ou 'resgatar'
+    const [loading, setLoading] = useState(false);
+    const [aberto, setAberto] = useState(false);
+
+    const handleAcao = async (e) => {
+        e.preventDefault();
+        const v = parseFloat(valor);
+        if (!v || v <= 0) return alert('O valor deve ser maior que zero.');
+        
+        const endpoint = tipo === 'reinvestir' ? '/financeiro/admin/reinvestir-lucro-pool' : '/financeiro/admin/resgatar-pool-para-lucro';
+        const saldoValidar = tipo === 'reinvestir' ? lucroDisponivel : meuSaldoPool;
+
+        if (v > saldoValidar) return alert('Saldo insuficiente para esta operação.');
+
+        setLoading(true);
+        try {
+            const res = await api.post(endpoint, { dados: v });
+            onMensagem(res.message || 'Operação realizada!');
+            setValor('');
+            setAberto(false);
+        } catch (err) {
+            onMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="card mb-1" style={{ borderLeft: '4px solid var(--warning)' }}>
+            <div className="flex-between">
+                <div>
+                    <h3 style={{ color: 'var(--warning)' }}>📈 Gestão de Patrimônio</h3>
+                    <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                        Reinvista o lucro no Pool para ganhar juros.
+                    </p>
+                </div>
+                <button
+                    className={`btn ${aberto ? 'btn-outline' : 'btn-primary'}`}
+                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: aberto ? 'transparent' : 'var(--warning)', borderColor: 'var(--warning)', color: aberto ? 'var(--warning)' : '#111' }}
+                    onClick={() => setAberto(!aberto)}
+                >
+                    {aberto ? 'Fechar' : 'Gerenciar'}
+                </button>
+            </div>
+
+            {aberto && (
+                <form onSubmit={handleAcao} style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '480px', margin: '1.2rem auto 0' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+                        <button 
+                            type="button" 
+                            className={`btn ${tipo === 'reinvestir' ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ flex: 1, fontSize: '0.75rem', height: 'auto', padding: '8px', background: tipo === 'reinvestir' ? 'var(--warning)' : 'transparent', borderColor: 'var(--warning)', color: tipo === 'reinvestir' ? '#111' : 'var(--warning)' }}
+                            onClick={() => setTipo('reinvestir')}
+                        >
+                            Reinvestir Lucro
+                        </button>
+                        <button 
+                            type="button" 
+                            className={`btn ${tipo === 'resgatar' ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ flex: 1, fontSize: '0.75rem', height: 'auto', padding: '8px', background: tipo === 'resgatar' ? 'var(--warning)' : 'transparent', borderColor: 'var(--warning)', color: tipo === 'resgatar' ? '#111' : 'var(--warning)' }}
+                            onClick={() => setTipo('resgatar')}
+                        >
+                            Resgatar p/ Lucro
+                        </button>
+                    </div>
+
+                    <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                            {tipo === 'reinvestir' ? 'Valor a Reinvestir (do Lucro)' : 'Valor a Resgatar para o Lucro Operacional'}
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type="number"
+                                placeholder="0,00"
+                                value={valor}
+                                onChange={e => setValor(e.target.value)}
+                                min="0.01"
+                                step="0.01"
+                                required
+                                style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '10px', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }}
+                            />
+                            <p style={{ fontSize: '0.65rem', marginTop: '4px', textAlign: 'right', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                                {tipo === 'reinvestir' 
+                                    ? `Lucro Disponível para Aporte: R$ ${lucroDisponivel.toLocaleString('pt-BR')}` 
+                                    : (
+                                        <>
+                                            Total na Cota: R$ {meuSaldoPool.toLocaleString('pt-BR')} <br/>
+                                            <span style={{ color: 'var(--success)' }}>
+                                                (Capital: R$ {(meuSaldoPool - (lucroAcumuladoPool || 0)).toLocaleString('pt-BR')} | Juros: R$ {(lucroAcumuladoPool || 0).toLocaleString('pt-BR')})
+                                            </span>
+                                        </>
+                                    )
+                                }
+                            </p>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'rgba(255,193,7,0.05)', borderRadius: '10px', border: '1px dashed rgba(255,193,7, 0.3)' }}>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--warning)', margin: 0, lineHeight: 1.4 }}>
+                            🔒 <strong>Garantia de Isolação:</strong> Cada participante (Investidor ou Plataforma) possui uma conta individual dentro do fundo. O resgate acima afetará <u>apenas</u> o patrimônio pertencente à plataforma.
+                        </p>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        style={{ padding: '0.75rem', fontSize: '0.9rem', fontWeight: 700, background: 'var(--warning)', color: '#111', border: 'none' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Processando...' : `Confirmar ${tipo === 'reinvestir' ? 'Reinvestimento' : 'Resgate Próprio'}`}
                     </button>
                 </form>
             )}
@@ -847,7 +964,7 @@ const AdminDashboard = () => {
                                         style={{ width: '100%', padding: '0.6rem', fontSize: '0.8rem', background: 'rgba(var(--primary-rgb), 0.15)', color: 'var(--primary)', border: '1px solid var(--primary)' }}
                                         onClick={() => handleInvestirLucro(sa)}
                                     >
-                                        Investir via Pool (Manual)
+                                        Investir via Pool (Governança)
                                     </button>
                                 </div>
                             ))}
@@ -899,6 +1016,12 @@ const AdminDashboard = () => {
                                 <AporteLucroCard
                                     onMensagem={(m) => { setMensagem(m); carregarSnapshot(); }}
                                 />
+                                <ReinvestimentoPoolCard
+                                    onMensagem={(m) => { setMensagem(m); carregarSnapshot(); }}
+                                    lucroDisponivel={fiscal.lucro_disponivel}
+                                    meuSaldoPool={fiscal.meu_saldo_pool}
+                                    lucroAcumuladoPool={fiscal.lucro_acumulado_pool}
+                                />
                             </div>
                         </div>
 
@@ -919,11 +1042,11 @@ const AdminDashboard = () => {
                                             <tr key={i}>
                                                 <td>{new Date(h.mes).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</td>
                                                 <td>
-                                                    <span style={{ color: 'var(--success)', fontSize: '0.75rem', display: 'block' }}>+{h.total_entrada.toLocaleString('pt-BR')}</span>
-                                                    <span style={{ color: 'var(--danger)', fontSize: '0.75rem', display: 'block' }}>-{h.total_saida.toLocaleString('pt-BR')}</span>
+                                                    <span style={{ color: 'var(--success)', fontSize: '0.75rem', display: 'block' }}>+{(h.total_entrada || 0).toLocaleString('pt-BR')}</span>
+                                                    <span style={{ color: 'var(--danger)', fontSize: '0.75rem', display: 'block' }}>-{(h.total_saida || 0).toLocaleString('pt-BR')}</span>
                                                 </td>
-                                                <td style={{ fontWeight: 600 }}>R$ {h.receita_plataforma.toLocaleString('pt-BR')}</td>
-                                                <td>{h.total_sacado > 0 ? `R$ ${h.total_sacado.toLocaleString('pt-BR')}` : '—'}</td>
+                                                <td style={{ fontWeight: 600 }}>R$ {(h.receita_plataforma || 0).toLocaleString('pt-BR')}</td>
+                                                <td>{h.total_sacado > 0 ? `R$ ${(h.total_sacado || 0).toLocaleString('pt-BR')}` : '—'}</td>
                                             </tr>
                                         ))}
                                     </tbody>

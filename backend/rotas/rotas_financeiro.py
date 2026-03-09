@@ -482,12 +482,22 @@ async def sacar_lucro_plataforma(
     if not dados.motivo or len(dados.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="Você deve fornecer uma justificativa clara (mínimo 5 caracteres) para o resgate de lucro.")
 
-    # DEDUZIR DO SALDO REAL DO ADMIN
-    admin.saldo -= dados.valor
+    # DEDUZIR DO SALDO DA PLATAFORMA (USUARIO 000PL)
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if not plataforma:
+        raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
+    
+    if plataforma.saldo < dados.valor:
+        # Se por algum motivo o saldo do 000PL estiver desalinhado com o cálculo virtual, 
+        # permitimos o saque mas o saldo ficará negativo ou precisamos de auditoria.
+        # Aqui vamos barrar para manter integridade.
+        raise HTTPException(status_code=400, detail="Saldo em conta plataforma insuficiente.")
 
-    # Registra a transação de auditoria
+    plataforma.saldo -= dados.valor
+
+    # Registra a transação de auditoria vinculado à plataforma
     transacao = Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados.valor,
         tipo=TipoTransacao.SAQUE,
         status="concluido",
@@ -516,14 +526,18 @@ async def aportar_lucro_plataforma(
     if not dados.motivo or len(dados.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="Forneça uma justificativa para o aporte (mínimo 5 caracteres).")
 
-    # Registra a transação de aporte (entrada no fiscal)
-    admin.saldo += dados.valor
+    # Registra a transação de aporte (entrada no fiscal) no usuário 000PL
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if not plataforma:
+        raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
+
+    plataforma.saldo += dados.valor
     transacao = Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados.valor,
         tipo=TipoTransacao.APORTE_CAPITAL,
         status="concluido",
-        detalhes=f"APORTE EXTERNO → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
+        detalhes=f"APORTE EXTERNO (INJETADO POR ADMIN {admin.id}) → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
     )
     db.add(transacao)
     db.commit()
@@ -568,12 +582,17 @@ async def reinvestir_lucro_pool(
     if dados > lucro_disponivel:
         raise HTTPException(status_code=400, detail="Lucro insuficiente.")
 
-    # 2. Executar Movimentação
-    admin.saldo_caixa += dados
+    # 2. Executar Movimentação no Usuário de Sistema 000PL
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if not plataforma:
+        raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
+
+    plataforma.saldo -= dados # Tira do lucro disponível (saldo 000PL)
+    plataforma.saldo_caixa += dados # Coloca no Pool (saldo_caixa 000PL)
     
     # Registro de Saída do Lucro
     db.add(Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados,
         tipo=TipoTransacao.SAQUE,
         status="concluido",
@@ -582,7 +601,7 @@ async def reinvestir_lucro_pool(
 
     # Registro de Entrada no Pool
     db.add(Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados,
         tipo=TipoTransacao.APORTE_CAIXA,
         status="concluido",
@@ -601,28 +620,33 @@ async def resgatar_pool_para_lucro(
     """
     Retira valor do Pool (Capital + Juros) e devolve para o Lucro da plataforma.
     """
-    if dados <= Decimal("0") or dados > admin.saldo_caixa:
-        raise HTTPException(status_code=400, detail="Saldo no Pool insuficiente ou valor inválido.")
+    # 1. Executar Movimentação no Usuário 000PL
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if not plataforma:
+        raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
 
-    # 1. Executar Movimentação
-    admin.saldo_caixa -= dados
+    if dados > plataforma.saldo_caixa:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente no Pool da Plataforma.")
+
+    plataforma.saldo_caixa -= dados
+    plataforma.saldo += dados
 
     # Registro de Saída do Pool
     db.add(Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados,
         tipo=TipoTransacao.RESGATE_CAIXA,
         status="concluido",
-        detalhes=f"RESGATE DO POOL PARA RETORNO AO LUCRO (CAPITAL + JUROS)"
+        detalhes=f"RESGATE DO POOL PARA RETORNO AO LUCRO (CAPITAL + JUROS) - ADMIN {admin.id}"
     ))
 
     # Registro de Entrada no Balanço de Lucro (Aporte de Capital)
     db.add(Transacao(
-        usuario_id=admin.id,
+        usuario_id=plataforma.id,
         valor=dados,
         tipo=TipoTransacao.APORTE_CAPITAL,
         status="concluido",
-        detalhes=f"RETORNO DE REINVESTIMENTO DO POOL (ID ADMIN: {admin.id})"
+        detalhes=f"RETORNO DE REINVESTIMENTO DO POOL (REINJETADO NO LUCRO DISPONÍVEL)"
     ))
 
     db.commit()

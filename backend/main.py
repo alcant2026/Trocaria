@@ -81,6 +81,26 @@ def startup_db_setup():
                                 conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.name}'"))
                             except Exception:
                                 pass
+        # 4. Garantir Usuário de Sistema (Peer Plataforma) para Isolação de Lucro
+        from modelos.modelos_db import Usuario
+        usuario_sistema = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if not usuario_sistema:
+            print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
+            novo_sistema = Usuario(
+                id="000PL",
+                nome="Peer Plataforma (Sistema)",
+                email="sistema@peer.com.br",
+                cpf="000.000.000-00",
+                senha_hash="SISTEMA_VIRTUAL",
+                chave_pix="sistema",
+                is_admin=True,
+                is_active=True,
+                saldo=0,
+                saldo_caixa=0
+            )
+            db.add(novo_sistema)
+            db.commit()
+
     except Exception as e:
         print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")
 

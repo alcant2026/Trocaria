@@ -108,9 +108,18 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
-            saldo_pool_caixa = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+            # Dados da Plataforma (Usuário 000PL)
+            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+            if not plataforma:
+                # Fallback se o 000PL ainda não foi criado no banco
+                p_saldo = Decimal("0.00")
+                p_saldo_caixa = Decimal("0.00")
+            else:
+                p_saldo = plataforma.saldo
+                p_saldo_caixa = plataforma.saldo_caixa
 
             total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.usuario_id == "000PL", # Saques agora são no 000PL
                 Transacao.tipo == TipoTransacao.SAQUE,
                 Transacao.detalhes.like("RESGATE DE LUCRO %"),
                 Transacao.status == "concluido"
@@ -204,9 +213,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_usuarios_gerenciado": float(saldo_usuarios),
                     "lucro_plataforma_total": float(sum(detalhamento_mes.values())),
                     "lucro_plataforma_historico": float(total_lucro_historico),
-                    "lucro_disponivel": float(total_lucro_historico - total_sacado_admin),
+                    "lucro_disponivel": float(p_saldo), # Lucro disponível é o saldo do 000PL
                     "saldo_pool_caixa": float(saldo_pool_caixa),
-                    "meu_saldo_pool": float(usuario.saldo_caixa),
+                    "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                     "lucro_acumulado_pool": float(juros_acumulados_pool),
                     "detalhamento_lucro": {
                         "taxas_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),

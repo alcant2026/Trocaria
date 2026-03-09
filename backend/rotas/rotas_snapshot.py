@@ -108,10 +108,12 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
-            # Dados da Plataforma (Usuário 000PL)
+            # 1. Saldo Total no Pool (Soma de todos os usuários)
+            saldo_pool_caixa = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+
+            # 2. Dados da Plataforma (Usuário 000PL) para Isolação
             plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
             if not plataforma:
-                # Fallback se o 000PL ainda não foi criado no banco
                 p_saldo = Decimal("0.00")
                 p_saldo_caixa = Decimal("0.00")
             else:

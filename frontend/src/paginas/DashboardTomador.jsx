@@ -24,7 +24,11 @@ import {
     UserPlus,
     X,
     Gift,
-    ArrowLeft
+    ArrowLeft,
+    ShoppingBag,
+    ChevronLeft,
+    ChevronRight,
+    ExternalLink
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
@@ -97,6 +101,104 @@ const formatarTipo = (tipo, detalhes) => {
 };
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+
+const LojaAfiliados = ({ onMensagem }) => {
+    const [itens, setItens] = useState([]);
+    const [pagina, setPagina] = useState(1);
+    const [totalPaginas, setTotalPaginas] = useState(1);
+    const [loading, setLoading] = useState(false);
+
+    const carregarLoja = async (p = 1) => {
+        setLoading(true);
+        try {
+            const data = await api.get(`/financeiro/loja/itens?pagina=${p}`);
+            setItens(data.itens);
+            setTotalPaginas(data.paginas);
+            setPagina(data.pagina_atual);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        carregarLoja(pagina);
+    }, [pagina]);
+
+    return (
+        <div className="animate-fade-in">
+            <div className="flex-between mb-1">
+                <div>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <ShoppingBag size={20} color="var(--primary)" /> Loja de Ofertas
+                    </h3>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Produtos selecionados da Shopee, Mercado Livre e muito mais!</p>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="card text-center py-2">Carregando ofertas...</div>
+            ) : itens.length === 0 ? (
+                <div className="card text-center text-muted py-2">Nenhuma oferta disponível no momento.</div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {itens.map(item => (
+                        <a 
+                            key={item.id} 
+                            href={item.url_afiliado} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="card card-interactive"
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '15px', 
+                                textDecoration: 'none',
+                                borderLeft: '4px solid #ff4d00'
+                            }}
+                        >
+                            <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {item.url_imagem ? (
+                                    <img src={item.url_imagem} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    <ShoppingBag size={24} color="#ff4d00" />
+                                )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <h4 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome_produto}</h4>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    Ver produto na loja <ExternalLink size={12} />
+                                </p>
+                            </div>
+                            <ChevronRight size={20} color="var(--text-muted)" />
+                        </a>
+                    ))}
+
+                    {totalPaginas > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '1rem', padding: '10px' }}>
+                            <button 
+                                disabled={pagina === 1}
+                                onClick={() => setPagina(pagina - 1)}
+                                style={{ background: 'transparent', border: 'none', color: pagina === 1 ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === 1 ? 'default' : 'pointer' }}
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{pagina} / {totalPaginas}</span>
+                            <button 
+                                disabled={pagina === totalPaginas}
+                                onClick={() => setPagina(pagina + 1)}
+                                style={{ background: 'transparent', border: 'none', color: pagina === totalPaginas ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === totalPaginas ? 'default' : 'pointer' }}
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const DashboardTomador = () => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
@@ -622,6 +724,10 @@ const DashboardTomador = () => {
                     <ShieldCheck size={28} />
                     <span>Upgrade</span>
                 </div>
+                <div className="action-btn" onClick={() => setActiveView('loja')}>
+                    <ShoppingBag size={28} color="#ff4d00" />
+                    <span>Loja</span>
+                </div>
             </div>
 
             {/* View Switcher Content */}
@@ -725,6 +831,14 @@ const DashboardTomador = () => {
                         </div>
                     </form>
                 </div >
+            )}
+            {activeView === 'loja' && (
+                <div className="card">
+                    <LojaAfiliados onMensagem={setMensagem} />
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                    </div>
+                </div>
             )}
 
             {/* Modal de Termos de Uso */}

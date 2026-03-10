@@ -12,7 +12,7 @@ import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
-from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro
+from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro, LinkAfiliado
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -344,6 +344,75 @@ async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depen
         })
 
     return resultado
+
+# --- Loja de Afiliados ---
+
+class LinkAfiliadoCreate(BaseModel):
+    nome_produto: str
+    url_afiliado: str
+    url_imagem: str = None
+    is_active: bool = True
+
+@router.get("/loja/itens")
+async def listar_itens_loja(pagina: int = 1, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    limite = 5
+    offset = (pagina - 1) * limite
+    total = db.query(LinkAfiliado).filter(LinkAfiliado.is_active == True).count()
+    itens = db.query(LinkAfiliado).filter(LinkAfiliado.is_active == True).order_by(LinkAfiliado.data_criacao.desc()).offset(offset).limit(limite).all()
+    return {
+        "itens": itens,
+        "total": total,
+        "paginas": (total + limite - 1) // limite,
+        "pagina_atual": pagina
+    }
+
+@router.get("/admin/loja/itens")
+async def admin_listar_itens_loja(pagina: int = 1, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    limite = 10
+    offset = (pagina - 1) * limite
+    total = db.query(LinkAfiliado).count()
+    itens = db.query(LinkAfiliado).order_by(LinkAfiliado.data_criacao.desc()).offset(offset).limit(limite).all()
+    return {
+        "itens": itens,
+        "total": total,
+        "paginas": (total + limite - 1) // limite,
+        "pagina_atual": pagina
+    }
+
+@router.post("/admin/loja/itens")
+async def criar_item_loja(dados: LinkAfiliadoCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    novo_item = LinkAfiliado(
+        nome_produto=dados.nome_produto,
+        url_afiliado=dados.url_afiliado,
+        url_imagem=dados.url_imagem,
+        is_active=dados.is_active
+    )
+    db.add(novo_item)
+    db.commit()
+    return {"message": "Produto adicionado à loja!"}
+
+@router.put("/admin/loja/itens/{id}")
+async def editar_item_loja(id: int, dados: LinkAfiliadoCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    item = db.query(LinkAfiliado).filter(LinkAfiliado.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item não encontrado.")
+    
+    item.nome_produto = dados.nome_produto
+    item.url_afiliado = dados.url_afiliado
+    item.url_imagem = dados.url_imagem
+    item.is_active = dados.is_active
+    db.commit()
+    return {"message": "Item atualizado!"}
+
+@router.delete("/admin/loja/itens/{id}")
+async def deletar_item_loja(id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    item = db.query(LinkAfiliado).filter(LinkAfiliado.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item não encontrado.")
+    
+    db.delete(item)
+    db.commit()
+    return {"message": "Item removido da loja!"}
 
 @router.post("/admin/confirmar/{transacao_id}")
 async def confirmar_transacao(transacao_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):

@@ -20,7 +20,12 @@ import {
     Store,
     Plus,
     Trash2,
-    MapPin
+    MapPin,
+    ShoppingBag,
+    Link as LinkIcon,
+    Image as ImageIcon,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -428,7 +433,7 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
             await api.put(`/financeiro/admin/parceiros/${p.id}`, { 
                 nome: p.nome, 
                 endereco: p.endereco, 
-                ativo: !p.ativo 
+                ativo: !p.is_active 
             });
             carregarParceiros();
         } catch (err) {
@@ -499,11 +504,11 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                             parceiros.map(p => (
                                 <div key={p.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{ padding: '8px', background: p.ativo ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                            <Store size={18} color={p.ativo ? 'var(--success)' : 'var(--text-muted)'} />
+                                        <div style={{ padding: '8px', background: p.is_active ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                            <Store size={18} color={p.is_active ? 'var(--success)' : 'var(--text-muted)'} />
                                         </div>
                                         <div>
-                                            <p style={{ fontSize: '0.9rem', fontWeight: 600, color: p.ativo ? 'var(--text-main)' : 'var(--text-muted)' }}>{p.nome}</p>
+                                            <p style={{ fontSize: '0.9rem', fontWeight: 600, color: p.is_active ? 'var(--text-main)' : 'var(--text-muted)' }}>{p.nome}</p>
                                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <MapPin size={12} /> {p.endereco}
                                             </p>
@@ -516,14 +521,14 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                                                 padding: '4px 10px', 
                                                 borderRadius: '6px', 
                                                 border: '1px solid var(--border-color)', 
-                                                background: p.ativo ? 'rgba(0,230,118,0.05)' : 'transparent',
-                                                color: p.ativo ? 'var(--success)' : 'var(--text-muted)',
+                                                background: p.is_active ? 'rgba(0,230,118,0.05)' : 'transparent',
+                                                color: p.is_active ? 'var(--success)' : 'var(--text-muted)',
                                                 fontSize: '0.7rem',
                                                 cursor: 'pointer',
                                                 fontWeight: 600
                                             }}
                                         >
-                                            {p.ativo ? 'ATIVO' : 'INATIVO'}
+                                            {p.is_active ? 'ATIVO' : 'INATIVO'}
                                         </button>
                                         <button 
                                             onClick={() => handleDeletar(p.id)}
@@ -545,6 +550,211 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                                     </div>
                                 </div>
                             ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Componente de Gestão da Loja de Afiliados
+const GerenciarLojaCard = ({ onMensagem }) => {
+    const [itens, setItens] = useState([]);
+    const [nome, setNome] = useState('');
+    const [url, setUrl] = useState('');
+    const [imagem, setImagem] = useState('');
+    const [aberto, setAberto] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [pagina, setPagina] = useState(1);
+    const [totalPaginas, setTotalPaginas] = useState(1);
+
+    const carregarItens = async (p = 1) => {
+        try {
+            const data = await api.get(`/financeiro/admin/loja/itens?pagina=${p}`);
+            setItens(data.itens);
+            setTotalPaginas(data.paginas);
+            setPagina(data.pagina_atual);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    useEffect(() => {
+        if (aberto) carregarItens(pagina);
+    }, [aberto, pagina]);
+
+    const handleAdicionar = async (e) => {
+        e.preventDefault();
+        if (!nome || !url) return onMensagem('Nome e Link são obrigatórios!');
+        setLoading(true);
+        try {
+            await api.post('/financeiro/admin/loja/itens', { 
+                nome_produto: nome, 
+                url_afiliado: url, 
+                url_imagem: imagem 
+            });
+            onMensagem('Produto adicionado com sucesso!');
+            setNome('');
+            setUrl('');
+            setImagem('');
+            carregarItens(1);
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggleAtivo = async (item) => {
+        try {
+            await api.put(`/financeiro/admin/loja/itens/${item.id}`, { 
+                nome_produto: item.nome_produto, 
+                url_afiliado: item.url_afiliado, 
+                url_imagem: item.url_imagem,
+                is_active: !item.is_active 
+            });
+            carregarItens(pagina);
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        }
+    };
+
+    const handleDeletar = async (id) => {
+        if (!window.confirm('Excluir este produto da loja?')) return;
+        try {
+            await api.delete(`/financeiro/admin/loja/itens/${id}`);
+            onMensagem('Produto removido!');
+            carregarItens(pagina);
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        }
+    };
+
+    return (
+        <div className="card mb-1" style={{ borderLeft: '4px solid #ff4d00' }}>
+            <div className="flex-between">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="icon-box" style={{ background: 'rgba(255, 77, 0, 0.1)', color: '#ff4d00' }}>
+                        <ShoppingBag size={20} />
+                    </div>
+                    <div>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '2px' }}>Loja de Afiliados</h3>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Gerencie links da Shopee, Mercado Livre, etc.</p>
+                    </div>
+                </div>
+                <button 
+                    className="btn btn-secondary" 
+                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
+                    onClick={() => setAberto(!aberto)}
+                >
+                    {aberto ? 'Fechar' : 'Gerenciar'}
+                </button>
+            </div>
+
+            {aberto && (
+                <div style={{ marginTop: '1.2rem' }}>
+                    <form onSubmit={handleAdicionar} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#ff4d00' }}>Novo Link de Afiliado</p>
+                        <div className="grid-2" style={{ gap: '10px' }}>
+                            <input 
+                                type="text" 
+                                placeholder="Nome do Produto" 
+                                className="input-field" 
+                                value={nome} 
+                                onChange={e => setNome(e.target.value)}
+                                style={{ fontSize: '0.85rem' }}
+                            />
+                            <input 
+                                type="text" 
+                                placeholder="URL do Afiliado" 
+                                className="input-field" 
+                                value={url} 
+                                onChange={e => setUrl(e.target.value)}
+                                style={{ fontSize: '0.85rem' }}
+                            />
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="URL da Imagem (Opcional)" 
+                            className="input-field" 
+                            value={imagem} 
+                            onChange={e => setImagem(e.target.value)}
+                            style={{ fontSize: '0.85rem' }}
+                        />
+                        <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontSize: '0.8rem', background: '#ff4d00', borderColor: '#ff4d00' }} disabled={loading}>
+                            <Plus size={16} /> {loading ? 'Adicionando...' : 'Adicionar Produto'}
+                        </button>
+                    </form>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {itens.length === 0 ? (
+                            <p className="text-muted text-center" style={{ fontSize: '0.8rem' }}>Nenhum link cadastrado.</p>
+                        ) : (
+                            <>
+                                {itens.map(item => (
+                                    <div key={item.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                            <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {item.url_imagem ? (
+                                                    <img src={item.url_imagem} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <ImageIcon size={18} color="var(--text-muted)" />
+                                                )}
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: item.is_active ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome_produto}</p>
+                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <LinkIcon size={10} /> {item.url_afiliado}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '12px' }}>
+                                            <button 
+                                                onClick={() => handleToggleAtivo(item)}
+                                                style={{ 
+                                                    padding: '4px 10px', 
+                                                    borderRadius: '6px', 
+                                                    border: '1px solid var(--border-color)', 
+                                                    background: item.is_active ? 'rgba(0,230,118,0.05)' : 'transparent',
+                                                    color: item.is_active ? 'var(--success)' : 'var(--text-muted)',
+                                                    fontSize: '0.65rem',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                {item.is_active ? 'ATIVO' : 'INATIVO'}
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeletar(item.id)}
+                                                style={{ padding: '6px', borderRadius: '6px', border: '1px solid rgba(255, 61, 0, 0.1)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer' }}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {totalPaginas > 1 && (
+                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '1rem', padding: '10px' }}>
+                                        <button 
+                                            disabled={pagina === 1}
+                                            onClick={() => setPagina(pagina - 1)}
+                                            style={{ background: 'transparent', border: 'none', color: pagina === 1 ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === 1 ? 'default' : 'pointer' }}
+                                        >
+                                            <ChevronLeft size={20} />
+                                        </button>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{pagina} / {totalPaginas}</span>
+                                        <button 
+                                            disabled={pagina === totalPaginas}
+                                            onClick={() => setPagina(pagina + 1)}
+                                            style={{ background: 'transparent', border: 'none', color: pagina === totalPaginas ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === totalPaginas ? 'default' : 'pointer' }}
+                                        >
+                                            <ChevronRight size={20} />
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -1194,6 +1404,9 @@ const AdminDashboard = () => {
                                     lucroAcumuladoPool={fiscal.lucro_acumulado_pool}
                                 />
                                 <GerenciarParceirosCard
+                                    onMensagem={(m) => setMensagem(m)}
+                                />
+                                <GerenciarLojaCard
                                     onMensagem={(m) => setMensagem(m)}
                                 />
                             </div>

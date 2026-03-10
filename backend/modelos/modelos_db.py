@@ -183,4 +183,12 @@ class GarantiaSocial(Base):
 
     auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="garantias_sociais")
-    garante = relationship("Usuario", back_populates="garantias_prestadas")
+class LinkAfiliado(Base):
+    __tablename__ = "links_afiliados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome_produto = Column(String(150), nullable=False)
+    url_afiliado = Column(String(500), nullable=False)
+    url_imagem = Column(String(500), nullable=True) # Opcional: Para exibir foto do produto
+    is_active = Column(Boolean, default=True)
+    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)

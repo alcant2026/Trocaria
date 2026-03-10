@@ -58,8 +58,11 @@ def get_db():
 @app.on_event("startup")
 def startup_db_setup():
     # 1. Garante que tabelas novas sejam criadas
-    Base.metadata.create_all(bind=engine)
-    
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"ESTRUTURA DB: Aviso na criação de tabelas (provável race condition): {e}")
+
     # 2. Sincroniza colunas novas automaticamente (Auto-Sync)
     try:
         sincronizar_esquema(Base, engine)
@@ -83,23 +86,29 @@ def startup_db_setup():
                                 pass
         # 4. Garantir Usuário de Sistema (Peer Plataforma) para Isolação de Lucro
         from modelos.modelos_db import Usuario
-        usuario_sistema = db.query(Usuario).filter(Usuario.id == "000PL").first()
-        if not usuario_sistema:
-            print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
-            novo_sistema = Usuario(
-                id="000PL",
-                nome="Peer Plataforma (Sistema)",
-                email="sistema@peer.com.br",
-                cpf="000.000.000-00",
-                senha_hash="SISTEMA_VIRTUAL",
-                chave_pix="sistema",
-                is_admin=True,
-                is_active=True,
-                saldo=0,
-                saldo_caixa=0
-            )
-            db.add(novo_sistema)
-            db.commit()
+        db = SessionLocal()
+        try:
+            usuario_sistema = db.query(Usuario).filter(Usuario.id == "000PL").first()
+            if not usuario_sistema:
+                print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
+                novo_sistema = Usuario(
+                    id="000PL",
+                    nome="Peer Plataforma (Sistema)",
+                    email="sistema@peer.com.br",
+                    cpf="000.000.000-00",
+                    senha_hash="SISTEMA_VIRTUAL",
+                    chave_pix="sistema",
+                    is_admin=True,
+                    is_active=True,
+                    saldo=0,
+                    saldo_caixa=0
+                )
+                db.add(novo_sistema)
+                db.commit()
+        except Exception as e:
+            print(f"ESTRUTURA DB: Erro ao criar usuário de sistema: {e}")
+        finally:
+            db.close()
 
     except Exception as e:
         print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")

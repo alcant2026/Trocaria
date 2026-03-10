@@ -36,7 +36,11 @@ def sincronizar_esquema(Base, engine):
                     if column.default is not None and hasattr(column.default, 'arg'):
                          # Valor literal simples
                          if not callable(column.default.arg):
-                            default_sql = f" DEFAULT {column.default.arg}"
+                            val = column.default.arg
+                            if isinstance(val, str):
+                                default_sql = f" DEFAULT '{val}'"
+                            else:
+                                default_sql = f" DEFAULT {val}"
                     elif str(column.type).lower() == "boolean":
                         default_sql = " DEFAULT FALSE"
                     

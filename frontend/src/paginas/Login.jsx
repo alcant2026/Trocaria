@@ -4,19 +4,19 @@ import api from '../api';
 import { Wallet } from 'lucide-react';
 
 const Login = ({ onLogin }) => {
-    const [email, setEmail] = useState('');
+    const [cpf, setCpf] = useState('');
     const [senha, setSenha] = useState('');
     const [mensagem, setMensagem] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await api.post('/auth/login', { email, senha });
+            const res = await api.post('/auth/login', { cpf, senha });
             api.setToken(res.access_token);
             localStorage.setItem('usuario', JSON.stringify(res.usuario));
             onLogin(res.usuario);
         } catch (err) {
-            setMensagem('E-mail ou senha incorretos.');
+            setMensagem('CPF ou senha incorretos.');
         }
     };
 
@@ -35,8 +35,8 @@ const Login = ({ onLogin }) => {
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="input-group">
-                            <label>E-mail</label>
-                            <input type="email" placeholder="Seu e-mail cadastrado" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" required />
+                            <label>CPF</label>
+                            <input type="text" placeholder="Seu CPF (000.000.000-00)" value={cpf} onChange={(e) => setCpf(e.target.value)} className="input-field" required />
                         </div>
 
                         <div className="input-group">

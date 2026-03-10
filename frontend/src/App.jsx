@@ -99,37 +99,21 @@ const App = () => {
                 </a>
 
 
-                <div className="nav-links-desktop">
-                    <a href="#tomador" className={`nav-item ${page === 'tomador' ? 'active' : ''}`}>
-                        <ArrowDownUp size={18} /> Início
-                    </a>
-                    <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`}>
-                        <TrendingUp size={18} /> Investimentos
-                    </a>
-                    {user.is_admin && (
-                        <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`}>
-                            <Settings size={18} /> Admin
-                        </a>
-                    )}
-                    <a href="#seguranca" className={`nav-item ${page === 'seguranca' ? 'active' : ''}`}>
-                        <Shield size={18} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Segurança
-                    </a>
-                </div>
+                {/* Menu Horizontal Removido (Unificado na Lateral) */}
 
-                <div className="flex-between hide-on-pc" style={{ gap: '10px' }}>
-                    <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)}>
-                        {menuAberto ? <X size={28} /> : <Menu size={28} />}
-                    </button>
-                </div>
-
-                <div className="hide-on-mobile flex-between" style={{ gap: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => setMenuAberto(true)}>
+                <div className="flex-between" style={{ gap: '15px' }}>
+                    <div className="avatar-trigger hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => setMenuAberto(true)}>
                         <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem' }}>
                             {user.nome[0].toUpperCase()}
                         </div>
                         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user.nome.split(' ')[0]}</span>
                     </div>
+
+                    <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)} aria-label="Abrir Menu">
+                        {menuAberto ? <X size={28} /> : <Menu size={28} />}
+                    </button>
                 </div>
+
 
                 <div className={`mobile-overlay ${menuAberto ? 'open' : ''}`} onClick={() => setMenuAberto(false)}></div>
 

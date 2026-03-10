@@ -413,7 +413,7 @@ tr:last-child td {
 .mobile-drawer {
   position: fixed;
   top: 0;
-  left: 0;
+  right: 0;
   width: 280px;
   height: 100%;
   background: #111111;
@@ -421,9 +421,9 @@ tr:last-child td {
   padding: 5rem 1.5rem 2rem;
   display: flex;
   flex-direction: column;
-  transform: translateX(-100%);
+  transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
 }
 
 .mobile-drawer.open {
@@ -525,11 +525,11 @@ tr:last-child td {
   }
 
   .mobile-menu-btn {
-    display: none;
+    display: flex;
   }
 
   .nav-links-desktop {
-    display: flex;
+    display: none;
   }
 
   .hide-on-pc {

@@ -300,6 +300,24 @@ async def editar_parceiro(id: int, dados: ParceiroUpdate, db: Session = Depends(
     db.commit()
     return {"message": "Parceiro atualizado!"}
 
+@router.delete("/admin/parceiros/{id}")
+async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    parceiro = db.query(Parceiro).filter(Parceiro.id == id).first()
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
+    
+    # Verificar se existem transações vinculadas a este parceiro
+    transacoes = db.query(Transacao).filter(Transacao.parceiro_id == id).first()
+    if transacoes:
+        # Se houver histórico, não deletamos, apenas inativamos (segurança de auditoria)
+        parceiro.is_active = False
+        db.commit()
+        return {"message": "Parceiro possui histórico de movimentações e foi apenas inativado por segurança."}
+    
+    db.delete(parceiro)
+    db.commit()
+    return {"message": "Parceiro removido com sucesso!"}
+
 @router.get("/admin/pendentes")
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     pendentes = db.query(Transacao).join(Usuario).filter(

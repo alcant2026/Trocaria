@@ -436,6 +436,17 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
         }
     };
 
+    const handleDeletar = async (id) => {
+        if (!window.confirm('Deseja realmente excluir este parceiro?')) return;
+        try {
+            await api.delete(`/financeiro/admin/parceiros/${id}`);
+            onMensagem('Parceiro removido com sucesso!');
+            carregarParceiros();
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        }
+    };
+
     return (
         <div className="card mb-1" style={{ borderLeft: '4px solid var(--primary-low)' }}>
             <div className="flex-between">
@@ -498,21 +509,40 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                                             </p>
                                         </div>
                                     </div>
-                                    <button 
-                                        onClick={() => handleToggleAtivo(p)}
-                                        style={{ 
-                                            padding: '4px 10px', 
-                                            borderRadius: '6px', 
-                                            border: '1px solid var(--border-color)', 
-                                            background: p.ativo ? 'rgba(0,230,118,0.05)' : 'transparent',
-                                            color: p.ativo ? 'var(--success)' : 'var(--text-muted)',
-                                            fontSize: '0.7rem',
-                                            cursor: 'pointer',
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        {p.ativo ? 'ATIVO' : 'INATIVO'}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <button 
+                                            onClick={() => handleToggleAtivo(p)}
+                                            style={{ 
+                                                padding: '4px 10px', 
+                                                borderRadius: '6px', 
+                                                border: '1px solid var(--border-color)', 
+                                                background: p.ativo ? 'rgba(0,230,118,0.05)' : 'transparent',
+                                                color: p.ativo ? 'var(--success)' : 'var(--text-muted)',
+                                                fontSize: '0.7rem',
+                                                cursor: 'pointer',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            {p.ativo ? 'ATIVO' : 'INATIVO'}
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeletar(p.id)}
+                                            style={{ 
+                                                padding: '6px', 
+                                                borderRadius: '6px', 
+                                                border: '1px solid rgba(255, 61, 0, 0.1)', 
+                                                background: 'transparent',
+                                                color: 'var(--danger)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                            title="Excluir Parceiro"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))
                         )}

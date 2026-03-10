@@ -12,14 +12,18 @@ import pyotp
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
-from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria
+from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
+    metodo: str = "pix" # pix ou especie
+    parceiro_id: int = None
 
 class SolicitacaoSaque(BaseModel):
     valor: Decimal = Field(gt=0)
-    chave_pix: str
+    chave_pix: str = ""
+    metodo: str = "pix" # pix ou especie
+    parceiro_id: int = None
     senha: str
     codigo_2fa: str
 
@@ -53,11 +57,21 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
     
     # Simulação de validação de titularidade (nome no cadastro vs nome da chave pix)
     # Aqui, como o usuário cadastrou sua chave_pix no perfil, comparamos com a solicitada no saque
-    if chave_pix != usuario.chave_pix:
-        raise HTTPException(
-            status_code=401, 
-            detail="Saque negado: A chave PIX deve pertencer obrigatoriamente à mesma titularidade da conta (conforme LGPD e regras Bacen)."
-        )
+    # Validação baseada no método
+    if dados.metodo == "pix":
+        if not chave_pix:
+            raise HTTPException(status_code=400, detail="Chave PIX obrigatória para este método.")
+        if chave_pix != usuario.chave_pix:
+            raise HTTPException(
+                status_code=401, 
+                detail="Saque negado: A chave PIX deve pertencer obrigatoriamente à mesma titularidade da conta."
+            )
+    elif dados.metodo == "especie":
+        if not dados.parceiro_id:
+            raise HTTPException(status_code=400, detail="Parceiro obrigatório para saque em espécie.")
+        parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
+        if not parceiro:
+            raise HTTPException(status_code=404, detail="Parceiro não encontrado ou inativo.")
 
     # NOVO: Validação OBRIGATÓRIA de Senha e 2FA
     if not verify_password(dados.senha, usuario.senha_hash):
@@ -86,22 +100,25 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
                 detail=f"Saque Bloqueado: Por medida de segurança, após alterar o 2FA, os saques ficam suspensos por 48 horas. Tente novamente em aproximadamente {int(horas_restantes)} horas."
             )
 
-    # Regra: 1º saque do dia grátis, demais R$ 5,00
-    hoje = datetime.datetime.now(TZ_BRASILIA).date()
-    inicio_dia = datetime.datetime.combine(hoje, datetime.time.min).replace(tzinfo=TZ_BRASILIA)
-    
-    saques_hoje = db.query(Transacao).filter(
-        Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.SAQUE,
-        Transacao.data_criacao >= inicio_dia
-    ).count()
-
+    # Regra: Isento se saldo_caixa >= 100
+    # Senão: 1º saque do dia grátis, demais R$ 5,00
     taxa = Decimal("0.00")
-    if saques_hoje >= 1:
-        taxa = Decimal("5.00")
-        if usuario.saldo < (valor + taxa):
-            raise HTTPException(status_code=400, detail=f"Saldo insuficiente para saque + taxa de R$ {taxa} (você já realizou {saques_hoje} saque(s) hoje).")
+    
+    if usuario.saldo_caixa < Decimal("100.00"):
+        hoje = datetime.datetime.now(TZ_BRASILIA).date()
+        inicio_dia = datetime.datetime.combine(hoje, datetime.time.min).replace(tzinfo=TZ_BRASILIA)
+        
+        saques_hoje = db.query(Transacao).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo == TipoTransacao.SAQUE,
+            Transacao.data_criacao >= inicio_dia
+        ).count()
 
+        if saques_hoje >= 1:
+            taxa = Decimal("5.00")
+            if usuario.saldo < (valor + taxa):
+                raise HTTPException(status_code=400, detail=f"Saldo insuficiente para saque + taxa de R$ {taxa}.")
+    
     # Deduzir valor e taxa imediatamente
     usuario.saldo -= (valor + taxa)
     
@@ -111,7 +128,9 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
         valor=valor,
         tipo=TipoTransacao.SAQUE,
         status="pendente",
-        detalhes=f"Solicitação de saque para chave PIX: {chave_pix}"
+        metodo=dados.metodo,
+        parceiro_id=dados.parceiro_id if dados.metodo == "especie" else None,
+        detalhes=f"Saque via {dados.metodo.upper()}" + (f" (Parceiro ID: {dados.parceiro_id})" if dados.metodo == "especie" else f" para PIX: {chave_pix}")
     )
     db.add(nova_transacao)
 
@@ -227,16 +246,54 @@ async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session
 async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     valor = dados.valor
     
+    if dados.metodo == "especie":
+        if not dados.parceiro_id:
+            raise HTTPException(status_code=400, detail="Parceiro obrigatório para depósito em espécie.")
+        parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
+        if not parceiro:
+            raise HTTPException(status_code=404, detail="Parceiro não encontrado ou inativo.")
+
     nova_transacao = Transacao(
         usuario_id=usuario.id,
         valor=valor,
         tipo=TipoTransacao.DEPOSITO,
         status="pendente",
-        detalhes="Notificação de depósito manual via PIX"
+        metodo=dados.metodo,
+        parceiro_id=dados.parceiro_id if dados.metodo == "especie" else None,
+        detalhes=f"Notificação de depósito via {dados.metodo.upper()}" + (f" (Parceiro ID: {dados.parceiro_id})" if dados.metodo == "especie" else "")
     )
     db.add(nova_transacao)
     db.commit()
-    return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar o Pix."}
+    return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar."}
+
+# --- Gestão de Parceiros (Admin) ---
+
+@router.get("/admin/parceiros")
+async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    return db.query(Parceiro).order_by(Parceiro.nome).all()
+
+class ParceiroCreate(BaseModel):
+    nome: str
+    endereco: str
+
+@router.post("/admin/parceiros")
+async def criar_parceiro(dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco)
+    db.add(parceiro)
+    db.commit()
+    return {"message": "Parceiro cadastrado com sucesso!"}
+
+@router.put("/admin/parceiros/{id}")
+async def editar_parceiro(id: int, dados: ParceiroCreate, is_active: bool = True, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    parceiro = db.query(Parceiro).filter(Parceiro.id == id).first()
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
+    
+    parceiro.nome = dados.nome
+    parceiro.endereco = dados.endereco
+    parceiro.is_active = is_active
+    db.commit()
+    return {"message": "Parceiro atualizado!"}
 
 @router.get("/admin/pendentes")
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):

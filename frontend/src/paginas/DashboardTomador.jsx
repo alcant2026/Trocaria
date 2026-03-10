@@ -127,7 +127,14 @@ const DashboardTomador = () => {
 
     // Forms state
     const [valorNotificacao, setValorNotificacao] = useState('');
+    const [metodoDeposito, setMetodoDeposito] = useState('pix');
+    const [parceiroIdDeposito, setParceiroIdDeposito] = useState('');
+    const [parceiros, setParceiros] = useState([]);
+
     const [valorSaque, setValorSaque] = useState('');
+    const [metodoSaque, setMetodoSaque] = useState('pix');
+    const [parceiroIdSaque, setParceiroIdSaque] = useState('');
+
     const [valor, setValor] = useState('');
     const [taxa, setTaxa] = useState('');
     const [parcelas, setParcelas] = useState(1);
@@ -185,6 +192,10 @@ const DashboardTomador = () => {
             if (res.historico) {
                 setHistorico(res.historico);
             }
+            
+            // Carregar parceiros
+            const resParceiros = await api.get('/financeiro/admin/parceiros');
+            setParceiros(resParceiros || []);
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
         }
@@ -307,14 +318,23 @@ const DashboardTomador = () => {
             showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
             return;
         }
+        if (metodoDeposito === 'especie' && !parceiroIdDeposito) {
+            showModal({ title: 'Parceiro Obrigatório', message: 'Selecione o estabelecimento para o depósito.', type: 'warning' });
+            return;
+        }
         try {
-            await api.post('/financeiro/notificar-deposito', { valor: v });
-            setMensagem('Notificação enviada! O administrador creditará seu saldo em breve.');
+            await api.post('/financeiro/notificar-deposito', { 
+                valor: v,
+                metodo: metodoDeposito,
+                parceiro_id: metodoDeposito === 'especie' ? parseInt(parceiroIdDeposito) : null
+            });
+            setMensagem('Notificação enviada!');
             setValorNotificacao('');
+            setParceiroIdDeposito('');
             carregarSnapshot();
             setActiveView('home');
         } catch (err) {
-            setMensagem('Erro ao notificar: ' + err.message);
+            setMensagem('Erro: ' + err.message);
         }
     };
 
@@ -328,10 +348,16 @@ const DashboardTomador = () => {
             setMensagem('Erro: O valor de saque deve ser maior que zero.');
             return;
         }
+        if (metodoSaque === 'especie' && !parceiroIdSaque) {
+            setMensagem('Erro: Selecione o parceiro para o saque.');
+            return;
+        }
         try {
             await api.post('/financeiro/solicitar-saque', {
                 valor: v,
-                chave_pix: usuario.chave_pix,
+                metodo: metodoSaque,
+                parceiro_id: metodoSaque === 'especie' ? parseInt(parceiroIdSaque) : null,
+                chave_pix: metodoSaque === 'pix' ? usuario.chave_pix : "",
                 senha: senhaSaque,
                 codigo_2fa: codigo2faSaque
             });
@@ -339,10 +365,11 @@ const DashboardTomador = () => {
             setValorSaque('');
             setSenhaSaque('');
             setCodigo2faSaque('');
+            setParceiroIdSaque('');
             setActiveView('home');
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro ao solicitar saque: ' + err.message);
+            setMensagem('Erro: ' + err.message);
         }
     };
 
@@ -715,30 +742,68 @@ const DashboardTomador = () => {
                 activeView === 'depositar' && (
                     <div className="card">
                         <h2 className="mb-1">Adicionar Saldo</h2>
-                        <p className="mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
-                        <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
-                            <div className="info-label">Chave PIX (E-mail)</div>
-                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                91980177874
-                                <button
-                                    onClick={copiarPix}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        transition: 'var(--transition)'
-                                    }}
-                                    title="Copiar chave PIX"
-                                >
-                                    {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
-                                </button>
-                            </div>
-                            {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
+                            <button
+                                className={`btn ${metodoDeposito === 'pix' ? 'btn-primary' : 'btn-outline'}`}
+                                style={{ flex: 1, padding: '0.6rem' }}
+                                onClick={() => setMetodoDeposito('pix')}
+                            >
+                                Via PIX
+                            </button>
+                            <button
+                                className={`btn ${metodoDeposito === 'especie' ? 'btn-primary' : 'btn-outline'}`}
+                                style={{ flex: 1, padding: '0.6rem' }}
+                                onClick={() => setMetodoDeposito('especie')}
+                            >
+                                Em Espécie
+                            </button>
                         </div>
+
+                        {metodoDeposito === 'pix' ? (
+                            <>
+                                <p className="mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
+                                <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
+                                    <div className="info-label">Chave PIX (E-mail)</div>
+                                    <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                        91980177874
+                                        <button
+                                            onClick={copiarPix}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                padding: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                transition: 'var(--transition)'
+                                            }}
+                                            title="Copiar chave PIX"
+                                        >
+                                            {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                                        </button>
+                                    </div>
+                                    {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="input-group">
+                                <label>Escolha o Estabelecimento Parceiro</label>
+                                <select
+                                    className="input-field"
+                                    value={parceiroIdDeposito}
+                                    onChange={(e) => setParceiroIdDeposito(e.target.value)}
+                                    style={{ marginBottom: '1rem' }}
+                                >
+                                    <option value="">Selecione um local...</option>
+                                    {parceiros.map(p => (
+                                        <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                    ))}
+                                </select>
+                                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <input
@@ -777,55 +842,105 @@ const DashboardTomador = () => {
                                 </div>
                             </div>
                         ) : (
-                            <>
-                                <p className="mb-1">O valor será enviado para sua chave PIX cadastrada: <br /><strong>{usuario.chave_pix}</strong></p>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '1.5rem' }}>
-                                    <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Valor do Saque</label>
-                                        <input
-                                            type="number"
-                                            className="input-field"
-                                            placeholder="R$ 0,00"
-                                            value={valorSaque}
-                                            min="0.01"
-                                            step="0.01"
-                                            onChange={(e) => setValorSaque(e.target.value)}
-                                            style={{ textAlign: 'center' }}
-                                        />
-                                    </div>
-
-                                    <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sua Senha de Acesso</label>
-                                        <input
-                                            type="password"
-                                            className="input-field"
-                                            placeholder="••••••••"
-                                            value={senhaSaque}
-                                            onChange={(e) => setSenhaSaque(e.target.value)}
-                                            style={{ textAlign: 'center' }}
-                                        />
-                                    </div>
-
-                                    <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Código 2FA (Authenticator)</label>
-                                        <input
-                                            type="text"
-                                            className="input-field"
-                                            placeholder="000 000"
-                                            maxLength={6}
-                                            value={codigo2faSaque}
-                                            onChange={(e) => setCodigo2faSaque(e.target.value)}
-                                            style={{ textAlign: 'center', letterSpacing: '2px' }}
-                                        />
-                                    </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+                                    <button
+                                        className={`btn ${metodoSaque === 'pix' ? 'btn-primary' : 'btn-outline'}`}
+                                        style={{ flex: 1, padding: '0.6rem' }}
+                                        onClick={() => setMetodoSaque('pix')}
+                                    >
+                                        Via PIX
+                                    </button>
+                                    <button
+                                        className={`btn ${metodoSaque === 'especie' ? 'btn-primary' : 'btn-outline'}`}
+                                        style={{ flex: 1, padding: '0.6rem' }}
+                                        onClick={() => setMetodoSaque('especie')}
+                                    >
+                                        Em Espécie
+                                    </button>
                                 </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '2rem' }}>
-                                    <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
-                                    <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                                {metodoSaque === 'pix' ? (
+                                    <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                                        O valor será enviado para sua chave PIX: <strong>{usuario.chave_pix}</strong>
+                                    </p>
+                                ) : (
+                                    <div className="input-group">
+                                        <label>Selecione o Parceiro para Retirada</label>
+                                        <select
+                                            className="input-field"
+                                            value={parceiroIdSaque}
+                                            onChange={(e) => setParceiroIdSaque(e.target.value)}
+                                        >
+                                            <option value="">Selecione um local...</option>
+                                            {parceiros.map(p => (
+                                                <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="input-group">
+                                    <label>Quanto deseja sacar?</label>
+                                    <input
+                                        type="number"
+                                        className="input-field"
+                                        placeholder="Valor R$ 0,00"
+                                        min="0.01"
+                                        step="0.01"
+                                        value={valorSaque}
+                                        onChange={(e) => setValorSaque(e.target.value)}
+                                        style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
+                                    />
                                 </div>
-                            </>
+
+                                {/* Regra de Taxa Dinâmica */}
+                                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                    <div className="flex-between" style={{ marginBottom: '4px' }}>
+                                        <span className="text-muted" style={{ fontSize: '0.85rem' }}>Taxa de Saque:</span>
+                                        <span style={{ fontWeight: 700, color: usuario.saldo_caixa >= 100 ? 'var(--success)' : 'var(--text-main)' }}>
+                                            {usuario.saldo_caixa >= 100 ? 'R$ 0,00 (ISENTO)' : 'R$ 5,00'}
+                                        </span>
+                                    </div>
+                                    <div className="flex-between" style={{ color: 'var(--success)', fontWeight: 800 }}>
+                                        <span>Você Receberá:</span>
+                                        <span>
+                                            R$ {Math.max(0, parseFloat(valorSaque || 0) - (usuario.saldo_caixa >= 100 ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    {usuario.saldo_caixa >= 100 ? (
+                                        <p style={{ fontSize: '0.65rem', color: 'var(--success)', marginTop: '8px', borderTop: '1px solid rgba(0,230,118,0.1)', paddingTop: '8px' }}>
+                                            ✨ Benefício Pool: Você possui R$ {usuario.saldo_caixa.toLocaleString('pt-BR')} investidos e não paga taxa de saque!
+                                        </p>
+                                    ) : (
+                                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                            Dica: Invista R$ 100 no Pool para ter saques ilimitados sem taxas.
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="grid-2" style={{ gap: '10px' }}>
+                                    <input
+                                        type="password"
+                                        className="input-field"
+                                        placeholder="Sua Senha"
+                                        value={senhaSaque}
+                                        onChange={(e) => setSenhaSaque(e.target.value)}
+                                    />
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Código 2FA"
+                                        value={codigo2faSaque}
+                                        onChange={(e) => setCodigo2faSaque(e.target.value)}
+                                    />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 )

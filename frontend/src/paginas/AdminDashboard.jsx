@@ -16,7 +16,11 @@ import {
     AlertCircle,
     Undo2,
     Copy,
-    Check
+    Check,
+    Store,
+    Plus,
+    Trash2,
+    MapPin
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -377,6 +381,143 @@ const ReinvestimentoPoolCard = ({ onMensagem, lucroDisponivel, meuSaldoPool, luc
                         {loading ? 'Processando...' : `Confirmar ${tipo === 'reinvestir' ? 'Reinvestimento' : 'Resgate Próprio'}`}
                     </button>
                 </form>
+            )}
+        </div>
+    );
+};
+// Componente de Gestão de Parceiros (Estabelecimentos para Depósito/Saque em Espécie)
+const GerenciarParceirosCard = ({ onMensagem }) => {
+    const [parceiros, setParceiros] = useState([]);
+    const [nome, setNome] = useState('');
+    const [endereco, setEndereco] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [aberto, setAberto] = useState(false);
+
+    const carregarParceiros = async () => {
+        try {
+            const res = await api.get('/financeiro/admin/parceiros');
+            setParceiros(res || []);
+        } catch (err) {
+            console.error('Erro ao carregar parceiros:', err);
+        }
+    };
+
+    useEffect(() => {
+        if (aberto) carregarParceiros();
+    }, [aberto]);
+
+    const handleAdicionar = async (e) => {
+        e.preventDefault();
+        if (!nome || !endereco) return alert('Preencha nome e endereço.');
+        setLoading(true);
+        try {
+            await api.post('/financeiro/admin/parceiros', { nome, endereco });
+            onMensagem('Parceiro adicionado com sucesso!');
+            setNome('');
+            setEndereco('');
+            carregarParceiros();
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggleAtivo = async (p) => {
+        try {
+            await api.put(`/financeiro/admin/parceiros/${p.id}`, { 
+                nome: p.nome, 
+                endereco: p.endereco, 
+                ativo: !p.ativo 
+            });
+            carregarParceiros();
+        } catch (err) {
+            onMensagem('Erro: ' + err.message);
+        }
+    };
+
+    return (
+        <div className="card mb-1" style={{ borderLeft: '4px solid var(--primary-low)' }}>
+            <div className="flex-between">
+                <div>
+                    <h3 style={{ color: 'var(--text-main)' }}>🏪 Parceiros (Espécie)</h3>
+                    <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                        Gerencie locais para depósitos e saques presenciais.
+                    </p>
+                </div>
+                <button
+                    className={`btn ${aberto ? 'btn-outline' : 'btn-primary'}`}
+                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
+                    onClick={() => setAberto(!aberto)}
+                >
+                    {aberto ? 'Fechar' : 'Gerenciar'}
+                </button>
+            </div>
+
+            {aberto && (
+                <div style={{ marginTop: '1.2rem' }}>
+                    <form onSubmit={handleAdicionar} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)' }}>Novo Parceiro</p>
+                        <div className="grid-2" style={{ gap: '10px' }}>
+                            <input 
+                                type="text" 
+                                placeholder="Nome do Estabelecimento" 
+                                className="input-field" 
+                                value={nome} 
+                                onChange={e => setNome(e.target.value)}
+                                style={{ fontSize: '0.85rem' }}
+                            />
+                            <input 
+                                type="text" 
+                                placeholder="Endereço Completo" 
+                                className="input-field" 
+                                value={endereco} 
+                                onChange={e => setEndereco(e.target.value)}
+                                style={{ fontSize: '0.85rem' }}
+                            />
+                        </div>
+                        <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontSize: '0.8rem' }} disabled={loading}>
+                            <Plus size={16} /> {loading ? 'Adicionando...' : 'Adicionar Local'}
+                        </button>
+                    </form>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {parceiros.length === 0 ? (
+                            <p className="text-muted text-center" style={{ fontSize: '0.8rem' }}>Nenhum parceiro cadastrado.</p>
+                        ) : (
+                            parceiros.map(p => (
+                                <div key={p.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ padding: '8px', background: p.ativo ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                            <Store size={18} color={p.ativo ? 'var(--success)' : 'var(--text-muted)'} />
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: '0.9rem', fontWeight: 600, color: p.ativo ? 'var(--text-main)' : 'var(--text-muted)' }}>{p.nome}</p>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <MapPin size={12} /> {p.endereco}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleToggleAtivo(p)}
+                                        style={{ 
+                                            padding: '4px 10px', 
+                                            borderRadius: '6px', 
+                                            border: '1px solid var(--border-color)', 
+                                            background: p.ativo ? 'rgba(0,230,118,0.05)' : 'transparent',
+                                            color: p.ativo ? 'var(--success)' : 'var(--text-muted)',
+                                            fontSize: '0.7rem',
+                                            cursor: 'pointer',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {p.ativo ? 'ATIVO' : 'INATIVO'}
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -1021,6 +1162,9 @@ const AdminDashboard = () => {
                                     lucroDisponivel={fiscal.lucro_disponivel}
                                     meuSaldoPool={fiscal.meu_saldo_pool}
                                     lucroAcumuladoPool={fiscal.lucro_acumulado_pool}
+                                />
+                                <GerenciarParceirosCard
+                                    onMensagem={(m) => setMensagem(m)}
                                 />
                             </div>
                         </div>

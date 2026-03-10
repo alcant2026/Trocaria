@@ -151,12 +151,25 @@ class Transacao(Base):
     status = Column(String, default="pendente", index=True) # pendente, concluido, falhou
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
-    # Para saques, armazenar a chave pix usada no momento
+    # Para saques/depósitos, armazenar a chave pix ou ID do parceiro
     detalhes = Column(String, nullable=True) 
+    metodo = Column(String, default="pix") # pix, especie
+    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
+    
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="transacoes")
+    parceiro = relationship("Parceiro")
+
+class Parceiro(Base):
+    __tablename__ = "parceiros"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    endereco = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
 
 class GarantiaSocial(Base):
     __tablename__ = "garantias_sociais"

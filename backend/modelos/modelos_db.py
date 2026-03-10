@@ -183,6 +183,8 @@ class GarantiaSocial(Base):
 
     auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="garantias_sociais")
+    garante = relationship("Usuario", back_populates="garantias_prestadas")
+
 class LinkAfiliado(Base):
     __tablename__ = "links_afiliados"
 

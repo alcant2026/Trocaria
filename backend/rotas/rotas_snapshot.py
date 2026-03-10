@@ -102,7 +102,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 TipoTransacao.RETORNO_INVESTIMENTO
             ]
 
-            saldo_usuarios = db.query(func.sum(Usuario.saldo)).scalar() or Decimal("0.00")
+            # Soma de saldos de usuários REAIS (Exclui conta de sistema 000PL)
+            saldo_usuarios = db.query(func.sum(Usuario.saldo)).filter(Usuario.id != "000PL").scalar() or Decimal("0.00")
             total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido"

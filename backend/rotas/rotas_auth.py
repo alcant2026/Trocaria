@@ -214,7 +214,7 @@ async def exigir_admin(usuario: Usuario = Depends(obter_usuario_logado)):
     return usuario
 
 class LoginUsuario(BaseModel):
-    email: EmailStr
+    cpf: str
     senha: str
 
 def verify_password(plain_password, hashed_password):
@@ -235,15 +235,18 @@ def create_access_token(data: dict):
 @router.post("/login")
 @limiter.limit("5/minute")
 async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get_db)):
+    # Normalizar CPF (remover pontos e traços)
+    cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
+    
     usuario = db.query(Usuario).filter(
-        Usuario.email == dados.email,
+        Usuario.cpf == cpf_limpo,
         Usuario.is_active == True
     ).first()
     
     if not usuario or not verify_password(dados.senha, usuario.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos."
+            detail="CPF ou senha incorretos."
         )
 
     access_token = create_access_token(data={"sub": str(usuario.id)})

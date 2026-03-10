@@ -276,6 +276,11 @@ class ParceiroCreate(BaseModel):
     nome: str
     endereco: str
 
+class ParceiroUpdate(BaseModel):
+    nome: str
+    endereco: str
+    ativo: bool = True
+
 @router.post("/admin/parceiros")
 async def criar_parceiro(dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco)
@@ -284,14 +289,14 @@ async def criar_parceiro(dados: ParceiroCreate, db: Session = Depends(get_db), a
     return {"message": "Parceiro cadastrado com sucesso!"}
 
 @router.put("/admin/parceiros/{id}")
-async def editar_parceiro(id: int, dados: ParceiroCreate, is_active: bool = True, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+async def editar_parceiro(id: int, dados: ParceiroUpdate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = db.query(Parceiro).filter(Parceiro.id == id).first()
     if not parceiro:
         raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
     
     parceiro.nome = dados.nome
     parceiro.endereco = dados.endereco
-    parceiro.is_active = is_active
+    parceiro.is_active = dados.ativo
     db.commit()
     return {"message": "Parceiro atualizado!"}
 

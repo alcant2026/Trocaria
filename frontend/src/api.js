@@ -37,6 +37,8 @@ const api = {
     get: (endpoint) => api.request(endpoint, { method: 'GET' }),
     getBlob: (endpoint) => api.request(endpoint, { method: 'GET', isBlob: true }),
     post: (endpoint, body) => api.request(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+    put: (endpoint, body) => api.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
+    delete: (endpoint) => api.request(endpoint, { method: 'DELETE' }),
 };
 
 export default api;

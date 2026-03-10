@@ -5,7 +5,7 @@ import DashboardTomador from './paginas/DashboardTomador';
 import DashboardInvestidor from './paginas/DashboardInvestidor';
 import AdminDashboard from './paginas/AdminDashboard';
 import Seguranca from './paginas/Seguranca';
-import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield } from 'lucide-react';
+import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield, ShoppingBag } from 'lucide-react';
 import './index.css';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 
@@ -128,6 +128,9 @@ const App = () => {
                         <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <TrendingUp size={20} /> Investimentos
                         </a>
+                        <a href="#loja" className={`nav-item ${page === 'loja' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                            <ShoppingBag size={20} /> Loja
+                        </a>
                         {user.is_admin && (
                             <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                                 <Settings size={20} /> Admin
@@ -185,9 +188,10 @@ const App = () => {
                 {page === 'login' && <div className="card text-center"><h2>Você está logado.</h2><button className="btn btn-primary" onClick={() => window.location.hash = 'tomador'}>Ir para o Início</button></div>}
                 {page === 'tomador' && <DashboardTomador />}
                 {page === 'investidor' && <DashboardInvestidor />}
+                {page === 'loja' && <DashboardTomador initialView="loja" />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'seguranca' && <Seguranca />}
-                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca'].includes(page)) && <DashboardTomador />}
+                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca', 'loja'].includes(page)) && <DashboardTomador />}
             </main>
             {/* Modal de Exclusão Crítica */}
             {modalExcluir && (

@@ -1030,7 +1030,7 @@ const AdminDashboard = () => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'}`}>
+                <div className={`alert ${mensagem?.toLowerCase()?.includes('erro') ? 'alert-danger' : 'alert-success'}`}>
                     <span>{mensagem}</span>
                     <button onClick={() => setMensagem('')} className="alert-close">✕</button>
                 </div>
@@ -1186,7 +1186,7 @@ const AdminDashboard = () => {
                                         <div className="mt-1 p-1" style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                             <p className="info-label mb-1">Comprovante/Detalhes:</p>
                                             <p style={{ fontSize: '0.8rem', wordBreak: 'break-all' }}>
-                                                {p.detalhes.includes('http') ? (
+                                                {p.detalhes?.includes('http') ? (
                                                     <>
                                                         <span style={{ display: 'block', marginBottom: '4px' }}>{p.detalhes.split('http')[0]}</span>
                                                         <a

@@ -27,7 +27,6 @@ import {
     ArrowLeft,
     ShoppingBag,
     ChevronLeft,
-    ChevronRight,
     ExternalLink
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
@@ -212,10 +211,10 @@ const LojaAfiliados = ({ onMensagem }) => {
     );
 };
 
-const DashboardTomador = () => {
+const DashboardTomador = ({ initialView = 'home' }) => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
     const [meusEmprestimos, setMeusEmprestimos] = useState([]);
-    const [activeView, setActiveView] = useState('home'); // 'home', 'solicitar', 'depositar', 'saque', 'score'
+    const [activeView, setActiveView] = useState(initialView); // 'home', 'solicitar', 'depositar', 'saque', 'score', 'loja'
     const [verSaldo, setVerSaldo] = useState(true);
     const [aceiteTermos, setAceiteTermos] = useState(false);
     const [showTermos, setShowTermos] = useState(false);
@@ -623,7 +622,7 @@ const DashboardTomador = () => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} `}>
+                <div className={`alert ${mensagem.toLowerCase()?.includes('erro') ? 'alert-danger' : 'alert-success'} `}>
                     <span>{mensagem}</span>
                     <button onClick={() => setMensagem('')} className="alert-close">✕</button>
                 </div>

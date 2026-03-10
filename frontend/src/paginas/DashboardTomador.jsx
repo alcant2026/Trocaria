@@ -168,10 +168,22 @@ const LojaAfiliados = ({ onMensagem }) => {
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <h4 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome_produto}</h4>
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    Ver produto na loja <ExternalLink size={12} />
+                                    Oferta disponível <ExternalLink size={12} />
                                 </p>
                             </div>
-                            <ChevronRight size={20} color="var(--text-muted)" />
+                            <button 
+                                className="btn btn-primary" 
+                                style={{ 
+                                    width: 'auto', 
+                                    padding: '6px 15px', 
+                                    fontSize: '0.75rem', 
+                                    background: '#ff4d00', 
+                                    borderColor: '#ff4d00',
+                                    borderRadius: '8px'
+                                }}
+                            >
+                                Comprar Agora
+                            </button>
                         </a>
                     ))}
 

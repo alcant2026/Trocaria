@@ -35,13 +35,31 @@ const Login = ({ onLogin }) => {
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="input-group">
-                            <label>CPF</label>
-                            <input type="text" placeholder="Seu CPF (000.000.000-00)" value={cpf} onChange={(e) => setCpf(e.target.value)} className="input-field" required />
+                            <label htmlFor="cpf">CPF</label>
+                            <input 
+                                id="cpf"
+                                name="cpf"
+                                type="text" 
+                                placeholder="Seu CPF (000.000.000-00)" 
+                                value={cpf} 
+                                onChange={(e) => setCpf(e.target.value)} 
+                                className="input-field" 
+                                required 
+                            />
                         </div>
 
                         <div className="input-group">
-                            <label>Senha</label>
-                            <input type="password" placeholder="Sua senha secreta" value={senha} onChange={(e) => setSenha(e.target.value)} className="input-field" required />
+                            <label htmlFor="senha">Senha</label>
+                            <input 
+                                id="senha"
+                                name="senha"
+                                type="password" 
+                                placeholder="Sua senha secreta" 
+                                value={senha} 
+                                onChange={(e) => setSenha(e.target.value)} 
+                                className="input-field" 
+                                required 
+                            />
                         </div>
 
                         <button type="submit" className="btn btn-primary mt-1">Entrar</button>

@@ -40,6 +40,7 @@ const Login = ({ onLogin }) => {
                                 id="cpf"
                                 name="cpf"
                                 type="text" 
+                                autoComplete="username"
                                 placeholder="Seu CPF (000.000.000-00)" 
                                 value={cpf} 
                                 onChange={(e) => setCpf(e.target.value)} 
@@ -54,6 +55,7 @@ const Login = ({ onLogin }) => {
                                 id="senha"
                                 name="senha"
                                 type="password" 
+                                autoComplete="current-password"
                                 placeholder="Sua senha secreta" 
                                 value={senha} 
                                 onChange={(e) => setSenha(e.target.value)} 
@@ -64,7 +66,11 @@ const Login = ({ onLogin }) => {
 
                         <button type="submit" className="btn btn-primary mt-1">Entrar</button>
 
-                        {mensagem && <p className="text-danger text-center mt-1" style={{ fontSize: '0.875rem' }}>{mensagem}</p>}
+                        {mensagem && (
+                             <div className="alert alert-danger mt-1">
+                                 {mensagem}
+                             </div>
+                        )}
                     </form>
                 </div>
 

@@ -27,16 +27,29 @@ import {
     ArrowLeft,
     ShoppingBag,
     ChevronLeft,
-    ExternalLink
+    ExternalLink,
+    Home,
+    CreditCard,
+    Coins,
+    Gem,
+    XCircle,
+    Timer,
+    CheckCircle,
+    Bell,
+    RefreshCw,
+    ArrowDown,
+    Store
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
+import CaixaParceiro from './CaixaParceiro';
+import LojaAfiliados from '../componentes/LojaAfiliados';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
         if (!isoDate) return null;
         const diff = new Date(isoDate + 'Z') - new Date();
-        if (diff <= 0) return '⏰ Expirado';
+        if (diff <= 0) return 'Expirado';
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
@@ -82,12 +95,13 @@ const TIPOS_LABEL = {
     taxa_conveniencia: 'Taxa de Conveniência',
     pagamento_parcela: 'Pagamento de Parcela',
     taxa_postagem: 'Taxa de Postagem',
+    comissao_parceiro: 'Comissão Recebida',
 };
 
 // Tipos que são saídas do tipo "taxa/pagamento"
 const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela']);
 // Tipos que são entradas (positivos)
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro']);
 // Todos os tipos negativos (sem badge CONCLUIDO)
 const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem']);
 
@@ -101,115 +115,6 @@ const formatarTipo = (tipo, detalhes) => {
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
-const LojaAfiliados = ({ onMensagem }) => {
-    const [itens, setItens] = useState([]);
-    const [pagina, setPagina] = useState(1);
-    const [totalPaginas, setTotalPaginas] = useState(1);
-    const [loading, setLoading] = useState(false);
-
-    const carregarLoja = async (p = 1) => {
-        setLoading(true);
-        try {
-            const data = await api.get(`/financeiro/loja/itens?pagina=${p}`);
-            setItens(data.itens);
-            setTotalPaginas(data.paginas);
-            setPagina(data.pagina_atual);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        carregarLoja(pagina);
-    }, [pagina]);
-
-    return (
-        <div className="animate-fade-in">
-            <div className="flex-between mb-1">
-                <div>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <ShoppingBag size={20} color="var(--primary)" /> Loja de Ofertas
-                    </h3>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Produtos selecionados da Shopee, Mercado Livre e muito mais!</p>
-                </div>
-            </div>
-
-            {loading ? (
-                <div className="card text-center py-2">Carregando ofertas...</div>
-            ) : itens.length === 0 ? (
-                <div className="card text-center text-muted py-2">Nenhuma oferta disponível no momento.</div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {itens.map(item => (
-                        <a 
-                            key={item.id} 
-                            href={item.url_afiliado} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="card card-interactive"
-                            style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '15px', 
-                                textDecoration: 'none',
-                                borderLeft: '4px solid #ff4d00'
-                            }}
-                        >
-                            <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {item.url_imagem ? (
-                                    <img src={item.url_imagem} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (
-                                    <ShoppingBag size={24} color="#ff4d00" />
-                                )}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <h4 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome_produto}</h4>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    Oferta disponível <ExternalLink size={12} />
-                                </p>
-                            </div>
-                            <button 
-                                className="btn btn-primary" 
-                                style={{ 
-                                    width: 'auto', 
-                                    padding: '6px 15px', 
-                                    fontSize: '0.75rem', 
-                                    background: '#ff4d00', 
-                                    borderColor: '#ff4d00',
-                                    borderRadius: '8px'
-                                }}
-                            >
-                                Comprar Agora
-                            </button>
-                        </a>
-                    ))}
-
-                    {totalPaginas > 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '1rem', padding: '10px' }}>
-                            <button 
-                                disabled={pagina === 1}
-                                onClick={() => setPagina(pagina - 1)}
-                                style={{ background: 'transparent', border: 'none', color: pagina === 1 ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === 1 ? 'default' : 'pointer' }}
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{pagina} / {totalPaginas}</span>
-                            <button 
-                                disabled={pagina === totalPaginas}
-                                onClick={() => setPagina(pagina + 1)}
-                                style={{ background: 'transparent', border: 'none', color: pagina === totalPaginas ? 'var(--text-muted)' : 'var(--primary)', cursor: pagina === totalPaginas ? 'default' : 'pointer' }}
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
 
 const DashboardTomador = ({ initialView = 'home' }) => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
@@ -622,8 +527,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${mensagem.toLowerCase()?.includes('erro') ? 'alert-danger' : 'alert-success'} `}>
-                    <span>{mensagem}</span>
+                <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} `}>
+                    <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
                     <button onClick={() => setMensagem('')} className="alert-close">✕</button>
                 </div>
             )}
@@ -649,8 +554,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>R$ {p.valor.toLocaleString('pt-BR')}</p>
                                         </div>
                                         <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button onClick={() => handleAceitarGarantia(p.solicitacao_id)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)', borderColor: 'var(--success)', width: 'auto' }}>Aceitar</button>
-                                            <button onClick={() => handleRejeitarGarantia(p.solicitacao_id)} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--danger)', borderColor: 'var(--danger)', width: 'auto' }}>Recusar</button>
+                                            <button onClick={() => handleAceitarGarantia(p.solicitacao_id)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)' }}>Aceitar</button>
+                                            <button onClick={() => handleRejeitarGarantia(p.solicitacao_id)} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--danger)' }}>Recusar</button>
                                         </div>
                                     </div>
                                 ))}
@@ -736,9 +641,15 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     <span>Upgrade</span>
                 </div>
                 <div className="action-btn" onClick={() => setActiveView('loja')}>
-                    <ShoppingBag size={28} color="#ff4d00" />
+                    <ShoppingBag size={28} color="var(--primary)" />
                     <span>Loja</span>
                 </div>
+                {usuario.is_parceiro && (
+                    <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
+                        <Store size={28} color="var(--warning)" />
+                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+                    </div>
+                )}
             </div>
 
             {/* View Switcher Content */}
@@ -834,11 +745,11 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                             </label>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                            <button type="submit" className="btn btn-primary" style={{ width: 'auto', minWidth: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: aceiteTermos ? 1 : 0.4, cursor: aceiteTermos ? 'pointer' : 'not-allowed' }} disabled={!aceiteTermos}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
+                            <button type="submit" className="btn btn-primary" style={{ opacity: aceiteTermos ? 1 : 0.4, cursor: aceiteTermos ? 'pointer' : 'not-allowed' }} disabled={!aceiteTermos}>
                                 <Gift size={18} /> Criar Pedido de Empréstimo
                             </button>
-                            <button type="button" className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
                     </form>
                 </div >
@@ -850,6 +761,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
                 </div>
+            )}
+            {activeView === 'caixa' && (
+                <CaixaParceiro onBack={() => setActiveView('home')} setMensagem={setMensagem} usuario={usuario} onUpdate={carregarSnapshot} />
             )}
 
             {/* Modal de Termos de Uso */}
@@ -915,6 +829,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                             <div className="input-group">
                                 <label>Escolha o Estabelecimento Parceiro</label>
                                 <select
+                                    name="parceiro_deposito"
+                                    id="parceiro_deposito"
                                     className="input-field"
                                     value={parceiroIdDeposito}
                                     onChange={(e) => setParceiroIdDeposito(e.target.value)}
@@ -931,21 +847,26 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    placeholder="Valor do Depósito R$"
-                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                    value={valorNotificacao}
-                                    min="0.01"
-                                    step="0.01"
-                                    onChange={(e) => setValorNotificacao(e.target.value)}
-                                />
+                                        <input
+                                            type="number"
+                                            name="valor_deposito_tomador"
+                                            id="valor_deposito_tomador"
+                                            autoComplete="off"
+                                            className="input-field"
+                                            placeholder="Valor do Depósito R$"
+                                        style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
+                                        value={valorNotificacao}
+                                        min="0.01"
+                                        step="0.01"
+                                        onChange={(e) => setValorNotificacao(e.target.value)}
+                                    />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleNotificarDeposito}>Informar Depósito</button>
-                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
+                            <button className="btn btn-primary" onClick={handleNotificarDeposito}>
+                                <Check size={18} /> Já realizei o Pagamento
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
                     </div>
                 )
@@ -993,6 +914,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     <div className="input-group">
                                         <label>Selecione o Parceiro para Retirada</label>
                                         <select
+                                            name="parceiro_saque_tomador"
+                                            id="parceiro_saque_tomador"
                                             className="input-field"
                                             value={parceiroIdSaque}
                                             onChange={(e) => setParceiroIdSaque(e.target.value)}
@@ -1009,6 +932,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     <label>Quanto deseja sacar?</label>
                                     <input
                                         type="number"
+                                        name="valor_saque_v1_tomador"
+                                        id="valor_saque_v1_tomador"
+                                        autoComplete="off"
                                         className="input-field"
                                         placeholder="Valor R$ 0,00"
                                         min="0.01"
@@ -1017,6 +943,11 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                         onChange={(e) => setValorSaque(e.target.value)}
                                         style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
                                     />
+                                    {parseFloat(valorSaque) > usuario.saldo && (
+                                        <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
+                                            ⚠️ Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Regra de Taxa Dinâmica */}
@@ -1044,25 +975,38 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     )}
                                 </div>
 
-                                <div className="grid-2" style={{ gap: '10px' }}>
-                                    <input
-                                        type="password"
-                                        className="input-field"
-                                        placeholder="Sua Senha"
-                                        value={senhaSaque}
-                                        onChange={(e) => setSenhaSaque(e.target.value)}
-                                    />
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="Código 2FA"
-                                        value={codigo2faSaque}
-                                        onChange={(e) => setCodigo2faSaque(e.target.value)}
-                                    />
-                                </div>
+                                    <div className="grid-2" style={{ gap: '10px' }}>
+                                        <input
+                                            type="password"
+                                            name="senha_saque_tomador"
+                                            id="senha_saque_tomador"
+                                            autoComplete="current-password"
+                                            className="input-field"
+                                            placeholder="Sua Senha"
+                                            value={senhaSaque}
+                                            onChange={(e) => setSenhaSaque(e.target.value)}
+                                        />
+                                        <input
+                                            type="text"
+                                            name="token_saque_tomador"
+                                            id="token_saque_tomador"
+                                            autoComplete="one-time-code"
+                                            className="input-field"
+                                            placeholder="Código 2FA"
+                                            value={codigo2faSaque}
+                                            onChange={(e) => setCodigo2faSaque(e.target.value)}
+                                        />
+                                    </div>
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
-                                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ flex: 1 }} 
+                                        onClick={handleSolicitarSaque}
+                                        disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo || !senhaSaque || !codigo2faSaque}
+                                    >
+                                        Confirmar Saque
+                                    </button>
                                     <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
                                 </div>
                             </div>
@@ -1076,7 +1020,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     <div className="card">
                         <h2 className="mb-1">Upgrade de Perfil</h2>
                         <div className="card-minimal mb-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>🚀 Turbo Score</h3>
+                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <RefreshCw size={20} className="animate-spin-slow" /> Turbo Score
+                            </h3>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Adicione +1.5 pontos ao seu score instantaneamente.</p>
                             <button className="btn btn-outline" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={handleComprarScore}>Comprar por R$ 35,00</button>
                         </div>
@@ -1103,6 +1049,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
                                 <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Como enviar: <br /> 1. Suba seus docs no Google Drive ou Imgur <br /> 2. Cole o link no campo abaixo <br /> 3. Ou descreva como nos enviou (ex: via WhatsApp).</p>
                                 <textarea
+                                    name="kyc_details"
+                                    id="kyc_details"
                                     className="input-field mt-1"
                                     style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
                                     placeholder="Link do Google Drive/Imgur ou Informe o envio..."
@@ -1433,6 +1381,15 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 })()}
                             </>
                         )}
+                        
+                        {/* NOVO MENU DO CAIXA DO LOJISTA */}
+                        {activeView === 'caixa' && usuario?.is_parceiro && (
+                            <CaixaParceiro 
+                                onUpdate={carregarSnapshot}
+                                usuario={usuario}
+                            />
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                             <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>
                         </div>

@@ -120,3 +120,36 @@ def estornar_e_limpar_solicitacao(solicitacao_id: int, db: Session):
     
     db.commit()
     return True
+
+def processar_expiracoes_interna(db: Session):
+    """
+    Função helper pra varredura lazy de expirações 4h/5d durante o /snapshot.
+    """
+    from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao
+    import datetime
+
+    agora = datetime.datetime.utcnow()
+    
+    # 1. Regra das 4h: Ninguém investiu nada -> APAGAR
+    expirados_4h = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
+        SolicitacaoEmprestimo.valor_arrecadado == 0,
+        SolicitacaoEmprestimo.data_expiracao_4h <= agora
+    ).all()
+
+    for s in expirados_4h:
+        estornar_e_limpar_solicitacao(s.id, db)
+
+    # 2. Regra dos 5d: Tem investimentos mas não atingiu meta OU atingiu e não assinou
+    expirados_5d = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
+        SolicitacaoEmprestimo.data_expiracao_5d <= agora
+    ).all()
+
+    for s in expirados_5d:
+        estornar_e_limpar_solicitacao(s.id, db)
+
+    # Se teve limpeza ou estorno estornar_e_limpar_solicitacao ja fez commit individual, 
+    # mas garantimos flush.
+    db.commit()
+    return len(expirados_4h) + len(expirados_5d)

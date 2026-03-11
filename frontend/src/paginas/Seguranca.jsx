@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock, Copy, Check } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock, Copy, Check, AlertTriangle } from 'lucide-react';
 
 const Seguranca = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -97,9 +97,9 @@ const Seguranca = () => {
             <div className="card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
                     <div style={{
-                        width: '60px',
-                        height: '60px',
-                        borderRadius: '16px',
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: 'var(--radius-md)',
                         background: status2fa ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 145, 0, 0.1)',
                         color: status2fa ? 'var(--success)' : 'var(--warning)',
                         display: 'flex',
@@ -109,8 +109,8 @@ const Seguranca = () => {
                         {status2fa ? <ShieldCheck size={32} /> : <ShieldAlert size={32} />}
                     </div>
                     <div>
-                        <h3 style={{ margin: 0 }}>Autenticação 2FA (TOTP)</h3>
-                        <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                        <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Autenticação 2FA (TOTP)</h3>
+                        <p className="text-muted" style={{ fontSize: '0.9rem' }}>
                             {status2fa ? "Proteção ATIVA" : "Configuração pendente (Obrigatório para saques)"}
                         </p>
                     </div>
@@ -181,8 +181,8 @@ const Seguranca = () => {
                         </div>
 
                         <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'left' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700, margin: '0 0 5px 0' }}>
-                                ⚠️ IMPORTANTE: Salve esta chave manual agora!
+                            <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700, margin: '0 0 5px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <AlertTriangle size={16} /> IMPORTANTE: Salve esta chave manual agora!
                             </p>
                             <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>
                                 Se você quiser colocar o 2FA no seu celular depois, você vai precisar dessa mesma chave. Anote-a em um lugar seguro.
@@ -224,8 +224,9 @@ const Seguranca = () => {
                         <div className="input-group">
                             <input
                                 type="text"
-                                name="two-factor-code"
-                                autocomplete="one-time-code"
+                                name="two_factor_code_v1"
+                                id="two_factor_code_v1"
+                                autoComplete="one-time-code"
                                 placeholder="Código de 6 dígitos"
                                 className="input-field"
                                 value={codigo}
@@ -252,7 +253,7 @@ const Seguranca = () => {
                         {!showDesativarForm ? (
                             <button 
                                 className="btn btn-outline" 
-                                style={{ width: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.8rem' }}
+                                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
                                 onClick={() => setShowDesativarForm(true)}
                             >
                                 Desativar 2FA
@@ -266,8 +267,9 @@ const Seguranca = () => {
                                 <div className="input-group">
                                      <input 
                                         type="password" 
-                                        name="password"
-                                        autocomplete="current-password"
+                                        name="pwd_disable_2fa_v1"
+                                        id="pwd_disable_2fa_v1"
+                                        autoComplete="current-password"
                                         placeholder="Sua senha de acesso" 
                                         className="input-field"
                                         value={senhaParaDesativar}
@@ -278,8 +280,9 @@ const Seguranca = () => {
                                 <div className="input-group">
                                     <input 
                                         type="text" 
-                                        name="disable-2fa-code"
-                                        autocomplete="one-time-code"
+                                        name="disable_2fa_token_v1"
+                                        id="disable_2fa_token_v1"
+                                        autoComplete="one-time-code"
                                         placeholder="Código 2FA atual" 
                                         className="input-field"
                                         value={codigoParaDesativar}
@@ -302,9 +305,9 @@ const Seguranca = () => {
                 )}
 
                 {mensagem && (
-                    <p className={`text-center mt-1 ${status2fa ? 'text-success' : 'text-danger'}`} style={{ fontSize: '0.875rem' }}>
+                    <div className={`alert alert-${status2fa || mensagem.includes('sucesso') ? 'success' : 'danger'} mt-1`}>
                         {mensagem}
-                    </p>
+                    </div>
                 )}
             </div>
         </div>

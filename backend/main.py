@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_investidor, rotas_financeiro, rotas_snapshot
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_investidor, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema
@@ -122,6 +122,7 @@ app.include_router(rotas_score.router)
 app.include_router(rotas_investidor.router)
 app.include_router(rotas_financeiro.router)
 app.include_router(rotas_snapshot.router)
+app.include_router(rotas_parceiros_caixa.router)
 
 @app.get("/")
 def home():

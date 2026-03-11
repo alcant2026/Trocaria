@@ -61,7 +61,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
 
     return (
         <div className="animate-fade-in">
-            <div className="card mb-1" style={{ background: 'linear-gradient(135deg, var(--card-bg), rgba(var(--primary-rgb), 0.05))', borderColor: 'var(--primary)' }}>
+            <div className="card mb-1" style={{ borderColor: 'var(--primary)', background: 'rgba(255, 214, 0, 0.02)' }}>
                 <div className="flex-between mb-1">
                     <div className="flex-between" style={{ gap: '10px' }}>
                         <TrendingUp size={24} color="var(--primary)" />
@@ -148,7 +148,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         onChange={(e) => setValorAporte(e.target.value)}
                     />
                     <button
-                        className="btn btn-primary mt-1 w-100"
+                        className="btn btn-primary mt-1"
                         onClick={handleAporte}
                         disabled={loading || !valorAporte || !senha || !aceitouTermos}
                     >
@@ -171,7 +171,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         disabled={!isDezembroResgate}
                     />
                     <button
-                        className="btn btn-outline mt-1 w-100"
+                        className="btn btn-outline mt-1"
                         onClick={handleResgate}
                         disabled={loading || !valorResgate || !isDezembroResgate || !senha}
                     >

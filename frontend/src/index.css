@@ -110,16 +110,28 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem 1.5rem;
+  padding: 0.8rem 1.5rem;
   border-radius: var(--radius-md);
   border: none;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: var(--transition);
   text-decoration: none;
   gap: 10px;
   width: 100%;
+  border: 1px solid transparent;
+}
+
+/* Responsividade de botões para evitar que fiquem esticados no PC */
+@media (min-width: 768px) {
+  .btn {
+    width: auto;
+    min-width: 160px;
+  }
+  .btn-full {
+    width: 100%;
+  }
 }
 
 .btn-primary {
@@ -129,16 +141,19 @@ p {
 
 .btn-primary:hover {
   background-color: var(--primary-hover);
-  transform: scale(0.98);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 204, 0, 0.3);
 }
 
 .btn-secondary {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-main);
+  border-color: var(--border-color);
 }
 
 .btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-outline {
@@ -669,6 +684,18 @@ tr:last-child td {
   color: var(--danger);
 }
 
+.alert-warning {
+  background: rgba(255, 145, 0, 0.1);
+  border-color: rgba(255, 145, 0, 0.2);
+  color: var(--warning);
+}
+
+.alert-info {
+  background: rgba(83, 130, 255, 0.1);
+  border-color: rgba(83, 130, 255, 0.2);
+  color: #5382FF;
+}
+
 .alert-close {
   background: none;
   border: none;
@@ -683,6 +710,27 @@ tr:last-child td {
 
 .alert-close:hover {
   opacity: 1;
+}
+
+/* Responsividade Melhorada para Mobile */
+@media (max-width: 768px) {
+  .flex-between {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .main-content {
+      padding: 5rem 1rem 2rem 1rem;
+  }
+
+  .action-grid {
+      grid-template-columns: repeat(3, 1fr);
+  }
+
+  .card {
+      padding: 1.2rem;
+  }
 }
 
 /* Auth Pages (Login/Registro) */

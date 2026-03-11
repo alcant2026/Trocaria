@@ -138,9 +138,9 @@ const Registro = () => {
                         </button>
 
                         {mensagem && (
-                            <p className={`text-center mt-1 ${sucesso ? 'text-success' : 'text-danger'}`} style={{ fontSize: '0.875rem' }}>
-                                {mensagem}
-                            </p>
+                             <div className={`alert alert-${sucesso ? 'success' : 'danger'} mt-1`}>
+                                 {mensagem}
+                             </div>
                         )}
                     </form>
                 </div>

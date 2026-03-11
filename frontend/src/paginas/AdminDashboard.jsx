@@ -25,7 +25,13 @@ import {
     Link as LinkIcon,
     Image as ImageIcon,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Banknote,
+    PlusCircle,
+    BarChart3,
+    ArrowDown,
+    RefreshCw,
+    Calendar
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -87,14 +93,15 @@ const SaqueLucroCard = ({ onMensagem, lucroDisponivel }) => {
         <div className="card mb-1" style={{ borderLeft: '4px solid var(--primary)' }}>
             <div className="flex-between">
                 <div>
-                    <h3 style={{ color: 'var(--primary)' }}>💰 Resgatar Lucro</h3>
+                    <h3 style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Banknote size={20} /> Resgatar Lucro
+                    </h3>
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>
                         Disponível: <strong style={{ color: 'var(--success)' }}>R$ {(lucroDisponivel || 0).toLocaleString('pt-BR')}</strong>
                     </p>
                 </div>
                 <button
                     className={`btn ${aberto ? 'btn-outline' : 'btn-primary'}`}
-                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
                     onClick={() => setAberto(!aberto)}
                 >
                     {aberto ? 'Cancelar' : 'Sacar'}
@@ -157,7 +164,6 @@ const SaqueLucroCard = ({ onMensagem, lucroDisponivel }) => {
                     <button
                         type="submit"
                         className="btn btn-primary"
-                        style={{ padding: '0.75rem', fontSize: '0.9rem', fontWeight: 700 }}
                         disabled={loading}
                     >
                         {loading ? 'Registrando...' : `Confirmar Saque${valor ? ' de R$ ' + parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''}`}
@@ -206,14 +212,16 @@ const AporteLucroCard = ({ onMensagem }) => {
         <div className="card mb-1" style={{ borderLeft: '4px solid var(--success)' }}>
             <div className="flex-between">
                 <div>
-                    <h3 style={{ color: 'var(--success)' }}>📥 Injetar Lucro (Aporte)</h3>
+                    <h3 style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <PlusCircle size={20} /> Injetar Lucro (Aporte)
+                    </h3>
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>
                         Injete capital externo para cobrir custos ou bônus.
                     </p>
                 </div>
                 <button
                     className={`btn ${aberto ? 'btn-outline' : 'btn-primary'}`}
-                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: aberto ? 'transparent' : 'var(--success)', borderColor: 'var(--success)', color: aberto ? 'var(--success)' : '#fff' }}
+                    style={{ borderColor: 'var(--success)', color: aberto ? 'var(--success)' : '#fff', background: aberto ? 'transparent' : 'var(--success)' }}
                     onClick={() => setAberto(!aberto)}
                 >
                     {aberto ? 'Cancelar' : 'Aportar'}
@@ -305,14 +313,16 @@ const ReinvestimentoPoolCard = ({ onMensagem, lucroDisponivel, meuSaldoPool, luc
         <div className="card mb-1" style={{ borderLeft: '4px solid var(--warning)' }}>
             <div className="flex-between">
                 <div>
-                    <h3 style={{ color: 'var(--warning)' }}>📈 Gestão de Patrimônio</h3>
+                    <h3 style={{ color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TrendingUp size={20} /> Gestão de Patrimônio
+                    </h3>
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>
                         Reinvista o lucro no Pool para ganhar juros.
                     </p>
                 </div>
                 <button
                     className={`btn ${aberto ? 'btn-outline' : 'btn-primary'}`}
-                    style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: aberto ? 'transparent' : 'var(--warning)', borderColor: 'var(--warning)', color: aberto ? 'var(--warning)' : '#111' }}
+                    style={{ borderColor: 'var(--warning)', color: aberto ? 'var(--warning)' : '#111', background: aberto ? 'transparent' : 'var(--warning)' }}
                     onClick={() => setAberto(!aberto)}
                 >
                     {aberto ? 'Fechar' : 'Gerenciar'}
@@ -380,7 +390,7 @@ const ReinvestimentoPoolCard = ({ onMensagem, lucroDisponivel, meuSaldoPool, luc
                     <button
                         type="submit"
                         className="btn btn-primary"
-                        style={{ padding: '0.75rem', fontSize: '0.9rem', fontWeight: 700, background: 'var(--warning)', color: '#111', border: 'none' }}
+                        style={{ background: 'var(--warning)', color: '#111', border: 'none' }}
                         disabled={loading}
                     >
                         {loading ? 'Processando...' : `Confirmar ${tipo === 'reinvestir' ? 'Reinvestimento' : 'Resgate Próprio'}`}
@@ -395,6 +405,7 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
     const [parceiros, setParceiros] = useState([]);
     const [nome, setNome] = useState('');
     const [endereco, setEndereco] = useState('');
+    const [usuarioId, setUsuarioId] = useState('');
     const [loading, setLoading] = useState(false);
     const [aberto, setAberto] = useState(false);
 
@@ -416,10 +427,11 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
         if (!nome || !endereco) return alert('Preencha nome e endereço.');
         setLoading(true);
         try {
-            await api.post('/financeiro/admin/parceiros', { nome, endereco });
+            await api.post('/financeiro/admin/parceiros', { nome, endereco, usuario_id: usuarioId });
             onMensagem('Parceiro adicionado com sucesso!');
             setNome('');
             setEndereco('');
+            setUsuarioId('');
             carregarParceiros();
         } catch (err) {
             onMensagem('Erro: ' + err.message);
@@ -433,6 +445,7 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
             await api.put(`/financeiro/admin/parceiros/${p.id}`, { 
                 nome: p.nome, 
                 endereco: p.endereco, 
+                usuario_id: p.usuario_id,
                 ativo: !p.is_active 
             });
             carregarParceiros();
@@ -491,6 +504,14 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                                 onChange={e => setEndereco(e.target.value)}
                                 style={{ fontSize: '0.85rem' }}
                             />
+                            <input 
+                                type="text" 
+                                placeholder="ID do Usuário (Dono)" 
+                                className="input-field" 
+                                value={usuarioId} 
+                                onChange={e => setUsuarioId(e.target.value)}
+                                style={{ fontSize: '0.85rem', gridColumn: 'span 2' }}
+                            />
                         </div>
                         <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontSize: '0.8rem' }} disabled={loading}>
                             <Plus size={16} /> {loading ? 'Adicionando...' : 'Adicionar Local'}
@@ -512,6 +533,11 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
                                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <MapPin size={12} /> {p.endereco}
                                             </p>
+                                            {p.usuario_id && (
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <User size={12} /> Usuário: {p.usuario_id}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -557,6 +583,8 @@ const GerenciarParceirosCard = ({ onMensagem }) => {
         </div>
     );
 };
+
+
 
 // Componente de Gestão da Loja de Afiliados
 const GerenciarLojaCard = ({ onMensagem }) => {
@@ -632,10 +660,10 @@ const GerenciarLojaCard = ({ onMensagem }) => {
     };
 
     return (
-        <div className="card mb-1" style={{ borderLeft: '4px solid #ff4d00' }}>
+        <div className="card mb-1" style={{ borderLeft: '4px solid var(--primary)' }}>
             <div className="flex-between">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div className="icon-box" style={{ background: 'rgba(255, 77, 0, 0.1)', color: '#ff4d00' }}>
+                    <div className="icon-box" style={{ background: 'rgba(255, 204, 0, 0.1)', color: 'var(--primary)' }}>
                         <ShoppingBag size={20} />
                     </div>
                     <div>
@@ -655,7 +683,7 @@ const GerenciarLojaCard = ({ onMensagem }) => {
             {aberto && (
                 <div style={{ marginTop: '1.2rem' }}>
                     <form onSubmit={handleAdicionar} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#ff4d00' }}>Novo Link de Afiliado</p>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)' }}>Novo Link de Afiliado</p>
                         <div className="grid-2" style={{ gap: '10px' }}>
                             <input 
                                 type="text" 
@@ -682,7 +710,7 @@ const GerenciarLojaCard = ({ onMensagem }) => {
                             onChange={e => setImagem(e.target.value)}
                             style={{ fontSize: '0.85rem' }}
                         />
-                        <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontSize: '0.8rem', background: '#ff4d00', borderColor: '#ff4d00' }} disabled={loading}>
+                        <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontSize: '0.8rem', width: '100%' }} disabled={loading}>
                             <Plus size={16} /> {loading ? 'Adicionando...' : 'Adicionar Produto'}
                         </button>
                     </form>
@@ -761,6 +789,22 @@ const GerenciarLojaCard = ({ onMensagem }) => {
             )}
         </div>
     );
+};
+
+// Componentes Dinâmicos de Formatação Financeira (Injetam cores baseadas em + e -)
+const FormatSaldos = ({ valor }) => {
+    const v = Number(valor) || 0;
+    if (v === 0) return <span style={{ color: 'var(--text-main)' }}>R$ 0</span>;
+    return <span style={{ color: v > 0 ? 'var(--success)' : 'var(--danger)' }}>R$ {v.toLocaleString('pt-BR')}</span>;
+};
+
+const FormatReceitas = ({ valor, isInverso = false, ocultarZeros = false }) => {
+    const v = Number(valor) || 0;
+    if (v === 0) return ocultarZeros ? <span style={{ color: 'var(--text-main)' }}>—</span> : <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>R$ 0</span>;
+    if (isInverso) {
+        return <span style={{ fontWeight: 600, color: v > 0 ? 'var(--danger)' : 'var(--success)' }}>{v > 0 ? '- ' : '+ '}R$ {Math.abs(v).toLocaleString('pt-BR')}</span>;
+    }
+    return <span style={{ fontWeight: 600, color: v > 0 ? 'var(--success)' : 'var(--danger)' }}>{v > 0 ? '+ ' : '- '}R$ {Math.abs(v).toLocaleString('pt-BR')}</span>;
 };
 
 const AdminDashboard = () => {
@@ -1030,8 +1074,8 @@ const AdminDashboard = () => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${mensagem?.toLowerCase()?.includes('erro') ? 'alert-danger' : 'alert-success'}`}>
-                    <span>{mensagem}</span>
+                <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'}`}>
+                    <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
                     <button onClick={() => setMensagem('')} className="alert-close">✕</button>
                 </div>
             )}
@@ -1041,7 +1085,7 @@ const AdminDashboard = () => {
                 <div className="grid-3 mb-1">
                     <div className="card">
                         <p className="info-label">Custódia (Passivo)</p>
-                        <h2 className="mt-1">R$ {fiscal.saldo_usuarios_gerenciado.toLocaleString('pt-BR')}</h2>
+                        <h2 className="mt-1"><FormatSaldos valor={fiscal.saldo_usuarios_gerenciado} /></h2>
                         <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                             <span>Total Gerido</span>
                             <Landmark size={14} />
@@ -1049,7 +1093,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="card" style={{ borderLeft: '4px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.02)' }}>
                         <p className="info-label text-primary">Saldo do Pool (Caixa)</p>
-                        <h2 className="mt-1 text-primary">R$ {(fiscal.saldo_pool_caixa || 0).toLocaleString('pt-BR')}</h2>
+                        <h2 className="mt-1 text-primary"><FormatSaldos valor={fiscal.saldo_pool_caixa} /></h2>
                         <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.72rem' }}>
                             <span>Fundo dos Investidores</span>
                             <TrendingUp size={14} color="var(--primary)" />
@@ -1057,7 +1101,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="card" style={{ borderLeft: '4px solid var(--success)', background: 'rgba(var(--success-rgb), 0.02)' }}>
                         <p className="info-label text-success">Lucro da Plataforma</p>
-                        <h2 className="mt-1 text-success">R$ {(fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico).toLocaleString('pt-BR')}</h2>
+                        <h2 className="mt-1 text-success"><FormatSaldos valor={fiscal.lucro_disponivel ?? fiscal.lucro_plataforma_historico} /></h2>
                         <div className="flex-between mt-1 text-muted" style={{ fontSize: '0.72rem' }}>
                             <span>Operacional</span>
                             <Landmark size={14} color="var(--success)" />
@@ -1067,25 +1111,22 @@ const AdminDashboard = () => {
             )}
 
             {/* Tabs */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '8px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '4px', display: 'flex', gap: '4px', width: 'fit-content', minWidth: 'max-content' }}>
+            <div className="flex-center mb-1 overflow-x-auto">
+                <div className="tab-group">
                     <button
-                        className={`btn ${activeTab === 'pendentes' ? 'btn-primary' : ''}`}
-                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        className={`tab-item ${activeTab === 'pendentes' ? 'active' : ''}`}
                         onClick={() => setActiveTab('pendentes')}
                     >
                         Fila de Aprovação
                     </button>
                     <button
-                        className={`btn ${activeTab === 'fiscal' ? 'btn-primary' : ''}`}
-                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        className={`tab-item ${activeTab === 'fiscal' ? 'active' : ''}`}
                         onClick={() => setActiveTab('fiscal')}
                     >
                         Relatório Fiscal
                     </button>
                     <button
-                        className={`btn ${activeTab === 'emprestimos' ? 'btn-primary' : ''}`}
-                        style={{ border: 'none', borderRadius: '8px', padding: '0.6rem 1.5rem', width: 'auto', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        className={`tab-item ${activeTab === 'emprestimos' ? 'active' : ''}`}
                         onClick={() => setActiveTab('emprestimos')}
                     >
                         Empréstimos
@@ -1204,17 +1245,16 @@ const AdminDashboard = () => {
                                     )}
                                 </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1rem' }}>
+                                <div className="flex-center mt-1" style={{ gap: '15px' }}>
                                     <button
                                         className="btn btn-outline"
-                                        style={{ width: 'auto', minWidth: '120px', padding: '0.6rem 1rem', color: 'var(--danger)', borderColor: 'rgba(255, 61, 0, 0.2)' }}
+                                        style={{ color: 'var(--danger)', borderColor: 'rgba(255, 61, 0, 0.2)' }}
                                         onClick={() => handleRejeitar(p.transacao_id)}
                                     >
                                         Rejeitar
                                     </button>
                                     <button
                                         className="btn btn-primary"
-                                        style={{ width: 'auto', minWidth: '180px', padding: '0.6rem 1.5rem' }}
                                         onClick={() => p.tipo === 'desbloqueio_dados' ? handleConfirmarVerificacao(p.transacao_id) : handleConfirmar(p.transacao_id, p.tipo)}
                                     >
                                         Aprovar
@@ -1244,7 +1284,6 @@ const AdminDashboard = () => {
                                         </div>
                                         <button
                                             className="btn btn-primary"
-                                            style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
                                             onClick={() => handleLiberarEspecial(loan.id)}
                                         >
                                             Liberar Manualmente
@@ -1341,8 +1380,8 @@ const AdminDashboard = () => {
                                     </div>
 
                                     <button
-                                        className="btn btn-primary"
-                                        style={{ width: '100%', padding: '0.6rem', fontSize: '0.8rem', background: 'rgba(var(--primary-rgb), 0.15)', color: 'var(--primary)', border: '1px solid var(--primary)' }}
+                                        className="btn btn-outline"
+                                        style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
                                         onClick={() => handleInvestirLucro(sa)}
                                     >
                                         Investir via Pool (Governança)
@@ -1355,38 +1394,57 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'fiscal' && fiscal && (
                 <div className="animate-fade-in">
+
+                    {mensagem && (
+                        <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} `}>
+                            <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
+                            <button onClick={() => setMensagem('')} className="alert-close">✕</button>
+                        </div>
+                    )}
+
                     <div className="grid-2">
                         <div className="card">
-                            <h3 className="mb-1">📊 Detalhes da Receita</h3>
+                            <h3 className="mb-1" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <BarChart3 size={20} color="var(--primary)" /> Detalhes da Receita
+                            </h3>
                             <div className="info-block" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <div className="flex-between">
                                     <span className="info-label">Ações de KYC/Score:</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.kyc_score || 0).toLocaleString('pt-BR')}</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.kyc_score} />
                                 </div>
                                 <div className="flex-between">
                                     <span className="info-label">Desbloqueio de Dados:</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.desbloqueio_dados || 0).toLocaleString('pt-BR')}</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.desbloqueio_dados} />
                                 </div>
                                 <div className="flex-between">
                                     <span className="info-label">Taxas de Postagem:</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxas_postagem || 0).toLocaleString('pt-BR')}</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.taxas_postagem} />
                                 </div>
                                 <div className="flex-between">
                                     <span className="info-label">Saques Extras (Taxas):</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxas_saque || 0).toLocaleString('pt-BR')}</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.taxas_saque} />
                                 </div>
                                 <div className="flex-between">
                                     <span className="info-label">Intermediação P2P (10%):</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.taxa_intermediacao || 0).toLocaleString('pt-BR')}</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.taxa_intermediacao} />
                                 </div>
                                 <div className="flex-between">
-                                    <span className="info-label">📥 Aportes Externos:</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.aportes_externos || 0).toLocaleString('pt-BR')}</span>
+                                    <span className="info-label">Taxa Espécie (0.5%):</span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.taxa_especie} />
                                 </div>
                                 <div className="flex-between">
-                                    <span className="info-label">🔁 Retorno Investimento:</span>
-                                    <span style={{ fontWeight: 600 }}>R$ {(fiscal.detalhamento_lucro.retorno_investimento || 0).toLocaleString('pt-BR')}</span>
+                                    <span className="info-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <ArrowDown size={14} /> Aportes Externos:
+                                    </span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.aportes_externos} />
                                 </div>
+                                <div className="flex-between">
+                                    <span className="info-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <RefreshCw size={14} /> Retorno Investimento:
+                                    </span>
+                                    <FormatReceitas valor={fiscal.detalhamento_lucro.retorno_investimento} />
+                                </div>
+
                             </div>
 
                             <div className="mt-2">
@@ -1403,6 +1461,7 @@ const AdminDashboard = () => {
                                     meuSaldoPool={fiscal.meu_saldo_pool}
                                     lucroAcumuladoPool={fiscal.lucro_acumulado_pool}
                                 />
+
                                 <GerenciarParceirosCard
                                     onMensagem={(m) => setMensagem(m)}
                                 />
@@ -1413,7 +1472,9 @@ const AdminDashboard = () => {
                         </div>
 
                         <div className="card">
-                            <h3 className="mb-1">📅 Histórico Mensal</h3>
+                            <h3 className="mb-1" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Calendar size={18} color="var(--primary)" /> Histórico Mensal
+                            </h3>
                             <div className="table-responsive">
                                 <table>
                                     <thead>
@@ -1429,11 +1490,12 @@ const AdminDashboard = () => {
                                             <tr key={i}>
                                                 <td>{new Date(h.mes).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</td>
                                                 <td>
-                                                    <span style={{ color: 'var(--success)', fontSize: '0.75rem', display: 'block' }}>+{(h.total_entrada || 0).toLocaleString('pt-BR')}</span>
-                                                    <span style={{ color: 'var(--danger)', fontSize: '0.75rem', display: 'block' }}>-{(h.total_saida || 0).toLocaleString('pt-BR')}</span>
+                                                    {(h.total_entrada || 0) > 0 ? <span style={{ color: 'var(--success)', fontSize: '0.75rem', display: 'block' }}>+{(h.total_entrada || 0).toLocaleString('pt-BR')}</span> : null}
+                                                    {(h.total_saida || 0) > 0 ? <span style={{ color: 'var(--danger)', fontSize: '0.75rem', display: 'block' }}>-{(h.total_saida || 0).toLocaleString('pt-BR')}</span> : null}
+                                                    {((h.total_entrada || 0) === 0 && (h.total_saida || 0) === 0) && <span style={{ color: 'var(--text-main)', fontSize: '0.75rem', display: 'block' }}>0</span>}
                                                 </td>
-                                                <td style={{ fontWeight: 600 }}>R$ {(h.receita_plataforma || 0).toLocaleString('pt-BR')}</td>
-                                                <td>{h.total_sacado > 0 ? `R$ ${(h.total_sacado || 0).toLocaleString('pt-BR')}` : '—'}</td>
+                                                <td><FormatReceitas valor={h.receita_plataforma} ocultarZeros={true} /></td>
+                                                <td><FormatReceitas valor={h.total_sacado} isInverso={true} ocultarZeros={true} /></td>
                                             </tr>
                                         ))}
                                     </tbody>

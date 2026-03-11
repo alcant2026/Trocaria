@@ -20,6 +20,7 @@ class TipoTransacao(enum.Enum):
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
     TAXA_SAQUE = "taxa_saque"
     TAXA_INTERMEDIACAO = "taxa_intermediacao"
+    TAXA_ESPECIE = "taxa_especie"
     APORTE_CAPITAL = "aporte_capital"
     PAGAMENTO_PARCELA = "pagamento_parcela"
     TAXA_POSTAGEM = "taxa_postagem"
@@ -28,6 +29,7 @@ class TipoTransacao(enum.Enum):
     RESGATE_CAIXA = "resgate_caixa"
     BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
     RETORNO_POOL = "retorno_pool"
+    COMISSAO_PARCEIRO = "comissao_parceiro"
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
@@ -170,6 +172,15 @@ class Parceiro(Base):
     endereco = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # NOVAS COLUNAS PARA O CAIXA FÍSICO
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True) # ID da conta que controla este caixa
+    caixa_aberto = Column(Boolean, default=False)
+    saldo_caixa_inicial = Column(Numeric(precision=20, scale=2), default=0) # Informa quanto dinheiro ele abriu o caixa
+    saldo_caixa_atual = Column(Numeric(precision=20, scale=2), default=0)   # Registra o sobe e desce de espécie
+    comissoes_acumuladas = Column(Numeric(precision=20, scale=2), default=0) # Dinheiro pendente a ser resgatado
+    
+    usuario = relationship("Usuario")
 
 class GarantiaSocial(Base):
     __tablename__ = "garantias_sociais"

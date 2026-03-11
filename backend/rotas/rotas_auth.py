@@ -325,7 +325,10 @@ async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logad
     totp = pyotp.TOTP(usuario.totp_secret)
     if totp.verify(codigo):
         usuario.two_factor_enabled = True
-        usuario.ultima_alteracao_2fa = datetime.utcnow()
+        # Só marca a alteração se for RE-ativação (campo já existia = o usuário desativou antes)
+        # No primeiro cadastro do 2FA, ultima_alteracao_2fa fica NULL → sem trava de 48h
+        if usuario.ultima_alteracao_2fa is not None:
+            usuario.ultima_alteracao_2fa = datetime.utcnow()
         db.commit()
         return {"message": "2FA ativado com sucesso!"}
     else:

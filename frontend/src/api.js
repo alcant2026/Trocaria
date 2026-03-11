@@ -23,8 +23,15 @@ const api = {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Erro na requisição');
+            let errorMessage = 'Erro na requisição';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorMessage;
+            } catch {
+                const text = await response.text().catch(() => '');
+                if (text) errorMessage = text;
+            }
+            throw new Error(errorMessage);
         }
 
         if (options.isBlob) {

@@ -266,6 +266,164 @@ async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(g
     db.commit()
     return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar."}
 
+# --- Checkout Físico (Painel Parceiro) ---
+class ParceiroVerificarRequest(BaseModel):
+    cliente_id: str
+    valor: float
+
+class ParceiroConfirmarRequest(BaseModel):
+    transacao_id: int
+
+@router.post("/parceiro/transacoes/verificar")
+async def verificar_transacao_parceiro(dados: ParceiroVerificarRequest, db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
+    # Localiza se o logado é um parceiro válido
+    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
+    if not parceiro:
+        raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+
+    valor_decimal = Decimal(str(dados.valor))
+    
+    # Procura uma transacao em especie desse parceiro pra aquele cliente, no valor exato
+    transacao = db.query(Transacao).filter(
+        Transacao.usuario_id == dados.cliente_id,
+        Transacao.valor == valor_decimal,
+        Transacao.metodo == "especie",
+        Transacao.status == "pendente",
+        Transacao.parceiro_id == parceiro.id
+    ).first()
+
+    if not transacao:
+         raise HTTPException(status_code=404, detail="Não há solicitação válida deste valor para este usuário. Peça que ele solicite o Caixa no app e tente novamente.")
+
+    cliente = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).first()
+    tipo_str = "Saque" if transacao.tipo == TipoTransacao.SAQUE else "Depósito"
+
+    return {
+        "mensagem": "Transação encontrada!",
+        "transacao": {
+            "id": transacao.id,
+            "tipo": tipo_str,
+            "valor": float(transacao.valor),
+            "valor_liquido": round(float(transacao.valor) * 0.98, 2),
+            "cliente_nome": cliente.nome
+        }
+    }
+
+@router.post("/parceiro/transacoes/confirmar")
+async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request: Request, db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
+    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
+    if not parceiro:
+        raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+
+    transacao = db.query(Transacao).filter(
+        Transacao.id == dados.transacao_id,
+        Transacao.status == "pendente",
+        Transacao.parceiro_id == parceiro.id
+    ).first()
+
+    if not transacao:
+         raise HTTPException(status_code=404, detail="Esta transação não existe ou já foi finalizada.")
+    
+    cliente = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).first()
+
+    # --- Nova lógica de taxas ---
+    # Garante Decimal puro para evitar TypeError com SQLite (que pode retornar float)
+    valor_decimal = Decimal(str(transacao.valor))
+    comissao_parceiro = valor_decimal * Decimal("0.015")  # 1.5% para o parceiro
+    taxa_plataforma   = valor_decimal * Decimal("0.005")  # 0.5% para a plataforma
+    fee_total         = valor_decimal * Decimal("0.02")   # 2% total
+
+    # Confirmação Efetiva e Registro de Taxas
+    if transacao.tipo == TipoTransacao.DEPOSITO:
+        # Cliente recebe apenas o valor líquido (98%) no saldo
+        valor_liquido = valor_decimal - fee_total
+        cliente.saldo = (Decimal(str(cliente.saldo or 0)) + valor_liquido)
+    elif transacao.tipo == TipoTransacao.SAQUE:
+        # O valor bruto (100%) já foi deduzido do saldo do cliente na solicitação.
+        # O cliente recebe apenas o valor líquido (98%) em mãos via parceiro.
+        pass
+
+    tipo_txt = 'Depósito' if transacao.tipo == TipoTransacao.DEPOSITO else 'Saque'
+
+    # Em ambos os casos (Depósito/Saque), registrar o lucro da plataforma (0.5%)
+    # Credita no saldo do 000PL (Usuário de Sistema) para que apareça como lucro disponível
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if plataforma:
+        plataforma.saldo += taxa_plataforma
+
+    db.add(Transacao(
+        usuario_id=cliente.id,
+        valor=taxa_plataforma,
+        tipo=TipoTransacao.TAXA_ESPECIE,
+        status="concluido",
+        detalhes=f"Receita Plataforma: Taxa espécie {tipo_txt} (Parceiro ID:{parceiro.id})"
+    ))
+
+    transacao.status = "concluido"
+
+    # Creditar comissão (1.5%) em comissoes_acumuladas
+    saldo_atual = Decimal(str(parceiro.comissoes_acumuladas or 0))
+    parceiro.comissoes_acumuladas = saldo_atual + comissao_parceiro
+    db.add(parceiro)  # garante tracking explicitamente na sessão
+
+
+    # Registro de auditoria simples (campos disponíveis no modelo)
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=datetime.datetime.utcnow(),
+    )
+    db.add(auditoria)
+    db.flush()  # gera o ID do auditoria antes do commit
+    transacao.auditoria_id = auditoria.id
+
+    db.commit()
+
+    # Invalida o cache do snapshot para dados frescos no próximo GET
+    try:
+        from rotas.rotas_snapshot import cache_snapshot_data
+        cache_snapshot_data.pop(parceiro_user.id, None)
+        cache_snapshot_data.pop(transacao.usuario_id, None)
+    except Exception:
+        pass
+
+    return {"message": f"{tipo_txt} processado com sucesso!"}
+
+@router.post("/parceiro/sacar-comissoes")
+async def sacar_comissoes_parceiro(db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
+    """Transfere as comissões acumuladas do parceiro para o saldo da carteira."""
+    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
+    if not parceiro:
+        raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+
+    saldo_comissoes = parceiro.comissoes_acumuladas or Decimal("0.00")
+    if saldo_comissoes <= Decimal("0.00"):
+        raise HTTPException(status_code=400, detail="Você não possui comissões acumuladas para sacar.")
+
+    # Transferir para o saldo da carteira
+    parceiro_user.saldo = (parceiro_user.saldo or Decimal("0.00")) + saldo_comissoes
+    parceiro.comissoes_acumuladas = Decimal("0.00")
+
+    # Registrar no histórico
+    db.add(Transacao(
+        usuario_id=parceiro_user.id,
+        valor=saldo_comissoes,
+        tipo=TipoTransacao.COMISSAO_PARCEIRO,
+        status="concluido",
+        detalhes=f"Resgate de comissões acumuladas do Caixa Físico"
+    ))
+
+    db.commit()
+
+    # Invalida cache do snapshot
+    try:
+        from rotas.rotas_snapshot import cache_snapshot_data
+        cache_snapshot_data.pop(parceiro_user.id, None)
+    except Exception:
+        pass
+
+    return {"message": f"R$ {saldo_comissoes:.2f} transferidos para sua carteira com sucesso!"}
+
 # --- Gestão de Parceiros (Admin) ---
 
 @router.get("/admin/parceiros")
@@ -275,15 +433,17 @@ async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depen
 class ParceiroCreate(BaseModel):
     nome: str
     endereco: str
+    usuario_id: str | None = None
 
 class ParceiroUpdate(BaseModel):
     nome: str
     endereco: str
+    usuario_id: str | None = None
     ativo: bool = True
 
 @router.post("/admin/parceiros")
 async def criar_parceiro(dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco)
+    parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco, usuario_id=dados.usuario_id)
     db.add(parceiro)
     db.commit()
     return {"message": "Parceiro cadastrado com sucesso!"}
@@ -296,6 +456,7 @@ async def editar_parceiro(id: int, dados: ParceiroUpdate, db: Session = Depends(
     
     parceiro.nome = dados.nome
     parceiro.endereco = dados.endereco
+    parceiro.usuario_id = dados.usuario_id
     parceiro.is_active = dados.ativo
     db.commit()
     return {"message": "Parceiro atualizado!"}
@@ -322,7 +483,8 @@ async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuari
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     pendentes = db.query(Transacao).join(Usuario).filter(
         Transacao.status == "pendente",
-        Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS])
+        Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS]),
+        Transacao.parceiro_id == None
     ).all()
     
     resultado = []
@@ -488,6 +650,7 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             TipoTransacao.DESBLOQUEIO_DADOS, 
             TipoTransacao.TAXA_SAQUE,
             TipoTransacao.TAXA_INTERMEDIACAO,
+            TipoTransacao.TAXA_ESPECIE,
             TipoTransacao.APORTE_CAPITAL,
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.RETORNO_INVESTIMENTO
@@ -512,7 +675,12 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             Transacao.status == "concluido"
         ).scalar() or Decimal("0.00")
 
-        lucro_disponivel = total_lucro_historico - total_sacado_admin - total_investido_institucional
+        # 5b. Passivo da Plataforma com os Parceiros (Comissões acumuladas não pagas)
+        total_comissoes_pendentes = db.query(func.sum(Parceiro.comissoes_acumuladas)).filter(
+            Parceiro.is_active == True
+        ).scalar() or Decimal("0.00")
+
+        lucro_disponivel = max(Decimal("0.00"), total_lucro_historico - total_sacado_admin - total_investido_institucional - total_comissoes_pendentes)
 
         # 6. Detalhamento Histórico (sem filtro de mês — bate com o Bruto)
         receitas_historico_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
@@ -568,12 +736,13 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             "lucro_plataforma_total": float(total_lucro_mes),
             "lucro_plataforma_historico": float(total_lucro_historico),
             "lucro_disponivel": float(lucro_disponivel),
+            "comissoes_parceiros_pendentes": float(total_comissoes_pendentes),
             "detalhamento_lucro": {
                 "taxas_postagem": float(detalhamento_historico.get('taxa_postagem', 0)),
-                "desbloqueio_lgpd": float(detalhamento_historico.get('desbloqueio_dados', 0)),
-                "kyc_e_score": float(detalhamento_historico.get('compra_score', 0)),
-                "taxas_saque_extra": float(detalhamento_historico.get('taxa_saque', 0)),
-                "taxas_intermediacao_p2p": float(detalhamento_historico.get('taxa_intermediacao', 0)),
+                "desbloqueio_dados": float(detalhamento_historico.get('desbloqueio_dados', 0)),
+                "kyc_score": float(detalhamento_historico.get('compra_score', 0)),
+                "taxas_saque": float(detalhamento_historico.get('taxa_saque', 0)),
+                "taxa_intermediacao": float(detalhamento_historico.get('taxa_intermediacao', 0)),
                 "aportes_externos": float(detalhamento_historico.get('aporte_capital', 0)),
                 "retorno_investimento": float(detalhamento_historico.get('retorno_investimento', 0))
             },
@@ -583,6 +752,9 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
     except Exception as e:
         logger.error(f"Erro no relatório fiscal: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao gerar relatório fiscal.")
+
+
+
 
 
 class SaqueAdminRequest(BaseModel):
@@ -607,7 +779,7 @@ async def sacar_lucro_plataforma(
 
     # Calcula o lucro total disponível (histórico de taxas)
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.TAXA_ESPECIE, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
         Transacao.status == "concluido"
     ).all()
     lucro_disponivel = sum(t.valor for t in todas_receitas)
@@ -710,6 +882,7 @@ async def reinvestir_lucro_pool(
         TipoTransacao.DESBLOQUEIO_DADOS, 
         TipoTransacao.TAXA_SAQUE, 
         TipoTransacao.TAXA_INTERMEDIACAO,
+        TipoTransacao.TAXA_ESPECIE,
         TipoTransacao.APORTE_CAPITAL,
         TipoTransacao.TAXA_POSTAGEM,
         TipoTransacao.RETORNO_INVESTIMENTO

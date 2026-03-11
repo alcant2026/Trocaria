@@ -1,12 +1,38 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
+import {
+    Wallet,
+    TrendingUp,
+    PlusCircle,
+    ArrowUpCircle,
+    ArrowDownCircle,
+    Lock,
+    Unlock,
+    Briefcase,
+    ChevronRight,
+    Eye,
+    EyeOff,
+    Search,
+    ArrowRight,
+    ShieldAlert,
+    Copy,
+    Check,
+    AlertCircle,
+    FileText,
+    CheckCircle2,
+    History,
+    Bolt,
+    Clock,
+    Store,
+    ArrowLeft
+} from 'lucide-react';
 
 // Hook de countdown reutilizável
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
         if (!isoDate) return null;
         const diff = new Date(isoDate + 'Z') - new Date();
-        if (diff <= 0) return '⏰ Expirado';
+        if (diff <= 0) return 'Expirado';
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
@@ -35,13 +61,13 @@ const TimerCard = ({ expira4h, expira5d }) => {
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: expirado4h ? 'rgba(255,61,0,0.08)' : 'rgba(255,145,0,0.08)', color: expirado4h ? 'var(--danger)' : 'var(--warning)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                        ⚡ {t4h || '—'}
+                        <Bolt size={12} /> {t4h || '—'}
                     </span>
                     <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>Janela rápida (prioridade)</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                        🕐 {t5d || '—'}
+                        <Clock size={12} /> {t5d || '—'}
                     </span>
                     <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>Prazo total do pedido</span>
                 </div>
@@ -62,9 +88,10 @@ const TIPOS_LABEL = {
     taxa_intermediacao: 'Taxa de Intermediação',
     taxa_conveniencia: 'Taxa de Conveniência',
     pagamento_parcela: 'Pagamento de Parcela',
+    comissao_parceiro: 'Comissão Recebida',
 };
 const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela']);
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro']);
 const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela']);
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -76,32 +103,11 @@ const formatarTipo = (tipo, detalhes) => {
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
-import {
-    Wallet,
-    TrendingUp,
-    PlusCircle,
-    ArrowUpCircle,
-    ArrowDownCircle,
-    Lock,
-    Unlock,
-    Briefcase,
-    ChevronRight,
-    Eye,
-    EyeOff,
-    Search,
-    ArrowRight,
-    ShieldAlert,
-    Copy,
-    Check,
-    AlertCircle,
-    FileText,
-    CheckCircle2,
-    History
-} from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
 import TermosUso from '../componentes/TermosUso';
 import CaixaInvestidor from './CaixaInvestidor';
+import CaixaParceiro from './CaixaParceiro';
 
 const DashboardInvestidor = () => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
@@ -302,7 +308,7 @@ const DashboardInvestidor = () => {
     const handleDesbloquear = (solicitacaoId) => {
         showModal({
             title: 'Desbloquear Perfil',
-            message: 'Deseja desbloquear os dados completos deste perfil por R$ 15,00? \n\n⚠️ O desbloqueio permite sua análise detalhada, mas não garante o pagamento do empréstimo.',
+            message: 'Deseja desbloquear os dados completos deste perfil por R$ 15,00? \n\n O desbloqueio permite sua análise detalhada, mas não garante o pagamento do empréstimo.',
             type: 'finance',
             onConfirm: async () => {
                 closeModal();
@@ -357,8 +363,8 @@ const DashboardInvestidor = () => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'}`}>
-                    <span>{mensagem}</span>
+                <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'}`}>
+                    <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
                     <button onClick={() => setMensagem('')} className="alert-close">✕</button>
                 </div>
             )}
@@ -402,7 +408,12 @@ const DashboardInvestidor = () => {
                                         </div>
                                     </div>
 
-                                    <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}>
+                                    <button 
+                                        name="btn_alternar_saldo_investidor"
+                                        id="btn_alternar_saldo_investidor"
+                                        onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} 
+                                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}
+                                    >
                                         {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
                                     </button>
                                 </div>
@@ -494,10 +505,16 @@ const DashboardInvestidor = () => {
                     <Briefcase size={28} />
                     <span>Carteira</span>
                 </div>
-                <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ border: '1px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
                     <TrendingUp size={28} color="var(--primary)" />
                     <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Caixa (Pool)</span>
                 </div>
+                {usuario.is_parceiro && (
+                    <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
+                        <Store size={28} color="var(--warning)" />
+                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+                    </div>
+                )}
             </div>
 
             {activeView === 'home' && (
@@ -586,7 +603,7 @@ const DashboardInvestidor = () => {
                         </>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                        <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
                 </div>
             )}
@@ -890,21 +907,23 @@ const DashboardInvestidor = () => {
 
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    placeholder="Valor do Depósito R$"
-                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                    value={valorNotificacao}
-                                    min="0.01"
-                                    step="0.01"
-                                    onChange={(e) => setValorNotificacao(e.target.value)}
-                                />
+                                    <input
+                                        type="number"
+                                        name="valor_deposito_especie"
+                                        id="valor_deposito_especie"
+                                        className="input-field"
+                                        placeholder="Valor do Depósito R$"
+                                        style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
+                                        value={valorNotificacao}
+                                        min="0.01"
+                                        step="0.01"
+                                        onChange={(e) => setValorNotificacao(e.target.value)}
+                                    />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '1.5rem' }}>
-                            <button className="btn btn-primary" style={{ width: 'auto', minWidth: '180px' }} onClick={handleNotificarDeposito}>Informar Depósito</button>
-                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
+                            <button className="btn btn-primary" onClick={handleNotificarDeposito}>Informar Depósito</button>
+                            <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
                     </div>
                 )
@@ -943,6 +962,8 @@ const DashboardInvestidor = () => {
                                     <div className="input-group">
                                         <label>Selecione o Parceiro para Retirada</label>
                                         <select
+                                            name="parceiro_saque"
+                                            id="parceiro_saque"
                                             className="input-field"
                                             value={parceiroIdSaque}
                                             onChange={(e) => setParceiroIdSaque(e.target.value)}
@@ -959,6 +980,9 @@ const DashboardInvestidor = () => {
                                     <label>Quanto deseja sacar?</label>
                                     <input
                                         type="number"
+                                        name="valor_saque_v1_investidor"
+                                        id="valor_saque_v1_investidor"
+                                        autoComplete="off"
                                         className="input-field"
                                         placeholder="Valor R$ 0,00"
                                         min="0.01"
@@ -967,6 +991,11 @@ const DashboardInvestidor = () => {
                                         onChange={(e) => setValorSaque(e.target.value)}
                                         style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
                                     />
+                                    {parseFloat(valorSaque) > usuario.saldo && (
+                                        <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
+                                            ⚠️ Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Regra de Taxa Dinâmica */}
@@ -997,6 +1026,9 @@ const DashboardInvestidor = () => {
                                 <div className="grid-2" style={{ gap: '10px' }}>
                                     <input
                                         type="password"
+                                        name="senha_saque_investidor"
+                                        id="senha_saque_investidor"
+                                        autoComplete="current-password"
                                         className="input-field"
                                         placeholder="Sua Senha"
                                         value={senhaSaque}
@@ -1004,6 +1036,9 @@ const DashboardInvestidor = () => {
                                     />
                                     <input
                                         type="text"
+                                        name="token_saque_investidor"
+                                        id="token_saque_investidor"
+                                        autoComplete="one-time-code"
                                         className="input-field"
                                         placeholder="Código 2FA"
                                         value={codigo2faSaque}
@@ -1011,15 +1046,31 @@ const DashboardInvestidor = () => {
                                     />
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
-                                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSolicitarSaque}>Confirmar Saque</button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={handleSolicitarSaque}
+                                        disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo || !senhaSaque || !codigo2faSaque}
+                                    >
+                                        Confirmar Saque
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Cancelar</button>
                                 </div>
                             </div>
                         )}
                     </div>
                 )
             }
+            {activeView === 'caixa' && usuario?.is_parceiro && (
+                <CaixaParceiro 
+                    onUpdate={carregarSnapshot}
+                    usuario={usuario}
+                />
+            )}
+            
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', paddingBottom: '2rem' }}>
+                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>
+            </div>
 
             {showTermos && (
                 <div className="modal-overlay">

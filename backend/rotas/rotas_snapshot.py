@@ -16,6 +16,10 @@ TZ_BRASILIA = timezone(timedelta(hours=-3))
 cache_snapshot_data = {}
 CACHE_TTL_SEG = 15 # 15 segundos de "paz" para o banco de dados
 
+# Versão do cache — incrementar aqui força invalidação de todos os snapshots cacheados
+# quando o servidor reinicia com novos campos no perfil
+CACHE_VERSION = "v3_comissoes_acumuladas"
+
 @router.get("/snapshot")
 @router.get("/snapshot/")
 async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -23,6 +27,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     Endpoint de Snapshot Autocontido com Cache de 15s.
     """
     agora_ts = datetime.utcnow().timestamp()
+    
+    # Lazy-Cleaning: Expurgar solicitações expiradas (4h/5d) antes de ler o BD
+    try:
+        from utils_emprestimo import processar_expiracoes_interna
+        removidos = processar_expiracoes_interna(db)
+        if removidos > 0:
+            print(f"[LAZY-CLEANING] Snapshot limpou {removidos} solicitações expiradas.")
+            # Invalida cache preventivamente se alterou banco
+            cache_snapshot_data.clear() 
+    except Exception as e:
+        print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
     
     # Verificar Cache
     if usuario.id in cache_snapshot_data:
@@ -33,6 +48,11 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     try:
         # 1. Perfil Básico (Sempre retorna)
         print(f"[DEBUG SNAPSHOT] Iniciando perfil para usuario {usuario.id}")
+        # Verificar se o usuário é Parceiro
+        from modelos.modelos_db import Parceiro
+        parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
+        is_parceiro = parceiro is not None
+        
         snapshot = {
             "perfil": {
                 "id": usuario.id,
@@ -46,7 +66,12 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "cidade": usuario.cidade,
                 "estado": usuario.estado,
                 "two_factor_enabled": usuario.two_factor_enabled,
-                "saldo_caixa": float(usuario.saldo_caixa or 0)
+                "saldo_caixa": float(usuario.saldo_caixa or 0),
+                "is_parceiro": is_parceiro,
+                "parceiro_id": parceiro.id if parceiro else None,
+                "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
+                "comissoes_acumuladas": float(parceiro.comissoes_acumuladas or 0) if parceiro else 0.0,
+                "saldo_caixa_atual": float(parceiro.saldo_caixa_atual or 0) if parceiro else 0.0,
             },
             "historico": []
         }
@@ -75,7 +100,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # Pendências
             pendentes_raw = db.query(Transacao).join(Usuario).filter(
                 Transacao.status == "pendente",
-                Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS])
+                Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS]),
+                Transacao.parceiro_id == None
             ).all()
             
             pendentes_list = []
@@ -97,6 +123,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 TipoTransacao.DESBLOQUEIO_DADOS, 
                 TipoTransacao.TAXA_SAQUE, 
                 TipoTransacao.TAXA_INTERMEDIACAO,
+                TipoTransacao.TAXA_ESPECIE,
                 TipoTransacao.APORTE_CAPITAL,
                 TipoTransacao.TAXA_POSTAGEM,
                 TipoTransacao.RETORNO_INVESTIMENTO
@@ -226,6 +253,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "kyc_score": float(detalhamento_mes.get('compra_score', 0)),
                         "taxas_saque": float(detalhamento_mes.get('taxa_saque', 0)),
                         "taxa_intermediacao": float(detalhamento_mes.get('taxa_intermediacao', 0)),
+                        "taxa_especie": float(detalhamento_mes.get('taxa_especie', 0)),
                         "aportes_externos": float(detalhamento_mes.get('aporte_capital', 0)),
                         "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0))
                     },

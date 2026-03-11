@@ -52,21 +52,7 @@ const App = () => {
             target="_blank"
             rel="noreferrer"
             aria-label="Falar no WhatsApp"
-            style={{
-                position: 'fixed',
-                right: '20px',
-                bottom: '20px',
-                zIndex: 1200,
-                background: '#25D366',
-                color: '#fff',
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 10px 20px rgba(0, 0, 0, 0.25)'
-            }}
+            className="whatsapp-float"
             title="Falar no WhatsApp"
         >
             <MessageCircle size={28} />
@@ -140,7 +126,7 @@ const App = () => {
                             <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Segurança
                         </a>
                     </div>
-                    <div className="drawer-footer" style={{ borderTop: '1px solid var(--border-color)', marginTop: 'auto', padding: '1.5rem 0' }}>
+                    <div className="drawer-footer">
                         <div className="flex-between mb-1" style={{ gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
@@ -158,20 +144,6 @@ const App = () => {
                         </div>
 
                         <button
-                            style={{
-                                background: 'rgba(255, 61, 0, 0.05)',
-                                border: '1px solid rgba(255, 61, 0, 0.1)',
-                                color: 'var(--danger)',
-                                fontSize: '0.7rem',
-                                cursor: 'pointer',
-                                textAlign: 'center',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                width: '100%',
-                                marginTop: '10px',
-                                fontWeight: 600,
-                                transition: 'var(--transition)'
-                            }}
                             className="btn-delete-account"
                             onClick={() => {
                                 setMenuAberto(false);
@@ -204,8 +176,8 @@ const App = () => {
                         <p>Esta ação é <strong>irreversível</strong>. Seus dados serão anonimizados seguindo as regras da <strong>LGPD</strong>.</p>
                         <p style={{ fontSize: '0.8rem' }}>Você perderá acesso imediato à plataforma.</p>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '2rem' }}>
-                            <button className="btn btn-danger" style={{ background: 'var(--danger)', color: '#fff' }} onClick={async () => {
+                        <div className="flex-center-column mt-2" style={{ gap: '15px' }}>
+                            <button className="btn btn-danger" onClick={async () => {
                                 setModalExcluir(false);
                                 try {
                                     const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/excluir-conta`, {

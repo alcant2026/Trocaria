@@ -9,6 +9,7 @@ from decimal import Decimal
 import datetime
 from datetime import timezone, timedelta
 import pyotp
+from typing import Optional, List
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
@@ -17,13 +18,13 @@ from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investi
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
     metodo: str = "pix" # pix ou especie
-    parceiro_id: int = None
+    parceiro_id: Optional[int] = None
 
 class SolicitacaoSaque(BaseModel):
     valor: Decimal = Field(gt=0)
     chave_pix: str = ""
     metodo: str = "pix" # pix ou especie
-    parceiro_id: int = None
+    parceiro_id: Optional[int] = None
     senha: str
     codigo_2fa: str
 

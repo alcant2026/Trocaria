@@ -286,12 +286,12 @@ const DashboardInvestidor = () => {
         }
         try {
             await api.post('/financeiro/solicitar-saque', {
-                valor: v,
-                metodo: metodoSaque,
-                parceiro_id: metodoSaque === 'especie' ? parseInt(parceiroIdSaque) : null,
-                chave_pix: metodoSaque === 'pix' ? usuario.chave_pix : "",
-                senha: senhaSaque,
-                codigo_2fa: codigo2faSaque
+                valor: v || 0,
+                metodo: metodoSaque || 'pix',
+                parceiro_id: metodoSaque === 'especie' ? (parseInt(parceiroIdSaque) || null) : null,
+                chave_pix: metodoSaque === 'pix' ? (usuario.chave_pix || "") : "",
+                senha: senhaSaque || "",
+                codigo_2fa: codigo2faSaque || ""
             });
             setMensagem('Solicitação de saque enviada com sucesso!');
             setValorSaque('');

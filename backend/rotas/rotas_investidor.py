@@ -7,7 +7,8 @@ from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, AcessoInvestidor,
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_data import adicionar_mes
-from utils_emprestimo import tentar_liberar_emprestimo
+from utils_emprestimo import tentar_liberar_emprestimo, estornar_e_limpar_solicitacao
+from utils_seguranca import registrar_acao_admin
 
 router = APIRouter(prefix="/investidor", tags=["Investidor"])
 
@@ -247,4 +248,5 @@ async def processar_expiracoes_job(db: Session = Depends(get_db), _: Usuario = D
         estornar_e_limpar_solicitacao(s.id, db)
 
     db.commit()
+    registrar_acao_admin(db, admin.id, "PROCESSAR_EXPIRACOES", alvo_id="SISTEMA", detalhes=f"Removidos 4h: {count_4h}, Estornados 5d: {count_5d}", ip=None)
     return {"message": "Expirações processadas e limpeza realizada.", "removidos_4h": count_4h, "estornados_limpos_5d": count_5d}

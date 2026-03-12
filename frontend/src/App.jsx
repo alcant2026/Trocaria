@@ -55,7 +55,7 @@ const App = () => {
             className="whatsapp-float"
             title="Falar no WhatsApp"
         >
-            <MessageCircle size={28} />
+            <MessageCircle size={32} fill="currentColor" />
         </a>
     );
 
@@ -79,25 +79,24 @@ const App = () => {
     return (
         <div className="app-container">
             <nav className="navbar">
-                <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'tomador'; }}>
-                    <img src="/favicon.svg" alt="P Logo" style={{ width: '32px', height: '32px' }} />
-                    <span>eer</span>
-                </a>
+                <div className="navbar-container">
+                    <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'tomador'; }}>
+                        <img src="/favicon.svg" alt="P Logo" style={{ width: '32px', height: '32px' }} />
+                        <span>eer</span>
+                    </a>
 
-
-                {/* Menu Horizontal Removido (Unificado na Lateral) */}
-
-                <div className="flex-between" style={{ gap: '15px' }}>
-                    <div className="avatar-trigger hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => setMenuAberto(true)}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                            {user.nome[0].toUpperCase()}
+                    <div className="nav-controls">
+                        <div className="avatar-trigger hide-on-mobile" onClick={() => setMenuAberto(true)}>
+                            <div className="avatar-circle">
+                                {user.nome[0].toUpperCase()}
+                            </div>
+                            <span className="user-firstname">{user.nome.split(' ')[0]}</span>
                         </div>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user.nome.split(' ')[0]}</span>
-                    </div>
 
-                    <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)} aria-label="Abrir Menu">
-                        {menuAberto ? <X size={28} /> : <Menu size={28} />}
-                    </button>
+                        <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)} aria-label="Abrir Menu">
+                            {menuAberto ? <X size={26} /> : <Menu size={26} />}
+                        </button>
+                    </div>
                 </div>
 
 
@@ -127,31 +126,31 @@ const App = () => {
                         </a>
                     </div>
                     <div className="drawer-footer">
-                        <div className="flex-between mb-1" style={{ gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary)', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                    {user.nome[0].toUpperCase()}
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>{user.nome.split(' ')[0]}</span>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Perfil Ativo</span>
-                                </div>
+                        <div className="footer-user-info">
+                            <div className="footer-avatar">
+                                {user.nome[0].toUpperCase()}
                             </div>
-                            <button className="btn btn-outline" style={{ width: 'auto', height: '40px', padding: '0 12px', borderRadius: '10px' }} onClick={logout} title="Sair da Conta">
-                                <LogOut size={18} />
-                                <span style={{ fontSize: '0.8rem' }}>Sair</span>
-                            </button>
+                            <div className="footer-texts">
+                                <span className="footer-name">{user.nome.split(' ')[0]}</span>
+                                <span className="footer-sub">Perfil Ativo</span>
+                            </div>
                         </div>
 
-                        <button
-                            className="btn-delete-account"
-                            onClick={() => {
-                                setMenuAberto(false);
-                                setModalExcluir(true);
-                            }}
-                        >
-                            Excluir minha conta e dados (LGPD)
-                        </button>
+                        <div className="footer-actions">
+                            <button className="btn-logout" onClick={logout}>
+                                <LogOut size={18} />
+                                <span>Sair</span>
+                            </button>
+                            <button
+                                className="btn-delete-account"
+                                onClick={() => {
+                                    setMenuAberto(false);
+                                    setModalExcluir(true);
+                                }}
+                            >
+                                Excluir Conta (LGPD)
+                            </button>
+                        </div>
                     </div>
                 </div>
             </nav>

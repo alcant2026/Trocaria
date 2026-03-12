@@ -326,6 +326,21 @@ const DashboardInvestidor = () => {
         });
     };
 
+    const baixarContrato = async (id) => {
+        try {
+            const blob = await api.getBlob(`/emprestimos/contrato/pdf/${id}`);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `contrato_peer_${id}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (err) {
+            console.error('Erro ao baixar contrato:', err);
+        }
+    };
+
 
     const totalInvestido = carteira.reduce((acc, item) => acc + item.valor_investido, 0);
 
@@ -505,16 +520,10 @@ const DashboardInvestidor = () => {
                     <Briefcase size={28} />
                     <span>Carteira</span>
                 </div>
-                <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                <div className="action-btn" onClick={() => setActiveView('caixa_pool')} style={{ borderColor: 'var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
                     <TrendingUp size={28} color="var(--primary)" />
                     <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Caixa (Pool)</span>
                 </div>
-                {usuario.is_parceiro && (
-                    <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-                        <Store size={28} color="var(--warning)" />
-                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
-                    </div>
-                )}
             </div>
 
             {activeView === 'home' && (
@@ -778,8 +787,18 @@ const DashboardInvestidor = () => {
                                         <span className="text-muted" style={{ fontSize: '0.8rem' }}># {item.solicitacao_id}</span>
                                         {item.tomador_is_verified && <CheckCircle2 size={16} color="var(--success)" title="Verificado" />}
                                     </div>
-                                    <div className={`badge ${item.status_emprestimo === 'concluido' ? 'badge-primary' : 'badge-success'}`}>
-                                        {item.status_emprestimo === 'concluido' ? 'CONCLUÍDO' : 'RENTABILIZANDO'}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <button 
+                                            onClick={() => baixarContrato(item.solicitacao_id)} 
+                                            className="btn-icon" 
+                                            title="Baixar Contrato PDF"
+                                            style={{ background: 'rgba(255,255,255,0.05)', padding: '6px', borderRadius: '8px', color: 'var(--text-main)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            <FileText size={16} />
+                                        </button>
+                                        <div className={`badge ${item.status_emprestimo === 'concluido' ? 'badge-primary' : 'badge-success'}`}>
+                                            {item.status_emprestimo === 'concluido' ? 'CONCLUÍDO' : 'RENTABILIZANDO'}
+                                        </div>
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -808,7 +827,7 @@ const DashboardInvestidor = () => {
                 </div>
             )}
 
-            {activeView === 'caixa' && (
+            {activeView === 'caixa_pool' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
                         <h3>Gestão do Caixa</h3>
@@ -1061,12 +1080,6 @@ const DashboardInvestidor = () => {
                     </div>
                 )
             }
-            {activeView === 'caixa' && usuario?.is_parceiro && (
-                <CaixaParceiro 
-                    onUpdate={carregarSnapshot}
-                    usuario={usuario}
-                />
-            )}
             
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', paddingBottom: '2rem' }}>
                 <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>

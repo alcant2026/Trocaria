@@ -205,3 +205,16 @@ class LinkAfiliado(Base):
     url_imagem = Column(String(500), nullable=True) # Opcional: Para exibir foto do produto
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AcaoAdmin(Base):
+    __tablename__ = "acoes_admin"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(String(5), ForeignKey("usuarios.id"))
+    alvo_id = Column(String(100), nullable=True) # ID do usuário ou objeto afetado
+    acao = Column(String(100), nullable=False) # Ex: "ALTERAR_SCORE", "ATIVAR_PARCEIRO"
+    detalhes = Column(String, nullable=True)
+    ip = Column(String, nullable=True)
+    data_acao = Column(DateTime, default=datetime.datetime.utcnow)
+
+    admin = relationship("Usuario")

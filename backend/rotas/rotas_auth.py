@@ -317,7 +317,8 @@ async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Sessio
         }
 
 @router.post("/2fa/ativar")
-async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def ativar_2fa(request: Request, codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
     """Valida o código e ativa definitivamente o 2FA para o usuário."""
     if not usuario.totp_secret:
         raise HTTPException(status_code=400, detail="Segredo 2FA não gerado.")
@@ -335,7 +336,8 @@ async def ativar_2fa(codigo: str, usuario: Usuario = Depends(obter_usuario_logad
         raise HTTPException(status_code=400, detail="Código 2FA inválido.")
 
 @router.post("/2fa/desativar")
-async def desativar_2fa(senha: str, codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+async def desativar_2fa(request: Request, senha: str, codigo: str, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
     """Desativa o 2FA mediante validação de senha e código atual."""
     if not verify_password(senha, usuario.senha_hash):
         raise HTTPException(status_code=401, detail="Senha incorreta.")

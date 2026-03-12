@@ -14,6 +14,8 @@ from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro, LinkAfiliado
+from limitador import limiter
+from utils_seguranca import registrar_acao_admin
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -38,7 +40,8 @@ router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 @router.post("/solicitar-saque")
-async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+@limiter.limit("2/minute")
+async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     valor = dados.valor
     chave_pix = dados.chave_pix
     
@@ -137,6 +140,11 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
 
     # Se houver taxa, registrar como lucro da plataforma
     if taxa > 0:
+        # Creditar lucro à plataforma (000PL)
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if plataforma:
+            plataforma.saldo += taxa
+
         transacao_taxa = Transacao(
             usuario_id=usuario.id,
             valor=taxa,
@@ -155,6 +163,7 @@ async def solicitar_saque(dados: SolicitacaoSaque, db: Session = Depends(get_db)
     return {"message": msg + " Aguardando processamento manual."}
 
 @router.post("/caixa/aporte")
+@limiter.limit("5/minute")
 async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """Move saldo da conta principal para o Caixa com blindagem jurídica."""
     if not verify_password(dados.senha, usuario.senha_hash):
@@ -446,6 +455,8 @@ class ParceiroUpdate(BaseModel):
 async def criar_parceiro(dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco, usuario_id=dados.usuario_id)
     db.add(parceiro)
+    db.flush()
+    registrar_acao_admin(db, admin.id, "CRIAR_PARCEIRO", alvo_id=str(parceiro.id), detalhes=f"Parceiro: {parceiro.nome}", ip=request.client.host)
     db.commit()
     return {"message": "Parceiro cadastrado com sucesso!"}
 
@@ -459,6 +470,7 @@ async def editar_parceiro(id: int, dados: ParceiroUpdate, db: Session = Depends(
     parceiro.endereco = dados.endereco
     parceiro.usuario_id = dados.usuario_id
     parceiro.is_active = dados.ativo
+    registrar_acao_admin(db, admin.id, "EDITAR_PARCEIRO", alvo_id=str(parceiro.id), detalhes=f"Novo nome: {parceiro.nome}, Ativo: {parceiro.is_active}", ip=request.client.host)
     db.commit()
     return {"message": "Parceiro atualizado!"}
 
@@ -596,6 +608,7 @@ async def confirmar_transacao(transacao_id: int, db: Session = Depends(get_db), 
         msg = f"Transação de {usuario.nome} confirmada!"
     
     transacao.status = "concluido"
+    registrar_acao_admin(db, admin.id, "CONFIRMAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Tipo: {transacao.tipo.value}, Valor: {transacao.valor}", ip=request.client.host)
     db.commit()
     return {"message": msg}
 
@@ -608,7 +621,7 @@ async def confirmar_verificacao(transacao_id: int, db: Session = Depends(get_db)
     usuario = transacao.usuario
     usuario.is_verified = True
     transacao.status = "concluido"
-    
+    registrar_acao_admin(db, admin.id, "CONFIRMAR_VERIFICACAO", alvo_id=usuario.id, detalhes=f"Transacao: {transacao.id}", ip=request.client.host)
     db.commit()
     return {"message": f"Identidade de {usuario.nome} verificada com sucesso!"}
 
@@ -626,9 +639,9 @@ async def rejeitar_transacao(transacao_id: int, motivo: str = "Dados inválidos 
     
     transacao.status = "falhou"
     transacao.detalhes = f"REJEITADO: {motivo}"
-    
+    registrar_acao_admin(db, admin.id, "REJEITAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Motivo: {motivo}", ip=request.client.host)
     db.commit()
-    return {"message": f"Transação de {usuario.nome} rejeitada. Motivo: {motivo}"}
+    return {"message": f"Transacao de {usuario.nome} rejeitada. Motivo: {motivo}"}
 
 @router.get("/admin/fiscal")
 async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
@@ -826,6 +839,9 @@ async def sacar_lucro_plataforma(
         detalhes=f"RESGATE DE LUCRO → PIX: {dados.chave_pix} | MOTIVO: {dados.motivo}"
     )
     db.add(transacao)
+    # Novo: Registro de Auditoria Admin
+    registrar_acao_admin(db, admin.id, "SACAR_LUCRO_SISTEMA", alvo_id=plataforma.id, detalhes=f"Valor: {dados.valor}, Motivo: {dados.motivo}", ip=request.client.host)
+    
     db.commit()
 
     return {
@@ -862,6 +878,7 @@ async def aportar_lucro_plataforma(
         detalhes=f"APORTE EXTERNO (INJETADO POR ADMIN {admin.id}) → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
     )
     db.add(transacao)
+    registrar_acao_admin(db, admin.id, "APORTAR_LUCRO_SISTEMA", alvo_id=plataforma.id, detalhes=f"Valor: {dados.valor}, Motivo: {dados.motivo}", ip=request.client.host)
     db.commit()
 
 @router.post("/admin/reinvestir-lucro-pool")
@@ -931,6 +948,7 @@ async def reinvestir_lucro_pool(
         detalhes=f"REINVESTIMENTO INSTITUCIONAL NO POOL (ORIGEM: LUCRO PLATAFORMA)"
     ))
 
+    registrar_acao_admin(db, admin.id, "REINVESTIR_LUCRO_POOL", alvo_id=plataforma.id, detalhes=f"Valor: {dados}", ip=None)
     db.commit()
     return {"message": "Sucesso! Lucro reinvestido no Pool.", "novo_saldo_pool": float(admin.saldo_caixa)}
 
@@ -972,6 +990,7 @@ async def resgatar_pool_para_lucro(
         detalhes=f"RETORNO DE REINVESTIMENTO DO POOL (REINJETADO NO LUCRO DISPONÍVEL)"
     ))
 
+    registrar_acao_admin(db, admin.id, "RESGATAR_POOL_PARA_LUCRO", alvo_id=plataforma.id, detalhes=f"Valor: {dados}", ip=None)
     db.commit()
     return {"message": "Sucesso! Capital e juros retornaram ao Lucro.", "novo_saldo_pool": float(admin.saldo_caixa)}
 
@@ -1064,6 +1083,7 @@ async def investir_lucro_plataforma(
 
     db.add(novo_investimento)
     db.add(transacao)
+    registrar_acao_admin(db, admin.id, "INVESTIR_LUCRO_SISTEMA", alvo_id=str(solicitacao.id), detalhes=f"Valor: {valor}, Motivo: {dados.motivo}", ip=request.client.host)
     db.commit()
 
     return {"message": "Investimento realizado com sucesso usando o saldo do Pool (Caixa)!", "valor": float(valor)}
@@ -1177,6 +1197,7 @@ async def liquidar_caixa_devedores(db: Session = Depends(get_db), admin: Usuario
             ))
 
     db.commit()
+    registrar_acao_admin(db, admin.id, "LIQUIDAR_CAIXA_DEVEDORES", alvo_id="SISTEMA", detalhes=f"Devedores afetados: {len(devedores)}, Valor total: {total_confiscado}", ip=None)
     return {
         "message": "Liquidação concluída com sucesso.",
         "devedores_afetados": len(devedores),

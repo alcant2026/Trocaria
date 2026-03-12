@@ -93,7 +93,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             })
 
         # 3. Dados por Perfil (Lógica duplicada aqui para evitar circularidade)
-        
+        tipos_receita = [
+            TipoTransacao.COMPRA_SCORE, 
+            TipoTransacao.DESBLOQUEIO_DADOS, 
+            TipoTransacao.TAXA_SAQUE, 
+            TipoTransacao.TAXA_INTERMEDIACAO,
+            TipoTransacao.TAXA_ESPECIE,
+            TipoTransacao.APORTE_CAPITAL,
+            TipoTransacao.TAXA_POSTAGEM,
+            TipoTransacao.RETORNO_INVESTIMENTO
+        ]
+
         # --- ADMIN DATA ---
         if usuario.is_admin:
             print(f"[DEBUG SNAPSHOT] Iniciando bloco ADMIN")
@@ -118,16 +128,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 })
 
             # Fiscal Resumo Otimizado (Lógica replicada de rotas_financeiro para evitar circularidade)
-            tipos_receita = [
-                TipoTransacao.COMPRA_SCORE, 
-                TipoTransacao.DESBLOQUEIO_DADOS, 
-                TipoTransacao.TAXA_SAQUE, 
-                TipoTransacao.TAXA_INTERMEDIACAO,
-                TipoTransacao.TAXA_ESPECIE,
-                TipoTransacao.APORTE_CAPITAL,
-                TipoTransacao.TAXA_POSTAGEM,
-                TipoTransacao.RETORNO_INVESTIMENTO
-            ]
 
             # Soma de saldos de usuários REAIS (Exclui conta de sistema 000PL)
             saldo_usuarios = db.query(func.sum(Usuario.saldo)).filter(Usuario.id != "000PL").scalar() or Decimal("0.00")
@@ -161,6 +161,14 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
+            # 3. Comissões pendentes (Passivo com parceiros)
+            total_comissoes_pendentes = db.query(func.sum(Parceiro.comissoes_acumuladas)).filter(
+                Parceiro.is_active == True
+            ).scalar() or Decimal("0.00")
+
+            # 4. Lucro Disponível (Cálculo Virtual para consistência com rotas_financeiro)
+            lucro_disponivel_virtual = max(Decimal("0.00"), total_lucro_historico - total_sacado_admin - total_investido_institucional - total_comissoes_pendentes)
+
             agora_br = datetime.now(TZ_BRASILIA)
             primeiro_dia_mes = agora_br.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -173,6 +181,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             detalhamento_mes = {t.name.lower(): Decimal("0.00") for t in tipos_receita}
             for tipo, soma in receitas_mes_query:
                 detalhamento_mes[tipo.value] = soma
+
+            lucro_mensal_plataforma = sum(detalhamento_mes.values())
 
             # Histórico Mensal
             print(f"[DEBUG SNAPSHOT] Buscando histórico mensal (GROUP BY)")
@@ -241,9 +251,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "pendentes": pendentes_list,
                 "fiscal": {
                     "saldo_usuarios_gerenciado": float(saldo_usuarios),
-                    "lucro_plataforma_total": float(sum(detalhamento_mes.values())),
+                    "lucro_plataforma_total": float(lucro_mensal_plataforma),
                     "lucro_plataforma_historico": float(total_lucro_historico),
-                    "lucro_disponivel": float(p_saldo), # Lucro disponível é o saldo do 000PL
+                    "lucro_disponivel": float(lucro_disponivel_virtual), 
                     "saldo_pool_caixa": float(saldo_pool_caixa),
                     "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                     "lucro_acumulado_pool": float(juros_acumulados_pool),

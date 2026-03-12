@@ -9,6 +9,7 @@ from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_data import adicionar_mes
 from utils_emprestimo import tentar_liberar_emprestimo, estornar_e_limpar_solicitacao
+from utils_seguranca import registrar_acao_admin
 
 router = APIRouter(prefix="/emprestimos", tags=["Empréstimos"])
 
@@ -139,6 +140,11 @@ async def criar_solicitacao(
     # Registrar custo apenas se houver cobânça
     transacao_custo = None
     if custo_pedido > Decimal("0"):
+        # Creditar lucro à plataforma (000PL)
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if plataforma:
+            plataforma.saldo += custo_pedido
+
         transacao_custo = Transacao(
             usuario_id=usuario.id,
             valor=custo_pedido,
@@ -540,7 +546,7 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     total_emprestado = solicitacao.valor
     valor_restante_rateio = valor_total_devido
     
-    admin = db.query(Usuario).filter(Usuario.is_admin == True).first()
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
     
     # 1. Passo: Devolver o Principal da Parcela (Pro-rata)
     # Valor que cada investidor deveria receber de principal nesta parcela
@@ -573,10 +579,10 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
         solicitacao.taxas_adicionais -= lucro_conveniencia_plataforma
         valor_restante_rateio -= lucro_conveniencia_plataforma
         
-        if admin and lucro_conveniencia_plataforma > 0:
-            admin.saldo += lucro_conveniencia_plataforma
+        if plataforma and lucro_conveniencia_plataforma > 0:
+            plataforma.saldo += lucro_conveniencia_plataforma
             db.add(Transacao(
-                usuario_id=admin.id,
+                usuario_id=plataforma.id,
                 valor=lucro_conveniencia_plataforma,
                 tipo=TipoTransacao.TAXA_INTERMEDIACAO,
                 status="concluido",
@@ -616,9 +622,8 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
                 
             inv.pago_para_investidor += valor_final_pool
             
-            # 3. Registro de Auditoria (Admin atua como gerente)
             db.add(Transacao(
-                usuario_id=admin.id,
+                usuario_id=plataforma.id,
                 valor=valor_final_pool,
                 tipo=TipoTransacao.RETORNO_POOL,
                 status="concluido",
@@ -636,10 +641,10 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
             ))
 
     # 3. Creditar Taxa de Performance ao Admin
-    if admin and lucro_performance_total > 0:
-        admin.saldo += lucro_performance_total
+    if plataforma and lucro_performance_total > 0:
+        plataforma.saldo += lucro_performance_total
         db.add(Transacao(
-            usuario_id=admin.id,
+            usuario_id=plataforma.id,
             valor=lucro_performance_total,
             tipo=TipoTransacao.TAXA_INTERMEDIACAO,
             status="concluido",
@@ -696,10 +701,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     valor_quitação_base = valor_parcela_base * parcelas_restantes
 
     # Buscar usuário admin para operações de Pool
-    admin = db.query(Usuario).filter(Usuario.is_admin == True).first()
-    if not admin:
-        # Fallback caso não exista admin marcado (puxa o primeiro ou o com ID 1)
-        admin = db.query(Usuario).order_by(Usuario.id).first()
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
 
     # 2. Lógica de Mora (Apenas sobre a parcela atual se estiver atrasada)
     agora = datetime.datetime.utcnow()
@@ -776,17 +778,16 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
             for p_caixa in participantes_caixa:
                 fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_liquido_investidor
                 p_caixa.saldo_caixa += fatia
-            
-            # Cálculo de juros para o log administrativo (baseado na proporção do admin)
+                # Cálculo de juros para o log administrativo (baseado na proporção da plataforma)
             lucro_pool_global = valor_liquido_investidor - principal_pendente
-            proporcao_admin = admin.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
+            proporcao_admin = plataforma.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
             juros_admin_quitacao = lucro_pool_global * proporcao_admin
             capital_admin_quitacao = principal_pendente * proporcao_admin
 
             inv.pago_para_investidor += valor_liquido_investidor
             tipo_trans = TipoTransacao.RETORNO_POOL
             detalhes_trans = f"Quitação Pro-rata Pool | Total: {valor_liquido_investidor} | Juros Est. Admin: {juros_admin_quitacao} | Pedido #{solicitacao_id}"
-            u_id = admin.id
+            u_id = plataforma.id
         else:
             investidor.saldo += valor_liquido_investidor
             inv.pago_para_investidor += valor_liquido_investidor
@@ -807,9 +808,10 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
         ))
 
     # 5. Registro Empresa e Tomador
-    if lucro_total_plataforma > 0:
+    if plataforma and lucro_total_plataforma > 0:
+        plataforma.saldo += lucro_total_plataforma
         db.add(Transacao(
-            usuario_id=usuario.id,
+            usuario_id=plataforma.id,
             valor=lucro_total_plataforma,
             tipo=TipoTransacao.TAXA_INTERMEDIACAO,
             status="concluido",
@@ -873,7 +875,7 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
 
     # 2. Rateio com Investidores (Proteção de Principal Pró-rata)
     total_emprestado = solicitacao.valor
-    admin = db.query(Usuario).filter(Usuario.is_admin == True).first()
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
     
     valor_restante_rateio = valor_pago
     
@@ -917,10 +919,10 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
         solicitacao.taxas_adicionais -= lucro_conveniencia_total
         valor_restante_rateio -= lucro_conveniencia_total
         
-        if admin and lucro_conveniencia_total > 0:
-            admin.saldo += lucro_conveniencia_total
+        if plataforma and lucro_conveniencia_total > 0:
+            plataforma.saldo += lucro_conveniencia_total
             db.add(Transacao(
-                usuario_id=admin.id,
+                usuario_id=plataforma.id,
                 valor=lucro_conveniencia_total,
                 tipo=TipoTransacao.TAXA_INTERMEDIACAO,
                 status="concluido",
@@ -959,13 +961,13 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
                 p_caixa.saldo_caixa += fatia
             
             # Cálculo de juros estimados para o admin (transparência)
-            proporcao_admin = admin.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
+            proporcao_admin = plataforma.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
             juros_admin_avulso = lucro_liquido_avulso * proporcao_admin
 
             inv.pago_para_investidor += valor_final
             tipo_trans = TipoTransacao.RETORNO_POOL
             detalhes_trans = f"Retorno Avulso Pro-rata Pool | Total: {valor_final} | Juros Est. Admin: {juros_admin_avulso} | Pedido #{solicitacao_id}"
-            u_id = admin.id
+            u_id = plataforma.id
         else:
             investidor.saldo += valor_final
             inv.pago_para_investidor += valor_final
@@ -986,12 +988,12 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
         ))
 
     # 5. Creditar Taxas à Plataforma Admin
-    if admin:
+    if plataforma:
         total_taxas_admin = lucro_conveniencia_total + lucro_performance_total
         if total_taxas_admin > 0:
-            admin.saldo += total_taxas_admin
+            plataforma.saldo += total_taxas_admin
             db.add(Transacao(
-                usuario_id=admin.id,
+                usuario_id=plataforma.id,
                 valor=total_taxas_admin,
                 tipo=TipoTransacao.TAXA_INTERMEDIACAO,
                 status="concluido",
@@ -1276,6 +1278,7 @@ async def verificar_inadimplencia(db: Session = Depends(get_db), admin: Usuario 
                 penalizados += 1
     
     db.commit()
+    registrar_acao_admin(db, admin.id, "VERIFICAR_INADIMPLENCIA", alvo_id="SISTEMA", detalhes=f"Emprestimos: {len(atrasados)}, Penalizados: {penalizados}", ip=None)
     return {"message": f"Verificação concluída. {len(atrasados)} empréstimos em atraso encontrados. {penalizados} garantidores penalizados com score 0."}
 
 @router.post("/admin/liberar-especial/{solicitacao_id}")
@@ -1287,6 +1290,7 @@ async def liberacao_especial_admin(solicitacao_id: int, db: Session = Depends(ge
     try:
         sucesso = tentar_liberar_emprestimo(solicitacao_id, db, ignore_guarantors=True)
         if sucesso:
+            registrar_acao_admin(db, admin.id, "LIBERACAO_ESPECIAL", alvo_id=str(solicitacao_id), detalhes="Bypass de garantidores", ip=None)
             return {"message": "Empréstimo liberado com sucesso (Bypass de Garantidores)!"}
         else:
             raise HTTPException(status_code=400, detail="Não foi possível liberar. Verifique se a meta de 100% foi atingida.")
@@ -1349,6 +1353,7 @@ async def confirmar_aporte_pool(
         detalhes=f"Aporte Pool Aprovado - Pedido #{solicitacao_id}"
     ))
 
+    registrar_acao_admin(db, admin.id, "APROVAR_APORTE_POOL", alvo_id=str(solicitacao_id), detalhes=f"Valor: {valor_aporte}", ip=None)
     db.commit()
     
     return {"message": f"Aporte do Pool de R$ {valor_aporte} confirmado!"}

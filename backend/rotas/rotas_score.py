@@ -34,6 +34,11 @@ async def comprar_score(db: Session = Depends(get_db), usuario: Usuario = Depend
     usuario.saldo -= custo
     usuario.score = novo_score
     
+    # Creditar lucro à plataforma (000PL)
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if plataforma:
+        plataforma.saldo += custo
+
     # Registrar transação
     nova_transacao = Transacao(
         usuario_id=usuario.id,
@@ -71,6 +76,12 @@ async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Dep
             raise HTTPException(status_code=400, detail="Saldo insuficiente para taxa de verificação (R$ 35,00).")
         # Deduzir saldo apenas se for o primeiro pagamento
         usuario.saldo -= custo
+        
+        # Creditar lucro à plataforma (000PL)
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if plataforma:
+            plataforma.saldo += custo
+
         detalhe_pagamento = "Pagamento Taxa KYC"
     else:
         detalhe_pagamento = "Reenvio de Documentos (Isento de Nova Taxa)"

@@ -645,7 +645,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     <span>Loja</span>
                 </div>
                 {usuario.is_parceiro && (
-                    <div className="action-btn" onClick={() => setActiveView('caixa')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
+                    <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
                         <Store size={28} color="var(--warning)" />
                         <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
                     </div>
@@ -762,7 +762,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     </div>
                 </div>
             )}
-            {activeView === 'caixa' && (
+            {activeView === 'caixa_parceiro' && (
                 <CaixaParceiro onBack={() => setActiveView('home')} setMensagem={setMensagem} usuario={usuario} onUpdate={carregarSnapshot} />
             )}
 
@@ -1383,7 +1383,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         )}
                         
                         {/* NOVO MENU DO CAIXA DO LOJISTA */}
-                        {activeView === 'caixa' && usuario?.is_parceiro && (
+                        {activeView === 'caixa_parceiro' && usuario?.is_parceiro && (
                             <CaixaParceiro 
                                 onUpdate={carregarSnapshot}
                                 usuario={usuario}

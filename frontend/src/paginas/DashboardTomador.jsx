@@ -317,7 +317,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
     const handleQuitar = (emprestimoId) => {
         showModal({
-            title: 'Quitar Empréstimo',
+            title: 'Liquidar Crédito',
             message: 'Deseja quitar o valor integral do empréstimo agora? \nEsta ação liquidará todas as parcelas restantes.',
             type: 'finance',
             onConfirm: async () => {
@@ -325,7 +325,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                 setLoadingAction(true);
                 try {
                     await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
-                    showModal({ title: 'Sucesso!', message: 'Empréstimo quitado com sucesso!', type: 'success' });
+                    showModal({ title: 'Sucesso!', message: 'Crédito liquidado com sucesso!', type: 'success' });
                     carregarSnapshot();
                 } catch (err) {
                     setMensagem('Erro ao quitar: ' + err.message);
@@ -662,7 +662,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {/* View Switcher Content */}
             {activeView === 'solicitar' && (
                 <div className="card">
-                    <h2 className="mb-1" style={{ color: 'var(--primary)' }}>Novo Empréstimo</h2>
+                    <h2 className="mb-1" style={{ color: 'var(--primary)' }}>Novo Pedido de Crédito</h2>
                     <form onSubmit={handleSolicitar}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                             <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
@@ -754,7 +754,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
                             <button type="submit" className="btn btn-primary" style={{ opacity: aceiteTermos ? 1 : 0.4, cursor: aceiteTermos ? 'pointer' : 'not-allowed' }} disabled={!aceiteTermos}>
-                                <Gift size={18} /> Criar Pedido de Empréstimo
+                                <Gift size={18} /> Criar Pedido de Apoio
                             </button>
                             <button type="button" className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
                         </div>
@@ -1194,7 +1194,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                             {ativos.length > 0 && (
                                                 <div>
                                                     <h4 style={{ fontSize: '0.75rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <TrendingUp size={14} /> Empréstimos Ativos
+                                                        <TrendingUp size={14} /> Créditos Ativos
                                                     </h4>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                                         {ativos.map(emp => (
@@ -1211,7 +1211,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                                                                 </button>
                                                                             )}
                                                                         </div>
-                                                                        <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Empréstimo #{emp.id}</h3>
+                                                                        <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Crédito #{emp.id}</h3>
                                                                         <div className="text-muted" style={{ fontSize: '0.7rem' }}>
                                                                             Você recebe: <strong style={{ color: 'var(--text-main)' }}>R$ {emp.valor.toLocaleString('pt-BR')}</strong>
                                                                         </div>

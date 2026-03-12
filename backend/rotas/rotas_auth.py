@@ -19,6 +19,7 @@ class RegistroUsuario(BaseModel):
     cpf: str
     senha: str 
     chave_pix: str
+    telefone: str | None = None
     cidade: str | None = None
     estado: str | None = None
     aceite_termos: bool = False
@@ -157,6 +158,7 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         cpf=dados.cpf,
         senha_hash=get_password_hash(dados.senha),
         chave_pix=dados.chave_pix,
+        telefone=dados.telefone,
         cidade=dados.cidade,
         estado=dados.estado,
         aceite_termos=dados.aceite_termos,
@@ -276,10 +278,20 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "is_verified": usuario.is_verified,
         "cpf": usuario.cpf,
         "chave_pix": usuario.chave_pix,
+        "telefone": usuario.telefone,
         "cidade": usuario.cidade,
         "estado": usuario.estado,
-        "two_factor_enabled": usuario.two_factor_enabled
+        "two_factor_enabled": usuario.two_factor_enabled,
+        "aceite_cookies": usuario.aceite_cookies
     }
+
+@router.post("/aceitar-cookies")
+async def aceitar_cookies(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Registra o consentimento de cookies para o usuário logado."""
+    usuario.aceite_cookies = True
+    usuario.data_aceite_cookies = datetime.utcnow()
+    db.commit()
+    return {"message": "Preferências de cookies salvas."}
 
 @router.post("/2fa/gerar")
 async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):

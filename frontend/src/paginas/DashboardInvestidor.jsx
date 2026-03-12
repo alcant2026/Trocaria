@@ -355,7 +355,7 @@ const DashboardInvestidor = () => {
         <div className="investidor-dashboard">
             <header className="mb-1">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h1>Painel Investidor</h1>
+                    <h1>Meus Aportes (Fundo Coletivo)</h1>
                     <div className="hide-on-mobile">
                         <div
                             onClick={handleCopiarId}
@@ -629,7 +629,7 @@ const DashboardInvestidor = () => {
             {activeView === 'mercado' && (
                 <div className="mt-1">
                     <div className="flex-between mb-1">
-                        <h3>Oportunidades de Investimento</h3>
+                        <h3>Apoio Comunitário</h3>
                         <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
 

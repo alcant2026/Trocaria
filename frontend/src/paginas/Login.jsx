@@ -8,6 +8,15 @@ const Login = ({ onLogin }) => {
     const [senha, setSenha] = useState('');
     const [mensagem, setMensagem] = useState('');
 
+    const maskCPF = (value) => {
+        return value
+            .replace(/\D/g, '') // Remove tudo que não é dígito
+            .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto após os 3 primeiros dígitos
+            .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto após os 6 primeiros dígitos
+            .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca hífen após os 9 primeiros dígitos
+            .replace(/(-\d{2})\d+?$/, '$1'); // Limita o CPF a 11 dígitos
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -29,7 +38,7 @@ const Login = ({ onLogin }) => {
                         <img src="/favicon.svg" alt="P Logo" style={{ width: '48px', height: '48px' }} />
                     </div>
                     <h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Bem-vindo ao Peer</h1>
-                    <p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Gestão Financeira Descentralizada</p>
+                    <p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Crédito Colaborativo: Fortalecendo nossa Comunidade</p>
                 </div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
@@ -43,7 +52,7 @@ const Login = ({ onLogin }) => {
                                 autoComplete="username"
                                 placeholder="Seu CPF (000.000.000-00)" 
                                 value={cpf} 
-                                onChange={(e) => setCpf(e.target.value)} 
+                                onChange={(e) => setCpf(maskCPF(e.target.value))} 
                                 className="input-field" 
                                 required 
                             />

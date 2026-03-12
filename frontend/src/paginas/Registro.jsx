@@ -10,6 +10,7 @@ const Registro = () => {
         cpf: '',
         chave_pix: '',
         senha: '',
+        telefone: '',
         cidade: '',
         estado: ''
     });
@@ -19,6 +20,23 @@ const Registro = () => {
     const [showTermos, setShowTermos] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [sucesso, setSucesso] = useState(false);
+
+    const maskCPF = (value) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+            .replace(/(-\d{2})\d+?$/, '$1');
+    };
+
+    const maskPhone = (value) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{2})(\d)/, '($1) $2')
+            .replace(/(\d{5})(\d)/, '$1-$2')
+            .replace(/(-\d{4})\d+?$/, '$1');
+    };
 
     // Carregar estados do IBGE
     React.useEffect(() => {
@@ -41,7 +59,11 @@ const Registro = () => {
     }, [formData.estado]);
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
+        let { name, value } = e.target;
+        
+        if (name === 'cpf') value = maskCPF(value);
+        if (name === 'telefone') value = maskPhone(value);
+
         if (name === 'estado') {
             setFormData({ ...formData, [name]: value, cidade: '' });
         } else {
@@ -89,12 +111,24 @@ const Registro = () => {
                         <div className="input-row input-row-2">
                             <div className="input-group">
                                 <label>CPF</label>
-                                <input name="cpf" placeholder="000.000.000-00" onChange={handleChange} className="input-field" required />
+                                <input name="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={handleChange} className="input-field" required />
                             </div>
                             <div className="input-group">
                                 <label>Chave PIX</label>
                                 <input name="chave_pix" placeholder="CPF ou E-mail" onChange={handleChange} className="input-field" required />
                             </div>
+                        </div>
+
+                        <div className="input-group">
+                            <label>Telefone / WhatsApp</label>
+                            <input 
+                                name="telefone" 
+                                placeholder="(00) 00000-0000" 
+                                value={formData.telefone}
+                                onChange={handleChange} 
+                                className="input-field" 
+                                required 
+                            />
                         </div>
 
                         <div className="input-row input-row-state-city">
@@ -129,7 +163,7 @@ const Registro = () => {
                                 style={{ marginTop: '4px', cursor: 'pointer' }}
                             />
                             <label htmlFor="aceite" style={{ fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
-                                Concordo com os <button type="button" onClick={() => setShowTermos(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>Termos de Uso</button> e a política de intermediação tecnológica.
+                                Concordo com os <button type="button" onClick={() => setShowTermos(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>Termos de Uso</button> e a <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Política de Privacidade</a>.
                             </label>
                         </div>
 

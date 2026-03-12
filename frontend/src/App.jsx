@@ -8,6 +8,8 @@ import Seguranca from './paginas/Seguranca';
 import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield, ShoppingBag } from 'lucide-react';
 import './index.css';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
+import BannerCookies from './componentes/BannerCookies';
+import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
 
 const App = () => {
     const whatsappLink = 'https://wa.me/5591980177874';
@@ -57,8 +59,26 @@ const App = () => {
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('usuario');
+        localStorage.removeItem('peer_cookies_accepted'); // Resetar para garantir novo aceite se necessário
         setUser(null);
         window.location.hash = 'login';
+    };
+
+    const atualizarPerfil = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/perfil`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data);
+                localStorage.setItem('usuario', JSON.stringify(data));
+            }
+        } catch (err) {
+            console.error("Erro ao atualizar perfil:", err);
+        }
     };
 
     const botaoWhatsapp = (
@@ -91,10 +111,14 @@ const App = () => {
                 </>
             );
         }
+        if (page === 'privacidade') {
+            return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
+        }
         return (
             <>
                 <Login onLogin={onLogin} />
                 {botaoWhatsapp}
+                <BannerCookies usuario={null} />
             </>
         );
     }
@@ -134,7 +158,7 @@ const App = () => {
                             <ArrowDownUp size={20} /> Início
                         </a>
                         <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <TrendingUp size={20} /> Investimentos
+                            <TrendingUp size={20} /> Fundo Coletivo
                         </a>
                         <a href="#loja" className={`nav-item ${page === 'loja' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ShoppingBag size={20} /> Loja
@@ -185,7 +209,8 @@ const App = () => {
                 {page === 'loja' && <DashboardTomador initialView="loja" />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'seguranca' && <Seguranca />}
-                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca', 'loja'].includes(page)) && <DashboardTomador />}
+                {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'tomador'} />}
+                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca', 'loja', 'privacidade'].includes(page)) && <DashboardTomador />}
             </main>
             {/* Modal de Exclusão Crítica */}
             {modalExcluir && (
@@ -223,6 +248,7 @@ const App = () => {
             )}
             {botaoWhatsapp}
             <TemporizadorInatividade aoDeslogar={logout} />
+            <BannerCookies usuario={user} onUpdate={atualizarPerfil} />
         </div>
     );
 };

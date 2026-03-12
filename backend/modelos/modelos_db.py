@@ -61,12 +61,20 @@ class Usuario(Base):
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True) # Para LGPD / Deleção lógica
     
+    # NOVOS: Contato
+    telefone = Column(String(20), nullable=True) # Ex: (91) 98017-7874
+    
     # Localização do Usuário
     cidade = Column(String, nullable=True)
     estado = Column(String, nullable=True)
     
     # Proteção Jurídica: Aceite de Termos de Uso (Intermediação SaaS)
     aceite_termos = Column(Boolean, default=False)
+    
+    # NOVOS: Conformidade LGPD (Cookies e Privacidade)
+    aceite_cookies = Column(Boolean, default=False)
+    data_aceite_cookies = Column(DateTime, nullable=True)
+    
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     
     auditoria = relationship("RegistroAuditoria")

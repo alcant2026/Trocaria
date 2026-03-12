@@ -204,6 +204,40 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 .mt-1 { margin-top: 1rem; }
 .text-center { text-align: center; }
 
+/* Página de Autenticação (Login/Registro) */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  background-image: url('/fundo_autenticacao.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.auth-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(0,0,0,0.4));
+  z-index: 1;
+}
+
+.auth-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 440px;
+  animation: slide-up 0.5s ease-out;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Navbar Clean */
 .navbar {
   position: fixed;
@@ -357,6 +391,16 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 @media (max-width: 768px) {
   .flex-between-mobile { flex-direction: column; align-items: flex-start; gap: 10px; }
   .whatsapp-float { width: 54px !important; height: 54px !important; bottom: 20px !important; right: 20px !important; }
+  .main-content { padding-top: 5rem; padding-left: 1rem; padding-right: 1rem; }
+  .nav-brand span { display: none; }
+}
+
+/* Navbar Responsividade */
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
 }
 
 /* Footer do Drawer */
@@ -372,3 +416,69 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* Multi-select logic */
 .custom-select-options::-webkit-scrollbar { width: 6px; }
 .custom-select-options::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+/* Splash Screen (Cold Start Render) */
+.splash-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    gap: 20px;
+}
+
+.splash-logo {
+    width: 64px;
+    height: 64px;
+    border: 4px solid rgba(255, 255, 255, 0.05);
+    border-top: 4px solid var(--primary);
+    border-right: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 30px rgba(255, 204, 0, 0.15);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.splash-loader::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 30%;
+    background: linear-gradient(90deg, #007bff, #00d084);
+    border-radius: 2px;
+    animation: splash-loading 1.5s infinite ease-in-out;
+}
+
+@keyframes splash-loading {
+    0% { left: -30%; }
+    100% { left: 100%; }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.splash-text {
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 500;
+    letter-spacing: 1px;
+}
+
+.splash-sub {
+    font-size: 0.7rem;
+    color: #666;
+}

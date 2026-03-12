@@ -219,14 +219,21 @@ const DashboardTomador = ({ initialView = 'home' }) => {
         }
     };
 
-    // Smart Polling (60s) - Só roda se a aba estiver visível
+    // Smart Polling (30s) + Visibility Update
     useEffect(() => {
         const interval = setInterval(() => {
-            if (!document.hidden) {
-                carregarSnapshot();
-            }
-        }, 60000);
-        return () => clearInterval(interval);
+            if (!document.hidden) carregarSnapshot();
+        }, 30000);
+
+        const handleVisibility = () => {
+            if (!document.hidden) carregarSnapshot();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     }, []);
 
     useEffect(() => {

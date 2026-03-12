@@ -15,8 +15,23 @@ const App = () => {
     const [user, setUser] = useState(null);
     const [menuAberto, setMenuAberto] = useState(false);
     const [modalExcluir, setModalExcluir] = useState(false);
+    const [servidorPronto, setServidorPronto] = useState(false);
 
     useEffect(() => {
+        // Verificar se o servidor está acordado (Cold Start Render)
+        const checkServer = async () => {
+            try {
+                const response = await fetch(import.meta.env.VITE_API_URL || 'http://localhost:8000');
+                if (response.ok || response.status === 404) {
+                    setServidorPronto(true);
+                }
+            } catch (err) {
+                console.log("Aguardando servidor...");
+                setTimeout(checkServer, 3000);
+            }
+        };
+        checkServer();
+
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#', '') || 'login';
             setPage(hash);
@@ -58,6 +73,14 @@ const App = () => {
             <MessageCircle size={32} fill="currentColor" />
         </a>
     );
+
+    if (!servidorPronto) {
+        return (
+            <div className="splash-container">
+                <div className="splash-logo"></div>
+            </div>
+        );
+    }
 
     if (!user) {
         if (page === 'registro') {

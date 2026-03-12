@@ -148,7 +148,7 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                             <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--warning)', margin: 0 }}>
                                 R$ {(usuario?.comissoes_acumuladas || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
-                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>1.5% por operação confirmada</p>
+                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>0.5% por operação confirmada</p>
                         </div>
                         <button
                             className="btn btn-primary"

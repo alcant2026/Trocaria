@@ -509,33 +509,52 @@ const DashboardInvestidor = () => {
                 </div>
             </div>
 
-            {/* Action Mosaic / Grid */}
-            <div className="action-grid">
-                <div className="action-btn" onClick={() => setActiveView('mercado')}>
-                    <TrendingUp size={28} color="var(--primary)" />
-                    <span>Oportunidades</span>
+            {/* Action Mosaic / Grid - Header for Active View */}
+            {activeView !== 'home' && (
+                <div className="flex-between mb-1 animate-fade-in" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button 
+                            onClick={() => { setActiveView('home'); setPassoDeposito(1); setPassoSaque(1); }}
+                            style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h2 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'capitalize' }}>
+                            {activeView === 'caixa_pool' ? 'Caixa (Pool)' : activeView === 'mercado' ? 'Oportunidades' : activeView}
+                        </h2>
+                    </div>
                 </div>
-                <div className="action-btn" onClick={() => setActiveView('depositar')}>
-                    <ArrowUpCircle size={28} />
-                    <span>Depositar</span>
+            )}
+
+            {/* Action Mosaic / Grid - Only visible in 'home' view */}
+            {activeView === 'home' && (
+                <div className="action-grid animate-fade-in">
+                    <div className="action-btn" onClick={() => setActiveView('mercado')}>
+                        <TrendingUp size={28} color="var(--primary)" />
+                        <span>Oportunidades</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('depositar')}>
+                        <ArrowUpCircle size={28} />
+                        <span>Depositar</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('saque')}>
+                        <ArrowDownCircle size={28} />
+                        <span>Sacar</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('historico')}>
+                        <History size={28} />
+                        <span>Histórico</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('carteira')}>
+                        <Briefcase size={28} />
+                        <span>Carteira</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('caixa_pool')} style={{ borderColor: 'var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                        <TrendingUp size={28} color="var(--primary)" />
+                        <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Caixa (Pool)</span>
+                    </div>
                 </div>
-                <div className="action-btn" onClick={() => setActiveView('saque')}>
-                    <ArrowDownCircle size={28} />
-                    <span>Sacar</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('historico')}>
-                    <History size={28} />
-                    <span>Histórico</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('carteira')}>
-                    <Briefcase size={28} />
-                    <span>Carteira</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('caixa_pool')} style={{ borderColor: 'var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
-                    <TrendingUp size={28} color="var(--primary)" />
-                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Caixa (Pool)</span>
-                </div>
-            </div>
+            )}
 
             {activeView === 'home' && (
                 <div className="home-content">
@@ -622,11 +641,10 @@ const DashboardInvestidor = () => {
                             )}
                         </>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                        <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
+                        {/* Removido botão redundante no rodapé */}
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Market Opportunities Detail View */}
 
@@ -634,7 +652,6 @@ const DashboardInvestidor = () => {
                 <div className="mt-1">
                     <div className="flex-between mb-1">
                         <h3>Apoio Comunitário</h3>
-                        <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
 
                     {solicitacoes.length === 0 ? (
@@ -890,7 +907,6 @@ const DashboardInvestidor = () => {
                 <div className="mt-1">
                     <div className="flex-between mb-1">
                         <h3>Minha Carteira</h3>
-                        <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Fechar</button>
                     </div>
                     {carteira.length === 0 ? (
                         <div className="card text-center text-muted">Você ainda não investiu em ativos.</div>
@@ -947,7 +963,6 @@ const DashboardInvestidor = () => {
                 <div className="mt-1">
                     <div className="flex-between mb-1">
                         <h3>Gestão do Caixa</h3>
-                        <button className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveView('home')}>Voltar</button>
                     </div>
                     <CaixaInvestidor
                         usuario={usuario}
@@ -1020,10 +1035,10 @@ const DashboardInvestidor = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <div style={{ marginTop: '1.5rem' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        style={{ flex: 2 }} 
+                                        style={{ width: '100%' }} 
                                         onClick={() => {
                                             if (parseFloat(valorNotificacao) > 0) setPassoDeposito(2);
                                             else showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
@@ -1031,7 +1046,6 @@ const DashboardInvestidor = () => {
                                     >
                                         Continuar
                                     </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoDeposito(1); }}>Voltar</button>
                                 </div>
                             </div>
                         )}
@@ -1176,16 +1190,15 @@ const DashboardInvestidor = () => {
                                             )}
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                        <div style={{ marginTop: '1.5rem' }}>
                                             <button 
                                                 className="btn btn-primary" 
-                                                style={{ flex: 2 }} 
+                                                style={{ width: '100%' }} 
                                                 disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo}
                                                 onClick={() => setPassoSaque(2)}
                                             >
                                                 Continuar
                                             </button>
-                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSaque(1); }}>Voltar</button>
                                         </div>
                                     </div>
                                 )}
@@ -1296,9 +1309,11 @@ const DashboardInvestidor = () => {
                 )
             }
             
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', paddingBottom: '2rem' }}>
-                <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>
-            </div>
+            {activeView !== 'home' && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', paddingBottom: '2rem' }}>
+                    <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>
+                </div>
+            )}
 
             {showTermos && (
                 <div className="modal-overlay">

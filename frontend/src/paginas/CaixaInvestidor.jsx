@@ -39,7 +39,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
             setTimeout(resetar, 3000);
             onUpdate();
         } catch (err) {
-            setMensagem({ type: 'error', text: err.response?.data?.detail || 'Erro ao aportar.' });
+            setMensagem({ type: 'error', text: err.message || 'Erro ao aportar.' });
         } finally {
             setLoading(false);
         }
@@ -60,7 +60,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
             setTimeout(resetar, 3000);
             onUpdate();
         } catch (err) {
-            setMensagem({ type: 'error', text: err.response?.data?.detail || 'Erro ao resgatar.' });
+            setMensagem({ type: 'error', text: err.message || 'Erro ao resgatar.' });
         } finally {
             setLoading(false);
         }

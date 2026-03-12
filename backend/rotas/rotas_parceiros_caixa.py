@@ -9,8 +9,9 @@ import datetime
 router = APIRouter(prefix="/parceiros", tags=["Caixa Parceiro"])
 
 # ================= COMISSIONAMENTO =================
-TAXA_INTERMEDIACAO_SAQUE = Decimal("0.02")  # 2% do saque vai pro parceiro
-TAXA_INTERMEDIACAO_DEPOSITO = Decimal("0.02") # 2% do depósito
+TAXA_TOTAL = Decimal("0.02")           # 2% taxa total da operação
+TAXA_COMISSAO_PARCEIRO = Decimal("0.005") # 0.5% vai pro parceiro (balcão)
+TAXA_PLATAFORMA = Decimal("0.015")     # 1.5% fica pra plataforma (Peer)
 
 @router.get("/meu-caixa")
 async def obter_meu_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -118,15 +119,34 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
         if usuario.saldo < dados.valor:
             raise HTTPException(status_code=400, detail="Você não tem saldo virtual disponível suficiente na Peer para enviar este depósito.")
         
-        comissao = dados.valor * TAXA_INTERMEDIACAO_DEPOSITO
+        # Cálculo de Taxas
+        valor_liquido = dados.valor * (Decimal("1.0") - TAXA_TOTAL)
+        comissao_parceiro = dados.valor * TAXA_COMISSAO_PARCEIRO
+        taxa_plataforma = dados.valor * TAXA_PLATAFORMA
         
-        # Debitar parceiro, Creditar cliente
+        # Debitar parceiro (valor bruto), Creditar cliente (valor líquido)
+        # O parceiro transfere o valor digital para o cliente.
+        # Aqui o parceiro transfere o valor solicitado, e o sistema retém a taxa.
         usuario.saldo -= dados.valor
-        cliente.saldo += dados.valor
+        cliente.saldo += valor_liquido
         
-        # Incrementar Gaveta Dinheiro Vivo do parceiro
+        # Incrementar Gaveta Dinheiro Vivo do parceiro (Ele recebeu o valor cheio em papel)
         parceiro.saldo_caixa_atual += dados.valor
-        parceiro.comissoes_acumuladas += comissao
+        parceiro.comissoes_acumuladas += comissao_parceiro
+        
+        # Creditar lucro à plataforma (000PL)
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if plataforma:
+            plataforma.saldo += taxa_plataforma
+
+        # Registro de Taxa da Plataforma
+        db.add(Transacao(
+            usuario_id=cliente.id,
+            valor=taxa_plataforma,
+            tipo=TipoTransacao.TAXA_ESPECIE,
+            status="concluido",
+            detalhes=f"Taxa Peer: Depósito em Espécie (Parceiro #{parceiro.id})"
+        ))
         
         # Transação de Envio pelo Parceiro
         db.add(Transacao(
@@ -163,15 +183,32 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
         if parceiro.saldo_caixa_atual < dados.valor:
             raise HTTPException(status_code=400, detail="Você não tem dinheiro físico em gaveta suficiente para pagar este saque.")
             
-        comissao = dados.valor * TAXA_INTERMEDIACAO_SAQUE
+        # Cálculo de Taxas
+        valor_em_maos = dados.valor * (Decimal("1.0") - TAXA_TOTAL)
+        comissao_parceiro = dados.valor * TAXA_COMISSAO_PARCEIRO
+        taxa_plataforma = dados.valor * TAXA_PLATAFORMA
         
-        # Debitar cliente e creditar parceiro digitalmente
+        # Debitar cliente (valor cheio) e creditar parceiro digitalmente (valor cheio)
         cliente.saldo -= dados.valor
         usuario.saldo += dados.valor
         
-        # Tirar dinheiro vivo da gaveta
-        parceiro.saldo_caixa_atual -= dados.valor
-        parceiro.comissoes_acumuladas += comissao
+        # Tirar dinheiro vivo da gaveta (O cliente recebe o valor líquido em mãos)
+        parceiro.saldo_caixa_atual -= valor_em_maos
+        parceiro.comissoes_acumuladas += comissao_parceiro
+        
+        # Creditar lucro à plataforma (000PL)
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        if plataforma:
+            plataforma.saldo += taxa_plataforma
+
+        # Registro de Taxa da Plataforma
+        db.add(Transacao(
+            usuario_id=cliente.id,
+            valor=taxa_plataforma,
+            tipo=TipoTransacao.TAXA_ESPECIE,
+            status="concluido",
+            detalhes=f"Taxa Peer: Saque em Espécie (Parceiro #{parceiro.id})"
+        ))
         
         # Transação Saque Cliente
         db.add(Transacao(

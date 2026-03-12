@@ -344,8 +344,8 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
     # --- Nova lógica de taxas ---
     # Garante Decimal puro para evitar TypeError com SQLite (que pode retornar float)
     valor_decimal = Decimal(str(transacao.valor))
-    comissao_parceiro = valor_decimal * Decimal("0.015")  # 1.5% para o parceiro
-    taxa_plataforma   = valor_decimal * Decimal("0.005")  # 0.5% para a plataforma
+    comissao_parceiro = valor_decimal * Decimal("0.005")  # 0.5% para o parceiro
+    taxa_plataforma   = valor_decimal * Decimal("0.015")  # 1.5% para a plataforma
     fee_total         = valor_decimal * Decimal("0.02")   # 2% total
 
     # Confirmação Efetiva e Registro de Taxas

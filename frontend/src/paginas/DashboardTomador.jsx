@@ -638,43 +638,62 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                 </div>
             </div>
 
-            {/* Action Mosaic / Grid */}
-            <div className="action-grid">
-                <div className="action-btn" onClick={() => setActiveView('solicitar')}>
-                    <PlusCircle size={28} color="var(--primary)" />
-                    <span>Solicitar</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('depositar')}>
-                    <ArrowUpCircle size={28} />
-                    <span>Depositar</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('saque')}>
-                    <ArrowDownCircle size={28} />
-                    <span>Sacar</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('historico')}>
-                    <History size={28} />
-                    <span>Histórico</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('contratos')}>
-                    <LayoutDashboard size={28} />
-                    <span>Contratos</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('score')}>
-                    <ShieldCheck size={28} />
-                    <span>Upgrade</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('loja')}>
-                    <ShoppingBag size={28} color="var(--primary)" />
-                    <span>Loja</span>
-                </div>
-                {usuario.is_parceiro && (
-                    <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-                        <Store size={28} color="var(--warning)" />
-                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+            {/* Action Mosaic / Grid - Header for Active View */}
+            {activeView !== 'home' && (
+                <div className="flex-between mb-1 animate-fade-in" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button 
+                            onClick={() => { setActiveView('home'); setPassoSolicitar(1); setPassoDeposito(1); setPassoSaque(1); setPassoUpgrade(1); }}
+                            style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h2 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'capitalize' }}>
+                            {activeView === 'caixa_parceiro' ? 'Meu Caixa' : activeView === 'score' ? 'Upgrade' : activeView}
+                        </h2>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+
+            {/* Action Mosaic / Grid - Only visible in 'home' view */}
+            {activeView === 'home' && (
+                <div className="action-grid animate-fade-in">
+                    <div className="action-btn" onClick={() => setActiveView('solicitar')}>
+                        <PlusCircle size={28} color="var(--primary)" />
+                        <span>Solicitar</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('depositar')}>
+                        <ArrowUpCircle size={28} />
+                        <span>Depositar</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('saque')}>
+                        <ArrowDownCircle size={28} />
+                        <span>Sacar</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('historico')}>
+                        <History size={28} />
+                        <span>Histórico</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('contratos')}>
+                        <LayoutDashboard size={28} />
+                        <span>Contratos</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('score')}>
+                        <ShieldCheck size={28} />
+                        <span>Upgrade</span>
+                    </div>
+                    <div className="action-btn" onClick={() => setActiveView('loja')}>
+                        <ShoppingBag size={28} color="var(--primary)" />
+                        <span>Loja</span>
+                    </div>
+                    {usuario.is_parceiro && (
+                        <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
+                            <Store size={28} color="var(--warning)" />
+                            <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* View Switcher Content */}
             {activeView === 'solicitar' && (
@@ -996,9 +1015,6 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {activeView === 'loja' && (
                 <div className="card">
                     <LojaAfiliados onMensagem={setMensagem} />
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                        <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '120px' }} onClick={() => setActiveView('home')}>Voltar</button>
-                    </div>
                 </div>
             )}
             {activeView === 'caixa_parceiro' && (
@@ -1067,10 +1083,10 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <div style={{ marginTop: '1.5rem' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        style={{ flex: 2 }} 
+                                        style={{ width: '100%' }} 
                                         onClick={() => {
                                             if (parseFloat(valorNotificacao) > 0) setPassoDeposito(2);
                                             else showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
@@ -1078,7 +1094,6 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     >
                                         Continuar
                                     </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoDeposito(1); }}>Voltar</button>
                                 </div>
                             </div>
                         )}
@@ -1418,16 +1433,15 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     </div>
                                 )}
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                                <div style={{ marginTop: '1rem' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        style={{ flex: 2 }} 
+                                        style={{ width: '100%' }} 
                                         disabled={!tipoUpgrade}
                                         onClick={() => setPassoUpgrade(2)}
                                     >
                                         Continuar
                                     </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoUpgrade(1); setTipoUpgrade(null); }}>Voltar</button>
                                 </div>
                             </div>
                         )}
@@ -1486,23 +1500,36 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 )}
 
                                 <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
-                                    <div className="info-label">Pagar via PIX (Copie e Cole)</div>
-                                    <div className="info-value" style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        91980177874
-                                        <button onClick={() => { navigator.clipboard.writeText('91980177874'); setCopiadoPix(true); setTimeout(() => setCopiadoPix(false), 2000); }} style={{ background: 'none', border: 'none', color: copiadoPix ? 'var(--success)' : 'var(--text-muted)', cursor: 'pointer' }}>
-                                            {copiadoPix ? <Check size={16} /> : <Copy size={16} />}
-                                        </button>
+                                    <div className="info-label">Custo do Upgrade</div>
+                                    <div className="info-value" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>
+                                        R$ 35,00
+                                    </div>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>O valor será descontado do seu saldo atual.</p>
+                                </div>
+
+                                <div className="info-block mb-1">
+                                    <div className="flex-between">
+                                        <span style={{ fontSize: '0.85rem' }}>Seu Saldo:</span>
+                                        <strong style={{ color: usuario.saldo >= 35 ? 'var(--success)' : 'var(--danger)' }}>
+                                            R$ {parseFloat(usuario.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </strong>
                                     </div>
                                 </div>
+
+                                {usuario.saldo < 35 && (
+                                    <div className="alert alert-warning mb-1" style={{ fontSize: '0.8rem', padding: '10px' }}>
+                                        <AlertCircle size={16} /> Você não tem saldo suficiente. <button onClick={() => setActiveView('depositar')} style={{ background: 'none', border: 'none', color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 700 }}>Fazer Depósito</button>
+                                    </div>
+                                )}
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
                                     <button 
                                         className="btn btn-primary" 
                                         style={{ flex: 2 }} 
-                                        disabled={tipoUpgrade === 'verificacao' && !kycDetails}
+                                        disabled={(tipoUpgrade === 'verificacao' && !kycDetails) || usuario.saldo < 35}
                                         onClick={() => setPassoUpgrade(3)}
                                     >
-                                        Já realizei o Pagamento
+                                        Pagar com Saldo
                                     </button>
                                     <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                 </div>
@@ -1518,8 +1545,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 <h3 className="mb-1">Tudo Pronto!</h3>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
                                     {tipoUpgrade === 'score' 
-                                        ? "Sua solicitação de Turbo Score será processada assim que o pagamento for confirmado." 
-                                        : "Nossa equipe analisará seus documentos e o pagamento em até 24h úteis."}
+                                        ? "Confirme para atualizar seu Score agora mesmo." 
+                                        : "Nossa equipe analisará seus documentos e sua conta em até 24h úteis."}
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
@@ -1534,9 +1561,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            {passoUpgrade === 1 && <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar ao Início</button>}
-                        </div>
+                        {/* Removido botão redundante no rodapé */}
                     </div>
                 )
             }
@@ -1630,9 +1655,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 )}
                             </>
                         )}
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
-                        </div>
+                        {/* Removido botão redundante no rodapé */}
                     </div>
                 )
             }
@@ -1913,10 +1936,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 usuario={usuario}
                             />
                         )}
-
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={() => setActiveView('home')}><ArrowLeft size={18} /> Voltar</button>
-                        </div>
+                        {/* Removido botão redundante global */}
                     </div>
                 )
             }

@@ -38,7 +38,12 @@ import {
     Bell,
     RefreshCw,
     ArrowDown,
-    Store
+    Store,
+    Package,
+    Zap,
+    Rocket,
+    MapPin,
+    Lock
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
@@ -161,6 +166,14 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     const [senhaSaque, setSenhaSaque] = useState('');
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [aceiteSolicitacao, setAceiteSolicitacao] = useState(false);
+    const [passoDeposito, setPassoDeposito] = useState(1);
+    const [passoSaque, setPassoSaque] = useState(1);
+    const [passoSolicitar, setPassoSolicitar] = useState(1);
+    const [passoUpgrade, setPassoUpgrade] = useState(1);
+    const [tipoUpgrade, setTipoUpgrade] = useState(null); // 'score' ou 'verificacao'
+    const [tipoGarantia, setTipoGarantia] = useState('social'); // 'social', 'fisica', 'hibrida' ou 'nenhuma'
+    const [garantiaDescricao, setGarantiaDescricao] = useState('');
+    const [parceiroIdGarantia, setParceiroIdGarantia] = useState('');
     const [mensagem, setMensagem] = useState(null);
 
     useEffect(() => {
@@ -258,7 +271,11 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                 valor: parseFloat(valor),
                 taxa_juros: parseFloat(taxa),
                 parcelas: parseInt(parcelas),
-                aceite_termos: true
+                aceite_termos: true,
+                tipo_garantia: tipoGarantia,
+                garantia_descricao: (tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') ? garantiaDescricao : null,
+                parceiro_id: (tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') ? parseInt(parceiroIdGarantia) : null,
+                garantidores_ids: (tipoGarantia === 'social' || tipoGarantia === 'hibrida') ? [idAmigo1, idAmigo2] : []
             });
             setMensagem(res.message || 'Solicitação enviada!');
             setActiveView('home');
@@ -662,103 +679,318 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {/* View Switcher Content */}
             {activeView === 'solicitar' && (
                 <div className="card">
-                    <h2 className="mb-1" style={{ color: 'var(--primary)' }}>Novo Pedido de Crédito</h2>
-                    <form onSubmit={handleSolicitar}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                            <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                <label style={{ textAlign: 'center', display: 'block' }}>Quanto você precisa?</label>
-                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <input
-                                        type="number"
-                                        className="input-field"
-                                        placeholder="0,00"
-                                        style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                        value={valor}
-                                        min="0.01"
-                                        step="0.01"
-                                        onChange={(e) => setValor(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '280px' }}>
-                                <div className="input-group" style={{ flex: 1 }}>
-                                    <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Taxa (% mês)</label>
-                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            className="input-field"
-                                            placeholder="Ex: 5"
-                                            style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
-                                            value={taxa}
-                                            min="0.1"
-                                            onChange={(e) => setTaxa(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div className="input-group" style={{ flex: 1 }}>
-                                    <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Prazo (meses)</label>
-                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <input
-                                            type="number"
-                                            className="input-field"
-                                            placeholder="Ex: 12"
-                                            style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
-                                            value={parcelas}
-                                            min="1"
-                                            onChange={(e) => setParcelas(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
+                    <div className="flex-between mb-1">
+                        <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Novo Pedido de Crédito</h2>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoSolicitar ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
+                            ))}
                         </div>
+                    </div>
 
-                        {valor && taxa && parcelas && (
+                    {/* PASSO 1: SIMULAÇÃO */}
+                    {passoSolicitar === 1 && (
+                        <div className="animate-fade-in">
+                            <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Simule o valor e as condições do seu pedido de apoio.</p>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
+                                    <label style={{ textAlign: 'center', display: 'block' }}>Quanto você precisa?</label>
+                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <input
+                                            type="number"
+                                            className="input-field"
+                                            placeholder="0,00"
+                                            style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
+                                            value={valor}
+                                            onChange={(e) => setValor(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '280px' }}>
+                                    <div className="input-group" style={{ flex: 1 }}>
+                                        <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Taxa (% mês)</label>
+                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                className="input-field"
+                                                placeholder="Ex: 5"
+                                                style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
+                                                value={taxa}
+                                                onChange={(e) => setTaxa(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="input-group" style={{ flex: 1 }}>
+                                        <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Prazo (meses)</label>
+                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <input
+                                                type="number"
+                                                className="input-field"
+                                                placeholder="Ex: 12"
+                                                style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
+                                                value={parcelas}
+                                                onChange={(e) => setParcelas(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {valor && taxa && parcelas && (
+                                <div className="info-block mt-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                                    <div className="info-label">Parcela Estimada</div>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                        R$ {((parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
+                                    <small className="text-muted">Total a devolver: R$ {(parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ flex: 2 }} 
+                                    disabled={!valor || !taxa || !parcelas || parseFloat(valor) <= 0}
+                                    onClick={() => setPassoSolicitar(2)}
+                                >
+                                    Continuar
+                                </button>
+                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSolicitar(1); }}>Voltar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PASSO 2: ESCOLHA DA GARANTIA */}
+                    {passoSolicitar === 2 && (
+                        <div className="animate-fade-in">
+                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Tipo de Garantia</h3>
+                            <p className="text-muted mb-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>Como você deseja garantir o pagamento do seu apoio?</p>
+                            
+                            <div className="grid-2" style={{ gap: '10px', marginBottom: '1rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                    <div 
+                                        className={`card-selecionavel ${tipoGarantia === 'social' ? 'active' : ''}`}
+                                        onClick={() => setTipoGarantia('social')}
+                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'social' ? 'var(--primary)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'social' ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent', borderRadius: '16px' }}
+                                    >
+                                        <Users size={20} color={tipoGarantia === 'social' ? 'var(--primary)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
+                                        <div style={{ fontWeight: 600, fontSize: '0.75rem' }}>Social</div>
+                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>2 Amigos</div>
+                                    </div>
+                                    <div 
+                                        className={`card-selecionavel ${tipoGarantia === 'fisica' ? 'active' : ''}`}
+                                        onClick={() => setTipoGarantia('fisica')}
+                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'fisica' ? 'var(--primary)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'fisica' ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent', borderRadius: '16px' }}
+                                    >
+                                        <Package size={20} color={tipoGarantia === 'fisica' ? 'var(--primary)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
+                                        <div style={{ fontWeight: 600, fontSize: '0.75rem' }}>Física</div>
+                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Item Valor</div>
+                                    </div>
+                                    <div 
+                                        className={`card-selecionavel ${tipoGarantia === 'hibrida' ? 'active' : ''}`}
+                                        onClick={() => setTipoGarantia('hibrida')}
+                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'hibrida' ? 'var(--success)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'hibrida' ? 'rgba(0, 230, 118, 0.1)' : 'transparent', borderRadius: '16px' }}
+                                    >
+                                        <Zap size={20} color={tipoGarantia === 'hibrida' ? 'var(--success)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
+                                        <div style={{ fontWeight: 700, fontSize: '0.75rem', color: tipoGarantia === 'hibrida' ? 'var(--success)' : 'inherit' }}>Jato ✨</div>
+                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Social + Fís.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div 
+                                className={`card-selecionavel ${tipoGarantia === 'nenhuma' ? 'active' : ''}`}
+                                onClick={() => setTipoGarantia('nenhuma')}
+                                style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'center', 
+                                    cursor: 'pointer', 
+                                    border: '1px solid', 
+                                    borderColor: tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'rgba(255,255,255,0.05)', 
+                                    background: tipoGarantia === 'nenhuma' ? 'rgba(255, 61, 0, 0.05)' : 'rgba(255,255,255,0.02)', 
+                                    borderRadius: '16px',
+                                    marginBottom: '1.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px'
+                                }}
+                            >
+                                <ShieldAlert size={20} color={tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'var(--text-muted)'} />
+                                <div style={{ textAlign: 'left' }}>
+                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'inherit' }}>Sem Garantia Coletiva</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aprovação mais difícil e maior rigor na análise.</div>
+                                </div>
+                            </div>
+
+                            <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {(tipoGarantia === 'social' || tipoGarantia === 'hibrida') && (
+                                    <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <div className="input-group">
+                                            <label>ID Amigo 1</label>
+                                            <input type="number" className="input-field" placeholder="0000" value={idAmigo1} onChange={(e) => setIdAmigo1(e.target.value)} />
+                                        </div>
+                                        <div className="input-group">
+                                            <label>ID Amigo 2</label>
+                                            <input type="number" className="input-field" placeholder="0000" value={idAmigo2} onChange={(e) => setIdAmigo2(e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') && (
+                                    <>
+                                        <div className="input-group">
+                                            <label>Descrição do Item</label>
+                                            <input 
+                                                type="text" 
+                                                className="input-field" 
+                                                placeholder="Ex: iPhone 13 Pro Max" 
+                                                value={garantiaDescricao}
+                                                onChange={(e) => setGarantiaDescricao(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="input-group">
+                                            <label>Parceiro para Entrega</label>
+                                            <select 
+                                                className="input-field"
+                                                value={parceiroIdGarantia}
+                                                onChange={(e) => setParceiroIdGarantia(e.target.value)}
+                                            >
+                                                <option value="">Selecione um parceiro...</option>
+                                                {parceiros.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.nome}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ flex: 2 }} 
+                                    disabled={
+                                        (tipoGarantia === 'social' && (!idAmigo1 || !idAmigo2)) ||
+                                        (tipoGarantia === 'fisica' && (!garantiaDescricao || !parceiroIdGarantia)) ||
+                                        (tipoGarantia === 'hibrida' && (!idAmigo1 || !idAmigo2 || !garantiaDescricao || !parceiroIdGarantia)) ||
+                                        (tipoGarantia === 'nenhuma' && false) // Sempre habilitado para 'nenhuma'
+                                    }
+                                    onClick={() => setPassoSolicitar(3)}
+                                >
+                                    Continuar
+                                </button>
+                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(1)}>Voltar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PASSO 3: TERMOS E TAXAS */}
+                    {passoSolicitar === 3 && (
+                        <div className="animate-fade-in">
+                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Termos e Compromissos</h3>
+                            
+                            {/* Aviso de Política de Taxa */}
+                            <div style={{ padding: '16px', background: 'rgba(255, 145, 0, 0.07)', border: '1px solid rgba(255, 145, 0, 0.2)', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Gift size={20} /> Taxa de Intermediação
+                                </p>
+                                <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                                    • 1º pedido do mês: <strong>ISENTO</strong> <br />
+                                    • A partir do 2º: <strong>R$ 4,00</strong> (taxa de processamento). <br />
+                                    <span style={{ fontSize: '0.7rem', display: 'block', marginTop: '4px' }}>Atenção: A taxa de R$ 4,00 não é devolvida caso não haja investidores.</span>
+                                </p>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <input
+                                    type="checkbox"
+                                    id="check-termos"
+                                    style={{ marginTop: '4px', transform: 'scale(1.2)' }}
+                                    checked={aceiteTermos}
+                                    onChange={(e) => setAceiteTermos(e.target.checked)}
+                                />
+                                <label htmlFor="check-termos" style={{ fontSize: '0.8rem', color: 'var(--text-main)', cursor: 'pointer', lineHeight: '1.4' }}>
+                                    Estou ciente da política de taxas e concordo com os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span> da plataforma Peer.
+                                </label>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ flex: 2 }} 
+                                    disabled={!aceiteTermos}
+                                    onClick={() => setPassoSolicitar(4)}
+                                >
+                                    Revisar Pedido
+                                </button>
+                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(2)}>Voltar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PASSO 4: REVISÃO FINAL */}
+                    {passoSolicitar === 4 && (
+                        <div className="animate-fade-in">
+                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Resumo da Solicitação</h3>
+                            
                             <div className="info-block mb-1">
-                                <div className="info-label">Parcela Estimada</div>
-                                <div className="info-value text-primary">
-                                    R$ {((parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Valor Desejado:</span>
+                                    <span style={{ fontWeight: 700 }}>R$ {parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <small className="text-muted">Total: R$ {(parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Taxa Oferecida:</span>
+                                    <span style={{ fontWeight: 700 }}>{taxa}% ao mês</span>
+                                </div>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Prazo:</span>
+                                    <span style={{ fontWeight: 700 }}>{parcelas} meses</span>
+                                </div>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Garantia:</span>
+                                    <span style={{ fontWeight: 700, color: tipoGarantia === 'hibrida' ? 'var(--success)' : tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'var(--primary)' }}>
+                                        {tipoGarantia === 'hibrida' ? 'Híbrida (Jato ✨)' : tipoGarantia === 'fisica' ? 'Física (Item)' : tipoGarantia === 'nenhuma' ? 'Nenhuma (Risco Alto)' : 'Social (Amigos)'}
+                                    </span>
+                                </div>
+                                {(tipoGarantia === 'social' || tipoGarantia === 'hibrida') && (
+                                    <div className="text-muted mb-1" style={{ fontSize: '0.75rem', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        Garantidores: ID {idAmigo1} e ID {idAmigo2}
+                                    </div>
+                                )}
+                                {(tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') && (
+                                    <div className="text-muted mb-1" style={{ fontSize: '0.75rem', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        Item: {garantiaDescricao} <br />
+                                        Local: {parceiros.find(p => p.id == parceiroIdGarantia)?.nome}
+                                    </div>
+                                )}
+                                <div className="flex-between" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', marginTop: '5px' }}>
+                                    <span style={{ fontWeight: 600 }}>Parcela Mensal:</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                        R$ {((parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
                             </div>
-                        )}
 
-                        {/* Aviso de Política de Taxa */}
-                        <div style={{ padding: '12px 16px', background: 'rgba(255, 145, 0, 0.07)', border: '1px solid rgba(255, 145, 0, 0.2)', borderRadius: '12px', maxWidth: '400px', margin: '0 auto 1rem' }}>
-                            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Gift size={16} /> 1º pedido do mês: <strong>isento de taxa</strong>
+                            <p className="text-muted text-center" style={{ fontSize: '0.75rem', padding: '0 10px' }}>
+                                Ao clicar em confirmar, seu pedido será publicado no mural de oportunidades para análise da comunidade.
                             </p>
-                            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                A partir do 2º pedido no mês, é cobrada uma taxa de <strong>R$ 4,00</strong>.<br />
-                                Atenção: se não houver investidores, a taxa <strong>não será devolvida</strong>.
-                            </p>
-                        </div>
 
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', maxWidth: '400px', margin: '1rem auto' }}>
-                            <input
-                                type="checkbox"
-                                id="check-termos"
-                                style={{ marginTop: '4px' }}
-                                checked={aceiteTermos}
-                                onChange={(e) => setAceiteTermos(e.target.checked)}
-                            />
-                            <label htmlFor="check-termos" style={{ fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer' }}>
-                                Estou ciente das <span style={{ color: 'var(--warning)', fontWeight: 600 }}>taxas de intermediação</span> (R$ 4,00 a partir do 2º pedido/mês) e concordo com os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span>.
-                            </label>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ flex: 2 }} 
+                                    onClick={handleSolicitar}
+                                >
+                                    {loadingAction ? 'Enviando...' : 'Confirmar e Publicar'}
+                                </button>
+                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(3)}>Voltar</button>
+                            </div>
                         </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
-                            <button type="submit" className="btn btn-primary" style={{ opacity: aceiteTermos ? 1 : 0.4, cursor: aceiteTermos ? 'pointer' : 'not-allowed' }} disabled={!aceiteTermos}>
-                                <Gift size={18} /> Criar Pedido de Apoio
-                            </button>
-                            <button type="button" className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
-                        </div>
-                    </form>
+                    )}
                 </div >
             )}
             {activeView === 'loja' && (
@@ -787,94 +1019,146 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {
                 activeView === 'depositar' && (
                     <div className="card">
-                        <h2 className="mb-1">Adicionar Saldo</h2>
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-                            <button
-                                className={`btn ${metodoDeposito === 'pix' ? 'btn-primary' : 'btn-outline'}`}
-                                style={{ flex: 1, padding: '0.6rem' }}
-                                onClick={() => setMetodoDeposito('pix')}
-                            >
-                                Via PIX
-                            </button>
-                            <button
-                                className={`btn ${metodoDeposito === 'especie' ? 'btn-primary' : 'btn-outline'}`}
-                                style={{ flex: 1, padding: '0.6rem' }}
-                                onClick={() => setMetodoDeposito('especie')}
-                            >
-                                Em Espécie
-                            </button>
+                        <div className="flex-between mb-1">
+                            <h2 style={{ fontSize: '1.2rem' }}>Adicionar Saldo</h2>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoDeposito ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
+                                ))}
+                            </div>
                         </div>
 
-                        {metodoDeposito === 'pix' ? (
-                            <>
-                                <p className="mb-1">Transfira via PIX para a chave abaixo e informe o valor:</p>
-                                <div className="info-block mb-1 text-center" style={{ position: 'relative' }}>
-                                    <div className="info-label">Chave PIX (E-mail)</div>
-                                    <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        91980177874
+                        {/* PASSO 1: VALOR E MÉTODO */}
+                        {passoDeposito === 1 && (
+                            <div className="animate-fade-in">
+                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Quanto deseja adicionar e como prefere pagar?</p>
+                                
+                                <div className="input-group mb-1">
+                                    <label>Escolha o Método</label>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
                                         <button
-                                            onClick={copiarPix}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: copiadoPix ? 'var(--success)' : 'var(--text-muted)',
-                                                cursor: 'pointer',
-                                                padding: '4px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                transition: 'var(--transition)'
-                                            }}
-                                            title="Copiar chave PIX"
+                                            className={`btn ${metodoDeposito === 'pix' ? 'btn-primary' : 'btn-outline'}`}
+                                            style={{ flex: 1, padding: '0.6rem' }}
+                                            onClick={() => setMetodoDeposito('pix')}
                                         >
-                                            {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                                            Via PIX
+                                        </button>
+                                        <button
+                                            className={`btn ${metodoDeposito === 'especie' ? 'btn-primary' : 'btn-outline'}`}
+                                            style={{ flex: 1, padding: '0.6rem' }}
+                                            onClick={() => setMetodoDeposito('especie')}
+                                        >
+                                            Em Espécie
                                         </button>
                                     </div>
-                                    {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado!</p>}
                                 </div>
-                            </>
-                        ) : (
-                            <div className="input-group">
-                                <label>Escolha o Estabelecimento Parceiro</label>
-                                <select
-                                    name="parceiro_deposito"
-                                    id="parceiro_deposito"
-                                    className="input-field"
-                                    value={parceiroIdDeposito}
-                                    onChange={(e) => setParceiroIdDeposito(e.target.value)}
-                                    style={{ marginBottom: '1rem' }}
-                                >
-                                    <option value="">Selecione um local...</option>
-                                    {parceiros.map(p => (
-                                        <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
-                                    ))}
-                                </select>
-                                <p className="text-muted" style={{ fontSize: '0.8rem' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+
+                                <div className="input-group">
+                                    <label>Valor do Depósito</label>
+                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <input
+                                            type="number"
+                                            className="input-field"
+                                            placeholder="R$ 0,00"
+                                            style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
+                                            value={valorNotificacao}
+                                            onChange={(e) => setValorNotificacao(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ flex: 2 }} 
+                                        onClick={() => {
+                                            if (parseFloat(valorNotificacao) > 0) setPassoDeposito(2);
+                                            else showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+                                        }}
+                                    >
+                                        Continuar
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoDeposito(1); }}>Voltar</button>
+                                </div>
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', maxWidth: '280px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <input
-                                            type="number"
-                                            name="valor_deposito_tomador"
-                                            id="valor_deposito_tomador"
-                                            autoComplete="off"
+                        {/* PASSO 2: INSTRUÇÕES */}
+                        {passoDeposito === 2 && (
+                            <div className="animate-fade-in">
+                                {metodoDeposito === 'pix' ? (
+                                    <>
+                                        <p className="mb-1">Tudo pronto! Agora realize a transferência PIX:</p>
+                                        <div className="info-block mb-1 text-center" style={{ position: 'relative', background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
+                                            <div className="info-label">Chave PIX (E-mail)</div>
+                                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                91980177874
+                                                <button
+                                                    onClick={copiarPix}
+                                                    style={{ background: 'none', border: 'none', color: copiadoPix ? 'var(--success)' : 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                                                >
+                                                    {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                                                </button>
+                                            </div>
+                                            {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado para o clipboard!</p>}
+                                        </div>
+                                        <div className="info-block mb-1">
+                                            <div className="info-label">Valor a pagar</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="input-group">
+                                        <label>Escolha o Estabelecimento Parceiro</label>
+                                        <select
                                             className="input-field"
-                                            placeholder="Valor do Depósito R$"
-                                        style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%' }}
-                                        value={valorNotificacao}
-                                        min="0.01"
-                                        step="0.01"
-                                        onChange={(e) => setValorNotificacao(e.target.value)}
-                                    />
+                                            value={parceiroIdDeposito}
+                                            onChange={(e) => setParceiroIdDeposito(e.target.value)}
+                                            style={{ marginBottom: '1rem' }}
+                                        >
+                                            <option value="">Selecione um local...</option>
+                                            {parceiros.map(p => (
+                                                <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                            ))}
+                                        </select>
+                                        <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ flex: 2 }} 
+                                        disabled={metodoDeposito === 'especie' && !parceiroIdDeposito}
+                                        onClick={() => setPassoDeposito(3)}
+                                    >
+                                        Já realizei o Pagamento
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoDeposito(1)}>Voltar</button>
+                                </div>
                             </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '1.5rem' }}>
-                            <button className="btn btn-primary" onClick={handleNotificarDeposito}>
-                                <Check size={18} /> Já realizei o Pagamento
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => setActiveView('home')}>Voltar</button>
-                        </div>
+                        )}
+
+                        {/* PASSO 3: CONFIRMAÇÃO FINAL */}
+                        {passoDeposito === 3 && (
+                            <div className="animate-fade-in text-center" style={{ padding: '1rem 0' }}>
+                                <div style={{ background: 'rgba(var(--success-rgb), 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                                    <CheckCircle2 size={40} color="var(--success)" />
+                                </div>
+                                <h3 className="mb-1">Quase lá!</h3>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
+                                    Estamos verificando seu depósito de <strong>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>.
+                                </p>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>
+                                    O saldo aparecerá na sua conta assim que o pagamento for confirmado.
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button className="btn btn-primary" onClick={handleNotificarDeposito}>Confirmar Notificação</button>
+                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)}>Revisar Dados</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )
             }
@@ -882,7 +1166,14 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {
                 activeView === 'saque' && (
                     <div className="card">
-                        <h2 className="mb-1">Solicitar Saque</h2>
+                        <div className="flex-between mb-1">
+                            <h2 style={{ fontSize: '1.2rem' }}>Solicitar Saque</h2>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoSaque ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
+                                ))}
+                            </div>
+                        </div>
 
                         {!usuario.two_factor_enabled ? (
                             <div className="text-center" style={{ padding: '1rem' }}>
@@ -895,128 +1186,164 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
-                                    <button
-                                        className={`btn ${metodoSaque === 'pix' ? 'btn-primary' : 'btn-outline'}`}
-                                        style={{ flex: 1, padding: '0.6rem' }}
-                                        onClick={() => setMetodoSaque('pix')}
-                                    >
-                                        Via PIX
-                                    </button>
-                                    <button
-                                        className={`btn ${metodoSaque === 'especie' ? 'btn-primary' : 'btn-outline'}`}
-                                        style={{ flex: 1, padding: '0.6rem' }}
-                                        onClick={() => setMetodoSaque('especie')}
-                                    >
-                                        Em Espécie
-                                    </button>
-                                </div>
+                            <>
+                                {/* PASSO 1: VALOR E MÉTODO */}
+                                {passoSaque === 1 && (
+                                    <div className="animate-fade-in">
+                                        <div className="input-group mb-1">
+                                            <label>Forma de Recebimento</label>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button
+                                                    className={`btn ${metodoSaque === 'pix' ? 'btn-primary' : 'btn-outline'}`}
+                                                    style={{ flex: 1, padding: '0.6rem' }}
+                                                    onClick={() => setMetodoSaque('pix')}
+                                                >
+                                                    Via PIX
+                                                </button>
+                                                <button
+                                                    className={`btn ${metodoSaque === 'especie' ? 'btn-primary' : 'btn-outline'}`}
+                                                    style={{ flex: 1, padding: '0.6rem' }}
+                                                    onClick={() => setMetodoSaque('especie')}
+                                                >
+                                                    Em Espécie
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                {metodoSaque === 'pix' ? (
-                                    <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                        O valor será enviado para sua chave PIX: <strong>{usuario.chave_pix}</strong>
-                                    </p>
-                                ) : (
-                                    <div className="input-group">
-                                        <label>Selecione o Parceiro para Retirada</label>
-                                        <select
-                                            name="parceiro_saque_tomador"
-                                            id="parceiro_saque_tomador"
-                                            className="input-field"
-                                            value={parceiroIdSaque}
-                                            onChange={(e) => setParceiroIdSaque(e.target.value)}
-                                        >
-                                            <option value="">Selecione um local...</option>
-                                            {parceiros.map(p => (
-                                                <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
-                                            ))}
-                                        </select>
+                                        <div className="input-group">
+                                            <label>Quanto deseja sacar?</label>
+                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <input
+                                                    type="number"
+                                                    className="input-field"
+                                                    placeholder="R$ 0,00"
+                                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
+                                                    value={valorSaque}
+                                                    onChange={(e) => setValorSaque(e.target.value)}
+                                                />
+                                            </div>
+                                            {parseFloat(valorSaque) > usuario.saldo && (
+                                                <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
+                                                    ⚠️ Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 2 }} 
+                                                disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo}
+                                                onClick={() => setPassoSaque(2)}
+                                            >
+                                                Continuar
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSaque(1); }}>Voltar</button>
+                                        </div>
                                     </div>
                                 )}
 
-                                <div className="input-group">
-                                    <label>Quanto deseja sacar?</label>
-                                    <input
-                                        type="number"
-                                        name="valor_saque_v1_tomador"
-                                        id="valor_saque_v1_tomador"
-                                        autoComplete="off"
-                                        className="input-field"
-                                        placeholder="Valor R$ 0,00"
-                                        min="0.01"
-                                        step="0.01"
-                                        value={valorSaque}
-                                        onChange={(e) => setValorSaque(e.target.value)}
-                                        style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}
-                                    />
-                                    {parseFloat(valorSaque) > usuario.saldo && (
-                                        <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
-                                            ⚠️ Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                        </p>
-                                    )}
-                                </div>
+                                {/* PASSO 2: REVISÃO E TAXAS */}
+                                {passoSaque === 2 && (
+                                    <div className="animate-fade-in">
+                                        <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+                                            <div className="flex-between mb-1">
+                                                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Valor Solicitado:</span>
+                                                <span style={{ fontWeight: 700 }}>R$ {parseFloat(valorSaque).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex-between mb-1">
+                                                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Taxa de Saque:</span>
+                                                <span style={{ fontWeight: 700, color: usuario.saldo_caixa >= 100 ? 'var(--success)' : 'var(--danger)' }}>
+                                                    {usuario.saldo_caixa >= 100 ? 'R$ 0,00 (ISENTO)' : 'R$ 5,00'}
+                                                </span>
+                                            </div>
+                                            <div className="flex-between" style={{ color: 'var(--success)', fontWeight: 800, fontSize: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                                                <span>Valor Líquido:</span>
+                                                <span>
+                                                    R$ {Math.max(0, parseFloat(valorSaque) - (usuario.saldo_caixa >= 100 ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                {/* Regra de Taxa Dinâmica */}
-                                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                                    <div className="flex-between" style={{ marginBottom: '4px' }}>
-                                        <span className="text-muted" style={{ fontSize: '0.85rem' }}>Taxa de Saque:</span>
-                                        <span style={{ fontWeight: 700, color: usuario.saldo_caixa >= 100 ? 'var(--success)' : 'var(--text-main)' }}>
-                                            {usuario.saldo_caixa >= 100 ? 'R$ 0,00 (ISENTO)' : 'R$ 5,00'}
-                                        </span>
-                                    </div>
-                                    <div className="flex-between" style={{ color: 'var(--success)', fontWeight: 800 }}>
-                                        <span>Você Receberá:</span>
-                                        <span>
-                                            R$ {Math.max(0, parseFloat(valorSaque || 0) - (usuario.saldo_caixa >= 100 ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                    {usuario.saldo_caixa >= 100 ? (
-                                        <p style={{ fontSize: '0.65rem', color: 'var(--success)', marginTop: '8px', borderTop: '1px solid rgba(0,230,118,0.1)', paddingTop: '8px' }}>
-                                            ✨ Benefício Pool: Você possui R$ {usuario.saldo_caixa.toLocaleString('pt-BR')} investidos e não paga taxa de saque!
-                                        </p>
-                                    ) : (
-                                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                                            Dica: Invista R$ 100 no Pool para ter saques ilimitados sem taxas.
-                                        </p>
-                                    )}
-                                </div>
+                                        {metodoSaque === 'pix' ? (
+                                            <p className="text-muted mb-1" style={{ fontSize: '0.85rem', textAlign: 'center' }}>
+                                                O valor será enviado para sua chave PIX: <br /><strong>{usuario.chave_pix}</strong>
+                                            </p>
+                                        ) : (
+                                            <div className="input-group mb-1">
+                                                <label>Selecione o Parceiro para Retirada</label>
+                                                <select
+                                                    className="input-field"
+                                                    value={parceiroIdSaque}
+                                                    onChange={(e) => setParceiroIdSaque(e.target.value)}
+                                                >
+                                                    <option value="">Selecione um local...</option>
+                                                    {parceiros.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
 
-                                    <div className="grid-2" style={{ gap: '10px' }}>
-                                        <input
-                                            type="password"
-                                            name="senha_saque_tomador"
-                                            id="senha_saque_tomador"
-                                            autoComplete="current-password"
-                                            className="input-field"
-                                            placeholder="Sua Senha"
-                                            value={senhaSaque}
-                                            onChange={(e) => setSenhaSaque(e.target.value)}
-                                        />
-                                        <input
-                                            type="text"
-                                            name="token_saque_tomador"
-                                            id="token_saque_tomador"
-                                            autoComplete="one-time-code"
-                                            className="input-field"
-                                            placeholder="Código 2FA"
-                                            value={codigo2faSaque}
-                                            onChange={(e) => setCodigo2faSaque(e.target.value)}
-                                        />
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 2 }} 
+                                                disabled={metodoSaque === 'especie' && !parceiroIdSaque}
+                                                onClick={() => setPassoSaque(3)}
+                                            >
+                                                Prosseguir para Segurança
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSaque(1)}>Voltar</button>
+                                        </div>
                                     </div>
+                                )}
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ flex: 1 }} 
-                                        onClick={handleSolicitarSaque}
-                                        disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo || !senhaSaque || !codigo2faSaque}
-                                    >
-                                        Confirmar Saque
-                                    </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Voltar</button>
-                                </div>
-                            </div>
+                                {/* PASSO 3: SEGURANÇA */}
+                                {passoSaque === 3 && (
+                                    <div className="animate-fade-in">
+                                        <div className="text-center mb-1">
+                                            <Lock size={32} color="var(--primary)" style={{ marginBottom: '10px' }} />
+                                            <p className="text-muted" style={{ fontSize: '0.85rem' }}>Para sua segurança, confirme sua senha e o código 2FA.</p>
+                                        </div>
+
+                                        <div className="input-group mb-1">
+                                            <label>Sua Senha</label>
+                                            <input
+                                                type="password"
+                                                className="input-field"
+                                                placeholder="Sua senha de acesso"
+                                                value={senhaSaque}
+                                                onChange={(e) => setSenhaSaque(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="input-group mb-1">
+                                            <label>Código 2FA</label>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="000000"
+                                                style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '1.2rem', fontWeight: 700 }}
+                                                value={codigo2faSaque}
+                                                onChange={(e) => setCodigo2faSaque(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 2 }} 
+                                                onClick={handleSolicitarSaque}
+                                                disabled={!senhaSaque || !codigo2faSaque}
+                                            >
+                                                Confirmar Saque
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSaque(2)}>Voltar</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )
@@ -1025,50 +1352,190 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {
                 activeView === 'score' && (
                     <div className="card">
-                        <h2 className="mb-1">Upgrade de Perfil</h2>
-                        <div className="card-minimal mb-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <RefreshCw size={20} className="animate-spin-slow" /> Turbo Score
-                            </h3>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Adicione +1.5 pontos ao seu score instantaneamente.</p>
-                            <button className="btn btn-outline" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={handleComprarScore}>Comprar por R$ 35,00</button>
+                        <div className="flex-between mb-1">
+                            <h2 style={{ fontSize: '1.2rem' }}>Upgrade de Perfil</h2>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoUpgrade ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
+                                ))}
+                            </div>
                         </div>
-                        {!usuario.is_verified && (
-                            <div className="card-minimal" style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                                <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 color="var(--success)" /> Verificação de Conta</h3>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sua privacidade é prioridade: não armazenamos fotos de documentos locais. Seus dados estão protegidos sob a LGPD.</p>
 
-                                {/* Novo: Exibir motivo de rejeição anterior se houver */}
-                                {(() => {
-                                    const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
-                                    if (kycRejeitado) {
-                                        return (
-                                            <div style={{ background: 'rgba(255, 61, 0, 0.1)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '12px', borderRadius: '12px', marginBottom: '1.5rem', width: '100%', maxWidth: '400px' }}>
-                                                <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                                    <AlertCircle size={16} /> ÚLTIMA TENTATIVA REJEITADA
-                                                </p>
-                                                <p style={{ color: '#fff', fontSize: '0.85rem', marginTop: '6px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                        {/* PASSO 1: SELEÇÃO DO UPGRADE */}
+                        {passoUpgrade === 1 && (
+                            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de tomador hoje.</p>
+                                
+                                <div 
+                                    className="card-minimal clickable" 
+                                    style={{ 
+                                        background: tipoUpgrade === 'score' ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(255,255,255,0.03)', 
+                                        padding: '1.2rem', 
+                                        borderRadius: '16px', 
+                                        border: tipoUpgrade === 'score' ? '1px solid var(--primary)' : '1px solid transparent',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onClick={() => setTipoUpgrade('score')}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
+                                            <RefreshCw size={24} color="var(--primary)" />
+                                        </div>
+                                        <div style={{ textAlign: 'left' }}>
+                                            <h3 style={{ fontSize: '1rem', marginBottom: '2px' }}>Turbo Score</h3>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+1.5 pontos imediatos no seu score.</p>
+                                        </div>
+                                        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                                            <span style={{ fontWeight: 800, color: 'var(--success)' }}>R$ 35,00</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {!usuario.is_verified && (
+                                    <div 
+                                        className="card-minimal clickable" 
+                                        style={{ 
+                                            background: tipoUpgrade === 'verificacao' ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(255,255,255,0.03)', 
+                                            padding: '1.2rem', 
+                                            borderRadius: '16px', 
+                                            border: tipoUpgrade === 'verificacao' ? '1px solid var(--primary)' : '1px solid transparent',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                        onClick={() => setTipoUpgrade('verificacao')}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ background: 'rgba(var(--success-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
+                                                <ShieldCheck size={24} color="var(--success)" />
                                             </div>
-                                        );
-                                    }
-                                    return null;
-                                })()}
+                                            <div style={{ textAlign: 'left' }}>
+                                                <h3 style={{ fontSize: '1rem', marginBottom: '2px' }}>Verificação de Conta</h3>
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Selo de verificado e maior confiança.</p>
+                                            </div>
+                                            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                                                <span style={{ fontWeight: 800, color: 'var(--success)' }}>R$ 35,00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '1rem' }}>Como enviar: <br /> 1. Suba seus docs no Google Drive ou Imgur <br /> 2. Cole o link no campo abaixo <br /> 3. Ou descreva como nos enviou (ex: via WhatsApp).</p>
-                                <textarea
-                                    name="kyc_details"
-                                    id="kyc_details"
-                                    className="input-field mt-1"
-                                    style={{ width: '100%', maxWidth: '400px', marginBottom: '1rem' }}
-                                    placeholder="Link do Google Drive/Imgur ou Informe o envio..."
-                                    value={kycDetails}
-                                    onChange={(e) => setKycDetails(e.target.value)}
-                                />
-                                <button className="btn btn-primary" style={{ width: 'auto', minWidth: '200px', padding: '0.75rem 1.5rem' }} onClick={handleSolicitarVerificacao}>Reenviar Docs (R$ 35,00)</button>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ flex: 2 }} 
+                                        disabled={!tipoUpgrade}
+                                        onClick={() => setPassoUpgrade(2)}
+                                    >
+                                        Continuar
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoUpgrade(1); setTipoUpgrade(null); }}>Voltar</button>
+                                </div>
                             </div>
                         )}
+
+                        {/* PASSO 2: DETALHES E INSTRUÇÕES */}
+                        {passoUpgrade === 2 && (
+                            <div className="animate-fade-in">
+                                {tipoUpgrade === 'score' ? (
+                                    <div className="text-center" style={{ padding: '0.5rem' }}>
+                                        <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                                            <TrendingUp size={30} color="var(--primary)" />
+                                        </div>
+                                        <h3 className="mb-1">Impulso de Score</h3>
+                                        <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>O score turbinado ajuda você a conseguir crédito mais rápido com taxas menores.</p>
+                                        
+                                        <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                            <div className="flex-between">
+                                                <span>Valor do Upgrade:</span>
+                                                <strong style={{ color: 'var(--success)' }}>R$ 35,00</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="animate-fade-in">
+                                        <h3 className="mb-1" style={{ fontSize: '1.1rem' }}>Sua Privacidade em 1º Lugar</h3>
+                                        <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Não armazenamos fotos de documentos localmente para sua segurança total (LGPD).</p>
+                                        
+                                        {/* Exibir motivo de rejeição anterior se houver */}
+                                        {(() => {
+                                            const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
+                                            if (kycRejeitado) {
+                                                return (
+                                                    <div style={{ background: 'rgba(255, 61, 0, 0.08)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '10px', borderRadius: '10px', marginBottom: '1rem' }}>
+                                                        <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <AlertCircle size={14} /> TENTATIVA ANTERIOR REJEITADA
+                                                        </p>
+                                                        <p style={{ color: '#fff', fontSize: '0.8rem', marginTop: '4px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
+                                        <div className="input-group mb-1">
+                                            <label style={{ fontSize: '0.8rem' }}>Link do Google Drive ou Imgur com seus documentos:</label>
+                                            <textarea
+                                                className="input-field"
+                                                style={{ minHeight: '80px', fontSize: '0.85rem' }}
+                                                placeholder="https://drive.google.com/..."
+                                                value={kycDetails}
+                                                onChange={(e) => setKycDetails(e.target.value)}
+                                            />
+                                        </div>
+                                        <p className="text-muted" style={{ fontSize: '0.7rem' }}>Ou descreva como nos enviou (ex: via WhatsApp).</p>
+                                    </div>
+                                )}
+
+                                <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
+                                    <div className="info-label">Pagar via PIX (Copie e Cole)</div>
+                                    <div className="info-value" style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                        91980177874
+                                        <button onClick={() => { navigator.clipboard.writeText('91980177874'); setCopiadoPix(true); setTimeout(() => setCopiadoPix(false), 2000); }} style={{ background: 'none', border: 'none', color: copiadoPix ? 'var(--success)' : 'var(--text-muted)', cursor: 'pointer' }}>
+                                            {copiadoPix ? <Check size={16} /> : <Copy size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ flex: 2 }} 
+                                        disabled={tipoUpgrade === 'verificacao' && !kycDetails}
+                                        onClick={() => setPassoUpgrade(3)}
+                                    >
+                                        Já realizei o Pagamento
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* PASSO 3: CONFIRMAÇÃO E ENVIO */}
+                        {passoUpgrade === 3 && (
+                            <div className="animate-fade-in text-center" style={{ padding: '1rem 0' }}>
+                                <div style={{ background: 'rgba(var(--success-rgb), 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                                    <CheckCircle2 size={40} color="var(--success)" />
+                                </div>
+                                <h3 className="mb-1">Tudo Pronto!</h3>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
+                                    {tipoUpgrade === 'score' 
+                                        ? "Sua solicitação de Turbo Score será processada assim que o pagamento for confirmado." 
+                                        : "Nossa equipe analisará seus documentos e o pagamento em até 24h úteis."}
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={tipoUpgrade === 'score' ? handleComprarScore : handleSolicitarVerificacao}
+                                    >
+                                        Finalizar e Notificar
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => setPassoUpgrade(2)}>Revisar</button>
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar</button>
+                            {passoUpgrade === 1 && <button className="btn btn-secondary" style={{ width: 'auto', minWidth: '150px' }} onClick={() => setActiveView('home')}>Voltar ao Início</button>}
                         </div>
                     </div>
                 )
@@ -1248,7 +1715,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                                                             </div>
 
                                                                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
-                                                                                <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Assinaturas de Garantia</p>
+                                                                                <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Configuração de Garantia</p>
+                                                                                {emp.tipo_garantia === 'hibrida' && <p style={{ fontSize: '0.65rem', color: 'var(--success)', fontWeight: 700, marginBottom: '4px' }}>✨ MODO JATO ATIVO (Pool Acelerado)</p>}
+                                                                                
                                                                                 {emp.garantidores && emp.garantidores.length > 0 ? (
                                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                                                         {emp.garantidores.map((g, idx) => (
@@ -1261,21 +1730,69 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                                                                             </div>
                                                                                         ))}
                                                                                     </div>
-                                                                                ) : emp.valor_arrecadado >= emp.valor ? (
-                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Indique 2 amigos via ID para assinar:</p>
-                                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                                                                            <input type="number" className="input-field" placeholder="ID 1" style={{ fontSize: '0.8rem', textAlign: 'center' }} value={idAmigo1} onChange={e => setIdAmigo1(e.target.value)} />
-                                                                                            <input type="number" className="input-field" placeholder="ID 2" style={{ fontSize: '0.8rem', textAlign: 'center' }} value={idAmigo2} onChange={e => setIdAmigo2(e.target.value)} />
-                                                                                        </div>
-                                                                                        <button className="btn btn-primary" style={{ padding: '8px', fontSize: '0.75rem' }} onClick={() => handleVincularGarantidores(emp.id)}>Vincular Amigos</button>
-                                                                                    </div>
                                                                                 ) : (
-                                                                                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Garantidores necessários após 100% da meta.</p>
+                                                                                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                                                        {emp.tipo_garantia === 'fisica' ? 'Garantia física configurada.' : 'Aguardando arrecadação para liberação social.'}
+                                                                                    </p>
                                                                                 )}
                                                                             </div>
                                                                         </div>
                                                                     </>
+                                                                )}
+
+                                                                {emp.status === 'aguardando_avaliacao' && (
+                                                                    <div style={{ background: 'rgba(255, 145, 0, 0.1)', border: '1px solid rgba(255, 145, 0, 0.3)', padding: '15px', borderRadius: '16px', marginBottom: '1rem' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                            <Package size={24} color="var(--warning)" />
+                                                                            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning)' }}>Ação Necessária: Entrega Física</h4>
+                                                                        </div>
+                                                                        <p style={{ fontSize: '0.75rem', marginTop: '8px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4' }}>
+                                                                            Seu pedido foi financiado! Agora você deve levar o item <strong>{emp.garantia_descricao}</strong> até o parceiro <strong>{emp.parceiro_nome}</strong> para avaliação e liberação final do saldo.
+                                                                        </p>
+                                                                        {emp.parceiro_endereco && (
+                                                                            <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                                                                <MapPin size={16} color="var(--warning)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-main)', margin: 0, lineHeight: '1.3' }}>
+                                                                                    <strong>Endereço de Entrega:</strong><br />
+                                                                                    {emp.parceiro_endereco}
+                                                                                </p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {emp.status === 'aguardando_garantidores' && (
+                                                                    <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', border: '1px solid rgba(var(--primary-rgb), 0.3)', padding: '15px', borderRadius: '16px', marginBottom: '1rem' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                            <Users size={24} color="var(--primary)" />
+                                                                            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary)' }}>Aguardando Assinaturas</h4>
+                                                                        </div>
+                                                                        <p style={{ fontSize: '0.75rem', marginTop: '8px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4' }}>
+                                                                            A parte física foi aprovada (ou meta batida)! Falta apenas seus 2 amigos aceitarem o compromisso social no painel deles para que o dinheiro caia na sua conta.
+                                                                        </p>
+                                                                        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                            {emp.garantidores && emp.garantidores.map((g, idx) => (
+                                                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
+                                                                                    <span>{g.nome}</span>
+                                                                                    <span style={{ color: g.aceito ? 'var(--success)' : 'var(--warning)', fontWeight: 700 }}>
+                                                                                        {g.aceito ? 'Confirmou ✓' : 'Pendente...'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {emp.status === 'reprovado_garantia' && (
+                                                                    <div style={{ background: 'rgba(255, 61, 0, 0.1)', border: '1px solid rgba(255, 61, 0, 0.3)', padding: '15px', borderRadius: '16px', marginBottom: '1rem' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                            <AlertCircle size={24} color="var(--danger)" />
+                                                                            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--danger)' }}>Garantia Reprovada</h4>
+                                                                        </div>
+                                                                        <p style={{ fontSize: '0.75rem', marginTop: '8px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4' }}>
+                                                                            O parceiro recusou o item físico. Você tem <strong>1 hora</strong> para regularizar (ex: entregar outro item compatível ou resolver com o parceiro). Caso contrário, o pedido será cancelado.
+                                                                        </p>
+                                                                    </div>
                                                                 )}
 
                                                                 <div className="info-block" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginTop: '10px' }}>

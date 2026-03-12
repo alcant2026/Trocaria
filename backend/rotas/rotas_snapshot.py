@@ -331,6 +331,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "valor_parcela": round(float(valor_parcela), 2),
                 "valor_total_restante": round(valor_total_restante, 2),
                 "status": s.status.value,
+                "tipo_garantia": s.tipo_garantia,
+                "garantia_descricao": s.garantia_descricao,
+                "parceiro_nome": s.parceiro.nome if s.parceiro else None,
+                "parceiro_endereco": s.parceiro.endereco if s.parceiro else None,
                 "proximo_vencimento": s.proximo_vencimento.isoformat() if s.proximo_vencimento else None,
                 "data_expiracao_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
                 "data_expiracao_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None,
@@ -377,6 +381,14 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "score": float(s.usuario.score) if is_unlocked else float(s.usuario.score), # O score costuma ser visível para atrair investidor
                 "verified": s.usuario.is_verified,
                 "unlocked": is_unlocked,
+                "tipo_garantia": s.tipo_garantia,
+                "garantia_descricao": s.garantia_descricao if is_unlocked else None,
+                "parceiro_nome": s.parceiro.nome if is_unlocked and s.parceiro else None,
+                "parceiro_endereco": s.parceiro.endereco if is_unlocked and s.parceiro else None,
+                "garantidores": [
+                    {"nome": g.garante.nome.split()[0], "aceito": g.aceito} 
+                    for g in s.garantias_sociais
+                ] if is_unlocked else [],
                 "expira_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
                 "expira_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None
             })

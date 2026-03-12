@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_data import adicionar_mes
 from utils_emprestimo import tentar_liberar_emprestimo, estornar_e_limpar_solicitacao
 from utils_seguranca import registrar_acao_admin
+from rotas.rotas_snapshot import cache_snapshot_data
 
 router = APIRouter(prefix="/emprestimos", tags=["Empréstimos"])
 
@@ -18,7 +20,10 @@ class SolicitacaoRequest(BaseModel):
     taxa_juros: Decimal = Field(gt=0)
     parcelas: int = Field(gt=0)
     aceite_termos: bool
-    indicados_cpfs: list[str] = []
+    tipo_garantia: str = "social"
+    garantia_descricao: Optional[str] = None
+    parceiro_id: Optional[int] = None
+    garantidores_ids: list[str] = []
 
 def validar_limites_solicitacao(usuario: Usuario):
     agora = datetime.datetime.utcnow()
@@ -123,7 +128,10 @@ async def criar_solicitacao(
         aceite_termos=True,
         auditoria_id=auditoria.id,
         cpf_aceite=usuario.cpf,
-        data_aceite=agora
+        data_aceite=agora,
+        tipo_garantia=dados.tipo_garantia,
+        garantia_descricao=dados.garantia_descricao,
+        parceiro_id=dados.parceiro_id
     )
 
     # Lógica de Sugestão de Aporte do Pool (Caixa) baseada em Score/KYC
@@ -159,16 +167,11 @@ async def criar_solicitacao(
     db.add(nova_solicitacao)
     db.flush() # Para gerar o ID
 
-    # Limpeza preventiva: se por algum motivo houver resíduos de garantias para este ID 
-    # (ex: deleção manual mal-feita no passado), limpamos agora.
-    db.query(GarantiaSocial).filter(GarantiaSocial.solicitacao_id == nova_solicitacao.id).delete()
+    if dados.garantidores_ids and dados.tipo_garantia in ["social", "hibrida"]:
+        for g_id in dados.garantidores_ids:
+            if g_id != usuario.id:
+                db.add(GarantiaSocial(solicitacao_id=nova_solicitacao.id, garante_id=g_id, aceito=False))
 
-    if transacao_custo:
-        db.add(transacao_custo)
-
-    if transacao_custo:
-        db.add(transacao_custo)
-    
     db.commit()
     db.refresh(nova_solicitacao)
 
@@ -619,6 +622,7 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
                 # Cada um recebe sua fatia proporcional do retorno total (Cap + Juros)
                 fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_final_pool
                 p_caixa.saldo_caixa += fatia
+                db.add(p_caixa)
                 
             inv.pago_para_investidor += valor_final_pool
             
@@ -672,6 +676,10 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
                 garante.saldo += valor_bloqueio
 
     db.commit()
+    
+    # Invalida o cache global para que os novos saldos reflitam imediatamente
+    cache_snapshot_data.clear()
+
     return {
         "message": f"Parcela paga! Multa: R$ {multa_atraso:.2f}",
         "novo_saldo": float(usuario.saldo),
@@ -778,6 +786,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
             for p_caixa in participantes_caixa:
                 fatia = (p_caixa.saldo_caixa / total_caixa_global) * valor_liquido_investidor
                 p_caixa.saldo_caixa += fatia
+                db.add(p_caixa)
                 # Cálculo de juros para o log administrativo (baseado na proporção da plataforma)
             lucro_pool_global = valor_liquido_investidor - principal_pendente
             proporcao_admin = plataforma.saldo_caixa / total_caixa_global if total_caixa_global > 0 else Decimal("0")
@@ -827,6 +836,10 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     ))
 
     db.commit()
+    
+    # Invalida o cache global
+    cache_snapshot_data.clear()
+
     return {
         "message": "Empréstimo quitado com sucesso!",
         "novo_saldo": float(usuario.saldo),
@@ -1044,6 +1057,38 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     from fastapi import Response
     from datetime import timedelta
     
+    # Função auxiliar para limpar strings (o PDF padrão só aceita latin-1)
+    def limpar(txt):
+        if not txt: return ""
+        return str(txt).encode('latin-1', 'replace').decode('latin-1')
+
+    # Subclasse para suportar rotação e marca d'água
+    class PDFContrato(FPDF):
+        def watermark(self):
+            self.set_font('helvetica', 'B', 40)
+            self.set_text_color(225, 225, 225) # Cinza mais visível (RGB 225)
+            self.rotate(45, 100, 150)
+            # Centralizar melhor o texto diagonal
+            self.text(10, 150, limpar("PEER - DOCUMENTO AUTENTICADO")) 
+            self.rotate(0)
+
+        def rotate(self, angle, x=None, y=None):
+            if x is None: x = self.x
+            if y is None: y = self.y
+            if self.angle != 0: self._out('Q')
+            self.angle = angle
+            if angle != 0:
+                import math
+                angle *= math.pi / 180
+                c = math.cos(angle)
+                s = math.sin(angle)
+                cx = x * self.k
+                cy = (self.h - y) * self.k
+                self._out(f'q 1 0 0 1 {cx:.5f} {cy:.5f} cm {c:.5f} {s:.5f} {-s:.5f} {c:.5f} cm 1 0 0 1 {-cx:.5f} {-cy:.5f} cm')
+
+        def header(self):
+            self.watermark()
+
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id
     ).first()
@@ -1065,21 +1110,18 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     if solicitacao.status not in [StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO]:
         raise HTTPException(status_code=400, detail="Contrato disponível apenas para empréstimos ativos ou concluídos.")
 
-    # Função auxiliar para limpar strings (o PDF padrão só aceita latin-1)
-    def limpar(txt):
-        if not txt: return ""
-        return str(txt).encode('latin-1', 'replace').decode('latin-1')
-
     # Ajuste de data para Brasília
     data_brasilia = solicitacao.data_criacao - timedelta(hours=3)
     data_formatada = data_brasilia.strftime('%d/%m/%Y %H:%M')
     
-    # Configuração do PDF
-    pdf = FPDF()
+    # Configuração do PDF usando a nova classe
+    pdf = PDFContrato()
+    pdf.angle = 0 # Inicializar atributo de ângulo
     pdf.add_page()
     pdf.set_font("helvetica", "B", 16)
     
     # Cabeçalho
+    pdf.set_text_color(0, 0, 0) # Reset cor do texto do contrato
     pdf.cell(0, 10, limpar("PEER - INTERMEDIAÇÃO FINANCEIRA"), ln=True, align="C")
     pdf.set_font("helvetica", "", 10)
     pdf.cell(0, 5, limpar("Sistema de Empréstimos Peer-to-Peer (P2P)"), ln=True, align="C")
@@ -1116,6 +1158,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
             f"CPF: {tomador.cpf}\n"
             f"MUTUANTES (INVESTIDORES): {investidores_nomes}\n"
             f"GARANTIDORES: {garantidores_nomes}\n"
+            f"TIPO DE GARANTIA: {solicitacao.tipo_garantia.upper()}\n"
             f"INTERMEDIADORA: Peer Tecnologia Ltda."
         )
     else:
@@ -1129,6 +1172,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
             f"MUTUANTE (INVESTIDOR): {nome_investidor_pdf}\n"
             f"CPF INVESTIDOR: {usuario.cpf}\n"
             f"GARANTIDORES: {garantidores_nomes}\n"
+            f"TIPO DE GARANTIA: {solicitacao.tipo_garantia.upper()}\n"
             f"INTERMEDIADORA: Peer Tecnologia Ltda."
         )
     
@@ -1147,6 +1191,14 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
         f"PRAZO TOTAL: {solicitacao.prazo_meses} meses\n"
         f"DATA DE ORIGINAÇÃO: {data_formatada}"
     )
+    
+    if solicitacao.tipo_garantia in ["fisica", "hibrida"]:
+        texto_objeto += f"\nDESCRIÇÃO DO BEM: {solicitacao.garantia_descricao or 'Não informado'}"
+        if solicitacao.parceiro:
+            texto_objeto += f"\nLOCAL DE CUSTÓDIA: {solicitacao.parceiro.nome} - {solicitacao.parceiro.endereco}"
+    elif solicitacao.tipo_garantia == "nenhuma":
+        texto_objeto += f"\nGARANTIA: SEM GARANTIA REAL/COLETIVA (CRÉDITO SOB RITMO DE ANÁLISE RIGOROSA)"
+
     pdf.multi_cell(0, 5, limpar(texto_objeto))
     pdf.ln(5)
     
@@ -1159,6 +1211,11 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
         "e restrições de novos créditos. O MUTUANTE declara ciência dos riscos inerentes ao investimento P2P. "
         "A plataforma Peer atua apenas como facilitadora técnica e intermediadora."
     )
+    if solicitacao.tipo_garantia in ["fisica", "hibrida"]:
+        clausulas += (
+            " O MUTUÁRIO declara ciência que o bem alienado oferecido como garantia poderá ser LIQUIDADO para "
+            "quitação da dívida em caso de inadimplência superior a 30 dias, conforme regras da plataforma."
+        )
     pdf.multi_cell(0, 5, limpar(clausulas))
     pdf.ln(10)
     
@@ -1211,7 +1268,6 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     pdf.ln(5)
     
     # Selo de Autenticidade
-    agora_brasilia = (datetime.datetime.utcnow() - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M')
     pdf.set_draw_color(0, 200, 0)
     pdf.set_line_width(0.5)
     pdf.rect(10, pdf.get_y(), 190, 20)
@@ -1220,8 +1276,12 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     pdf.set_text_color(0, 150, 0)
     pdf.cell(0, 5, limpar("DOCUMENTO AUTENTICADO DIGITALMENTE"), ln=True)
     pdf.set_font("helvetica", "", 8)
-    pdf.cell(0, 4, limpar(f"Hash de Segurança: {hash(str(solicitacao.id) + str(solicitacao.data_criacao))}"), ln=True)
-    pdf.cell(0, 4, limpar(f"Emissão do Documento: {agora_brasilia} (Horário de Brasília)"), ln=True)
+    import hashlib
+    hash_base = f"peer-{solicitacao.id}-{solicitacao.data_criacao}"
+    hash_seguranca = hashlib.sha256(hash_base.encode()).hexdigest()[:16].upper()
+
+    pdf.cell(0, 4, limpar(f"Hash de Segurança: {hash_seguranca}"), ln=True)
+    pdf.cell(0, 4, limpar(f"Certificação de Origem: {data_formatada} (Horário de Brasília)"), ln=True)
     
     # Saída
     pdf_content = bytes(pdf.output())
@@ -1338,6 +1398,7 @@ async def confirmar_aporte_pool(
     for p_caixa in participantes_caixa:
         fatia_debito = (p_caixa.saldo_caixa / total_pool) * valor_aporte
         p_caixa.saldo_caixa -= fatia_debito
+        db.add(p_caixa)
 
     solicitacao.valor_arrecadado += valor_aporte
     
@@ -1356,4 +1417,11 @@ async def confirmar_aporte_pool(
     registrar_acao_admin(db, admin.id, "APROVAR_APORTE_POOL", alvo_id=str(solicitacao_id), detalhes=f"Valor: {valor_aporte}", ip=None)
     db.commit()
     
-    return {"message": f"Aporte do Pool de R$ {valor_aporte} confirmado!"}
+    # Tenta liberar o empréstimo se atingiu 100% (o que é o caso após aporte do Pool)
+    from utils_emprestimo import tentar_liberar_emprestimo
+    tentar_liberar_emprestimo(solicitacao.id, db, ignore_guarantors=False)
+
+    # Invalida o cache global
+    cache_snapshot_data.clear()
+    
+    return {"message": f"Aporte do Pool de R$ {valor_aporte} confirmado e empréstimo processado!"}

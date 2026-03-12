@@ -11,6 +11,8 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
     const [erro, setErro] = useState(null);
     const [sucesso, setSucesso] = useState(null);
     const [confirmando, setConfirmando] = useState(false);
+    const [activeTab, setActiveTab] = useState('caixa'); // 'caixa' ou 'garantia'
+    const [motivoReprovacao, setMotivoReprovacao] = useState('');
 
     const handleSacarComissao = async () => {
         setErro(null);
@@ -32,23 +34,37 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
         setSucesso(null);
         setResultado(null);
 
-        const v = parseFloat(valor.replace(',', '.'));
         const cid = clienteId.trim();
-
         if (!cid) return setErro("Digite o ID do Cliente.");
-        if (!v || v <= 0) return setErro("Digite o Valor da Operação.");
 
-        setLoading(true);
-        try {
-            const res = await api.post('/financeiro/parceiro/transacoes/verificar', {
-                cliente_id: cid,
-                valor: v
-            });
-            setResultado(res.transacao || res);
-        } catch (err) {
-            setErro(err.message || "Nenhum pedido pendente encontrado com esse ID e valor. Peça para o cliente solicitar pelo App.");
-        } finally {
-            setLoading(false);
+        if (activeTab === 'caixa') {
+            const v = parseFloat((valor || '').replace(',', '.'));
+            if (!v || v <= 0) return setErro("Digite o Valor da Operação.");
+
+            setLoading(true);
+            try {
+                const res = await api.post('/financeiro/parceiro/transacoes/verificar', {
+                    cliente_id: cid,
+                    valor: v
+                });
+                setResultado(res.transacao || res);
+            } catch (err) {
+                setErro(err.message || "Nenhuma transação pendente encontrada.");
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setLoading(true);
+            try {
+                const res = await api.post('/emprestimos/parceiro/verificar-garantia', {
+                    cliente_id: cid
+                });
+                setResultado(res);
+            } catch (err) {
+                setErro(err.message || "Nenhuma garantia física pendente.");
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -73,15 +89,50 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
         }
     };
 
+    const handleAvaliarGarantia = async (decisao) => {
+        if (!resultado) return;
+        setLoading(true);
+        try {
+            const res = await api.post('/emprestimos/parceiro/avaliar-garantia', {
+                solicitacao_id: resultado.id,
+                decisao: decisao,
+                motivo: motivoReprovacao
+            });
+            setSucesso(res.message);
+            setResultado(null);
+            setClienteId('');
+            setMotivoReprovacao('');
+            if (onUpdate) onUpdate();
+        } catch (err) {
+            setErro(err.message || "Erro ao avaliar garantia.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="animate-fade-in card" style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-            <div className="flex-between mb-1" style={{ borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '15px' }}>
+            <div className="flex-between mb-1" style={{ borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Store size={24} color="var(--warning)" />
                     <div>
-                        <h2 style={{ fontSize: '1.2rem', color: 'var(--warning)', margin: 0 }}>Meu Caixa (Parceiro)</h2>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Terminal de Liberação Física</p>
+                        <h2 style={{ fontSize: '1.2rem', color: 'var(--warning)', margin: 0 }}>Terminal Parceiro</h2>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Geração de Saldo & Garantias</p>
                     </div>
+                </div>
+                <div style={{ display: 'flex', gap: '5px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '10px' }}>
+                    <button 
+                        onClick={() => { setActiveTab('caixa'); setResultado(null); }}
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: activeTab === 'caixa' ? 'var(--warning)' : 'transparent', color: activeTab === 'caixa' ? '#000' : 'var(--text-muted)', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        Caixa
+                    </button>
+                    <button 
+                        onClick={() => { setActiveTab('garantia'); setResultado(null); }}
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: activeTab === 'garantia' ? 'var(--warning)' : 'transparent', color: activeTab === 'garantia' ? '#000' : 'var(--text-muted)', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        Garantias
+                    </button>
                 </div>
             </div>
 
@@ -129,7 +180,7 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                     </div>
                 )}
 
-                <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: activeTab === 'caixa' ? '1fr 1fr' : '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="input-group">
                         <label>ID do Cliente</label>
                         <input
@@ -144,21 +195,23 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                             disabled={loading}
                         />
                     </div>
-                    <div className="input-group">
-                        <label>Valor (R$)</label>
-                        <input
-                            type="number"
-                            name="valor_operacao_caixa"
-                            id="valor_operacao_caixa"
-                            autoComplete="off"
-                            className="input-field"
-                            placeholder="0,00"
-                            step="0.01"
-                            value={valor}
-                            onChange={(e) => { setValor(e.target.value); setErro(null); setSucesso(null); }}
-                            disabled={loading}
-                        />
-                    </div>
+                    {activeTab === 'caixa' && (
+                        <div className="input-group">
+                            <label>Valor (R$)</label>
+                            <input
+                                type="number"
+                                name="valor_operacao_caixa"
+                                id="valor_operacao_caixa"
+                                autoComplete="off"
+                                className="input-field"
+                                placeholder="0,00"
+                                step="0.01"
+                                value={valor}
+                                onChange={(e) => { setValor(e.target.value); setErro(null); setSucesso(null); }}
+                                disabled={loading}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {!resultado ? (
@@ -166,10 +219,10 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                         className="btn btn-primary mt-1"
                         style={{ background: 'var(--warning)', width: '100%' }}
                         onClick={handleBuscar}
-                        disabled={loading || !clienteId || !valor}
+                        disabled={loading || !clienteId || (activeTab === 'caixa' && !valor)}
                     >
                         {loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
-                        {loading ? 'Buscando...' : 'Buscar Pedido Pendente'}
+                        {loading ? 'Buscando...' : activeTab === 'caixa' ? 'Buscar Pedido Pendente' : 'Verificar Garantia'}
                     </button>
                 ) : (
                     <div className="animate-slide-up">
@@ -179,7 +232,7 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                                     <UserCheck size={24} color="var(--success)" />
                                 </div>
                                 <div>
-                                    <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--success)' }}>Pedido Encontrado</h3>
+                                    <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--success)' }}>{activeTab === 'caixa' ? 'Pedido Encontrado' : 'Solicitação Localizada'}</h3>
                                     <p style={{ margin: 0, fontSize: '0.75rem' }}>{resultado.cliente_nome}</p>
                                 </div>
                             </div>
@@ -187,19 +240,28 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
                                 <div className="info-block" style={{ padding: '12px' }}>
                                     <div className="flex-between">
-                                        <span className="info-label">Operação</span>
-                                        <span className="badge badge-warning" style={{ background: resultado.tipo === 'Saque' ? 'rgba(255, 145, 0, 0.2)' : 'rgba(0, 230, 118, 0.2)', color: resultado.tipo === 'Saque' ? 'var(--warning)' : 'var(--success)' }}>
-                                            {(resultado.tipo || '').toUpperCase()} FÍSICO
+                                        <span className="info-label">Tipo de Operação</span>
+                                        <span className="badge" style={{ background: 'rgba(255, 145, 0, 0.2)', color: 'var(--warning)', fontSize: '0.65rem' }}>
+                                            {(resultado.tipo || '').toUpperCase()}
                                         </span>
                                     </div>
                                 </div>
+                                
+                                {activeTab === 'garantia' && (
+                                    <div className="info-block" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)' }}>
+                                        <div className="info-label">Item a ser Avaliado</div>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '5px' }}>{resultado.descricao}</div>
+                                    </div>
+                                )}
+
                                 <div className="info-block" style={{ padding: '12px' }}>
                                     <div className="flex-between">
-                                        <span className="info-label">Valor Esperado</span>
+                                        <span className="info-label">{activeTab === 'caixa' ? 'Valor Esperado' : 'Valor do Empréstimo'}</span>
                                         <span style={{ fontSize: '1rem', fontWeight: 700 }}>R$ {Number(resultado.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     </div>
                                 </div>
-                                {resultado.valor_liquido && (
+
+                                {activeTab === 'caixa' && resultado.valor_liquido && (
                                     <div className="info-block" style={{ padding: '12px', border: '1px solid var(--success)', background: 'rgba(0, 230, 118, 0.05)' }}>
                                         <div className="flex-between">
                                             <span className="info-label" style={{ color: 'var(--success)' }}>{resultado.tipo === 'Depósito' ? 'Crédito ao Cliente' : 'Entrega em Espécie'}</span>
@@ -209,28 +271,62 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                                 )}
                             </div>
 
-                            {confirmando ? (
-                                <div className="info-block" style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)', textAlign: 'center' }}>
-                                    <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--text-main)' }}>
-                                        Confirma o recebimento/entrega física deste valor?
-                                    </p>
+                            {activeTab === 'caixa' ? (
+                                confirmando ? (
+                                    <div className="info-block" style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)', textAlign: 'center' }}>
+                                        <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--text-main)' }}>
+                                            Confirma o recebimento/entrega física deste valor?
+                                        </p>
+                                        <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                            <button className="btn btn-secondary" onClick={() => setConfirmando(false)} disabled={loading}>
+                                                Cancelar
+                                            </button>
+                                            <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={handleConfirmar} disabled={loading}>
+                                                {loading ? 'Confirmando...' : 'Sim, Confirmar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
                                     <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button className="btn btn-secondary" onClick={() => setConfirmando(false)} disabled={loading}>
-                                            Cancelar
+                                        <button className="btn btn-secondary" onClick={() => { setResultado(null); setErro(null); }} disabled={loading}>
+                                            Voltar
                                         </button>
-                                        <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={handleConfirmar} disabled={loading}>
-                                            {loading ? 'Confirmando...' : 'Sim, Confirmar'}
+                                        <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={() => setConfirmando(true)} disabled={loading}>
+                                            Processar
                                         </button>
                                     </div>
-                                </div>
+                                )
                             ) : (
-                                <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                    <button className="btn btn-secondary" onClick={() => { setResultado(null); setErro(null); }} disabled={loading}>
-                                        Voltar
-                                    </button>
-                                    <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={() => setConfirmando(true)} disabled={loading}>
-                                        Processar
-                                    </button>
+                                <div className="animate-fade-in">
+                                    <div className="input-group mb-1">
+                                        <label>Motivo (Se reprovado)</label>
+                                        <input 
+                                            type="text" 
+                                            className="input-field" 
+                                            placeholder="Ex: Objeto não condiz com o valor" 
+                                            value={motivoReprovacao}
+                                            onChange={(e) => setMotivoReprovacao(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <button 
+                                            className="btn btn-secondary" 
+                                            style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} 
+                                            onClick={() => handleAvaliarGarantia('reprovar')} 
+                                            disabled={loading || !motivoReprovacao}
+                                        >
+                                            Reprovar
+                                        </button>
+                                        <button 
+                                            className="btn btn-primary" 
+                                            style={{ background: 'var(--success)' }} 
+                                            onClick={() => handleAvaliarGarantia('aprovar')} 
+                                            disabled={loading}
+                                        >
+                                            {loading ? 'Processando...' : 'Aprovar Item'}
+                                        </button>
+                                    </div>
+                                    <button className="btn btn-outline mt-1" style={{ width: '100%' }} onClick={() => setResultado(null)}>Voltar</button>
                                 </div>
                             )}
                         </div>

@@ -10,6 +10,9 @@ class StatusSolicitacao(enum.Enum):
     REJEITADO = "rejeitado"
     CANCELADO = "cancelado"
     CONCLUIDO = "concluido"
+    AGUARDANDO_AVALIACAO = "aguardando_avaliacao"
+    REPROVADO_GARANTIA = "reprovado_garantia"
+    AGUARDANDO_GARANTIDORES = "aguardando_garantidores"
 
 class TipoTransacao(enum.Enum):
     DEPOSITO = "deposito"
@@ -107,6 +110,12 @@ class SolicitacaoEmprestimo(Base):
     taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0) # Taxas de R$ 1,50 acumuladas
     sugestao_pool = Column(Numeric(precision=20, scale=2), default=0) # Valor sugerido pelo sistema para o Pool investir
     
+    # NOVAS COLUNAS: Garantia Física
+    tipo_garantia = Column(String(20), default="social") # "social" ou "fisica"
+    garantia_descricao = Column(String(255), nullable=True) # Descrição do objeto
+    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True) # Onde será entregue
+    data_reprovacao_garantia = Column(DateTime, nullable=True) # Para contagem de 1h
+    
     # Blindagem Jurídica: Rastreabilidade de Aceite
     aceite_termos = Column(Boolean, default=False)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
@@ -116,6 +125,7 @@ class SolicitacaoEmprestimo(Base):
     auditoria = relationship("RegistroAuditoria")
 
     usuario = relationship("Usuario", back_populates="solicitacoes")
+    parceiro = relationship("Parceiro")
     acessos_investidores = relationship("AcessoInvestidor", back_populates="solicitacao")
     investimentos = relationship("Investimento", back_populates="solicitacao")
     garantias_sociais = relationship("GarantiaSocial", back_populates="solicitacao", cascade="all, delete-orphan")

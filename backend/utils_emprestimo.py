@@ -12,38 +12,51 @@ def tentar_liberar_emprestimo(solicitacao_id: int, db: Session, ignore_guarantor
     2. Todos os garantidores aceitaram a garantia social (pulado se ignore_guarantors=True).
     """
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.id == solicitacao_id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+        SolicitacaoEmprestimo.id == solicitacao_id
     ).first()
 
-    if not solicitacao:
+    if not solicitacao or solicitacao.status not in [StatusSolicitacao.PENDENTE, StatusSolicitacao.AGUARDANDO_AVALIACAO]:
         return False
 
     # 1. Verificar Arrecadação
     if solicitacao.valor_arrecadado < solicitacao.valor:
         return False
 
-    # 2. Verificar Garantidores (Pular se for liberação especial de Admin)
+    # 2. Orquestração de Garantias
     if not ignore_guarantors:
-        garantias = db.query(GarantiaSocial).filter(
-            GarantiaSocial.solicitacao_id == solicitacao_id
-        ).all()
-        
-        print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidores encontrados: {len(garantias)}")
-
-        # Exigamos exatamente 2 garantidores conforme a regra de negócio
-        if len(garantias) < 2:
-            print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Menos de 2 garantidores ({len(garantias)}).")
+        # Fluxo de Garantia Física ou Híbrida (Etapa Inicial)
+        if solicitacao.tipo_garantia in ["fisica", "hibrida"] and solicitacao.status == StatusSolicitacao.PENDENTE:
+            solicitacao.status = StatusSolicitacao.AGUARDANDO_AVALIACAO
+            db.commit()
+            print(f"DEBUG: [Liberacao #{solicitacao_id}] STATUS -> AGUARDANDO_AVALIACAO.")
             return False
+
+        # Fluxo de Garantia Social (Etapa Inicial)
+        if solicitacao.tipo_garantia == "social" and solicitacao.status == StatusSolicitacao.PENDENTE:
+            solicitacao.status = StatusSolicitacao.AGUARDANDO_GARANTIDORES
+            db.commit()
+            print(f"DEBUG: [Liberacao #{solicitacao_id}] STATUS -> AGUARDANDO_GARANTIDORES.")
+            # Não retornamos False aqui, seguimos para verificar os garantidores abaixo
+
+        # Verificação de Garantidores (para 'social' ou 'hibrida' após avaliação física)
+        if solicitacao.tipo_garantia in ["social", "hibrida"]:
+            # Se for híbrida, só chega aqui se o parceiro já aprovou (status mudou de AGUARDANDO_AVALIACAO para AGUARDANDO_GARANTIDORES)
+            # Se for social, chega aqui direto do bloco acima
+            garantias = db.query(GarantiaSocial).filter(
+                GarantiaSocial.solicitacao_id == solicitacao_id
+            ).all()
             
-        for g in garantias:
-            print(f"DEBUG: [Liberacao #{solicitacao_id}] Garantidor ID {g.garante_id}: Aceito={g.aceito}")
-
-        if any(not g.aceito for g in garantias):
-            print(f"DEBUG: [Liberacao #{solicitacao_id}] BLOQUEIO - Nem todos os garantidores aceitaram.")
-            return False
+            if len(garantias) < 2:
+                # Se não tem garantidores ainda (e deveria ter), volta para aguardar
+                if solicitacao.status == StatusSolicitacao.PENDENTE:
+                     solicitacao.status = StatusSolicitacao.AGUARDANDO_GARANTIDORES
+                     db.commit()
+                return False
+                
+            if any(not g.aceito for g in garantias):
+                return False
     else:
-        print(f"DEBUG: [Liberacao #{solicitacao_id}] BYPASS - Ignorando garantidores por ordem administrativa.")
+        print(f"DEBUG: [Liberacao #{solicitacao_id}] BYPASS - Ignorando garantidores por ordem administrativa ou avaliação física.")
 
     # Se chegou aqui, libera!
     print(f"DEBUG: [Liberacao #{solicitacao_id}] SUCESSO! Liberando empréstimo...")
@@ -147,6 +160,16 @@ def processar_expiracoes_interna(db: Session):
     ).all()
 
     for s in expirados_5d:
+        estornar_e_limpar_solicitacao(s.id, db)
+
+    # 3. Regra de 1h: Garantia Física REPROVADA e não regularizada -> APAGAR
+    limite_1h = agora - datetime.timedelta(hours=1)
+    reprovados_expirados = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.status == StatusSolicitacao.REPROVADO_GARANTIA,
+        SolicitacaoEmprestimo.data_reprovacao_garantia <= limite_1h
+    ).all()
+
+    for s in reprovados_expirados:
         estornar_e_limpar_solicitacao(s.id, db)
 
     # Se teve limpeza ou estorno estornar_e_limpar_solicitacao ja fez commit individual, 

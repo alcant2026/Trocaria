@@ -109,7 +109,7 @@ const SaqueLucroCard = ({ onMensagem, lucroDisponivel }) => {
             </div>
 
             {aberto && (
-                <form onSubmit={handleSacar} style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '480px', margin: '1.2rem auto 0' }}>
+                <form onSubmit={handleSacar} style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '480px', width: '100%', margin: '1.2rem auto 0' }}>
 
                     {/* Campo de Valor com botão Sacar Tudo */}
                     <div style={{ position: 'relative' }}>
@@ -1478,7 +1478,7 @@ const AdminDashboard = () => {
                             <div className="table-responsive">
                                 <table>
                                     <thead>
-                                        <tr>
+                                        <tr style={{ fontSize: '0.7rem' }}>
                                             <th>Mês</th>
                                             <th>Fluxo (In/Out)</th>
                                             <th>Receita</th>

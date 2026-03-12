@@ -123,7 +123,13 @@ def sincronizar_esquema(Base, engine):
                         conn.commit()
                         logger.info(f"✅ Índice '{index.name}' criado com sucesso.")
                     except Exception as e:
-                        logger.error(f"❌ Erro ao criar índice '{index.name}': {e}")
+                        # Ignorar erros se o índice já existir (comum em race conditions de boot no Render)
+                        if "already exists" in str(e).lower() or "duplicada" in str(e).lower():
+                            logger.info(f"ℹ️ Índice '{index.name}' já existe ou está sendo criado. Pulando...")
+                            conn.rollback()
+                        else:
+                            logger.error(f"❌ Erro ao criar índice '{index.name}': {e}")
+                            conn.rollback()
 
         logger.debug("Sincronização concluída.")
 

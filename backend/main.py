@@ -67,64 +67,48 @@ def get_db():
         db.close()
 
 @app.on_event("startup")
-def startup_db_setup():
-    # 1. Garante que tabelas novas sejam criadas
+async def startup_db_setup():
+    print("🚀 SISTEMA: Iniciando processo de boot...")
+    
+    # 1. Garante que tabelas novas sejam criadas (Rápido)
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"ESTRUTURA DB: Aviso na criação de tabelas (provável race condition): {e}")
+        print(f"ESTRUTURA DB: Aviso na criação de tabelas (race condition): {e}")
 
-    # 2. Sincroniza colunas novas automaticamente (Auto-Sync)
+    # 2. Sincroniza esquema e enums (Só se necessário)
     try:
+        # Sincronia de colunas e índices
         sincronizar_esquema(Base, engine)
         
-        # 3. Garantir que os tipos ENUM no Postgres tenham os novos valores
+        # Sincronia de Enums (Postgres)
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao
-            # Usar conexão direta com AUTOCOMMIT para ALTER TYPE
             with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                # Sincronizar TODAS as variantes de nome possíveis para evitar DatatypeMismatch
                 for enum_class, type_names in [(TipoTransacao, ["tipo_transacao", "tipotransacao"]), 
                                              (StatusSolicitacao, ["status_solicitacao", "statussolicitacao"])]:
                     for type_name in type_names:
                         for member in enum_class:
                             try:
-                                # Tenta adicionar o valor minúsculo (padrão do código)
                                 conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.value}'"))
-                                # Tenta adicionar o valor maiúsculo (legado/segurança)
-                                conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.name}'"))
-                            except Exception:
-                                pass
-        # 4. Garantir Usuário de Sistema (Peer Plataforma) para Isolação de Lucro
+                            except Exception: pass
+
+        # 3. Usuário de Sistema
         from modelos.modelos_db import Usuario
-        db = SessionLocal()
-        try:
-            usuario_sistema = db.query(Usuario).filter(Usuario.id == "000PL").first()
-            if not usuario_sistema:
+        with SessionLocal() as db:
+            if not db.query(Usuario).filter(Usuario.id == "000PL").first():
                 print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
                 novo_sistema = Usuario(
-                    id="000PL",
-                    nome="Peer Plataforma (Sistema)",
-                    email="sistema@peer.com.br",
-                    cpf="000.000.000-00",
-                    senha_hash="SISTEMA_VIRTUAL",
-                    chave_pix="sistema",
-                    is_admin=True,
-                    is_active=True,
-                    saldo=0,
-                    saldo_caixa=0
+                    id="000PL", nome="Peer Plataforma (Sistema)", email="sistema@peer.com.br",
+                    cpf="000.000.000-00", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
+                    is_admin=True, is_active=True, saldo=0, saldo_caixa=0
                 )
                 db.add(novo_sistema)
                 db.commit()
-        except Exception as e:
-            print(f"ESTRUTURA DB: Erro ao criar usuário de sistema: {e}")
-        finally:
-            db.close()
-
     except Exception as e:
-        print(f"ERRO CRÍTICO NA SINCRONIA DE DB: {e}")
+        print(f"ERRO NO BOOT DE DB: {e}")
 
-    print("ESTRUTURA DB: Sincronização automática finalizada.")
+    print("✅ SISTEMA: Pronto para receber tráfego!")
 
 # Incluir Rotas
 app.include_router(rotas_auth.router)
@@ -137,7 +121,9 @@ app.include_router(rotas_parceiros_caixa.router)
 
 @app.get("/")
 def home():
-    return {"message": "Bem-vindo ao Peer API!", "docs": "/docs"}
+    return {"status": "online", "message": "Peer API ativa"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

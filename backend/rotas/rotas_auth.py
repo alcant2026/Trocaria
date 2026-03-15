@@ -430,10 +430,13 @@ async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, b
     usuario.codigo_recuperacao_hash = hashlib.sha256(codigo.encode()).hexdigest()
     usuario.expiracao_recuperacao = datetime.utcnow() + timedelta(minutes=15)
     
+    print(f"DEBUG AUTH: Gerado código {codigo} para usuario {usuario.email}")
     db.commit()
 
     # Enviar e-mail em SEGUNDO PLANO (Não bloqueia o worker do Render)
+    print(f"DEBUG AUTH: Adicionando tarefa de e-mail ao background_tasks...")
     background_tasks.add_task(enviar_email_recuperacao, usuario.email, usuario.nome, codigo)
+    print(f"DEBUG AUTH: Tarefa adicionada. Retornando 200 OK.")
     
     return {
         "message": "Código enviado com sucesso.",

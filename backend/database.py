@@ -32,19 +32,27 @@ def normalizar_database_url(url: str) -> str:
 if SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = normalizar_database_url(SQLALCHEMY_DATABASE_URL)
 
-engine_args = {}
-if "sqlite" in SQLALCHEMY_DATABASE_URL:
+# Configuração do Engine
+is_sqlite = "sqlite" in SQLALCHEMY_DATABASE_URL
+is_neon = "neon.tech" in SQLALCHEMY_DATABASE_URL
+
+# Configurações leves para o plano Free do Render/Neon (evita estourar conexões e memória)
+pool_args = {
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+}
+
+if not is_sqlite:
+    # No Neon Free, o limite de conexões é baixo (~10). 
+    # Com 2 workers, manter pool_size=2 e max_overflow=0 evita o erro.
+    pool_args["pool_size"] = 2
+    pool_args["max_overflow"] = 0
+else:
     engine_args["connect_args"] = {"check_same_thread": False}
 
-# pool_pre_ping=True ajuda a evitar erros de "EOF detected" e conexões inativas
-# pool_size e max_overflow limitam conexões para não estourar o limite do Neon/Render
-# pool_recycle garante que conexões velhas sejam renovadas
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
-    pool_pre_ping=True, 
-    pool_size=5, 
-    max_overflow=10,
-    pool_recycle=1800,
+    **pool_args,
     **engine_args
 )
 

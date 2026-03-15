@@ -406,9 +406,11 @@ class RedefinirSenha(BaseModel):
     codigo: str
     nova_senha: str
 
+from fastapi import BackgroundTasks
+
 @router.post("/recuperar-senha/solicitar")
 @limiter.limit("3/minute")
-async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, db: Session = Depends(get_db)):
+async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Inicia o fluxo de recuperação validando o CPF e enviando o código."""
     cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
     
@@ -430,12 +432,9 @@ async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, d
     
     db.commit()
 
-    # Enviar e-mail (Simulado ou Real dependendo do .env)
-    enviado = enviar_email_recuperacao(usuario.email, usuario.nome, codigo)
+    # Enviar e-mail em SEGUNDO PLANO (Não bloqueia o worker do Render)
+    background_tasks.add_task(enviar_email_recuperacao, usuario.email, usuario.nome, codigo)
     
-    if not enviado:
-        raise HTTPException(status_code=500, detail="Erro ao enviar código de recuperação. Tente novamente.")
-
     return {
         "message": "Código enviado com sucesso.",
         "email_mascarado": mascarar_email(usuario.email)

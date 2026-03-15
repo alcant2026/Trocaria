@@ -50,7 +50,7 @@ O backend é a API que processa os dados.
    - **Root Directory**: `backend`
    - **Environment**: `Python 3`
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT`
+   - **Start Command**: `gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 90`
 4. **Variáveis de Ambiente (Advanced > Add Environment Variable)**:
    - `DATABASE_URL`: (URL do banco do Passo 2)
    - `SECRET_KEY`: (Crie uma chave longa e aleatória)

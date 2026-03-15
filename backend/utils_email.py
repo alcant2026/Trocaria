@@ -86,7 +86,8 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
         # Selecionar o método de conexão baseado na porta (465 é SSL puro, 587 é STARTTLS)
         if SMTP_PORT == 465:
             print("DEBUG EMAIL: Usando SMTP_SSL para porta 465...")
-            context = smtplib.create_default_context()
+            import ssl
+            context = ssl.create_default_context()
             server_class = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=20, context=context)
         else:
             print(f"DEBUG EMAIL: Usando SMTP padrão com STARTTLS para porta {SMTP_PORT}...")

@@ -51,7 +51,6 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
     </html>
     """
 
-    print(f"DEBUG EMAIL: Iniciando envio via API para {email_destino}")
     
     if MODO_EMAIL == "CONSOLE":
         print("\n" + "="*50)
@@ -83,10 +82,7 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
         with urllib.request.urlopen(req, timeout=15) as response:
             status = response.getcode()
             response_body = response.read().decode("utf-8")
-            print(f"DEBUG EMAIL: Resposta da API ({status}): {response_body}")
-            
             if status in [200, 201]:
-                print("DEBUG EMAIL: E-mail enviado com sucesso via API!")
                 return True
             else:
                 print(f"ERRO API RESEND: Status {status}")

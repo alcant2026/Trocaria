@@ -8,7 +8,6 @@ from sqlalchemy import text
 from utils_db import sincronizar_esquema
 
 app = FastAPI(title="Peer API P2P")
-print("🔥 VERSÃO DO SISTEMA: v2.0 - API HTTP Resend")
 
 # Configuração de CORS - Aceita Front de Produção ou Local
 frontend_url = os.getenv("FRONTEND_URL", "")

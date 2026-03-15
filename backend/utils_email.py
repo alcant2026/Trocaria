@@ -82,12 +82,19 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
         msg.attach(MIMEText(html_template, 'html'))
 
         print(f"DEBUG EMAIL: Tentando conexão com {SMTP_SERVER}:{SMTP_PORT} (Timeout 20s)...")
-        # Usando timeout para evitar que a tarefa de segundo plano trave indefinidamente
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20) as server:
-            print("DEBUG EMAIL: Conexão estabelecida. Iniciando STARTTLS...")
+        
+        # Selecionar o método de conexão baseado na porta (465 é SSL puro, 587 é STARTTLS)
+        if SMTP_PORT == 465:
+            print("DEBUG EMAIL: Usando SMTP_SSL para porta 465...")
+            context = smtplib.create_default_context()
+            server_class = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=20, context=context)
+        else:
+            print(f"DEBUG EMAIL: Usando SMTP padrão com STARTTLS para porta {SMTP_PORT}...")
+            server_class = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20)
+            server_class.starttls()
+
+        with server_class as server:
             server.set_debuglevel(1)
-            server.starttls()
-            
             print(f"DEBUG EMAIL: Autenticando usuário {SMTP_USER}...")
             server.login(SMTP_USER, SMTP_PASS)
             

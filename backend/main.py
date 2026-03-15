@@ -39,14 +39,6 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Middleware de Segurança "Gratuito" (Security Headers)
 @app.middleware("http")
 async def add_security_headers(request, call_next):
@@ -55,8 +47,27 @@ async def add_security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:3000 http://localhost:5173 https://peer-front.onrender.com https://peer-api.onrender.com;"
+    # CSP atualizado para incluir cred30.site e domínios do Render
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self' http://localhost:3000 http://localhost:5173 "
+        "https://cred30.site https://www.cred30.site "
+        "https://peer-front.onrender.com https://peer-api.onrender.com https://peer-5gq5.onrender.com;"
+    )
     return response
+
+# CORSMiddleware deve vir DEPOIS de outras middlewares que injetam headers
+# para garantir que os headers de CORS não sejam sobrescritos ou removidos.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Dependência do DB
 def get_db():

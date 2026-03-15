@@ -41,6 +41,7 @@ pool_args = {
     "pool_pre_ping": True,
     "pool_recycle": 1800,
 }
+engine_args = {}
 
 if not is_sqlite:
     # No Neon Free, o limite de conexões é baixo (~10). 

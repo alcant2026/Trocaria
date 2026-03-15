@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
 const TemporizadorInatividade = ({ aoDeslogar }) => {
-    const tempoInatividade = 15 * 60 * 1000; // 15 minutos em milissegundos
+    const tempoInatividade = 7 * 60 * 1000; // 7 minutos em milissegundos
     const timerRef = useRef(null);
 
     const reiniciarTimer = () => {

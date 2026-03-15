@@ -87,6 +87,10 @@ class Usuario(Base):
     two_factor_enabled = Column(Boolean, default=False)
     ultima_alteracao_2fa = Column(DateTime, nullable=True) # Trava de 48h para saques
 
+    # Recuperação de Conta (Segurança Bancária)
+    codigo_recuperacao_hash = Column(String(200), nullable=True)
+    expiracao_recuperacao = Column(DateTime, nullable=True)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
     garantias_prestadas = relationship("GarantiaSocial", back_populates="garante")

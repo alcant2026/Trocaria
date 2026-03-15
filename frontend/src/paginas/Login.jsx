@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-import { Wallet } from 'lucide-react';
+import { Wallet, Eye, EyeOff } from 'lucide-react';
 
 const Login = ({ onLogin }) => {
     const [cpf, setCpf] = useState('');
     const [senha, setSenha] = useState('');
+    const [showSenha, setShowSenha] = useState(false);
     const [mensagem, setMensagem] = useState('');
 
     const maskCPF = (value) => {
@@ -60,20 +61,53 @@ const Login = ({ onLogin }) => {
 
                         <div className="input-group">
                             <label htmlFor="senha">Senha</label>
-                            <input 
-                                id="senha"
-                                name="senha"
-                                type="password" 
-                                autoComplete="current-password"
-                                placeholder="Sua senha secreta" 
-                                value={senha} 
-                                onChange={(e) => setSenha(e.target.value)} 
-                                className="input-field" 
-                                required 
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input 
+                                    id="senha"
+                                    name="senha"
+                                    type={showSenha ? "text" : "password"} 
+                                    autoComplete="current-password"
+                                    placeholder="Sua senha secreta" 
+                                    value={senha} 
+                                    onChange={(e) => setSenha(e.target.value)} 
+                                    className="input-field" 
+                                    style={{ paddingRight: '45px' }}
+                                    required 
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSenha(!showSenha)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '4px'
+                                    }}
+                                    aria-label={showSenha ? "Esconder senha" : "Mostrar senha"}
+                                >
+                                    {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         <button type="submit" className="btn btn-primary mt-1">Entrar</button>
+
+                        <div className="text-center mt-1">
+                            <a 
+                                href="#recuperar-senha" 
+                                style={{ color: '#fff', fontSize: '0.85rem', opacity: 0.8, textDecoration: 'none' }}
+                                onClick={(e) => { e.preventDefault(); window.location.hash = 'recuperar-senha'; }}
+                            >
+                                Esqueci minha senha
+                            </a>
+                        </div>
 
                         {mensagem && (
                              <div className="alert alert-danger mt-1">

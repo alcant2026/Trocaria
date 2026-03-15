@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, TrendingUp, ArrowUpCircle, ArrowDownCircle, Calendar, Info, CheckCircle2, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import { Wallet, TrendingUp, ArrowUpCircle, ArrowDownCircle, Calendar, Info, CheckCircle2, RefreshCw, AlertTriangle, X, Eye, EyeOff } from 'lucide-react';
 import api from '../api';
 
 const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
@@ -7,6 +7,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
     const [valorAporte, setValorAporte] = useState('');
     const [valorResgate, setValorResgate] = useState('');
     const [senha, setSenha] = useState('');
+    const [showSenha, setShowSenha] = useState(false);
     const [aceitouTermos, setAceitouTermos] = useState(false);
     const [loading, setLoading] = useState(false);
     const [mensagem, setMensagem] = useState(null);
@@ -105,6 +106,18 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         <RefreshCw size={14} className="animate-spin" />
                         Rendimento Automático (Pool)
                     </div>
+                    {usuario.divida_total_pool > 0 && (
+                        <div className="mt-1 p-1" style={{ background: 'rgba(255, 61, 0, 0.05)', borderRadius: '12px', border: '1px solid rgba(255, 61, 0, 0.1)', maxWidth: '300px', margin: '10px auto' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                                <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Bloqueado:</span>
+                                <span>R$ {(usuario.divida_total_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                                <span style={{ color: 'var(--success)', fontWeight: 600 }}>Disponível:</span>
+                                <span>R$ {(usuario.saldo_caixa_disponivel || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -190,14 +203,36 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         </div>
                         <div className="input-group">
                             <label>Sua Senha de Acesso</label>
-                            <input
-                                type="password"
-                                className="input-field"
-                                placeholder="******"
-                                value={senha}
-                                onChange={(e) => setSenha(e.target.value)}
-                                autoFocus
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showSenha ? "text" : "password"}
+                                    className="input-field"
+                                    placeholder="******"
+                                    value={senha}
+                                    onChange={(e) => setSenha(e.target.value)}
+                                    style={{ paddingRight: '45px' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSenha(!showSenha)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '4px'
+                                    }}
+                                >
+                                    {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
                         </div>
                         <button className="btn btn-primary w-full" onClick={handleAporteFinal} disabled={loading || !senha}>
                             {loading ? 'Processando...' : 'Confirmar e Finalizar'}
@@ -237,6 +272,11 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                                         Continuar
                                     </button>
                                 </div>
+                                {usuario.divida_total_pool > 0 && (
+                                    <div className="alert alert-warning mt-1" style={{ fontSize: '0.75rem', textAlign: 'left' }}>
+                                        <AlertTriangle size={14} /> <strong>Atenção:</strong> Resgates acima do saldo disponível (R$ {usuario.saldo_caixa_disponivel?.toLocaleString('pt-BR')}) resultarão em liquidação automática da sua dívida ativa.
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -251,14 +291,36 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         </div>
                         <div className="input-group">
                             <label>Sua Senha de Acesso</label>
-                            <input
-                                type="password"
-                                className="input-field"
-                                placeholder="******"
-                                value={senha}
-                                onChange={(e) => setSenha(e.target.value)}
-                                autoFocus
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showSenha ? "text" : "password"}
+                                    className="input-field"
+                                    placeholder="******"
+                                    value={senha}
+                                    onChange={(e) => setSenha(e.target.value)}
+                                    style={{ paddingRight: '45px' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSenha(!showSenha)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '4px'
+                                    }}
+                                >
+                                    {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
                         </div>
                         <button className="btn btn-primary w-full" onClick={handleResgateFinal} disabled={loading || !senha}>
                             {loading ? 'Processando...' : 'Confirmar Resgate'}

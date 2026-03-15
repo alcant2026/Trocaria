@@ -28,29 +28,28 @@ class SolicitacaoRequest(BaseModel):
 def validar_limites_solicitacao(usuario: Usuario):
     agora = datetime.datetime.utcnow()
     
-    # Regra 1: 1 pedido a cada 15 dias (padrão)
+    # 0. Resetar contador diário se for um novo dia (UTC)
+    if usuario.ultima_solicitacao:
+        if usuario.ultima_solicitacao.date() < agora.date():
+            usuario.solicitacoes_hoje = 0
+
+    # 1. Regra base: 1 pedido a cada 15 dias
     if usuario.ultima_solicitacao:
         dias_passados = (agora - usuario.ultima_solicitacao).days
         if dias_passados < 15:
-            # Se o score for menor que um certo limite ou não comprou upgrade, bloqueia
-            # Aqui assumimos que o score influencia o limite diário conforme pedido
+            # Se atingiu o limite de 5 mesmo com upgrade, bloqueia
             if usuario.solicitacoes_hoje >= 5:
                  raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Limite de 5 solicitações diárias atingido (Requer Upgrade de Score)."
+                    detail="Limite de 5 solicitações diárias atingido (Upgrade de Score ativo)."
                 )
             
-            # Se não tem score suficiente para o upgrade diário, cai na trava de 15 dias
+            # Se não tem score >= 1.5, cai na trava obrigatória de 15 dias
             if usuario.score < Decimal("1.5"):
                  raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Você só pode realizar um novo pedido em {15 - dias_passados} dias ou comprando Score."
+                    detail=f"Você só pode realizar um novo pedido em {15 - dias_passados} dias. Compre Score para liberar até 5 pedidos por dia!"
                 )
-
-    # Resetar contador diário se for um novo dia
-    # (Lógica simplificada, idealmente seria via cron ou middleware)
-    # if usuario.ultima_solicitacao and usuario.ultima_solicitacao.date() < agora.date():
-    #     usuario.solicitacoes_hoje = 0
 
     return True
 

@@ -164,6 +164,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     const [idAmigo1, setIdAmigo1] = useState('');
     const [idAmigo2, setIdAmigo2] = useState('');
     const [senhaSaque, setSenhaSaque] = useState('');
+    const [showSenhaSaque, setShowSenhaSaque] = useState(false);
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [aceiteSolicitacao, setAceiteSolicitacao] = useState(false);
     const [passoDeposito, setPassoDeposito] = useState(1);
@@ -415,6 +416,22 @@ const DashboardTomador = ({ initialView = 'home' }) => {
         }
     };
 
+    const confirmarComprarScore = async () => {
+        setLoadingAction(true);
+        try {
+            const res = await api.post('/score/comprar');
+            showModal({ title: 'Score Atualizado', message: res.message, type: 'success' });
+            carregarSnapshot();
+            setPassoUpgrade(1);
+            setTipoUpgrade(null);
+            setActiveView('home');
+        } catch (err) {
+            setMensagem('Erro ao comprar score: ' + err.message);
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
     const handleComprarScore = () => {
         showModal({
             title: 'Aumentar Score',
@@ -422,16 +439,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             type: 'pool',
             onConfirm: async () => {
                 closeModal();
-                setLoadingAction(true);
-                try {
-                    const res = await api.post('/score/comprar');
-                    showModal({ title: 'Score Atualizado', message: res.message, type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro ao comprar score: ' + err.message);
-                } finally {
-                    setLoadingAction(false);
-                }
+                await confirmarComprarScore();
             }
         });
     };
@@ -468,6 +476,24 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     };
 
 
+    const confirmarSolicitarVerificacao = async () => {
+        if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
+        setLoadingAction(true);
+        try {
+            const res = await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
+            showModal({ title: 'Solicitação Enviada', message: res.message, type: 'success' });
+            setKycDetails('');
+            setPassoUpgrade(1);
+            setTipoUpgrade(null);
+            setActiveView('home');
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro ao solicitar verificação: ' + err.message);
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
     const handleSolicitarVerificacao = () => {
         if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
         showModal({
@@ -476,18 +502,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             type: 'info',
             onConfirm: async () => {
                 closeModal();
-                setLoadingAction(true);
-                try {
-                    const res = await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
-                    showModal({ title: 'Solicitação Enviada', message: res.message, type: 'success' });
-                    setKycDetails('');
-                    setActiveView('home');
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro ao solicitar verificação: ' + err.message);
-                } finally {
-                    setLoadingAction(false);
-                }
+                await confirmarSolicitarVerificacao();
             }
         });
     };
@@ -617,25 +632,27 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     </div>
                 </div>
 
-                <div className="hide-on-mobile">
-                    {/* PC-only Widget: Resumo Financeiro ou Info */}
-                    <div className="card" style={{ height: '100%' }}>
-                        <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Atividade</h3>
-                        <div className="grid-2" style={{ gap: '10px' }}>
-                            <div className="info-block">
-                                <div className="info-label">Dívida Total</div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}</div>
+                {(usuario.divida_total > 0 || usuario.total_garantias > 0) && (
+                    <div className="hide-on-mobile">
+                        {/* PC-only Widget: Resumo Financeiro ou Info */}
+                        <div className="card" style={{ height: '100%' }}>
+                            <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Atividade</h3>
+                            <div className="grid-2" style={{ gap: '10px' }}>
+                                <div className="info-block">
+                                    <div className="info-label">Dívida Total</div>
+                                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}</div>
+                                </div>
+                                <div className="info-block">
+                                    <div className="info-label">Garantias</div>
+                                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{usuario.total_garantias || 0} Ativas</div>
+                                </div>
                             </div>
-                            <div className="info-block">
-                                <div className="info-label">Garantias</div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{usuario.total_garantias || 0} Ativas</div>
+                            <div className="mt-1 p-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.8rem' }}>
+                                <p style={{ margin: 0 }}>Lembre-se: manter seu Score acima de 600 libera taxas de juros reduzidas em até 2%.</p>
                             </div>
-                        </div>
-                        <div className="mt-1 p-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.8rem' }}>
-                            <p style={{ margin: 0 }}>Lembre-se: manter seu Score acima de 600 libera taxas de juros reduzidas em até 2%.</p>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Action Mosaic / Grid - Header for Active View */}
@@ -1169,8 +1186,10 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
-                                    <button className="btn btn-primary" onClick={handleNotificarDeposito}>Confirmar Notificação</button>
-                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)}>Revisar Dados</button>
+                                    <button className="btn btn-primary" onClick={handleNotificarDeposito} disabled={loadingAction}>
+                                        {loadingAction ? 'Processando...' : 'Confirmar e Notificar'}
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)} disabled={loadingAction}>Revisar Dados</button>
                                 </div>
                             </div>
                         )}
@@ -1324,13 +1343,35 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
                                         <div className="input-group mb-1">
                                             <label>Sua Senha</label>
-                                            <input
-                                                type="password"
-                                                className="input-field"
-                                                placeholder="Sua senha de acesso"
-                                                value={senhaSaque}
-                                                onChange={(e) => setSenhaSaque(e.target.value)}
-                                            />
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type={showSenhaSaque ? "text" : "password"}
+                                                    className="input-field"
+                                                    placeholder="Sua senha de acesso"
+                                                    value={senhaSaque}
+                                                    onChange={(e) => setSenhaSaque(e.target.value)}
+                                                    style={{ paddingRight: '45px' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSenhaSaque(!showSenhaSaque)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '12px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: 'var(--text-muted)',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        padding: '4px'
+                                                    }}
+                                                >
+                                                    {showSenhaSaque ? <EyeOff size={20} /> : <Eye size={20} />}
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="input-group mb-1">
@@ -1552,11 +1593,12 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        onClick={tipoUpgrade === 'score' ? handleComprarScore : handleSolicitarVerificacao}
+                                        onClick={tipoUpgrade === 'score' ? confirmarComprarScore : confirmarSolicitarVerificacao}
+                                        disabled={loadingAction}
                                     >
-                                        Finalizar e Notificar
+                                        {loadingAction ? 'Processando...' : 'Finalizar e Pagar com Saldo'}
                                     </button>
-                                    <button className="btn btn-secondary" onClick={() => setPassoUpgrade(2)}>Revisar</button>
+                                    <button className="btn btn-secondary" onClick={() => setPassoUpgrade(2)} disabled={loadingAction}>Revisar</button>
                                 </div>
                             </div>
                         )}

@@ -10,6 +10,10 @@ from database import get_db
 import qrcode
 import io
 import base64
+import random
+import string
+import hashlib
+from utils_email import enviar_email_recuperacao, mascarar_email
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -391,3 +395,93 @@ async def excluir_conta(usuario: Usuario = Depends(obter_usuario_logado), db: Se
     
     db.commit()
     return {"message": "Conta excluída com sucesso. Seus dados foram anonimizados conforme a LGPD."}
+
+# --- ROTAS DE RECUPERAÇÃO DE SENHA (SEGURANÇA BANCÁRIA) ---
+
+class SolicitarRecuperacao(BaseModel):
+    cpf: str
+
+class RedefinirSenha(BaseModel):
+    cpf: str
+    codigo: str
+    nova_senha: str
+
+@router.post("/recuperar-senha/solicitar")
+@limiter.limit("3/minute")
+async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, db: Session = Depends(get_db)):
+    """Inicia o fluxo de recuperação validando o CPF e enviando o código."""
+    cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
+    
+    usuario = db.query(Usuario).filter(Usuario.cpf == cpf_limpo, Usuario.is_active == True).first()
+    
+    # Por segurança (prevenção de enumeração), se o usuário não existir, não damos erro explícito
+    if not usuario:
+        # Mas demoramos um pouco para evitar timing attacks
+        import time
+        time.sleep(0.5)
+        return {"message": "Se o CPF estiver cadastrado, um código foi enviado.", "email_mascarado": "da***@em***.com"}
+
+    # Gerar código de 6 dígitos
+    codigo = "".join(random.choices(string.digits, k=6))
+    
+    # Salvar Hash do código (Segurança Bancária: nunca salvar limpo)
+    usuario.codigo_recuperacao_hash = hashlib.sha256(codigo.encode()).hexdigest()
+    usuario.expiracao_recuperacao = datetime.utcnow() + timedelta(minutes=15)
+    
+    db.commit()
+
+    # Enviar e-mail (Simulado ou Real dependendo do .env)
+    enviado = enviar_email_recuperacao(usuario.email, usuario.nome, codigo)
+    
+    if not enviado:
+        raise HTTPException(status_code=500, detail="Erro ao enviar código de recuperação. Tente novamente.")
+
+    return {
+        "message": "Código enviado com sucesso.",
+        "email_mascarado": mascarar_email(usuario.email)
+    }
+
+@router.post("/recuperar-senha/redefinir")
+@limiter.limit("5/minute")
+async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session = Depends(get_db)):
+    """Valida o código e redefine a senha do usuário."""
+    cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
+    
+    usuario = db.query(Usuario).filter(Usuario.cpf == cpf_limpo, Usuario.is_active == True).first()
+    
+    if not usuario or not usuario.codigo_recuperacao_hash:
+        raise HTTPException(status_code=400, detail="Solicitação de recuperação não encontrada ou expirada.")
+
+    # Verificar expiração
+    if datetime.utcnow() > usuario.expiracao_recuperacao:
+        usuario.codigo_recuperacao_hash = None # Limpa por segurança
+        db.commit()
+        raise HTTPException(status_code=400, detail="O código de recuperação expirou (limite de 15 min).")
+
+    # Validar código
+    hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
+    if hash_enviado != usuario.codigo_recuperacao_hash:
+        raise HTTPException(status_code=400, detail="Código de recuperação inválido.")
+
+    # Validar nova senha (mínimo 6 caracteres sugerido)
+    if len(dados.nova_senha) < 6:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+
+    # Sucesso: Atualizar senha e limpar campos de recuperação
+    usuario.senha_hash = get_password_hash(dados.nova_senha)
+    usuario.codigo_recuperacao_hash = None
+    usuario.expiracao_recuperacao = None
+    
+    # Registrar auditoria
+    agora = datetime.utcnow()
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=agora,
+        municipio="Redefinição de Senha"
+    )
+    db.add(auditoria)
+    
+    db.commit()
+    
+    return {"message": "Sua senha foi redefinida com sucesso! Você já pode fazer login."}

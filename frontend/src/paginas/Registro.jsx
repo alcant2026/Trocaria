@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 import TermosUso from '../componentes/TermosUso';
 import SeletorCustom from '../componentes/SeletorCustom';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Registro = () => {
     const [formData, setFormData] = useState({
@@ -20,6 +21,7 @@ const Registro = () => {
     const [showTermos, setShowTermos] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [sucesso, setSucesso] = useState(false);
+    const [showSenha, setShowSenha] = useState(false);
 
     const maskCPF = (value) => {
         return value
@@ -151,7 +153,36 @@ const Registro = () => {
 
                         <div className="input-group">
                             <label>Senha</label>
-                            <input name="senha" type="password" placeholder="Mínimo 6 caracteres" onChange={handleChange} className="input-field" required />
+                            <div style={{ position: 'relative' }}>
+                                <input 
+                                    name="senha" 
+                                    type={showSenha ? "text" : "password"} 
+                                    placeholder="Mínimo 6 caracteres" 
+                                    onChange={handleChange} 
+                                    className="input-field" 
+                                    style={{ paddingRight: '45px' }}
+                                    required 
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSenha(!showSenha)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '4px'
+                                    }}
+                                >
+                                    {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '1.5rem' }}>

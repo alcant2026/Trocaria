@@ -132,6 +132,7 @@ const DashboardInvestidor = () => {
     const [valorInvestir, setValorInvestir] = useState({});
     const [aceiteRisco, setAceiteRisco] = useState({}); // Controle por ID de solicitação
     const [senhaSaque, setSenhaSaque] = useState('');
+    const [showSenhaSaque, setShowSenhaSaque] = useState(false);
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [passoDeposito, setPassoDeposito] = useState(1);
     const [passoSaque, setPassoSaque] = useState(1);
@@ -316,6 +317,19 @@ const DashboardInvestidor = () => {
         }
     };
 
+    const confirmarDesbloqueio = async (solicitacaoId) => {
+        setLoadingAction(true);
+        try {
+            const res = await api.post(`/emprestimos/desbloquear-dados/${solicitacaoId}`);
+            showModal({ title: 'Sucesso!', message: res.message, type: 'success' });
+            carregarSnapshot();
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.message || 'Erro ao desbloquear.', type: 'error' });
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
     const handleDesbloquear = (solicitacaoId) => {
         showModal({
             title: 'Desbloquear Perfil',
@@ -323,16 +337,7 @@ const DashboardInvestidor = () => {
             type: 'finance',
             onConfirm: async () => {
                 closeModal();
-                setLoadingAction(true);
-                try {
-                    const res = await api.post(`/emprestimos/desbloquear-dados/${solicitacaoId}`);
-                    showModal({ title: 'Sucesso!', message: res.message, type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao desbloquear.', type: 'error' });
-                } finally {
-                    setLoadingAction(false);
-                }
+                await confirmarDesbloqueio(solicitacaoId);
             }
         });
     };
@@ -358,34 +363,29 @@ const DashboardInvestidor = () => {
     return (
         <div className="investidor-dashboard">
             <header className="mb-1">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h1>Meus Aportes (Fundo Coletivo)</h1>
-                    <div className="hide-on-mobile">
-                        <div
-                            onClick={handleCopiarId}
-                            style={{
-                                fontSize: '0.65rem',
-                                background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15), rgba(var(--success-rgb), 0.15))',
-                                padding: '6px 14px',
-                                borderRadius: '30px',
-                                border: '1px solid rgba(var(--primary-rgb), 0.3)',
-                                color: copiadoId ? 'var(--success)' : 'var(--text-main)',
-                                fontWeight: 800,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
-                                transform: copiadoId ? 'scale(0.95)' : 'scale(1)'
-                            }}
-                        >
-                            {copiadoId ? <Check size={14} /> : <Copy size={14} />}
-                            <span style={{ letterSpacing: '1px' }}>ID: {usuario.id}</span>
-                        </div>
+                <h1>Meus Aportes (Fundo Coletivo)</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div
+                        onClick={handleCopiarId}
+                        style={{
+                            fontSize: '0.65rem',
+                            background: 'rgba(255,255,255,0.05)',
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            border: '1px solid var(--border-color)',
+                            color: copiadoId ? 'var(--success)' : 'var(--text-muted)',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        {copiadoId ? <Check size={12} /> : <Copy size={12} />}
+                        ID: {usuario.id}
                     </div>
                 </div>
-                <p className="text-muted">Gestão estratégica de capital e ativos P2P.</p>
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>Gestão estratégica de capital e ativos P2P.</p>
             </header>
 
             {mensagem && (
@@ -395,48 +395,44 @@ const DashboardInvestidor = () => {
                 </div>
             )}
 
-            {/* Top Grid for PC: Balance and Action Quick Links */}
+            {/* Grid de Saldo e Performance */}
             <div className="grid-2">
                 {/* Wallet Overview Card */}
                 <div className="card card-actionable" onClick={() => setActiveView('home')}>
                     <div className="flex-between mb-1">
                         <div className="flex-between" style={{ gap: '10px' }}>
                             <Wallet size={20} color="var(--success)" />
-                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Ativos e Saldo</span>
+                            <span style={{ fontWeight: 600, fontSize: '1rem' }}>Ativos e Saldo</span>
                         </div>
                         <ChevronRight size={18} color="var(--text-muted)" />
                     </div>
 
                     {(() => {
                         const totalRecebido = carteira.reduce((acc, item) => acc + (item.valor_recebido || 0), 0);
-                        const historicoRecente = [...historico].slice(0, 15).reverse();
-                        const maxVal = Math.max(...historicoRecente.map(i => Math.abs(i.valor || 0)), 1);
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <div className="flex-between" style={{ alignItems: 'flex-start' }}>
                                     <div>
-                                        <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>SALDO DISPONÍVEL</p>
+                                        <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 700 }}>SALDO DISPONÍVEL</p>
                                         {verSaldo ? (
-                                            <h2 style={{ fontSize: '2rem', color: 'var(--success)' }}>
+                                            <h2 style={{ fontSize: '2.2rem', color: 'var(--success)', marginBottom: '1.5rem' }}>
                                                 R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                             </h2>
                                         ) : (
-                                            <div style={{ height: '32px', width: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
+                                            <div style={{ height: '40px', width: '150px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '1.5rem' }} />
                                         )}
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                Total Investido: <strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>R$ {totalInvestido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                Total Investido: <strong style={{ color: 'var(--text-main)' }}>R$ {totalInvestido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                                             </p>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                Já Recebido: <strong style={{ color: 'var(--success)', fontSize: '0.85rem' }}>R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                Já Recebido: <strong style={{ color: 'var(--success)' }}>R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                                             </p>
                                         </div>
                                     </div>
 
                                     <button 
-                                        name="btn_alternar_saldo_investidor"
-                                        id="btn_alternar_saldo_investidor"
                                         onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} 
                                         style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}
                                     >
@@ -444,7 +440,6 @@ const DashboardInvestidor = () => {
                                     </button>
                                 </div>
 
-                                {/* Enlarge Candlestick Chart Area (Agrupado por Dia) */}
                                 {historico.length > 0 && (() => {
                                     const diasAgrupados = historico.reduce((acc, item) => {
                                         if (!item.data) return acc;
@@ -459,19 +454,17 @@ const DashboardInvestidor = () => {
                                     const diasArray = Object.values(diasAgrupados).slice(0, 10).reverse();
                                     const maxValDia = Math.max(...diasArray.map(d => Math.abs(d.saldo)), 1);
                                     return (
-                                        <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                                        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
                                             <div className="flex-between mb-1">
-                                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fluxo Recente</span>
-                                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{diasArray.length} Dias</span>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Fluxo Recente</span>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{diasArray.length} Dias</span>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '60px', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '50px', gap: '8px' }}>
                                                 {diasArray.map((d, idx) => {
                                                     const isGreen = d.saldo >= 0;
-                                                    const height = Math.max(8, (Math.abs(d.saldo) / maxValDia) * 60);
+                                                    const height = Math.max(6, (Math.abs(d.saldo) / maxValDia) * 50);
                                                     return (
-                                                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                                            <div title={`${d.dia}\n${isGreen ? '+' : ''} R$ ${d.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} style={{ width: '100%', maxWidth: '12px', height: `${height}px`, background: isGreen ? 'var(--success)' : 'var(--danger)', borderRadius: '3px', opacity: 0.8 }}></div>
-                                                        </div>
+                                                        <div key={idx} style={{ flex: 1, height: `${height}px`, background: isGreen ? 'var(--success)' : 'var(--danger)', borderRadius: '4px', opacity: 0.8 }} title={`${d.dia}: R$ ${d.saldo.toLocaleString('pt-BR')}`}></div>
                                                     );
                                                 })}
                                             </div>
@@ -483,26 +476,78 @@ const DashboardInvestidor = () => {
                     })()}
                 </div>
 
-                <div className="hide-on-mobile">
-                    {/* PC-only Widget: Resumo de Performance */}
-                    <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <h3 className="mb-1" style={{ fontSize: '1rem' }}>Performance da Carteira</h3>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '15px' }}>
-                            <div className="info-block">
-                                <div className="info-label">Rentabilidade Média</div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>
-                                    {totalInvestido > 0 ? (((carteira.reduce((a, i) => a + (i.pago_para_investidor || 0), 0) - totalInvestido) / totalInvestido) * 100).toFixed(1) : '0.0'}%
-                                </div>
+                {/* Performance Card - Now visible on mobile too */}
+                <div className="card">
+                    <div className="flex-between mb-1">
+                        <div className="flex-between" style={{ gap: '10px' }}>
+                            <TrendingUp size={20} color="var(--primary)" />
+                            <span style={{ fontWeight: 600, fontSize: '1rem' }}>Performance da Carteira</span>
+                        </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '10px' }}>
+                        <div className="info-block" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                            <div className="info-label" style={{ fontSize: '0.7rem', fontWeight: 700 }}>Rentabilidade Total</div>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: totalInvestido > 0 && (((carteira.reduce((a, i) => a + (i.valor_recebido || 0), 0) - totalInvestido) / totalInvestido) * 100) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {totalInvestido > 0 ? (((carteira.reduce((a, i) => a + (i.valor_recebido || 0), 0) - totalInvestido) / totalInvestido) * 100).toFixed(1) : '0.0'}%
                             </div>
-                            <div className="grid-2" style={{ gap: '10px' }}>
-                                <div className="info-block">
-                                    <div className="info-label">Ativos</div>
-                                    <div style={{ fontWeight: 700 }}>{carteira.length} Contratos</div>
-                                </div>
-                                <div className="info-block">
-                                    <div className="info-label">Recebível</div>
-                                    <div style={{ fontWeight: 700 }}>R$ {carteira.reduce((a, i) => a + (i.valor_restante || 0), 0).toLocaleString('pt-BR')}</div>
-                                </div>
+                        </div>
+
+                        {/* Rentabilidade por Mês (Últimos 12 Meses) */}
+                        <div style={{ padding: '0 4px' }}>
+                            <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', fontWeight: 800 }}>Lucro Mensal (12 Meses)</h4>
+                            {(() => {
+                                const lucrosMensaisRaw = historico.reduce((acc, h) => {
+                                    if (!h.data || h.status !== 'concluido') return acc;
+                                    const data = new Date(h.data);
+                                    // Chave Única por Mês/Ano para ordenação
+                                    const chaveSort = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+                                    const label = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+                                    
+                                    if (!acc[chaveSort]) acc[chaveSort] = { label, lucro: 0 };
+                                    
+                                    // Ganhos: Recebimento de parcela ou comissão
+                                    if (h.tipo === 'recebimento' || h.tipo === 'comissao_parceiro') {
+                                        acc[chaveSort].lucro += (h.valor || 0);
+                                    }
+                                    // Custos Operacionais (Taxas deduzidas do lucro direto do investidor)
+                                    if (['taxa_intermediacao', 'taxa_conveniencia', 'compra_score', 'desbloqueio_dados'].includes(h.tipo)) {
+                                        acc[chaveSort].lucro -= (h.valor || 0);
+                                    }
+                                    return acc;
+                                }, {});
+
+                                // Ordenar e pegar os últimos 12 meses
+                                const mensalidades = Object.keys(lucrosMensaisRaw)
+                                    .sort((a, b) => b.localeCompare(a))
+                                    .slice(0, 12)
+                                    .map(key => lucrosMensaisRaw[key]);
+
+                                if (mensalidades.length === 0) return <p className="text-muted" style={{ fontSize: '0.75rem' }}>Nenhum lucro registrado no período.</p>;
+
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {mensalidades.map((m, idx) => (
+                                            <div key={idx} className="flex-between" style={{ paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', textTransform: 'capitalize' }}>{m.label}</span>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: m.lucro >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                    {m.lucro >= 0 ? '+' : ''} R$ {Math.abs(m.lucro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        <div className="grid-2" style={{ gap: '12px' }}>
+                            <div className="info-block" style={{ padding: '12px' }}>
+                                <div className="info-label" style={{ fontSize: '0.65rem' }}>Ativos</div>
+                                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{carteira.length} Contratos</div>
+                            </div>
+                            <div className="info-block" style={{ padding: '12px' }}>
+                                <div className="info-label" style={{ fontSize: '0.65rem' }}>Recebível</div>
+                                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>R$ {carteira.reduce((a, i) => a + (i.valor_restante || 0), 0).toLocaleString('pt-BR')}</div>
                             </div>
                         </div>
                     </div>
@@ -1118,8 +1163,10 @@ const DashboardInvestidor = () => {
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
-                                    <button className="btn btn-primary" onClick={handleNotificarDeposito}>Confirmar Notificação</button>
-                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)}>Revisar</button>
+                                    <button className="btn btn-primary" onClick={handleNotificarDeposito} disabled={loadingAction}>
+                                        {loadingAction ? 'Processando...' : 'Confirmar e Notificar'}
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)} disabled={loadingAction}>Revisar</button>
                                 </div>
                             </div>
                         )}
@@ -1269,13 +1316,35 @@ const DashboardInvestidor = () => {
 
                                         <div className="input-group mb-1">
                                             <label>Sua Senha</label>
-                                            <input
-                                                type="password"
-                                                className="input-field"
-                                                placeholder="Sua senha de acesso"
-                                                value={senhaSaque}
-                                                onChange={(e) => setSenhaSaque(e.target.value)}
-                                            />
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type={showSenhaSaque ? "text" : "password"}
+                                                    className="input-field"
+                                                    placeholder="Sua senha de acesso"
+                                                    value={senhaSaque}
+                                                    onChange={(e) => setSenhaSaque(e.target.value)}
+                                                    style={{ paddingRight: '45px' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSenhaSaque(!showSenhaSaque)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '12px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: 'var(--text-muted)',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        padding: '4px'
+                                                    }}
+                                                >
+                                                    {showSenhaSaque ? <EyeOff size={20} /> : <Eye size={20} />}
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="input-group mb-1">

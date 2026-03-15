@@ -10,6 +10,7 @@ import './index.css';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 import BannerCookies from './componentes/BannerCookies';
 import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
+import RecuperarSenha from './paginas/RecuperarSenha';
 
 const App = () => {
     const whatsappLink = 'https://wa.me/5591980177874';
@@ -48,7 +49,20 @@ const App = () => {
             setUser(JSON.parse(savedUser));
         }
 
-        return () => window.removeEventListener('hashchange', handleHashChange);
+        // Adicionar ouvinte para logout automático quando token for recusado pela API (401)
+        const handleUnauthorized = () => {
+            console.warn("Sessão expirada. Realizando logout automático.");
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            setUser(null);
+            window.location.hash = 'login';
+        };
+        window.addEventListener('peer_unauthorized', handleUnauthorized);
+
+        return () => {
+            window.removeEventListener('hashchange', handleHashChange);
+            window.removeEventListener('peer_unauthorized', handleUnauthorized);
+        }
     }, []);
 
     const onLogin = (userData) => {
@@ -113,6 +127,9 @@ const App = () => {
         }
         if (page === 'privacidade') {
             return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
+        }
+        if (page === 'recuperar-senha') {
+            return <RecuperarSenha />;
         }
         return (
             <>

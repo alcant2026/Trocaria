@@ -23,6 +23,9 @@ const api = {
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                window.dispatchEvent(new Event('peer_unauthorized'));
+            }
             let errorMessage = 'Erro na requisição';
             try {
                 const errorData = await response.json();

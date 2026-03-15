@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Key, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 const Seguranca = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -12,6 +12,7 @@ const Seguranca = () => {
     const [senhaParaDesativar, setSenhaParaDesativar] = useState('');
     const [codigoParaDesativar, setCodigoParaDesativar] = useState('');
     const [showDesativarForm, setShowDesativarForm] = useState(false);
+    const [showSenha, setShowSenha] = useState(false);
 
     useEffect(() => {
         carregarStatus();
@@ -127,11 +128,11 @@ const Seguranca = () => {
 
                 {!status2fa && secretData && (
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ background: '#fff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1rem' }}>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.9)', padding: '1.2rem', borderRadius: '24px', display: 'inline-block', marginBottom: '1.5rem', boxShadow: '0 0 30px rgba(255, 255, 255, 0.1)' }}>
                             <img
                                 src={secretData.qr_code}
                                 alt="QR Code 2FA"
-                                style={{ width: '200px', height: '200px', display: 'block' }}
+                                style={{ width: '200px', height: '200px', display: 'block', borderRadius: '12px' }}
                                 onError={(e) => {
                                     e.target.onerror = null;
                                     setMensagem("Dica: Use a chave manual abaixo caso tenha problemas.");
@@ -265,17 +266,38 @@ const Seguranca = () => {
                                     Atenção: Ao desativar ou reativar o 2FA, os saques serão bloqueados por mais 48 horas.
                                 </p>
                                 <div className="input-group">
-                                     <input 
-                                        type="password" 
-                                        name="pwd_disable_2fa_v1"
-                                        id="pwd_disable_2fa_v1"
-                                        autoComplete="current-password"
-                                        placeholder="Sua senha de acesso" 
-                                        className="input-field"
-                                        value={senhaParaDesativar}
-                                        onChange={(e) => setSenhaParaDesativar(e.target.value)}
-                                        style={{ marginBottom: '10px' }}
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                        <input 
+                                            type={showSenha ? "text" : "password"} 
+                                            name="pwd_disable_2fa_v1"
+                                            id="pwd_disable_2fa_v1"
+                                            autoComplete="current-password"
+                                            placeholder="Sua senha de acesso" 
+                                            className="input-field"
+                                            value={senhaParaDesativar}
+                                            onChange={(e) => setSenhaParaDesativar(e.target.value)}
+                                            style={{ marginBottom: '10px', paddingRight: '45px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSenha(!showSenha)}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '12px',
+                                                top: 'calc(50% - 5px)',
+                                                transform: 'translateY(-50%)',
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                padding: '4px'
+                                            }}
+                                        >
+                                            {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="input-group">
                                     <input 

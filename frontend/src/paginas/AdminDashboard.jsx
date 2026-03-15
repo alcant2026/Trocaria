@@ -1365,26 +1365,31 @@ const AdminDashboard = () => {
 
                                     <div className="flex-between mb-1" style={{ padding: '8px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '8px', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
                                         <div>
-                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sugestão Pool (Score)</p>
-                                            <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.9rem' }}>R$ {sa.sugestao_pool?.toLocaleString('pt-BR') || '0,00'}</p>
+                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Skin in the Game (Pool)</p>
+                                            <p style={{ fontWeight: 800, color: 'var(--success)', fontSize: '0.9rem' }}>R$ {sa.saldo_caixa_tomador?.toLocaleString('pt-BR') || '0,00'}</p>
                                         </div>
-                                        {sa.sugestao_pool > 0 && (
-                                            <button
-                                                className="btn btn-primary"
-                                                style={{ width: 'auto', padding: '4px 12px', fontSize: '0.7rem', height: 'auto' }}
-                                                onClick={() => handleConfirmarAportePool(sa.id, sa.sugestao_pool)}
-                                            >
-                                                Aprovar Aporte
-                                            </button>
-                                        )}
+                                        <div>
+                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Sugestão Pool (Sistema)</p>
+                                            <p style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.9rem', textAlign: 'right' }}>R$ {sa.sugestao_pool?.toLocaleString('pt-BR') || '0,00'}</p>
+                                        </div>
                                     </div>
 
+                                    {sa.sugestao_pool > 0 && (
+                                        <button
+                                            className="btn btn-primary mb-1 text-xs py-2 w-full"
+                                            style={{ borderRadius: '8px' }}
+                                            onClick={() => handleConfirmarAportePool(sa.id, sa.sugestao_pool)}
+                                        >
+                                            Injetar Aporte do Pool
+                                        </button>
+                                    )}
+
                                     <button
-                                        className="btn btn-outline"
-                                        style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                        className="btn btn-outline text-xs py-2 w-full"
+                                        style={{ borderColor: 'var(--primary)', color: 'var(--primary)', borderRadius: '8px' }}
                                         onClick={() => handleInvestirLucro(sa)}
                                     >
-                                        Investir via Pool (Governança)
+                                        Investimento via Governança
                                     </button>
                                 </div>
                             ))}

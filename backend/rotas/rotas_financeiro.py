@@ -10,7 +10,8 @@ import datetime
 from datetime import timezone, timedelta
 import pyotp
 from typing import Optional, List
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, StatusSolicitacao, SolicitacaoEmprestimo
+from utils_emprestimo import calcular_divida_total, liquidar_emprestimo_via_pool
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro, LinkAfiliado
@@ -216,17 +217,30 @@ async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session
             detail="Resgate bloqueado: O saldo do Caixa só pode ser resgatado entre 19 e 21 de Dezembro."
         )
 
-    # NOVO: Chave Anticalote - Bloqueia resgate se houver empréstimo ativo
+    # NOVO: Chave Anticalote - Bloqueia resgate e liquida se houver empréstimo ativo
     emprestimo_ativo = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.usuario_id == usuario.id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
     ).first()
     
     if emprestimo_ativo:
-        raise HTTPException(
-            status_code=403,
-            detail="Saque Negado: Você possui um empréstimo ativo. O resgate do Caixa está bloqueado até a quitação total da dívida."
-        )
+        divida_total = calcular_divida_total(emprestimo_ativo)
+        saldo_disponivel = max(Decimal("0.00"), usuario.saldo_caixa - divida_total)
+
+        # "se for tenta sacar se tiver devendo ai sim e liquidado"
+        if dados.valor > saldo_disponivel:
+            valor_liquidacao = min(usuario.saldo_caixa, divida_total)
+            if valor_liquidacao > 0:
+                liquidar_emprestimo_via_pool(usuario, emprestimo_ativo, valor_liquidacao, db)
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Liquidação Forçada: R$ {valor_liquidacao:,.2f} do seu Caixa foram usados para abater sua dívida ativa. Tente resgatar um valor menor (Saldo Disponível: R$ {usuario.saldo_caixa - divida_total if (usuario.saldo_caixa - divida_total) > 0 else 0:,.2f})."
+                )
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Resgate Negado: Todo o seu saldo no Caixa está bloqueado como garantia do seu empréstimo ativo."
+                )
 
     if usuario.saldo_caixa < dados.valor:
         raise HTTPException(status_code=400, detail="Saldo no Caixa insuficiente para resgate.")

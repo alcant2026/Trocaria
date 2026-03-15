@@ -6,6 +6,7 @@ from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmp
 from sqlalchemy import func, case, and_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
+from utils_emprestimo import calcular_divida_total
 
 router = APIRouter(tags=["Snapshot"])
 
@@ -53,6 +54,18 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
         is_parceiro = parceiro is not None
         
+        # 0. Calcular Dívida Total Pendente (Skin in the game guarantee)
+        divida_total_pendente = Decimal("0.00")
+        emprestimos_ativos = db.query(SolicitacaoEmprestimo).filter(
+            SolicitacaoEmprestimo.usuario_id == usuario.id,
+            SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+        ).all()
+        for emp in emprestimos_ativos:
+            divida_total_pendente += calcular_divida_total(emp)
+        
+        saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
+        saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
+
         snapshot = {
             "perfil": {
                 "id": usuario.id,
@@ -66,7 +79,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "cidade": usuario.cidade,
                 "estado": usuario.estado,
                 "two_factor_enabled": usuario.two_factor_enabled,
-                "saldo_caixa": float(usuario.saldo_caixa or 0),
+                "saldo_caixa": float(saldo_caixa_total),
+                "saldo_caixa_disponivel": float(saldo_caixa_disponivel),
+                "divida_total_pool": float(divida_total_pendente),
                 "is_parceiro": is_parceiro,
                 "parceiro_id": parceiro.id if parceiro else None,
                 "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
@@ -287,7 +302,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "score": float(sa.usuario.score),
                     "taxa": float(sa.taxa_juros),
                     "parcelas": sa.prazo_meses,
-                    "sugestao_pool": float(sa.sugestao_pool or 0)
+                    "sugestao_pool": float(sa.sugestao_pool or 0),
+                    "saldo_caixa_tomador": float(sa.usuario.saldo_caixa or 0)
                 })
 
             # 6. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)

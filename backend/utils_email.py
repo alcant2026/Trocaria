@@ -81,20 +81,28 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
         
         msg.attach(MIMEText(html_template, 'html'))
 
-        print(f"DEBUG EMAIL: Conectando a {SMTP_SERVER}...")
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.set_debuglevel(1)  # Ativa logs detalhados do SMTP no console/log do Render
+        print(f"DEBUG EMAIL: Tentando conexão com {SMTP_SERVER}:{SMTP_PORT} (Timeout 20s)...")
+        # Usando timeout para evitar que a tarefa de segundo plano trave indefinidamente
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20) as server:
+            print("DEBUG EMAIL: Conexão estabelecida. Iniciando STARTTLS...")
+            server.set_debuglevel(1)
             server.starttls()
+            
             print(f"DEBUG EMAIL: Autenticando usuário {SMTP_USER}...")
             server.login(SMTP_USER, SMTP_PASS)
-            print(f"DEBUG EMAIL: Enviando mensagem...")
+            
+            print(f"DEBUG EMAIL: Enviando mensagem para {email_destino}...")
             server.send_message(msg)
             print(f"DEBUG EMAIL: E-mail enviado com sucesso!")
             
         return True
+    except smtplib.SMTPException as e:
+        print(f"ERRO SMTP: {str(e)}")
+        return False
     except Exception as e:
         print(f"ERRO CRÍTICO AO ENVIAR E-MAIL: {str(e)}")
-        # Em produção, você logaria isso em um sistema de erro
+        import traceback
+        traceback.print_exc()
         return False
 
 def mascarar_email(email: str) -> str:

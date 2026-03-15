@@ -45,6 +45,13 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Evita o fundo preto/branco ao puxar a tela no mobile (bounce) */
+  overscroll-behavior: none;
+}
+
+html {
+  background-color: var(--background);
+  overscroll-behavior: none;
 }
 
 /* Scrollbar Style */
@@ -267,10 +274,25 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
   justify-content: center;
   padding: 1.5rem;
   position: relative;
+  overflow: hidden;
+}
+
+/* 
+   Hack para background fixo no mobile: 
+   background-attachment: fixed é bugado no iOS/Android.
+   Usar um ::before fixo resolve o escalonamento e o jitter.
+*/
+.auth-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
   background-image: url('/fundo_autenticacao.png');
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
+  z-index: 0;
+  /* Garante que o fundo não mude de tamanho com a barra do navegador */
+  height: 100%;
+  width: 100%;
 }
 
 .auth-overlay {

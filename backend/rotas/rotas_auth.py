@@ -433,10 +433,13 @@ async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, b
     print(f"DEBUG AUTH: Gerado código {codigo} para usuario {usuario.email}")
     db.commit()
 
-    # Enviar e-mail em SEGUNDO PLANO (Não bloqueia o worker do Render)
-    print(f"DEBUG AUTH: Adicionando tarefa de e-mail ao background_tasks...")
-    background_tasks.add_task(enviar_email_recuperacao, usuario.email, usuario.nome, codigo)
-    print(f"DEBUG AUTH: Tarefa adicionada. Retornando 200 OK.")
+    # TESTE SÍNCRONO: Chamando diretamente para ver os logs no Render em tempo real
+    print(f"DEBUG AUTH: Enviando e-mail de forma síncrona para teste...")
+    try:
+        enviar_email_recuperacao(usuario.email, usuario.nome, codigo)
+        print(f"DEBUG AUTH: Função de e-mail finalizada.")
+    except Exception as e:
+        print(f"DEBUG AUTH: Erro ao chamar função de e-mail: {e}")
     
     return {
         "message": "Código enviado com sucesso.",

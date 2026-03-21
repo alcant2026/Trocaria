@@ -205,6 +205,9 @@ async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session 
         auditoria_id=auditoria.id
     )
     db.add(transacao)
+    # Novo: Registrar na auditoria administrativa
+    registrar_acao_admin(db, usuario.id, "APORTE_CAIXA_POOL", alvo_id=usuario.id, detalhes=f"Valor: {dados.valor}", ip=request.client.host)
+    
     db.commit()
     cache_snapshot_data.clear()
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
@@ -221,7 +224,9 @@ async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session
     agora = datetime.datetime.now(TZ_BRASILIA)
     # REGRA: Apenas entre 19 e 21 de dezembro
     if not (agora.month == 12 and 19 <= agora.day <= 21):
-         raise HTTPException(
+          # Auditoria de tentativa de resgate fora de época (importante para o admin)
+          registrar_acao_admin(db, usuario.id, "TENTATIVA_RESGATE_FORA_DATA", alvo_id=usuario.id, detalhes=f"Valor tentado: {dados.valor}", ip=request.client.host)
+          raise HTTPException(
             status_code=403, 
             detail="Resgate bloqueado: O saldo do Caixa só pode ser resgatado entre 19 e 21 de Dezembro."
         )

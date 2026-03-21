@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Enum, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Enum, Boolean, Text
 from sqlalchemy.orm import relationship
 import datetime
 import enum
@@ -38,20 +38,20 @@ class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
 
     id = Column(Integer, primary_key=True, index=True)
-    ip = Column(String, nullable=False)
-    municipio = Column(String, nullable=True)
-    user_agent = Column(String, nullable=True)
+    ip = Column(String(45), nullable=False)
+    municipio = Column(String(255), nullable=True)
+    user_agent = Column(Text, nullable=True) # TEXT no DB
     data_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Usuario(Base):
     __tablename__ = "usuarios"
 
     id = Column(String(5), primary_key=True, index=True)
-    nome = Column(String(100), nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
+    nome = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     cpf = Column(String(14), unique=True, index=True, nullable=False)
-    senha_hash = Column(String(200), nullable=False)
-    chave_pix = Column(String(100), nullable=False)
+    senha_hash = Column(Text, nullable=False) # TEXT no DB
+    chave_pix = Column(String(255), nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_bloqueado = Column(Numeric(precision=20, scale=2), default=0) # NOVO: Para garantidores
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0) # Saldo no Pool de Investimentos
@@ -68,8 +68,8 @@ class Usuario(Base):
     telefone = Column(String(20), nullable=True) # Ex: (91) 98017-7874
     
     # Localização do Usuário
-    cidade = Column(String, nullable=True)
-    estado = Column(String, nullable=True)
+    cidade = Column(String(100), nullable=True)
+    estado = Column(String(50), nullable=True)
     
     # Proteção Jurídica: Aceite de Termos de Uso (Intermediação SaaS)
     aceite_termos = Column(Boolean, default=False)
@@ -77,13 +77,14 @@ class Usuario(Base):
     # NOVOS: Conformidade LGPD (Cookies e Privacidade)
     aceite_cookies = Column(Boolean, default=False)
     data_aceite_cookies = Column(DateTime, nullable=True)
+    data_aceite = Column(DateTime, nullable=True) # Sincronizado com Neon
     
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     
     auditoria = relationship("RegistroAuditoria")
 
     # Autenticação de Dois Fatores (2FA)
-    totp_secret = Column(String, nullable=True)
+    totp_secret = Column(String(32), nullable=True)
     two_factor_enabled = Column(Boolean, default=False)
     ultima_alteracao_2fa = Column(DateTime, nullable=True) # Trava de 48h para saques
 
@@ -123,8 +124,10 @@ class SolicitacaoEmprestimo(Base):
     # Blindagem Jurídica: Rastreabilidade de Aceite
     aceite_termos = Column(Boolean, default=False)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
-    cpf_aceite = Column(String, nullable=True)
+    cpf_aceite = Column(String(14), nullable=True)
     data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
+    ip_aceite = Column(String(45), nullable=True)
+    municipio_aceite = Column(String(255), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
 
@@ -147,7 +150,9 @@ class Investimento(Base):
     
     # Blindagem Jurídica: Rastreabilidade
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
-    cpf_aceite = Column(String, nullable=True)
+    cpf_aceite = Column(String(14), nullable=True)
+    ip_aceite = Column(String(45), nullable=True)
+    municipio_aceite = Column(String(255), nullable=True)
     is_institutional = Column(Boolean, default=False)
     is_pool = Column(Boolean, default=False) # Se o dinheiro veio do Pool (Caixa)
 
@@ -172,11 +177,11 @@ class Transacao(Base):
     usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     tipo = Column(Enum(TipoTransacao, name="tipo_transacao", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
-    status = Column(String, default="pendente", index=True) # pendente, concluido, falhou
+    status = Column(String(50), default="pendente", index=True) # pendente, concluido, falhou
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Para saques/depósitos, armazenar a chave pix ou ID do parceiro
-    detalhes = Column(String, nullable=True) 
+    detalhes = Column(Text, nullable=True) # TEXT no DB
     metodo = Column(String, default="pix") # pix, especie
     parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
     
@@ -212,6 +217,8 @@ class GarantiaSocial(Base):
     garante_id = Column(String(5), ForeignKey("usuarios.id", ondelete="CASCADE"))
     aceito = Column(Boolean, default=False)
     data_aceite = Column(DateTime, nullable=True)
+    ip_aceite = Column(String(45), nullable=True)
+    municipio_aceite = Column(String(255), nullable=True)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
@@ -235,8 +242,8 @@ class AcaoAdmin(Base):
     admin_id = Column(String(5), ForeignKey("usuarios.id"))
     alvo_id = Column(String(100), nullable=True) # ID do usuário ou objeto afetado
     acao = Column(String(100), nullable=False) # Ex: "ALTERAR_SCORE", "ATIVAR_PARCEIRO"
-    detalhes = Column(String, nullable=True)
-    ip = Column(String, nullable=True)
+    detalhes = Column(Text, nullable=True) # TEXT no DB
+    ip = Column(String(45), nullable=True)
     data_acao = Column(DateTime, default=datetime.datetime.utcnow)
 
     admin = relationship("Usuario")

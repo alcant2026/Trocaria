@@ -43,13 +43,16 @@ TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 @router.post("/solicitar-saque")
 @limiter.limit("2/minute")
-async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    valor = dados.valor
-    chave_pix = dados.chave_pix
+async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    # SEGURANÇA MÁXIMA: Lock do registro do usuário para evitar race conditions no saldo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
+    
+    valor = dados.valor
+    chave_pix = dados.chave_pix
+    
     if valor <= 0:
         raise HTTPException(status_code=400, detail="Valor de saque inválido.")
 
@@ -167,8 +170,11 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
 
 @router.post("/caixa/aporte")
 @limiter.limit("5/minute")
-async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Move saldo da conta principal para o Caixa com blindagem jurídica."""
+    # Lock para evitar bit-flipping de saldo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    
     if not verify_password(dados.senha, usuario.senha_hash):
         raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
     
@@ -204,8 +210,11 @@ async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session 
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
 
 @router.post("/caixa/resgate")
-async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Resgata saldo do Caixa com blindagem e auditoria."""
+    # Lock preventivo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if not verify_password(dados.senha, usuario.senha_hash):
         raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
 
@@ -348,12 +357,14 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
         Transacao.id == dados.transacao_id,
         Transacao.status == "pendente",
         Transacao.parceiro_id == parceiro.id
-    ).first()
+    ).with_for_update().first() # Lock na transação para evitar duplo processamento
 
     if not transacao:
-         raise HTTPException(status_code=404, detail="Esta transação não existe ou já foi finalizada.")
+        raise HTTPException(status_code=404, detail="Esta transação não existe ou já foi finalizada.")
     
-    cliente = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).first()
+    # Lock no cliente e na plataforma para segurança financeira
+    cliente = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
 
     # --- Nova lógica de taxas ---
     # Garante Decimal puro para evitar TypeError com SQLite (que pode retornar float)
@@ -421,16 +432,20 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
 @router.post("/parceiro/sacar-comissoes")
 async def sacar_comissoes_parceiro(db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
     """Transfere as comissões acumuladas do parceiro para o saldo da carteira."""
-    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
+    # Lock no registro do parceiro para garantir integridade do saque de comissão
+    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).with_for_update().first()
     if not parceiro:
         raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+
+    # Lock no usuário para o crédito
+    usuario = db.query(Usuario).filter(Usuario.id == parceiro_user.id).with_for_update().first()
 
     saldo_comissoes = parceiro.comissoes_acumuladas or Decimal("0.00")
     if saldo_comissoes <= Decimal("0.00"):
         raise HTTPException(status_code=400, detail="Você não possui comissões acumuladas para sacar.")
 
     # Transferir para o saldo da carteira
-    parceiro_user.saldo = (parceiro_user.saldo or Decimal("0.00")) + saldo_comissoes
+    usuario.saldo = (usuario.saldo or Decimal("0.00")) + saldo_comissoes
     parceiro.comissoes_acumuladas = Decimal("0.00")
 
     # Registrar no histórico
@@ -610,11 +625,12 @@ async def deletar_item_loja(id: int, db: Session = Depends(get_db), admin: Usuar
 
 @router.post("/admin/confirmar/{transacao_id}")
 async def confirmar_transacao(transacao_id: int, request: Request, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    transacao = db.query(Transacao).filter(Transacao.id == transacao_id).first()
+    # Lock na transação e no usuário alvo
+    transacao = db.query(Transacao).filter(Transacao.id == transacao_id).with_for_update().first()
     if not transacao or transacao.status != "pendente":
         raise HTTPException(status_code=404, detail="Transação pendente não encontrada.")
 
-    usuario = transacao.usuario
+    usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
     
     if transacao.tipo == TipoTransacao.DEPOSITO:
         usuario.saldo += transacao.valor
@@ -652,10 +668,12 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
         raise HTTPException(status_code=404, detail="Transação pendente não encontrada.")
 
     usuario = transacao.usuario
+    # Lock no usuário para garantir atomicidade na rejeição (estorno de saldo)
+    usuario_lock = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
     
     # Só não estorna em DEPÓSITO (dinheiro ainda não entrou) e RECEBIMENTO (dinheiro vindo de fora)
     if transacao.tipo.value not in ["deposito", "recebimento"]:
-        usuario.saldo += transacao.valor
+        usuario_lock.saldo += transacao.valor
     
     transacao.status = "falhou"
     transacao.detalhes = f"REJEITADO: {motivo}"
@@ -839,8 +857,8 @@ async def sacar_lucro_plataforma(
     if not dados.motivo or len(dados.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="Você deve fornecer uma justificativa clara (mínimo 5 caracteres) para o resgate de lucro.")
 
-    # DEDUZIR DO SALDO DA PLATAFORMA (USUARIO 000PL)
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    # DEDUZIR DO SALDO DA PLATAFORMA (USUARIO 000PL) com LOCK
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
     
@@ -887,8 +905,8 @@ async def aportar_lucro_plataforma(
     if not dados.motivo or len(dados.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="Forneça uma justificativa para o aporte (mínimo 5 caracteres).")
 
-    # Registra a transação de aporte (entrada no fiscal) no usuário 000PL
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    # Registra a transação de aporte (entrada no fiscal) no usuário 000PL com LOCK
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
 
@@ -945,8 +963,8 @@ async def reinvestir_lucro_pool(
     if dados > lucro_disponivel:
         raise HTTPException(status_code=400, detail="Lucro insuficiente.")
 
-    # 2. Executar Movimentação no Usuário de Sistema 000PL
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    # 2. Executar Movimentação no Usuário de Sistema 000PL com LOCK
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
 
@@ -984,8 +1002,8 @@ async def resgatar_pool_para_lucro(
     """
     Retira valor do Pool (Capital + Juros) e devolve para o Lucro da plataforma.
     """
-    # 1. Executar Movimentação no Usuário 000PL
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    # 1. Executar Movimentação no Usuário 000PL com LOCK
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
 

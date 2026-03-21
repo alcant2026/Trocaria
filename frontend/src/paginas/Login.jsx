@@ -99,13 +99,21 @@ const Login = ({ onLogin }) => {
 
                         <button type="submit" className="btn btn-primary mt-1">Entrar</button>
 
-                        <div className="text-center mt-1">
+                        <div className="text-center mt-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <a 
                                 href="#recuperar-senha" 
                                 style={{ color: '#fff', fontSize: '0.85rem', opacity: 0.8, textDecoration: 'none' }}
                                 onClick={(e) => { e.preventDefault(); window.location.hash = 'recuperar-senha'; }}
                             >
                                 Esqueci minha senha
+                            </a>
+                            <a 
+                                href="https://wa.me/5591980177874?text=Olá,%20esqueci%20meus%20dados%20de%20acesso%20(CPF/Email)%20no%20Peer%20e%20gostaria%20de%20recuperá-los." 
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: 'var(--primary)', fontSize: '0.85rem', opacity: 0.9, textDecoration: 'none', fontWeight: 500 }}
+                            >
+                                Esqueci meu CPF ou E-mail
                             </a>
                         </div>
 

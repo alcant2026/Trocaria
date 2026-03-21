@@ -115,3 +115,15 @@ def mascarar_email(email: str) -> str:
         return f"{usuario_m}@{dominio_m}.{'.'.join(partes_dominio[1:])}"
     except:
         return "****@****.com"
+
+def mascarar_cpf(cpf: str) -> str:
+    """Retorna o CPF mascarado (ex: 123.***.***-99) conforme LGPD."""
+    try:
+        # Garante que o CPF tenha apenas números para o mascaramento
+        cpf_limpo = "".join(filter(str.isdigit, cpf))
+        if len(cpf_limpo) != 11:
+            return "***.***.***-**"
+        
+        return f"{cpf_limpo[:3]}.***.***-{cpf_limpo[-2:]}"
+    except:
+        return "***.***.***-**"

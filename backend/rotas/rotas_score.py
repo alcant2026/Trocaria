@@ -14,8 +14,11 @@ class SolicitacaoVerificacao(BaseModel):
     detalhes: str = ""
 
 @router.post("/comprar")
-async def comprar_score(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def comprar_score(db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     
+    # LOCK no usuário para débito de saldo e atualização de score
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
@@ -34,8 +37,8 @@ async def comprar_score(db: Session = Depends(get_db), usuario: Usuario = Depend
     usuario.saldo -= custo
     usuario.score = novo_score
     
-    # Creditar lucro à plataforma (000PL)
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    # Creditar lucro à plataforma (000PL) com LOCK
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if plataforma:
         plataforma.saldo += custo
 
@@ -58,10 +61,13 @@ async def comprar_score(db: Session = Depends(get_db), usuario: Usuario = Depend
     }
 
 @router.post("/solicitar-verificacao")
-async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """
     O tomador paga R$ 35,00 para solicitar a verificação humana (Selo Verificado).
     """
+    # LOCK
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if usuario.is_verified:
         raise HTTPException(status_code=400, detail="Sua conta já está verificada.")
 
@@ -77,8 +83,8 @@ async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Dep
         # Deduzir saldo apenas se for o primeiro pagamento
         usuario.saldo -= custo
         
-        # Creditar lucro à plataforma (000PL)
-        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+        # Creditar lucro à plataforma (000PL) com LOCK
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
         if plataforma:
             plataforma.saldo += custo
 

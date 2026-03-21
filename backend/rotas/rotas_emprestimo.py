@@ -58,8 +58,11 @@ async def criar_solicitacao(
     dados: SolicitacaoRequest, 
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(obter_usuario_logado)
+    usuario_logado: Usuario = Depends(obter_usuario_logado)
 ):
+    # LOCK no usuário para débito de saldo de postagem e atualização de contadores
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    
     valor = dados.valor
     taxa_juros = dados.taxa_juros
     parcelas = dados.parcelas
@@ -208,7 +211,19 @@ async def vincular_garantidores(
     if len(dados.user_ids) != 2:
         raise HTTPException(status_code=400, detail="Você deve indicar exatamente 2 amigos.")
 
-    # Limpar garantias anteriores se houver (para permitir correção)
+    # 1. SEGURANÇA: Antes de deletar garantias antigas, precisamos DEVOLVER o saldo bloqueado se eles já aceitaram
+    garantias_antigas = db.query(GarantiaSocial).filter(GarantiaSocial.solicitacao_id == solicitacao_id).all()
+    valor_bloqueio = solicitacao.valor * Decimal("0.50")
+    
+    for g_antiga in garantias_antigas:
+        if g_antiga.aceito:
+            garante_antigo = db.query(Usuario).filter(Usuario.id == g_antiga.garante_id).with_for_update().first()
+            if garante_antigo and garante_antigo.saldo_bloqueado >= valor_bloqueio:
+                garante_antigo.saldo_bloqueado -= valor_bloqueio
+                garante_antigo.saldo += valor_bloqueio
+                print(f"DEBUG: [Vincular #{solicitacao_id}] Saldo desbloqueado para antigo garantidor {garante_antigo.id}")
+
+    # 2. Agora sim, limpar para cadastrar os novos
     db.query(GarantiaSocial).filter(GarantiaSocial.solicitacao_id == solicitacao_id).delete()
 
     for user_id in dados.user_ids:
@@ -237,12 +252,15 @@ async def aceitar_garantia(
     solicitacao_id: int, 
     request: Request,
     db: Session = Depends(get_db), 
-    usuario: Usuario = Depends(obter_usuario_logado)
+    usuario_logado: Usuario = Depends(obter_usuario_logado)
 ):
     """
     Rota para o indicado aceitar ser garantia do tomador.
     Verifica score >= 500 e registra IP/Município.
     """
+    # LOCK no usuário para garantir atomicidade do bloqueio de saldo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if usuario.score < Decimal("500"):
         raise HTTPException(status_code=403, detail="Seu score é insuficiente para ser garantidor (Mínimo 500).")
 
@@ -381,11 +399,15 @@ async def listar_solicitacoes(db: Session = Depends(get_db), usuario: Usuario = 
     return resultado
 
 @router.post("/desbloquear-dados/{solicitacao_id}")
-async def desbloquear_dados(solicitacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def desbloquear_dados(solicitacao_id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """
     O investidor paga R$ 15,00 para ver o primeiro nome e o score do tomador.
     """
     custo = Decimal("15.00")
+    
+    # LOCK no investidor para débito de saldo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if usuario.saldo < custo:
         raise HTTPException(status_code=400, detail="Saldo insuficiente para desbloquear dados (R$ 15,00).")
 
@@ -469,17 +491,21 @@ class PagamentoRequest(BaseModel):
     valor_pagamento: Decimal = Field(gt=0)
 
 @router.post("/pagar-parcela/{solicitacao_id}")
-async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     valor_pagamento = dados.valor_pagamento
     
+    # LOCK no usuário para débito de saldo
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+
     if not usuario or usuario.saldo < valor_pagamento:
         raise HTTPException(status_code=400, detail="Saldo insuficiente ou usuário não encontrado.")
 
+    # LOCK na solicitação para evitar pagamentos duplicados
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).first()
+    ).with_for_update().first()
 
     if not solicitacao or solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
         raise HTTPException(status_code=404, detail="Empréstimo ativo não encontrado ou já quitado.")
@@ -686,12 +712,15 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
     }
 
 @router.post("/quitar-total/{solicitacao_id}")
-async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    # LOCK no usuário e na solicitação
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).first()
+    ).with_for_update().first()
     
     if not solicitacao:
         raise HTTPException(status_code=404, detail="Empréstimo ativo não encontrado.")
@@ -846,13 +875,16 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
     }
 
 @router.post("/pagamento-avulso/{solicitacao_id}")
-async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """
     Permite pagar qualquer valor. 
     Regra: Adiciona R$ 1,50 à dívida total como taxa de conveniência.
     """
     valor_pago = dados.valor_pagamento
     taxa_conveniencia = Decimal("1.50")
+
+    # LOCK
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
 
     if not usuario or usuario.saldo < valor_pago:
         raise HTTPException(status_code=400, detail="Saldo insuficiente.")
@@ -861,7 +893,7 @@ async def pagamento_avulso(solicitacao_id: int, dados: PagamentoRequest, db: Ses
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.usuario_id == usuario.id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).first()
+    ).with_for_update().first()
 
     if not solicitacao:
         raise HTTPException(status_code=404, detail="Empréstimo aprovado não encontrado.")
@@ -1376,6 +1408,9 @@ async def confirmar_aporte_pool(
     # Verificar se o Pool tem saldo (soma total do saldo_caixa dos usuários)
     total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
     
+    # Lock na plataforma para o investimento institucional
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+
     if total_pool < valor_aporte:
         raise HTTPException(status_code=400, detail=f"Saldo insuficiente no Pool (Disponível: R$ {total_pool})")
 

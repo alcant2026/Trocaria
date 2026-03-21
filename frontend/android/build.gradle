@@ -1,7 +1,4 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
-    
     repositories {
         google()
         mavenCentral()
@@ -15,12 +12,42 @@ buildscript {
     }
 }
 
+plugins {
+    id 'java'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
 apply from: "variables.gradle"
 
 allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                if (project.plugins.hasPlugin('kotlin-android')) {
+                    kotlinOptions {
+                        jvmTarget = '17'
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -9,12 +9,14 @@ from utils_db import sincronizar_esquema
 
 app = FastAPI(title="Peer API P2P")
 
-# Configuração de CORS - Aceita Front de Produção ou Local
+# Configuração de CORS - Aceita Front de Produção, Local e Mobile (Capacitor)
 frontend_url = os.getenv("FRONTEND_URL", "")
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
+    "http://localhost",        # Capacitor Android
+    "capacitor://localhost",   # Capacitor iOS
     "https://cred30.site",
     "https://www.cred30.site",
     "https://peer-front.onrender.com",
@@ -47,20 +49,19 @@ async def add_security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    # CSP atualizado para incluir cred30.site e domínios do Render
+    # CSP atualizado para incluir cred30.site, domínios do Render e esquema capacitor:
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
-        "connect-src 'self' http://localhost:3000 http://localhost:5173 "
+        "connect-src 'self' http://localhost:3000 http://localhost:5173 http://localhost capacitor: "
         "https://cred30.site https://www.cred30.site "
         "https://peer-front.onrender.com https://peer-api.onrender.com https://peer-5gq5.onrender.com;"
     )
     return response
 
 # CORSMiddleware deve vir DEPOIS de outras middlewares que injetam headers
-# para garantir que os headers de CORS não sejam sobrescritos ou removidos.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -111,7 +112,7 @@ async def startup_db_setup():
                 print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
                 novo_sistema = Usuario(
                     id="000PL", nome="Peer Plataforma (Sistema)", email="sistema@peer.com.br",
-                    cpf="000.000.000-00", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
+                    cpf="00000000000", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
                     is_admin=True, is_active=True, saldo=0, saldo_caixa=0
                 )
                 db.add(novo_sistema)

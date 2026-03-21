@@ -21,8 +21,10 @@ async def desbloquear_solicitacao(solicitacao_id: int, db: Session = Depends(get
     if not investidor:
         raise HTTPException(status_code=404, detail="Investidor não encontrado")
 
-    custo = Decimal("15.00")
-    if investidor.saldo < custo:
+    # LOCK no investidor para débito de saldo
+    usuario = db.query(Usuario).filter(Usuario.id == investidor.id).with_for_update().first()
+
+    if usuario.saldo < custo:
         raise HTTPException(status_code=400, detail="Saldo insuficiente. Custo: R$ 15,00")
 
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
@@ -156,13 +158,16 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
     if not dados.aceite_risco:
         raise HTTPException(status_code=400, detail="Você deve aceitar os riscos do investimento para prosseguir.")
         
-    if not investidor or investidor.saldo < valor:
+    # LOCK no investidor e na solicitação para garantir arrecadação íntegra
+    usuario = db.query(Usuario).filter(Usuario.id == investidor.id).with_for_update().first()
+    
+    if not usuario or usuario.saldo < valor:
         raise HTTPException(status_code=400, detail="Saldo insuficiente ou investidor não encontrado.")
 
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
-    ).first()
+    ).with_for_update().first()
 
     if not solicitacao:
         raise HTTPException(status_code=404, detail="Solicitação não encontrada ou não está mais pendente.")
@@ -173,7 +178,7 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
          raise HTTPException(status_code=400, detail=f"Valor excede o necessário. Faltam apenas R$ {restante}")
 
     # Processar investimento
-    investidor.saldo -= valor
+    usuario.saldo -= valor
     solicitacao.valor_arrecadado += valor
     
     # Criar registro de auditoria
@@ -188,7 +193,7 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
     db.flush()
 
     novo_investimento = Investimento(
-        investidor_id=investidor.id,
+        investidor_id=usuario.id,
         solicitacao_id=solicitacao.id,
         valor_investido=valor,
         pago_para_investidor=Decimal("0.00"),
@@ -196,12 +201,12 @@ async def investir_em_solicitacao(solicitacao_id: int, dados: InvestimentoReques
         ciencia_risco=dados.aceite_risco,
         # Blindagem Jurídica
         auditoria_id=auditoria.id,
-        cpf_aceite=investidor.cpf
+        cpf_aceite=usuario.cpf
     )
 
     # Registrar transação
     transacao = Transacao(
-        usuario_id=investidor.id,
+        usuario_id=usuario.id,
         valor=valor,
         tipo=TipoTransacao.INVESTIMENTO,
         status="concluido",

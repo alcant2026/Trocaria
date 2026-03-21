@@ -36,9 +36,15 @@ def tentar_liberar_emprestimo(solicitacao_id: int, db: Session, ignore_guarantor
     1. A arrecadação atingiu 100%.
     2. Todos os garantidores aceitaram a garantia social (pulado se ignore_guarantors=True).
     """
+    # Lock na solicitação para evitar liberação dupla em condições de corrida
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id
-    ).first()
+    ).with_for_update().first()
+    
+    # Lock no tomador se a solicitação existir
+    if solicitacao:
+        from modelos.modelos_db import Usuario
+        db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).with_for_update().first()
 
     if not solicitacao or solicitacao.status not in [StatusSolicitacao.PENDENTE, StatusSolicitacao.AGUARDANDO_AVALIACAO]:
         return False
@@ -112,7 +118,8 @@ def estornar_e_limpar_solicitacao(solicitacao_id: int, db: Session):
     """
     from modelos.modelos_db import Investimento, AcessoInvestidor, Transacao, TipoTransacao, SolicitacaoEmprestimo
     
-    solicitacao = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.id == solicitacao_id).first()
+    # Lock na solicitação e nos investidores/garantidores
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.id == solicitacao_id).with_for_update().first()
     if not solicitacao:
         return False
 
@@ -138,10 +145,12 @@ def estornar_e_limpar_solicitacao(solicitacao_id: int, db: Session):
     for g in garantias:
         if g.aceito:
             garante = g.garante
-            if garante.saldo_bloqueado >= valor_bloqueio:
-                garante.saldo_bloqueado -= valor_bloqueio
-                garante.saldo += valor_bloqueio
-                print(f"DEBUG: [Estorno #{solicitacao_id}] Saldo devolvido para garantidor {garante.id}")
+            # Lock no garantidor para o estorno
+            garante_lock = db.query(Usuario).filter(Usuario.id == garante.id).with_for_update().first()
+            if garante_lock.saldo_bloqueado >= valor_bloqueio:
+                garante_lock.saldo_bloqueado -= valor_bloqueio
+                garante_lock.saldo += valor_bloqueio
+                print(f"DEBUG: [Estorno #{solicitacao_id}] Saldo devolvido para garantidor {garante_lock.id}")
 
     # 3. Limpeza Agressiva (Economia de BD)
     # Deletar acessos de dados
@@ -218,13 +227,21 @@ def liquidar_emprestimo_via_pool(usuario, solicitacao, valor_liquidação, db: S
     
     # 2. Rateio Proporcional entre os outros participantes do Pool
     # Importante: O próprio tomador NÃO recebe fatia da sua própria liquidação
-    total_caixa_outros = db.query(func.sum(Usuario.saldo_caixa)).filter(Usuario.id != usuario.id).scalar() or Decimal("1.00")
-    outros_participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0, Usuario.id != usuario.id).all()
+    total_caixa_outros = db.query(func.sum(Usuario.saldo_caixa)).filter(Usuario.id != usuario.id).scalar() or Decimal("0.00")
     
-    for p_caixa in outros_participantes:
-        fatia = (p_caixa.saldo_caixa / total_caixa_outros) * valor_liquidação
-        p_caixa.saldo_caixa += fatia
-        db.add(p_caixa)
+    if total_caixa_outros > 0:
+        outros_participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0, Usuario.id != usuario.id).all()
+        
+        for p_caixa in outros_participantes:
+            fatia = (p_caixa.saldo_caixa / total_caixa_outros) * valor_liquidação
+            p_caixa.saldo_caixa += fatia
+            db.add(p_caixa)
+    else:
+        # Se não houver mais ninguém no Pool, o valor vai para a plataforma como reserva técnica
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+        if plataforma:
+            plataforma.saldo_caixa += valor_liquidação
+            print(f"DEBUG: [Liquidação #{solicitacao.id}] Sem outros participantes. Valor revertido para reserva técnica (000PL).")
         
     # 3. Atualizar o empréstimo
     solicitacao.valor_amortizado += valor_liquidação

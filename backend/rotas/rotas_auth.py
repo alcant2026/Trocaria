@@ -247,12 +247,24 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
     # Normalizar CPF (remover pontos e traços)
     cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
     
+    print(f"DEBUG LOGIN: Tentativa de login para CPF: {cpf_limpo}")
+    
     usuario = db.query(Usuario).filter(
         Usuario.cpf == cpf_limpo,
         Usuario.is_active == True
     ).first()
     
-    if not usuario or not verify_password(dados.senha, usuario.senha_hash):
+    if not usuario:
+        print(f"DEBUG LOGIN: Usuário NÃO encontrado para CPF {cpf_limpo}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="CPF ou senha incorretos."
+        )
+
+    senha_valida = verify_password(dados.senha, usuario.senha_hash)
+    print(f"DEBUG LOGIN: Usuário {usuario.id} encontrado. Senha válida: {senha_valida}")
+
+    if not senha_valida:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="CPF ou senha incorretos."

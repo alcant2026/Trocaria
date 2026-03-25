@@ -7,7 +7,9 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 load_dotenv()
 
-DEFAULT_DB_URL = "sqlite:///./cred_plus.db"
+# Caminho absoluto para evitar criação de múltiplos arquivos .db
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DB_URL = f"sqlite:///{os.path.join(BASE_DIR, 'cred_plus.db')}"
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
 def normalizar_database_url(url: str) -> str:

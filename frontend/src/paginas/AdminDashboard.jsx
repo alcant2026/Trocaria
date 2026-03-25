@@ -1066,7 +1066,7 @@ const AdminDashboard = () => {
             <header className="mb-1">
                 <div className="flex-between">
                     <div>
-                        <h1>Gestão Peer</h1>
+                        <h1>Gestão PSY PAY</h1>
                         <p className="text-muted">Monitoramento de fluxo e conformidade.</p>
                     </div>
                     <ShieldCheck size={40} color="var(--primary)" />

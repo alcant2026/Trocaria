@@ -18,6 +18,7 @@ from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investi
 from limitador import limiter
 from utils_seguranca import registrar_acao_admin
 from rotas.rotas_snapshot import cache_snapshot_data
+from utils_score import atualizar_score
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -205,9 +206,11 @@ async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session 
         auditoria_id=auditoria.id
     )
     db.add(transacao)
-    # Novo: Registrar na auditoria administrativa
     registrar_acao_admin(db, usuario.id, "APORTE_CAIXA_POOL", alvo_id=usuario.id, detalhes=f"Valor: {dados.valor}", ip=request.client.host)
     
+    # NOVO: Ganho de Score por aporte no Pool
+    atualizar_score(db, usuario.id, dados.valor, "APORTE_CAIXA")
+
     db.commit()
     cache_snapshot_data.clear()
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
@@ -280,6 +283,10 @@ async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session
         auditoria_id=auditoria.id
     )
     db.add(transacao)
+
+    # NOVO: Perda de Score por resgate (penalidade)
+    atualizar_score(db, usuario.id, dados.valor, "RESGATE_CAIXA")
+
     db.commit()
     cache_snapshot_data.clear()
     return {"message": f"Resgate de R$ {dados.valor:.2f} realizado!", "novo_saldo": float(usuario.saldo)}
@@ -640,10 +647,14 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
     if transacao.tipo == TipoTransacao.DEPOSITO:
         usuario.saldo += transacao.valor
         msg = f"Saldo de R$ {transacao.valor} creditado para {usuario.nome}!"
+        # NOVO: Ganho de score por Depósito
+        atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
     elif transacao.tipo == TipoTransacao.SAQUE:
         # No saque, o saldo já foi deduzido (bloqueado) na solicitação.
         # Aqui o admin apenas confirma que enviou o Pix.
         msg = f"Saque de R$ {transacao.valor} para {usuario.nome} marcado como enviado!"
+        # NOVO: Perda de score por Saque (Penalidade)
+        atualizar_score(db, usuario.id, transacao.valor, "SAQUE")
     else:
         msg = f"Transação de {usuario.nome} confirmada!"
     

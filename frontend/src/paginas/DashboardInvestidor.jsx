@@ -348,7 +348,7 @@ const DashboardInvestidor = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `contrato_peer_${id}.pdf`);
+            link.setAttribute('download', `contrato_psy pay_${id}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);

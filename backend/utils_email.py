@@ -18,7 +18,7 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
     Envia o e-mail de recuperação de conta via API HTTP do Resend.
     Porta 443 (HTTPS) é usada para evitar bloqueios de SMTP em servidores cloud.
     """
-    assunto = f"Código de Recuperação - Peer App"
+    assunto = f"Código de Recuperação - PSY PAY App"
     
     html_template = f"""
     <html>
@@ -30,7 +30,7 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
                 </div>
                 <h1 style="color: #FFFFFF; font-size: 24px; font-weight: 700; margin-bottom: 16px; letter-spacing: -1px;">Olá, {nome_usuario}</h1>
                 <p style="color: #8E8E93; font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
-                    Recebemos uma solicitação de segurança para redefinir sua senha no <strong>Peer App</strong>. 
+                    Recebemos uma solicitação de segurança para redefinir sua senha no <strong>PSY PAY App</strong>. 
                     Utilize o código abaixo para prosseguir:
                 </p>
                 <div style="background: rgba(255, 204, 0, 0.05); border: 2px dashed #FFCC00; padding: 20px; border-radius: 16px; margin-bottom: 32px;">
@@ -41,11 +41,11 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
                 </p>
                 <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 24px;">
                     <p style="font-size: 12px; color: #444; margin-bottom: 4px;">Se não foi você, recomendamos trocar sua senha por segurança.</p>
-                    <p style="font-size: 12px; color: #FFCC00; font-weight: 600;">Equipe de Segurança • Peer App</p>
+                    <p style="font-size: 12px; color: #FFCC00; font-weight: 600;">Equipe de Segurança • PSY PAY App</p>
                 </div>
             </div>
             <div style="text-align: center; margin-top: 24px; color: #444; font-size: 11px;">
-                &copy; 2026 Peer App - Crédito Colaborativo com Segurança Bancária.
+                &copy; 2026 PSY PAY App - Crédito Colaborativo com Segurança Bancária.
             </div>
         </body>
     </html>
@@ -63,7 +63,7 @@ def enviar_email_recuperacao(email_destino: str, nome_usuario: str, codigo: str)
     # Preparar payload para a API do Resend
     url = "https://api.resend.com/emails"
     payload = {
-        "from": f"Peer App <{EMAIL_REMETENTE}>",
+        "from": f"PSY PAY App <{EMAIL_REMETENTE}>",
         "to": [email_destino],
         "subject": assunto,
         "html": html_template

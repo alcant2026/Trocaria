@@ -20,8 +20,8 @@ def migrar_saldos_teste():
             # Se o deploy ainda não rodou o startup, criamos agora
             plataforma = Usuario(
                 id=plataforma_id,
-                nome="Peer Plataforma (Sistema)",
-                email="sistema@peer.com.br",
+                nome="PSY PAY Plataforma (Sistema)",
+                email="sistema@psy pay.com.br",
                 cpf="000.000.000-00",
                 senha_hash="SISTEMA_VIRTUAL",
                 chave_pix="sistema",

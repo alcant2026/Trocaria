@@ -11,6 +11,7 @@ import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 import BannerCookies from './componentes/BannerCookies';
 import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
 import RecuperarSenha from './paginas/RecuperarSenha';
+import Logo from './componentes/Logo';
 
 const App = () => {
     const whatsappLink = 'https://wa.me/5591980177874';
@@ -57,11 +58,11 @@ const App = () => {
             setUser(null);
             window.location.hash = 'login';
         };
-        window.addEventListener('peer_unauthorized', handleUnauthorized);
+        window.addEventListener('psypay_unauthorized', handleUnauthorized);
 
         return () => {
             window.removeEventListener('hashchange', handleHashChange);
-            window.removeEventListener('peer_unauthorized', handleUnauthorized);
+            window.removeEventListener('psypay_unauthorized', handleUnauthorized);
         }
     }, []);
 
@@ -73,7 +74,7 @@ const App = () => {
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('usuario');
-        localStorage.removeItem('peer_cookies_accepted'); // Resetar para garantir novo aceite se necessário
+        localStorage.removeItem('psy pay_cookies_accepted'); // Resetar para garantir novo aceite se necessário
         setUser(null);
         window.location.hash = 'login';
     };
@@ -145,8 +146,7 @@ const App = () => {
             <nav className="navbar">
                 <div className="navbar-container">
                     <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'tomador'; }}>
-                        <img src="/favicon.svg" alt="P Logo" style={{ width: '32px', height: '32px' }} />
-                        <span>eer</span>
+                        <Logo size={28} />
                     </a>
 
                     <div className="nav-controls">

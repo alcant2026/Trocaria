@@ -94,7 +94,7 @@ const Registro = () => {
             <div className="auth-overlay"></div>
             <div className="auth-content" style={{ maxWidth: '450px' }}>
                 <div className="text-center mb-1">
-                    <h1 style={{ fontSize: '2rem', letterSpacing: '-0.5px' }}>Junte-se ao Peer</h1>
+                    <h1 style={{ fontSize: '2rem', letterSpacing: '-0.5px' }}>Junte-se ao PSY PAY</h1>
                     <p style={{ opacity: 0.8 }}>O futuro do crédito P2P começa aqui.</p>
                 </div>
 

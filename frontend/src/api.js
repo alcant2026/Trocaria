@@ -24,7 +24,7 @@ const api = {
 
         if (!response.ok) {
             if (response.status === 401) {
-                window.dispatchEvent(new Event('peer_unauthorized'));
+                window.dispatchEvent(new Event('psy pay_unauthorized'));
             }
             let errorMessage = 'Erro na requisição';
             try {

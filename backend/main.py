@@ -7,7 +7,7 @@ from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema
 
-app = FastAPI(title="Peer API P2P")
+app = FastAPI(title="PSY PAY API P2P")
 
 # Configuração de CORS - Aceita Front de Produção, Local e Mobile (Capacitor)
 frontend_url = os.getenv("FRONTEND_URL", "")
@@ -19,7 +19,7 @@ origins = [
     "capacitor://localhost",   # Capacitor iOS
     "https://cred30.site",
     "https://www.cred30.site",
-    "https://peer-front.onrender.com",
+    "https://psy pay-front.onrender.com",
 ]
 
 if frontend_url:
@@ -57,7 +57,7 @@ async def add_security_headers(request, call_next):
         "img-src 'self' data:; "
         "connect-src 'self' http://localhost:3000 http://localhost:5173 http://localhost capacitor: "
         "https://cred30.site https://www.cred30.site "
-        "https://peer-front.onrender.com https://peer-api.onrender.com https://peer-5gq5.onrender.com;"
+        "https://psy pay-front.onrender.com https://psy pay-api.onrender.com https://psy pay-5gq5.onrender.com;"
     )
     return response
 
@@ -111,7 +111,7 @@ async def startup_db_setup():
             if not db.query(Usuario).filter(Usuario.id == "000PL").first():
                 print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
                 novo_sistema = Usuario(
-                    id="000PL", nome="Peer Plataforma (Sistema)", email="sistema@peer.com.br",
+                    id="000PL", nome="PSY PAY Plataforma (Sistema)", email="sistema@psy pay.com.br",
                     cpf="00000000000", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
                     is_admin=True, is_active=True, saldo=0, saldo_caixa=0
                 )
@@ -133,7 +133,7 @@ app.include_router(rotas_parceiros_caixa.router)
 
 @app.get("/")
 def home():
-    return {"status": "online", "message": "Peer API ativa"}
+    return {"status": "online", "message": "PSY PAY API ativa"}
 
 if __name__ == "__main__":
     import uvicorn

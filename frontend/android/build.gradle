@@ -12,16 +12,6 @@ buildscript {
     }
 }
 
-plugins {
-    id 'java'
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
-
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 apply from: "variables.gradle"

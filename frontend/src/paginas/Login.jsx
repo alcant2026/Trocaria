@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 
 import { Wallet, Eye, EyeOff } from 'lucide-react';
+import Logo from '../componentes/Logo';
 
 const Login = ({ onLogin }) => {
     const [cpf, setCpf] = useState('');
@@ -36,11 +37,11 @@ const Login = ({ onLogin }) => {
             <div className="auth-content">
                 <div className="text-center mb-1">
                     <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)', boxShadow: '0 0 40px rgba(255, 204, 0, 0.15)' }}>
-                        <img src="/favicon.svg" alt="P Logo" style={{ width: '48px', height: '48px' }} />
-                    </div>
-                    <h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Bem-vindo ao Peer</h1>
-                    <p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Crédito Colaborativo: Fortalecendo nossa Comunidade</p>
-                </div>
+                        <Logo size={56} showText={false} />
+</div>
+<h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Bem-vindo ao PSY PAY</h1>
+<p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Comunidade de Fomento e Participação</p>
+</div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
                     <form onSubmit={handleSubmit}>
@@ -108,7 +109,7 @@ const Login = ({ onLogin }) => {
                                 Esqueci minha senha
                             </a>
                             <a 
-                                href="https://wa.me/5591980177874?text=Olá,%20esqueci%20meus%20dados%20de%20acesso%20(CPF/Email)%20no%20Peer%20e%20gostaria%20de%20recuperá-los." 
+                                href="https://wa.me/5591980177874?text=Olá,%20esqueci%20meus%20dados%20de%20acesso%20(CPF/Email)%20no%20PSY PAY%20e%20gostaria%20de%20recuperá-los." 
                                 target="_blank"
                                 rel="noreferrer"
                                 style={{ color: 'var(--primary)', fontSize: '0.85rem', opacity: 0.9, textDecoration: 'none', fontWeight: 500 }}

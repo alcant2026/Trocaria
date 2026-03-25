@@ -12,6 +12,7 @@ from utils_data import adicionar_mes
 from utils_emprestimo import tentar_liberar_emprestimo, estornar_e_limpar_solicitacao
 from utils_seguranca import registrar_acao_admin
 from rotas.rotas_snapshot import cache_snapshot_data
+from utils_score import atualizar_score
 
 router = APIRouter(prefix="/emprestimos", tags=["Empréstimos"])
 
@@ -547,14 +548,14 @@ async def pagar_parcela(solicitacao_id: int, dados: PagamentoRequest, db: Sessio
         ))
 
     if multa_atraso == 0:
-        usuario.score = min(Decimal("1000"), usuario.score + Decimal("2.0"))
+        atualizar_score(db, usuario.id, Decimal("2.0"), "PAGAMENTO_PARCELA")
     else:
         # Atraso penaliza o ganho de score, mas se ele pagou, recupera o score anterior se estava zerado
         if usuario.score == 0 and usuario.score_anterior > 0:
             usuario.score = usuario.score_anterior
             usuario.score_anterior = Decimal("0") # Limpa a memória
         else:
-            usuario.score = min(Decimal("1000"), usuario.score + Decimal("0.5"))
+            atualizar_score(db, usuario.id, Decimal("0.5"), "PAGAMENTO_PARCELA")
             
         # RESTAURA SCORE DOS GARANTIDORES: Se o tomador pagou o atraso, os amigos voltam ao patamar original
         for g in solicitacao.garantias_sociais:
@@ -761,7 +762,7 @@ async def quitar_total(solicitacao_id: int, db: Session = Depends(get_db), usuar
         usuario.score = usuario.score_anterior
         usuario.score_anterior = Decimal("0")
     else:
-        usuario.score = min(Decimal("1000"), usuario.score + Decimal("5.0")) # Bônus por quitação
+        atualizar_score(db, usuario.id, Decimal("5.0"), "QUITACAO_TOTAL") # Bônus por quitação
         
     # RESTAURA SCORE DOS GARANTIDORES
     for g in solicitacao.garantias_sociais:
@@ -1155,7 +1156,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     pdf.set_text_color(0, 0, 0) # Reset cor do texto do contrato
     pdf.cell(0, 10, limpar("PEER - INTERMEDIAÇÃO FINANCEIRA"), ln=True, align="C")
     pdf.set_font("helvetica", "", 10)
-    pdf.cell(0, 5, limpar("Sistema de Empréstimos Peer-to-Peer (P2P)"), ln=True, align="C")
+    pdf.cell(0, 5, limpar("Sistema de Empréstimos PSY PAY-to-PSY PAY (P2P)"), ln=True, align="C")
     pdf.ln(10)
     
     # Título do Contrato
@@ -1177,7 +1178,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
         for inv in solicitacao.investimentos:
             if inv.investidor:
                 if hasattr(inv, 'is_institutional') and inv.is_institutional:
-                    nomes_investidores.append("Peer Tecnologia Ltda. (Institucional)")
+                    nomes_investidores.append("PSY PAY Tecnologia Ltda. (Institucional)")
                 else:
                     nomes_investidores.append(inv.investidor.nome)
         investidores_nomes = ", ".join(nomes_investidores)
@@ -1190,13 +1191,13 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
             f"MUTUANTES (INVESTIDORES): {investidores_nomes}\n"
             f"GARANTIDORES: {garantidores_nomes}\n"
             f"TIPO DE GARANTIA: {solicitacao.tipo_garantia.upper()}\n"
-            f"INTERMEDIADORA: Peer Tecnologia Ltda."
+            f"INTERMEDIADORA: PSY PAY Tecnologia Ltda."
         )
     else:
         # Se investidor está vendo seu contrato
         nome_investidor_pdf = usuario.nome
         if investimento_usuario and hasattr(investimento_usuario, 'is_institutional') and investimento_usuario.is_institutional:
-            nome_investidor_pdf = "Peer Tecnologia Ltda. (Institucional)"
+            nome_investidor_pdf = "PSY PAY Tecnologia Ltda. (Institucional)"
         
         texto_partes = (
             f"MUTUÁRIO (TOMADOR): {tomador.nome}\n"
@@ -1204,7 +1205,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
             f"CPF INVESTIDOR: {usuario.cpf}\n"
             f"GARANTIDORES: {garantidores_nomes}\n"
             f"TIPO DE GARANTIA: {solicitacao.tipo_garantia.upper()}\n"
-            f"INTERMEDIADORA: Peer Tecnologia Ltda."
+            f"INTERMEDIADORA: PSY PAY Tecnologia Ltda."
         )
     
     pdf.multi_cell(0, 5, limpar(texto_partes))
@@ -1240,7 +1241,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     clausulas = (
         "O MUTUÁRIO declara-se ciente que o não pagamento de parcelas acarretará em redução do score interno "
         "e restrições de novos créditos. O MUTUANTE declara ciência dos riscos inerentes ao investimento P2P. "
-        "A plataforma Peer atua apenas como facilitadora técnica e intermediadora."
+        "A plataforma PSY PAY atua apenas como facilitadora técnica e intermediadora."
     )
     if solicitacao.tipo_garantia in ["fisica", "hibrida"]:
         clausulas += (
@@ -1287,7 +1288,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
         if not inv.investidor: continue
         pdf.set_font("helvetica", "B", 8)
         if hasattr(inv, 'is_institutional') and inv.is_institutional:
-            pdf.cell(0, 5, limpar(f"INVESTIDOR: Peer Tecnologia Ltda. (Institucional)"), ln=True)
+            pdf.cell(0, 5, limpar(f"INVESTIDOR: PSY PAY Tecnologia Ltda. (Institucional)"), ln=True)
         else:
             pdf.cell(0, 5, limpar(f"INVESTIDOR: {inv.investidor.nome} ({inv.investidor.cpf})"), ln=True)
         pdf.set_font("helvetica", "", 8)
@@ -1308,7 +1309,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     pdf.cell(0, 5, limpar("DOCUMENTO AUTENTICADO DIGITALMENTE"), ln=True)
     pdf.set_font("helvetica", "", 8)
     import hashlib
-    hash_base = f"peer-{solicitacao.id}-{solicitacao.data_criacao}"
+    hash_base = f"psy pay-{solicitacao.id}-{solicitacao.data_criacao}"
     hash_seguranca = hashlib.sha256(hash_base.encode()).hexdigest()[:16].upper()
 
     pdf.cell(0, 4, limpar(f"Hash de Segurança: {hash_seguranca}"), ln=True)
@@ -1320,7 +1321,7 @@ async def gerar_contrato_pdf(solicitacao_id: int, db: Session = Depends(get_db),
     return Response(
         content=pdf_content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=contrato_peer_{solicitacao.id}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=contrato_psy pay_{solicitacao.id}.pdf"}
     )
 
 @router.get("/contrato/{solicitacao_id}")

@@ -7,7 +7,7 @@ const PoliticaPrivacidade = ({ onVoltar }) => {
             <div className="text-center mb-2">
                 <Shield size={48} color="var(--primary)" className="mb-1" />
                 <h1 style={{ fontSize: '2rem' }}>Política de Privacidade</h1>
-                <p className="text-muted">Compromisso Peer com a sua segurança e LGPD</p>
+                <p className="text-muted">Compromisso PSY PAY com a sua segurança e LGPD</p>
             </div>
 
             <section className="card mb-1">
@@ -49,7 +49,7 @@ const PoliticaPrivacidade = ({ onVoltar }) => {
                     <UserCheck size={20} color="var(--primary)" />
                     <h3 style={{ margin: 0 }}>4. Compartilhamento</h3>
                 </div>
-                <p>A Peer **não comercializa** seus dados com terceiros. O compartilhamento ocorre apenas entre Tomadores e Investidores durante a formalização do contrato de mútuo civil, conforme exigido pelo Código Civil Brasileiro.</p>
+                <p>A PSY PAY **não comercializa** seus dados com terceiros. O compartilhamento ocorre apenas entre Tomadores e Investidores durante a formalização do contrato de mútuo civil, conforme exigido pelo Código Civil Brasileiro.</p>
             </section>
 
             <div className="text-center mt-2">

@@ -416,33 +416,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
         }
     };
 
-    const confirmarComprarScore = async () => {
-        setLoadingAction(true);
-        try {
-            const res = await api.post('/score/comprar');
-            showModal({ title: 'Score Atualizado', message: res.message, type: 'success' });
-            carregarSnapshot();
-            setPassoUpgrade(1);
-            setTipoUpgrade(null);
-            setActiveView('home');
-        } catch (err) {
-            setMensagem('Erro ao comprar score: ' + err.message);
-        } finally {
-            setLoadingAction(false);
-        }
-    };
-
-    const handleComprarScore = () => {
-        showModal({
-            title: 'Aumentar Score',
-            message: 'Deseja comprar +1.5 de Score por R$ 35,00?',
-            type: 'pool',
-            onConfirm: async () => {
-                closeModal();
-                await confirmarComprarScore();
-            }
-        });
-    };
+    // Remoção da compra de score direta (Agora é via comportamento)
+    // const confirmarComprarScore = ...
+    // const handleComprarScore = ...
 
     const handleAceitarGarantia = async (id) => {
         try {
@@ -520,7 +496,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `contrato_peer_${id}.pdf`);
+            link.setAttribute('download', `contrato_psy pay_${id}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
@@ -950,7 +926,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     onChange={(e) => setAceiteTermos(e.target.checked)}
                                 />
                                 <label htmlFor="check-termos" style={{ fontSize: '0.8rem', color: 'var(--text-main)', cursor: 'pointer', lineHeight: '1.4' }}>
-                                    Estou ciente da política de taxas e concordo com os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span> da plataforma Peer.
+                                    Estou ciente da política de taxas e concordo com os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span> da plataforma PSY PAY.
                                 </label>
                             </div>
 
@@ -1422,29 +1398,16 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de tomador hoje.</p>
                                 
-                                <div 
-                                    className="card-minimal clickable" 
-                                    style={{ 
-                                        background: tipoUpgrade === 'score' ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(255,255,255,0.03)', 
-                                        padding: '1.2rem', 
-                                        borderRadius: '16px', 
-                                        border: tipoUpgrade === 'score' ? '1px solid var(--primary)' : '1px solid transparent',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                    onClick={() => setTipoUpgrade('score')}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
-                                            <RefreshCw size={24} color="var(--primary)" />
-                                        </div>
-                                        <div style={{ textAlign: 'left' }}>
-                                            <h3 style={{ fontSize: '1rem', marginBottom: '2px' }}>Turbo Score</h3>
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+1.5 pontos imediatos no seu score.</p>
-                                        </div>
-                                        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                            <span style={{ fontWeight: 800, color: 'var(--success)' }}>R$ 35,00</span>
-                                        </div>
-                                    </div>
+                                <div style={{ padding: '1.2rem', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '16px', border: '1px solid rgba(var(--primary-rgb), 0.1)', marginBottom: '10px' }}>
+                                    <h3 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
+                                        <Zap size={18} /> Novo Sistema de Score
+                                    </h3>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
+                                        Agora você ganha score conforme seu comportamento: <br />
+                                        • <strong>Depósitos</strong>: +1.0 ponto a cada R$ 100 <br />
+                                        • <strong>Caixa (Pool)</strong>: +2.0 pontos a cada R$ 100 <br />
+                                        • <strong>Pagamentos</strong>: Pontualidade gera bônus extra.
+                                    </p>
                                 </div>
 
                                 {!usuario.is_verified && (
@@ -1478,7 +1441,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     <button 
                                         className="btn btn-primary" 
                                         style={{ width: '100%' }} 
-                                        disabled={!tipoUpgrade}
+                                        disabled={!tipoUpgrade || tipoUpgrade === 'score'}
                                         onClick={() => setPassoUpgrade(2)}
                                     >
                                         Continuar

@@ -2,11 +2,9 @@ import sqlite3
 import re
 import os
 
-db_path = "backend/cred_plus.db"
-if not os.path.exists(db_path):
-    print(f"❌ Banco não encontrado em: {db_path}")
-    # Tenta na raiz
-    db_path = "cred_plus.db"
+# Caminho absoluto do banco (sempre relativo à pasta backend)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(BASE_DIR, "cred_plus.db")
 
 print(f"📂 Usando banco: {db_path}")
 

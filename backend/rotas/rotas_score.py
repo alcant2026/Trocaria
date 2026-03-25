@@ -13,52 +13,10 @@ router = APIRouter(prefix="/score", tags=["Score"])
 class SolicitacaoVerificacao(BaseModel):
     detalhes: str = ""
 
-@router.post("/comprar")
-async def comprar_score(db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    
-    # LOCK no usuário para débito de saldo e atualização de score
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
-    custo = Decimal("35.00")
-    if usuario.saldo < custo:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente. Custo: R$ 35,00")
-
-    ganho_score = Decimal("1.5")
-    novo_score = usuario.score + ganho_score
-    
-    # Limite máximo de score é 1000
-    if novo_score > Decimal("1000"):
-        novo_score = Decimal("1000")
-
-    # Deduzir saldo e atualizar score
-    usuario.saldo -= custo
-    usuario.score = novo_score
-    
-    # Creditar lucro à plataforma (000PL) com LOCK
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo += custo
-
-    # Registrar transação
-    nova_transacao = Transacao(
-        usuario_id=usuario.id,
-        valor=custo,
-        tipo=TipoTransacao.COMPRA_SCORE,
-        status="concluido",
-        detalhes="Compra de 1.5 pontos de score"
-    )
-
-    db.add(nova_transacao)
-    db.commit()
-    
-    return {
-        "message": f"Score atualizado: {usuario.score}", 
-        "score": float(usuario.score),
-        "saldo": float(usuario.saldo)
-    }
+@router.get("/meu-score")
+async def consultar_score(usuario: Usuario = Depends(obter_usuario_logado)):
+    """Retorna o score atual do usuário logado."""
+    return {"score": float(usuario.score)}
 
 @router.post("/solicitar-verificacao")
 async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

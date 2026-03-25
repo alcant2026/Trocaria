@@ -8,7 +8,7 @@ const BannerCookies = ({ usuario, onUpdate }) => {
 
     useEffect(() => {
         // Mostra o banner se o usuário não aceitou e não tem o aceite salvo localmente
-        const aceiteLocal = localStorage.getItem('peer_cookies_accepted');
+        const aceiteLocal = localStorage.getItem('psy pay_cookies_accepted');
         if (!aceiteLocal && (!usuario || !usuario.aceite_cookies)) {
             const timer = setTimeout(() => setVisivel(true), 2000);
             return () => clearTimeout(timer);
@@ -22,12 +22,12 @@ const BannerCookies = ({ usuario, onUpdate }) => {
                 await api.post('/auth/aceitar-cookies');
                 if (onUpdate) onUpdate();
             }
-            localStorage.setItem('peer_cookies_accepted', 'true');
+            localStorage.setItem('psy pay_cookies_accepted', 'true');
             setVisivel(false);
         } catch (err) {
             console.error("Erro ao salvar aceite de cookies:", err);
             // Salva pelo menos localmente se o servidor falhar
-            localStorage.setItem('peer_cookies_accepted', 'true');
+            localStorage.setItem('psy pay_cookies_accepted', 'true');
             setVisivel(false);
         } finally {
             setLoading(false);

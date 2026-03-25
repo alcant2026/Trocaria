@@ -10,7 +10,7 @@ from utils_email import enviar_email_recuperacao
 load_dotenv()
 
 # Pegar e-mail de teste do argumento ou usar um padrão
-email_teste = sys.argv[1] if len(sys.argv) > 1 else "contato@peer.com.br"
+email_teste = sys.argv[1] if len(sys.argv) > 1 else "contato@psy pay.com.br"
 print(f"Tentando enviar e-mail para {email_teste}...")
 
 sucesso = enviar_email_recuperacao(email_teste, "Usuário de Teste", "123456")

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/parceiros", tags=["Caixa Parceiro"])
 # ================= COMISSIONAMENTO =================
 TAXA_TOTAL = Decimal("0.02")           # 2% taxa total da operação
 TAXA_COMISSAO_PARCEIRO = Decimal("0.005") # 0.5% vai pro parceiro (balcão)
-TAXA_PLATAFORMA = Decimal("0.015")     # 1.5% fica pra plataforma (Peer)
+TAXA_PLATAFORMA = Decimal("0.015")     # 1.5% fica pra plataforma (PSY PAY)
 
 @router.get("/meu-caixa")
 async def obter_meu_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -117,7 +117,7 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
     if dados.tipo_operacao == "deposito":
         # Cliente traz papel -> Parceiro transfere do seu dig -> pro cliente
         if usuario.saldo < dados.valor:
-            raise HTTPException(status_code=400, detail="Você não tem saldo virtual disponível suficiente na Peer para enviar este depósito.")
+            raise HTTPException(status_code=400, detail="Você não tem saldo virtual disponível suficiente na PSY PAY para enviar este depósito.")
         
         # Cálculo de Taxas
         valor_liquido = dados.valor * (Decimal("1.0") - TAXA_TOTAL)
@@ -145,7 +145,7 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
             valor=taxa_plataforma,
             tipo=TipoTransacao.TAXA_ESPECIE,
             status="concluido",
-            detalhes=f"Taxa Peer: Depósito em Espécie (Parceiro #{parceiro.id})"
+            detalhes=f"Taxa PSY PAY: Depósito em Espécie (Parceiro #{parceiro.id})"
         ))
         
         # Transação de Envio pelo Parceiro
@@ -207,7 +207,7 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
             valor=taxa_plataforma,
             tipo=TipoTransacao.TAXA_ESPECIE,
             status="concluido",
-            detalhes=f"Taxa Peer: Saque em Espécie (Parceiro #{parceiro.id})"
+            detalhes=f"Taxa PSY PAY: Saque em Espécie (Parceiro #{parceiro.id})"
         ))
         
         # Transação Saque Cliente

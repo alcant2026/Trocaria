@@ -22,6 +22,8 @@ origins = [
     "https://psy-pay-front.onrender.com",
     "https://psy-pay.onrender.com",
     "https://peer-5gq5.onrender.com",
+    "https://peer-front.onrender.com",
+    "https://peer.onrender.com",
 ]
 
 if frontend_url:
@@ -61,7 +63,7 @@ async def add_security_headers(request, call_next):
         "connect-src 'self' http://localhost:3000 http://localhost:5173 http://localhost capacitor: "
         "https://cred30.site https://www.cred30.site "
         "https://psy-pay-front.onrender.com https://psy-pay-api.onrender.com https://psy-pay-5gq5.onrender.com "
-        "https://peer-5gq5.onrender.com https://peer-front.onrender.com;"
+        "https://peer-5gq5.onrender.com https://peer-front.onrender.com https://peer-api.onrender.com;"
     )
     return response
 

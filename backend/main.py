@@ -20,6 +20,8 @@ origins = [
     "https://cred30.site",
     "https://www.cred30.site",
     "https://psy-pay-front.onrender.com",
+    "https://psy-pay.onrender.com",
+    "https://peer-5gq5.onrender.com",
 ]
 
 if frontend_url:
@@ -31,6 +33,7 @@ if frontend_url:
 
 # Remover duplicatas mantendo a ordem
 origins = list(dict.fromkeys(origins))
+print(f"🚀 CORS ORIGINS: {origins}")
 
 from limitador import limiter
 from slowapi.errors import RateLimitExceeded
@@ -57,7 +60,8 @@ async def add_security_headers(request, call_next):
         "img-src 'self' data:; "
         "connect-src 'self' http://localhost:3000 http://localhost:5173 http://localhost capacitor: "
         "https://cred30.site https://www.cred30.site "
-        "https://psy-pay-front.onrender.com https://psy-pay-api.onrender.com https://psy-pay-5gq5.onrender.com;"
+        "https://psy-pay-front.onrender.com https://psy-pay-api.onrender.com https://psy-pay-5gq5.onrender.com "
+        "https://peer-5gq5.onrender.com https://peer-front.onrender.com;"
     )
     return response
 

@@ -110,37 +110,33 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
                 detail=f"Saque Bloqueado: Por medida de segurança, após alterar o 2FA, os saques ficam suspensos por 48 horas. Tente novamente em aproximadamente {int(horas_restantes)} horas."
             )
 
-    # Regra: Isento se saldo_caixa >= 100
-    # Senão: 1º saque do dia grátis, demais R$ 5,00
+    # Regra: Isento se o valor do saque for menor ou igual ao saldo no Pool (saldo_caixa)
+    # Senão: R$ 5,00 de taxa (descontada do valor solicitado)
     taxa = Decimal("0.00")
+    saldo_caixa_v = usuario.saldo_caixa or Decimal("0.00")
+    if valor > saldo_caixa_v:
+        taxa = Decimal("5.00")
+        if valor <= taxa:
+            raise HTTPException(status_code=400, detail=f"O valor solicitado deve ser maior que a taxa de R$ {taxa}.")
     
-    if usuario.saldo_caixa < Decimal("100.00"):
-        hoje = datetime.datetime.now(TZ_BRASILIA).date()
-        inicio_dia = datetime.datetime.combine(hoje, datetime.time.min).replace(tzinfo=TZ_BRASILIA)
-        
-        saques_hoje = db.query(Transacao).filter(
-            Transacao.usuario_id == usuario.id,
-            Transacao.tipo == TipoTransacao.SAQUE,
-            Transacao.data_criacao >= inicio_dia
-        ).count()
+    if usuario.saldo < valor:
+        raise HTTPException(status_code=400, detail="Saldo principal insuficiente para realizar este saque.")
 
-        if saques_hoje >= 1:
-            taxa = Decimal("5.00")
-            if usuario.saldo < (valor + taxa):
-                raise HTTPException(status_code=400, detail=f"Saldo insuficiente para saque + taxa de R$ {taxa}.")
+    # Valor que será efetivamente sacado (líquido)
+    valor_liquido = valor - taxa
     
-    # Deduzir valor e taxa imediatamente
-    usuario.saldo -= (valor + taxa)
+    # Deduzir o valor bruto do saldo do usuário
+    usuario.saldo -= valor
     
-    # Criar transação de saque pendente
+    # Criar transação de saque pendente (com o valor LÍQUIDO que o admin deve pagar)
     nova_transacao = Transacao(
         usuario_id=usuario.id,
-        valor=valor,
+        valor=valor_liquido,
         tipo=TipoTransacao.SAQUE,
         status="pendente",
         metodo=dados.metodo,
         parceiro_id=dados.parceiro_id if dados.metodo == "especie" else None,
-        detalhes=f"Saque via {dados.metodo.upper()}" + (f" (Parceiro ID: {dados.parceiro_id})" if dados.metodo == "especie" else f" para PIX: {chave_pix}")
+        detalhes=f"Saque via {dados.metodo.upper()} para PIX: {chave_pix} | Bruto: R$ {valor} | Taxa: R$ {taxa} (Dedução)"
     )
     db.add(nova_transacao)
 
@@ -156,7 +152,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
             valor=taxa,
             tipo=TipoTransacao.TAXA_SAQUE,
             status="concluido",
-            detalhes=f"Taxa de saque extra ({saques_hoje + 1}º saque no dia)"
+            detalhes="Taxa de saque (valor solicitado superior ao saldo do Pool)"
         )
         db.add(transacao_taxa)
 
@@ -165,7 +161,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     
     msg = "Solicitação de saque registrada." 
     if taxa > 0:
-        msg += f" Taxa de R$ {taxa} aplicada por ser o seu {saques_hoje + 1}º saque hoje."
+        msg += f" Taxa de R$ {taxa} aplicada (Saque > Saldo Pool)."
     
     return {"message": msg + " Aguardando processamento manual."}
 
@@ -1084,8 +1080,8 @@ async def investir_lucro_plataforma(
             detail=f"Saldo do Pool insuficiente para este investimento. Disponível: R$ {float(saldo_pool_global):.2f}"
         )
 
-    # Validar meta
-    restante = solicitacao.valor - solicitacao.valor_arrecadado
+    # Validar meta (Arredondamento para evitar erro de float)
+    restante = (solicitacao.valor - solicitacao.valor_arrecadado).quantize(Decimal("0.01"))
     if valor > restante:
          raise HTTPException(status_code=400, detail=f"Valor excede o necessário. Faltam apenas R$ {restante}")
 

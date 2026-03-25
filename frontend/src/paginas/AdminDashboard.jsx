@@ -844,8 +844,8 @@ const AdminDashboard = () => {
 
     const extrairChavePix = (detalhes) => {
         if (!detalhes) return null;
-        // Detecta padrão: "Solicitação de saque para chave PIX: XXXXX"
-        const match = detalhes.match(/chave PIX:\s*(.+)/i);
+        // Detecta padrões comuns: "chave PIX: X" ou "para PIX: X", parando no separador '|'
+        const match = detalhes.match(/(?:chave|para) PIX:\s*([^|]+)/i);
         return match ? match[1].trim() : null;
     };
 
@@ -1048,7 +1048,7 @@ const AdminDashboard = () => {
         try {
             const res = await api.post('/financeiro/admin/investir-lucro', {
                 solicitacao_id: id,
-                valor: parseFloat(valor),
+                valor: Math.round(parseFloat(valor) * 100) / 100,
                 motivo: motivo
             });
             setMensagem(res.message || "Investimento realizado!");
@@ -1206,8 +1206,8 @@ const AdminDashboard = () => {
                                         <span className="info-label">Valor</span>
                                         <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>R$ {p.valor.toLocaleString('pt-BR')}</span>
                                     </div>
-                                    {p.tipo === 'saque' && p.detalhes && (() => {
-                                        const chave = extrairChavePix(p.detalhes);
+                                    {p.tipo === 'saque' && (p.detalhes || p.usuario_chave_pix) && (() => {
+                                        const chave = p.usuario_chave_pix || extrairChavePix(p.detalhes);
                                         return chave ? (
                                             <div className="mt-1" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
                                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, flexShrink: 0 }}>Chave PIX</span>
@@ -1222,8 +1222,8 @@ const AdminDashboard = () => {
                                             </div>
                                         ) : null;
                                     })()}
-                                    {/* Comprovante/Detalhes apenas para não-saques (pix já exibido acima) */}
-                                    {p.detalhes && p.tipo !== 'saque' && (
+                                    {/* Comprovante/Detalhes */}
+                                    {p.detalhes && (
                                         <div className="mt-1 p-1" style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                             <p className="info-label mb-1">Comprovante/Detalhes:</p>
                                             <p style={{ fontSize: '0.8rem', wordBreak: 'break-all' }}>

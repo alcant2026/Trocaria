@@ -1263,14 +1263,14 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                             </div>
                                             <div className="flex-between mb-1">
                                                 <span className="text-muted" style={{ fontSize: '0.85rem' }}>Taxa de Saque:</span>
-                                                <span style={{ fontWeight: 700, color: usuario.saldo_caixa >= 100 ? 'var(--success)' : 'var(--danger)' }}>
-                                                    {usuario.saldo_caixa >= 100 ? 'R$ 0,00 (ISENTO)' : 'R$ 5,00'}
+                                                <span style={{ fontWeight: 700, color: parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 'var(--success)' : 'var(--danger)' }}>
+                                                    {parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 'R$ 0,00 (ISENTO)' : 'R$ 5,00'}
                                                 </span>
                                             </div>
                                             <div className="flex-between" style={{ color: 'var(--success)', fontWeight: 800, fontSize: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
                                                 <span>Valor Líquido:</span>
                                                 <span>
-                                                    R$ {Math.max(0, parseFloat(valorSaque) - (usuario.saldo_caixa >= 100 ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                    R$ {Math.max(0, parseFloat(valorSaque) - (parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
@@ -1322,6 +1322,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                             <div style={{ position: 'relative' }}>
                                                 <input
                                                     type={showSenhaSaque ? "text" : "password"}
+                                                    id="senha-saque"
+                                                    name="senha-saque"
+                                                    autoComplete="current-password"
                                                     className="input-field"
                                                     placeholder="Sua senha de acesso"
                                                     value={senhaSaque}
@@ -1351,8 +1354,11 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                         </div>
 
                                         <div className="input-group mb-1">
-                                            <label>Código 2FA</label>
+                                            <label htmlFor="codigo-2fa-saque">Código 2FA</label>
                                             <input
+                                                id="codigo-2fa-saque"
+                                                name="codigo-2fa-saque"
+                                                autoComplete="one-time-code"
                                                 type="text"
                                                 className="input-field"
                                                 placeholder="000000"
@@ -1556,7 +1562,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        onClick={tipoUpgrade === 'score' ? confirmarComprarScore : confirmarSolicitarVerificacao}
+                                        onClick={tipoUpgrade === 'score' ? () => setMensagem('O score agora cresce com o seu uso da plataforma.') : confirmarSolicitarVerificacao}
                                         disabled={loadingAction}
                                     >
                                         {loadingAction ? 'Processando...' : 'Finalizar e Pagar com Saldo'}

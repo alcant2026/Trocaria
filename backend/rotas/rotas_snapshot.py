@@ -136,6 +136,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 pendentes_list.append({
                     "transacao_id": p.id,
                     "usuario_nome": p.usuario.nome,
+                    "usuario_cpf": p.usuario.cpf,
+                    "usuario_verificado": p.usuario.is_verified,
+                    "usuario_chave_pix": p.usuario.chave_pix,
                     "valor": float(p.valor),
                     "tipo": p.tipo.value,
                     "detalhes": p.detalhes,

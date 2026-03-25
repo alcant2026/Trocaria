@@ -1260,14 +1260,14 @@ const DashboardInvestidor = () => {
                                             </div>
                                             <div className="flex-between mb-1">
                                                 <span className="text-muted" style={{ fontSize: '0.85rem' }}>Taxa de Saque:</span>
-                                                <span style={{ fontWeight: 700, color: usuario.saldo_caixa >= 100 ? 'var(--success)' : 'var(--danger)' }}>
-                                                    {usuario.saldo_caixa >= 100 ? 'ISENTO' : 'R$ 5,00'}
+                                                <span style={{ fontWeight: 700, color: parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 'var(--success)' : 'var(--danger)' }}>
+                                                    {parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 'ISENTO' : 'R$ 5,00'}
                                                 </span>
                                             </div>
                                             <div className="flex-between" style={{ color: 'var(--success)', fontWeight: 800, fontSize: '1.1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
                                                 <span>Valor a Receber:</span>
                                                 <span>
-                                                    R$ {Math.max(0, parseFloat(valorSaque) - (usuario.saldo_caixa >= 100 ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                    R$ {Math.max(0, parseFloat(valorSaque) - (parseFloat(valorSaque) <= (usuario.saldo_caixa || 0) ? 0 : 5)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
@@ -1348,8 +1348,11 @@ const DashboardInvestidor = () => {
                                         </div>
 
                                         <div className="input-group mb-1">
-                                            <label>Código 2FA</label>
+                                            <label htmlFor="codigo-2fa-saque-inv">Código 2FA</label>
                                             <input
+                                                id="codigo-2fa-saque-inv"
+                                                name="codigo-2fa-saque-inv"
+                                                autoComplete="one-time-code"
                                                 type="text"
                                                 className="input-field"
                                                 placeholder="000000"

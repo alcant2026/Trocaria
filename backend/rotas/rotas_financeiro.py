@@ -572,7 +572,7 @@ class LinkAfiliadoCreate(BaseModel):
 
 @router.get("/loja/itens")
 async def listar_itens_loja(pagina: int = 1, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    limite = 5
+    limite = 12
     offset = (pagina - 1) * limite
     total = db.query(LinkAfiliado).filter(LinkAfiliado.is_active == True).count()
     itens = db.query(LinkAfiliado).filter(LinkAfiliado.is_active == True).order_by(LinkAfiliado.data_criacao.desc()).offset(offset).limit(limite).all()
@@ -585,7 +585,7 @@ async def listar_itens_loja(pagina: int = 1, db: Session = Depends(get_db), usua
 
 @router.get("/admin/loja/itens")
 async def admin_listar_itens_loja(pagina: int = 1, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    limite = 10
+    limite = 12
     offset = (pagina - 1) * limite
     total = db.query(LinkAfiliado).count()
     itens = db.query(LinkAfiliado).order_by(LinkAfiliado.data_criacao.desc()).offset(offset).limit(limite).all()

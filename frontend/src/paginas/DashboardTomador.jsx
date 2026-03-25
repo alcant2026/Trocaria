@@ -1404,16 +1404,25 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de tomador hoje.</p>
                                 
-                                <div style={{ padding: '1.2rem', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '16px', border: '1px solid rgba(var(--primary-rgb), 0.1)', marginBottom: '10px' }}>
+                                <div 
+                                    className="clickable" 
+                                    style={{ 
+                                        padding: '1.2rem', 
+                                        background: tipoUpgrade === 'score' ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(var(--primary-rgb), 0.05)', 
+                                        borderRadius: '16px', 
+                                        border: tipoUpgrade === 'score' ? '1px solid var(--primary)' : '1px solid rgba(var(--primary-rgb), 0.1)', 
+                                        marginBottom: '10px',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onClick={() => setTipoUpgrade('score')}
+                                >
                                     <h3 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
                                         <Zap size={18} /> Novo Sistema de Score
                                     </h3>
                                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
-                                        Agora você ganha score conforme seu comportamento: <br />
-                                        • <strong>Depósitos</strong>: +1.0 ponto a cada R$ 100 <br />
-                                        • <strong>Caixa (Pool)</strong>: +2.0 pontos a cada R$ 100 <br />
-                                        • <strong>Pagamentos</strong>: Pontualidade gera bônus extra.
+                                        Agora você ganha score conforme seu comportamento financeiro na plataforma.
                                     </p>
+                                    <div style={{ marginTop: '5px', fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>Clique para ver como pontuar</div>
                                 </div>
 
                                 {!usuario.is_verified && (
@@ -1447,7 +1456,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     <button 
                                         className="btn btn-primary" 
                                         style={{ width: '100%' }} 
-                                        disabled={!tipoUpgrade || tipoUpgrade === 'score'}
+                                        disabled={!tipoUpgrade}
                                         onClick={() => setPassoUpgrade(2)}
                                     >
                                         Continuar
@@ -1460,18 +1469,38 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         {passoUpgrade === 2 && (
                             <div className="animate-fade-in">
                                 {tipoUpgrade === 'score' ? (
-                                    <div className="text-center" style={{ padding: '0.5rem' }}>
-                                        <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                                    <div className="animate-fade-in" style={{ padding: '0.5rem' }}>
+                                        <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                                             <TrendingUp size={30} color="var(--primary)" />
                                         </div>
-                                        <h3 className="mb-1">Impulso de Score</h3>
-                                        <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>O score turbinado ajuda você a conseguir crédito mais rápido com taxas menores.</p>
+                                        <h3 className="mb-1 text-center" style={{ fontSize: '1.1rem' }}>Como aumentar seu Score?</h3>
+                                        <p className="text-muted mb-1 text-center" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>Diferente de sistemas antigos, no PSY PAY seu score reflete sua confiança real.</p>
                                         
-                                        <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                                            <div className="flex-between">
-                                                <span>Valor do Upgrade:</span>
-                                                <strong style={{ color: 'var(--success)' }}>R$ 35,00</strong>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)' }}>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>💰 Depósitos</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +1.0 ponto a cada R$ 100,00 depositados.</div>
                                             </div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--warning)' }}>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>🏦 Aporte no Pool (Caixa)</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos a cada R$ 100,00 aplicados no Pool.</div>
+                                            </div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--success)' }}>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>✅ Pagamentos em Dia</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos fixos por cada parcela paga rigorosamente em dia.</div>
+                                            </div>
+                                            <div className="info-block" style={{ background: 'rgba(255,61,0,0.05)', padding: '12px', borderLeft: '4px solid var(--danger)' }}>
+                                                <div style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--danger)', marginBottom: '4px' }}>⚠️ Saques/Resgates</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O score diminui (-2.0 pts) ao retirar liquidez da plataforma.</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-1 p-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.75rem' }}>
+                                            <p style={{ margin: 0 }}>O Score máximo é 1000. Recompensamos quem ajuda o ecossistema a crescer!</p>
+                                        </div>
+
+                                        <div className="mt-1">
+                                            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setActiveView('home')}>Entendido</button>
                                         </div>
                                     </div>
                                 ) : (

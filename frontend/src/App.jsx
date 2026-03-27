@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './paginas/Login';
 import Registro from './paginas/Registro';
-import DashboardTomador from './paginas/DashboardTomador';
-import DashboardInvestidor from './paginas/DashboardInvestidor';
+import DashboardCliente from './paginas/DashboardCliente';
 import AdminDashboard from './paginas/AdminDashboard';
 import Seguranca from './paginas/Seguranca';
 import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield, ShoppingBag } from 'lucide-react';
@@ -68,7 +67,7 @@ const App = () => {
 
     const onLogin = (userData) => {
         setUser(userData);
-        window.location.hash = 'tomador'; // Default
+        window.location.hash = 'cliente'; 
     };
 
     const logout = () => {
@@ -171,10 +170,10 @@ const App = () => {
                         <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Menu</h2>
                         </div>
-                        <a href="#tomador" className={`nav-item ${page === 'tomador' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                        <a href="#cliente" className={`nav-item ${page === 'cliente' || page === 'tomador' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
                         </a>
-                        <a href="#investidor" className={`nav-item ${page === 'investidor' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                        <a href="#pool" className={`nav-item ${page === 'pool' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <TrendingUp size={20} /> Fundo Coletivo
                         </a>
                         <a href="#loja" className={`nav-item ${page === 'loja' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
@@ -220,14 +219,14 @@ const App = () => {
             </nav>
 
             <main className="main-content">
-                {page === 'login' && <div className="card text-center"><h2>Você está logado.</h2><button className="btn btn-primary" onClick={() => window.location.hash = 'tomador'}>Ir para o Início</button></div>}
-                {page === 'tomador' && <DashboardTomador />}
-                {page === 'investidor' && <DashboardInvestidor />}
-                {page === 'loja' && <DashboardTomador initialView="loja" />}
+                {page === 'login' && <div className="card text-center"><h2>Você está logado.</h2><button className="btn btn-primary" onClick={() => window.location.hash = 'cliente'}>Ir para o Início</button></div>}
+                {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
+                {page === 'pool' && <DashboardCliente initialView="pool" />}
+                {page === 'loja' && <DashboardCliente initialView="loja" />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'seguranca' && <Seguranca />}
-                {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'tomador'} />}
-                {(!['tomador', 'investidor', 'admin', 'login', 'seguranca', 'loja', 'privacidade'].includes(page)) && <DashboardTomador />}
+                {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
+                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'seguranca', 'loja', 'privacidade'].includes(page)) && <DashboardCliente />}
             </main>
             {/* Modal de Exclusão Crítica */}
             {modalExcluir && (

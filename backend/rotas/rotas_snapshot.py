@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, GarantiaSocial, AcessoInvestidor, StatusSolicitacao
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, StatusSolicitacao
 from sqlalchemy import func, case, and_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
@@ -80,6 +80,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "estado": usuario.estado,
                 "two_factor_enabled": usuario.two_factor_enabled,
                 "saldo_caixa": float(saldo_caixa_total),
+                "saldo_pool": float(saldo_caixa_total), # Alias para o frontend
                 "saldo_caixa_disponivel": float(saldo_caixa_disponivel),
                 "divida_total_pool": float(divida_total_pendente),
                 "is_parceiro": is_parceiro,
@@ -320,8 +321,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "id": sl.id,
                     "tomador": sl.usuario.nome,
                     "valor": float(sl.valor),
-                    "arrecadado": float(sl.valor_arrecadado),
-                    "garantidores_atuais": len(sl.garantias_sociais)
+                    "arrecadado": float(sl.valor_arrecadado)
                 })
 
         # --- TOMADOR DATA ---
@@ -334,11 +334,15 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             total_com_juros = s.valor * (Decimal("1") + (taxa_mensal * s.prazo_meses))
             valor_parcela = total_com_juros / s.prazo_meses
             
-            total_pago_real = (valor_parcela * s.parcelas_pagas) + s.valor_amortizado
+            # Tratamento de nulos para campos novos ou legados
+            taxas_adicionais = s.taxas_adicionais or Decimal("0.00")
+            valor_amortizado = s.valor_amortizado or Decimal("0.00")
+            
+            total_pago_real = (valor_parcela * s.parcelas_pagas) + valor_amortizado
             if s.status == StatusSolicitacao.CONCLUIDO:
                 valor_total_restante = 0.00
             else:
-                valor_total_restante = max(0, float((total_com_juros + s.taxas_adicionais) - total_pago_real))
+                valor_total_restante = max(0, float((total_com_juros + taxas_adicionais) - total_pago_real))
 
             meus_emp_list.append({
                 "id": s.id,
@@ -356,58 +360,31 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "parceiro_endereco": s.parceiro.endereco if s.parceiro else None,
                 "proximo_vencimento": s.proximo_vencimento.isoformat() if s.proximo_vencimento else None,
                 "data_expiracao_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
-                "data_expiracao_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None,
-                "garantidores": [
-                    {
-                        "nome": g.garante.nome.split()[0],
-                        "aceito": g.aceito
-                    } for g in s.garantias_sociais
-                ]
+                "data_expiracao_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None
             })
 
-        garantias_raw = db.query(GarantiaSocial).filter(GarantiaSocial.garante_id == usuario.id, GarantiaSocial.aceito == False).all()
-        garantias_list = []
-        for g in garantias_raw:
-            garantias_list.append({
-                "id": g.id, # Importante incluir o ID da garantia para aceitar/rejeitar
-                "solicitacao_id": g.solicitacao_id,
-                "valor": float(g.solicitacao.valor),
-                "tomador": g.solicitacao.usuario.nome.split()[0]
-            })
-            
-        snapshot["tomador"] = {
-            "meus_emprestimos": meus_emp_list,
-            "garantias_pendentes": garantias_list
-        }
+        snapshot["cliente_emprestimos"] = meus_emp_list # Unificado
 
         # --- INVESTIDOR DATA ---
         print(f"[DEBUG SNAPSHOT] Iniciando bloco INVESTIDOR")
         solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE).all()
         
-        # Obter IDs de solicitações já desbloqueadas por este investidor
-        desbloqueadas_ids = {a.solicitacao_id for a in db.query(AcessoInvestidor.solicitacao_id).filter(AcessoInvestidor.investidor_id == usuario.id).all()}
-        
         solic_list = []
         for s in solicitacoes_raw:
-            is_unlocked = s.id in desbloqueadas_ids
             solic_list.append({
                 "id": s.id,
                 "valor": float(s.valor),
                 "valor_arrecadado": float(s.valor_arrecadado),
-                "taxa": float(s.taxa_juros) if is_unlocked else 0, # Oculto se bloqueado
-                "parcelas": s.prazo_meses if is_unlocked else 0,
-                "nome": s.usuario.nome if is_unlocked else None,
-                "score": float(s.usuario.score) if is_unlocked else float(s.usuario.score), # O score costuma ser visível para atrair investidor
+                "taxa": float(s.taxa_juros),
+                "parcelas": s.prazo_meses,
+                "nome": s.usuario.nome,
+                "score": float(s.usuario.score),
                 "verified": s.usuario.is_verified,
-                "unlocked": is_unlocked,
+                "unlocked": True, # Acesso agora é livre
                 "tipo_garantia": s.tipo_garantia,
-                "garantia_descricao": s.garantia_descricao if is_unlocked else None,
-                "parceiro_nome": s.parceiro.nome if is_unlocked and s.parceiro else None,
-                "parceiro_endereco": s.parceiro.endereco if is_unlocked and s.parceiro else None,
-                "garantidores": [
-                    {"nome": g.garante.nome.split()[0], "aceito": g.aceito} 
-                    for g in s.garantias_sociais
-                ] if is_unlocked else [],
+                "garantia_descricao": s.garantia_descricao,
+                "parceiro_nome": s.parceiro.nome if s.parceiro else None,
+                "parceiro_endereco": s.parceiro.endereco if s.parceiro else None,
                 "expira_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
                 "expira_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None
             })

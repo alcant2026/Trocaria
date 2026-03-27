@@ -96,10 +96,14 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 .main-content {
   flex: 1;
-  padding: 6rem 1.5rem 2rem 1.5rem;
+  padding: 6rem 1rem 2rem 1rem;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
+}
+
+@media (min-width: 480px) {
+  .main-content { padding: 6rem 1.5rem 2rem 1.5rem; }
 }
 
 /* Cards */
@@ -187,7 +191,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-main);
-  font-size: 1rem;
+  font-size: 16px; /* Força 16px para evitar auto-zoom no iOS */
   transition: var(--transition);
 }
 
@@ -247,6 +251,17 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 .mb-1 { margin-bottom: 1rem; }
 .mt-1 { margin-top: 1rem; }
 .text-center { text-align: center; }
+
+/* Dynamic Typography Utilities */
+.text-clamp-balance {
+  font-size: clamp(1.5rem, 8vw, 2.25rem) !important;
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.text-clamp-h2 {
+  font-size: clamp(1.2rem, 6vw, 1.5rem);
+}
 
 /* Grid Utils */
 .grid-2 {
@@ -468,8 +483,8 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 @media (max-width: 400px) {
   .main-content { padding-left: 0.75rem; padding-right: 0.75rem; padding-top: 4.5rem; }
   .card { padding: 1rem; border-radius: var(--radius-md); }
-  h1 { font-size: 1.6rem; }
-  h2 { font-size: 1.3rem; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
   .action-grid { gap: 0.5rem; }
 }
 

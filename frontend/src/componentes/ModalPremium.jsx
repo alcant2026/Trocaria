@@ -95,7 +95,10 @@ const ModalPremium = ({
                 style={{
                     border: `1px solid ${theme.border}`,
                     maxWidth: '420px',
-                    textAlign: 'center'
+                    maxHeight: '85vh',
+                    overflowY: 'auto',
+                    textAlign: 'center',
+                    padding: window.innerWidth < 480 ? '1.5rem 1.25rem' : '2.5rem 2rem'
                 }}
             >
                 <button

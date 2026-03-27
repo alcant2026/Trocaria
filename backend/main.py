@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_investidor, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema
@@ -27,13 +27,11 @@ origins = [
 ]
 
 if frontend_url:
-    # Suporte a múltiplas URLs separadas por vírgula
     for url in frontend_url.split(","):
         clean_url = url.strip().rstrip("/")
         if clean_url:
             origins.append(clean_url)
 
-# Remover duplicatas mantendo a ordem
 origins = list(dict.fromkeys(origins))
 print(f"🚀 CORS ORIGINS: {origins}")
 
@@ -46,7 +44,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# Middleware de Segurança "Gratuito" (Security Headers)
+# Middleware de Segurança
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
@@ -54,7 +52,6 @@ async def add_security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    # CSP atualizado para incluir cred30.site, domínios do Render e esquema capacitor:
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
@@ -67,7 +64,6 @@ async def add_security_headers(request, call_next):
     )
     return response
 
-# CORSMiddleware deve vir DEPOIS de outras middlewares que injetam headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -88,18 +84,14 @@ def get_db():
 async def startup_db_setup():
     print("🚀 SISTEMA: Iniciando processo de boot...")
     
-    # 1. Garante que tabelas novas sejam criadas (Rápido)
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"ESTRUTURA DB: Aviso na criação de tabelas (race condition): {e}")
 
-    # 2. Sincroniza esquema e enums (Só se necessário)
     try:
-        # Sincronia de colunas e índices
         sincronizar_esquema(Base, engine)
         
-        # Sincronia de Enums (Postgres)
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao
             with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
@@ -111,13 +103,12 @@ async def startup_db_setup():
                                 conn.execute(text(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{member.value}'"))
                             except Exception: pass
 
-        # 3. Usuário de Sistema
         from modelos.modelos_db import Usuario
         with SessionLocal() as db:
             if not db.query(Usuario).filter(Usuario.id == "000PL").first():
                 print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
                 novo_sistema = Usuario(
-                    id="000PL", nome="PSY PAY Plataforma (Sistema)", email="sistema@psy pay.com.br",
+                    id="000PL", nome="PSY PAY Plataforma (Sistema)", email="sistema@psypay.com.br",
                     cpf="00000000000", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
                     is_admin=True, is_active=True, saldo=0, saldo_caixa=0
                 )
@@ -132,7 +123,6 @@ async def startup_db_setup():
 app.include_router(rotas_auth.router)
 app.include_router(rotas_emprestimo.router)
 app.include_router(rotas_score.router)
-app.include_router(rotas_investidor.router)
 app.include_router(rotas_financeiro.router)
 app.include_router(rotas_snapshot.router)
 app.include_router(rotas_parceiros_caixa.router)
@@ -142,6 +132,5 @@ def home():
     return {"status": "online", "message": "PSY PAY API ativa"}
 
 if __name__ == "__main__":
-    import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

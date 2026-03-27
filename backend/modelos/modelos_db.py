@@ -10,9 +10,6 @@ class StatusSolicitacao(enum.Enum):
     REJEITADO = "rejeitado"
     CANCELADO = "cancelado"
     CONCLUIDO = "concluido"
-    AGUARDANDO_AVALIACAO = "aguardando_avaliacao"
-    REPROVADO_GARANTIA = "reprovado_garantia"
-    AGUARDANDO_GARANTIDORES = "aguardando_garantidores"
 
 class TipoTransacao(enum.Enum):
     DEPOSITO = "deposito"
@@ -40,7 +37,7 @@ class RegistroAuditoria(Base):
     id = Column(Integer, primary_key=True, index=True)
     ip = Column(String(45), nullable=False)
     municipio = Column(String(255), nullable=True)
-    user_agent = Column(Text, nullable=True) # TEXT no DB
+    user_agent = Column(Text, nullable=True)
     data_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Usuario(Base):
@@ -50,51 +47,39 @@ class Usuario(Base):
     nome = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     cpf = Column(String(14), unique=True, index=True, nullable=False)
-    senha_hash = Column(Text, nullable=False) # TEXT no DB
+    senha_hash = Column(Text, nullable=False)
     chave_pix = Column(String(255), nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
-    saldo_bloqueado = Column(Numeric(precision=20, scale=2), default=0) # NOVO: Para garantidores
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0) # Saldo no Pool de Investimentos
     score = Column(Numeric(precision=6, scale=1), default=0)
-    score_anterior = Column(Numeric(precision=6, scale=1), default=0) # Memória para restaurar após calote
+    score_anterior = Column(Numeric(precision=6, scale=1), default=0)
     ultima_solicitacao = Column(DateTime, nullable=True)
     solicitacoes_hoje = Column(Integer, default=0)
     ultima_atualizacao_score = Column(DateTime, default=datetime.datetime.utcnow)
     is_admin = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True) # Para LGPD / Deleção lógica
+    is_active = Column(Boolean, default=True)
     
-    # NOVOS: Contato
-    telefone = Column(String(20), nullable=True) # Ex: (91) 98017-7874
-    
-    # Localização do Usuário
+    telefone = Column(String(20), nullable=True)
     cidade = Column(String(100), nullable=True)
     estado = Column(String(50), nullable=True)
-    
-    # Proteção Jurídica: Aceite de Termos de Uso (Intermediação SaaS)
     aceite_termos = Column(Boolean, default=False)
-    
-    # NOVOS: Conformidade LGPD (Cookies e Privacidade)
     aceite_cookies = Column(Boolean, default=False)
     data_aceite_cookies = Column(DateTime, nullable=True)
-    data_aceite = Column(DateTime, nullable=True) # Sincronizado com Neon
+    data_aceite = Column(DateTime, nullable=True)
     
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
-    
     auditoria = relationship("RegistroAuditoria")
 
-    # Autenticação de Dois Fatores (2FA)
     totp_secret = Column(String(32), nullable=True)
     two_factor_enabled = Column(Boolean, default=False)
-    ultima_alteracao_2fa = Column(DateTime, nullable=True) # Trava de 48h para saques
+    ultima_alteracao_2fa = Column(DateTime, nullable=True)
 
-    # Recuperação de Conta (Segurança Bancária)
     codigo_recuperacao_hash = Column(String(200), nullable=True)
     expiracao_recuperacao = Column(DateTime, nullable=True)
 
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
-    garantias_prestadas = relationship("GarantiaSocial", back_populates="garante")
 
 class SolicitacaoEmprestimo(Base):
     __tablename__ = "solicitacoes_emprestimo"
@@ -102,26 +87,25 @@ class SolicitacaoEmprestimo(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
-    valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
     status = Column(Enum(StatusSolicitacao, name="status_solicitacao", values_callable=lambda x: [e.value for e in x]), default=StatusSolicitacao.PENDENTE, index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
-    data_expiracao_4h = Column(DateTime)
-    data_expiracao_5d = Column(DateTime)
-    proximo_vencimento = Column(DateTime, nullable=True) # Data para cobrança de juros de mora
+    proximo_vencimento = Column(DateTime, nullable=True)
     parcelas_pagas = Column(Integer, default=0)
-    valor_amortizado = Column(Numeric(precision=20, scale=2), default=0) # Pagamentos de valor livre
-    taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0) # Taxas de R$ 1,50 acumuladas
-    sugestao_pool = Column(Numeric(precision=20, scale=2), default=0) # Valor sugerido pelo sistema para o Pool investir
+    taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0)
+    valor_amortizado = Column(Numeric(precision=20, scale=2), default=0)
+    valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
+    tipo_garantia = Column(String(50), default="pool") # pool, avalista, objeto
+    garantia_descricao = Column(Text, nullable=True)
+    sugestao_pool = Column(Numeric(precision=20, scale=2), default=0)
     
-    # NOVAS COLUNAS: Garantia Física
-    tipo_garantia = Column(String(20), default="social") # "social" ou "fisica"
-    garantia_descricao = Column(String(255), nullable=True) # Descrição do objeto
-    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True) # Onde será entregue
-    data_reprovacao_garantia = Column(DateTime, nullable=True) # Para contagem de 1h
-    
-    # Blindagem Jurídica: Rastreabilidade de Aceite
+    data_expiracao_4h = Column(DateTime, nullable=True) # Janela para entrega física
+    data_expiracao_5d = Column(DateTime, nullable=True) # Prazo total para captação (se houver)
+
+    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
+    parceiro = relationship("Parceiro")
+
     aceite_termos = Column(Boolean, default=False)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String(14), nullable=True)
@@ -130,12 +114,8 @@ class SolicitacaoEmprestimo(Base):
     municipio_aceite = Column(String(255), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
-
     usuario = relationship("Usuario", back_populates="solicitacoes")
-    parceiro = relationship("Parceiro")
-    acessos_investidores = relationship("AcessoInvestidor", back_populates="solicitacao")
     investimentos = relationship("Investimento", back_populates="solicitacao")
-    garantias_sociais = relationship("GarantiaSocial", back_populates="solicitacao", cascade="all, delete-orphan")
 
 class Investimento(Base):
     __tablename__ = "investimentos"
@@ -144,31 +124,12 @@ class Investimento(Base):
     investidor_id = Column(String(5), ForeignKey("usuarios.id"))
     solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"))
     valor_investido = Column(Numeric(precision=20, scale=2), nullable=False)
-    pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0) # Total recebido de volta
+    pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0)
     data_investimento = Column(DateTime, default=datetime.datetime.utcnow)
-    ciencia_risco = Column(Boolean, default=False) # Blindagem jurídica: investidor deu aceite no risco
-    
-    # Blindagem Jurídica: Rastreabilidade
-    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
-    cpf_aceite = Column(String(14), nullable=True)
-    ip_aceite = Column(String(45), nullable=True)
-    municipio_aceite = Column(String(255), nullable=True)
-    is_institutional = Column(Boolean, default=False)
-    is_pool = Column(Boolean, default=False) # Se o dinheiro veio do Pool (Caixa)
+    is_pool = Column(Boolean, default=True)
 
-    auditoria = relationship("RegistroAuditoria")
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
     investidor = relationship("Usuario")
-
-class AcessoInvestidor(Base):
-    __tablename__ = "acessos_investidores"
-
-    id = Column(Integer, primary_key=True, index=True)
-    investidor_id = Column(String(5), ForeignKey("usuarios.id"))
-    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"))
-    data_acesso = Column(DateTime, default=datetime.datetime.utcnow)
-
-    solicitacao = relationship("SolicitacaoEmprestimo", back_populates="acessos_investidores")
 
 class Transacao(Base):
     __tablename__ = "transacoes"
@@ -177,12 +138,11 @@ class Transacao(Base):
     usuario_id = Column(String(5), ForeignKey("usuarios.id"))
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     tipo = Column(Enum(TipoTransacao, name="tipo_transacao", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
-    status = Column(String(50), default="pendente", index=True) # pendente, concluido, falhou
+    status = Column(String(50), default="pendente", index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
-    # Para saques/depósitos, armazenar a chave pix ou ID do parceiro
-    detalhes = Column(Text, nullable=True) # TEXT no DB
-    metodo = Column(String, default="pix") # pix, especie
+    detalhes = Column(Text, nullable=True)
+    metodo = Column(String, default="pix")
     parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
     
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
@@ -200,30 +160,13 @@ class Parceiro(Base):
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
-    # NOVAS COLUNAS PARA O CAIXA FÍSICO
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True) # ID da conta que controla este caixa
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
     caixa_aberto = Column(Boolean, default=False)
-    saldo_caixa_inicial = Column(Numeric(precision=20, scale=2), default=0) # Informa quanto dinheiro ele abriu o caixa
-    saldo_caixa_atual = Column(Numeric(precision=20, scale=2), default=0)   # Registra o sobe e desce de espécie
-    comissoes_acumuladas = Column(Numeric(precision=20, scale=2), default=0) # Dinheiro pendente a ser resgatado
+    saldo_caixa_inicial = Column(Numeric(precision=20, scale=2), default=0)
+    saldo_caixa_atual = Column(Numeric(precision=20, scale=2), default=0)
+    comissoes_acumuladas = Column(Numeric(precision=20, scale=2), default=0)
     
     usuario = relationship("Usuario")
-
-class GarantiaSocial(Base):
-    __tablename__ = "garantias_sociais"
-
-    id = Column(Integer, primary_key=True, index=True)
-    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id", ondelete="CASCADE"))
-    garante_id = Column(String(5), ForeignKey("usuarios.id", ondelete="CASCADE"))
-    aceito = Column(Boolean, default=False)
-    data_aceite = Column(DateTime, nullable=True)
-    ip_aceite = Column(String(45), nullable=True)
-    municipio_aceite = Column(String(255), nullable=True)
-    auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
-
-    auditoria = relationship("RegistroAuditoria")
-    solicitacao = relationship("SolicitacaoEmprestimo", back_populates="garantias_sociais")
-    garante = relationship("Usuario", back_populates="garantias_prestadas")
 
 class LinkAfiliado(Base):
     __tablename__ = "links_afiliados"
@@ -231,7 +174,7 @@ class LinkAfiliado(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome_produto = Column(String(150), nullable=False)
     url_afiliado = Column(String(500), nullable=False)
-    url_imagem = Column(String(500), nullable=True) # Opcional: Para exibir foto do produto
+    url_imagem = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -240,9 +183,9 @@ class AcaoAdmin(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     admin_id = Column(String(5), ForeignKey("usuarios.id"))
-    alvo_id = Column(String(100), nullable=True) # ID do usuário ou objeto afetado
-    acao = Column(String(100), nullable=False) # Ex: "ALTERAR_SCORE", "ATIVAR_PARCEIRO"
-    detalhes = Column(Text, nullable=True) # TEXT no DB
+    alvo_id = Column(String(100), nullable=True)
+    acao = Column(String(100), nullable=False)
+    detalhes = Column(Text, nullable=True)
     ip = Column(String(45), nullable=True)
     data_acao = Column(DateTime, default=datetime.datetime.utcnow)
 

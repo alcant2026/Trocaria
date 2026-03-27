@@ -121,7 +121,7 @@ const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
 
-const DashboardTomador = ({ initialView = 'home' }) => {
+const DashboardCliente = ({ initialView = 'home' }) => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
     const [meusEmprestimos, setMeusEmprestimos] = useState([]);
     const [activeView, setActiveView] = useState(initialView); // 'home', 'solicitar', 'depositar', 'saque', 'score', 'loja'
@@ -130,6 +130,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     const [showTermos, setShowTermos] = useState(false);
     const [copiadoPix, setCopiadoPix] = useState(false);
     const [copiadoId, setCopiadoId] = useState(false);
+    const [valorPool, setValorPool] = useState('');
 
     // Modal Premium State
     const [modalPremium, setModalPremium] = useState({
@@ -159,22 +160,16 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     const [parceiroIdSaque, setParceiroIdSaque] = useState('');
 
     const [valor, setValor] = useState('');
-    const [taxa, setTaxa] = useState('');
     const [parcelas, setParcelas] = useState(1);
-    const [idAmigo1, setIdAmigo1] = useState('');
-    const [idAmigo2, setIdAmigo2] = useState('');
     const [senhaSaque, setSenhaSaque] = useState('');
     const [showSenhaSaque, setShowSenhaSaque] = useState(false);
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
-    const [aceiteSolicitacao, setAceiteSolicitacao] = useState(false);
     const [passoDeposito, setPassoDeposito] = useState(1);
     const [passoSaque, setPassoSaque] = useState(1);
     const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
     const [tipoUpgrade, setTipoUpgrade] = useState(null); // 'score' ou 'verificacao'
-    const [tipoGarantia, setTipoGarantia] = useState('social'); // 'social', 'fisica', 'hibrida' ou 'nenhuma'
-    const [garantiaDescricao, setGarantiaDescricao] = useState('');
-    const [parceiroIdGarantia, setParceiroIdGarantia] = useState('');
+    const [limiteInfo, setLimiteInfo] = useState({ limite_total: 0, limite_disponivel: 0, isento_taxa: false });
     const [mensagem, setMensagem] = useState(null);
 
     useEffect(() => {
@@ -192,10 +187,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     );
     const [valorAvulsoPorId, setValorAvulsoPorId] = useState({}); // { id: 'valor' }
     const [showAvulsoPorId, setShowAvulsoPorId] = useState({}); // { id: true/false }
-    const [garantiasPendentes, setGarantiasPendentes] = useState([]);
 
     const fecharAlertaRejeicao = () => {
-        localStorage.setItem('alerta_rejeicao_tomador', 'fechado');
+        localStorage.setItem('alerta_rejeicao_cliente', 'fechado');
         setMostrarAlertaRejeicaoState(false);
     };
 
@@ -217,9 +211,11 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                 setUsuario(res.perfil);
                 localStorage.setItem('usuario', JSON.stringify(res.perfil));
             }
-            if (res.tomador) {
-                setMeusEmprestimos(res.tomador.meus_emprestimos || []);
-                setGarantiasPendentes(res.tomador.garantias_pendentes || []);
+            if (res.cliente_emprestimos) {
+                setMeusEmprestimos(res.cliente_emprestimos || []);
+                // O limite agora vem calculado do backend baseado no Pool + Score
+                const resLimite = await api.get('/emprestimos/limite');
+                setLimiteInfo(resLimite);
             }
             if (res.historico) {
                 setHistorico(res.historico);
@@ -261,27 +257,28 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             setMensagem('Erro: O valor solicitado deve ser maior que zero.');
             return;
         }
-        if (!taxa || !parcelas) return;
+
+        if (v > limiteInfo.limite_disponivel) {
+            setMensagem(`Erro: Seu limite disponível é de R$ ${limiteInfo.limite_disponivel.toFixed(2)}.`);
+            return;
+        }
+
         if (!aceiteTermos) {
-            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso e taxas da plataforma para continuar.', type: 'warning' });
+            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso e as políticas da cooperativa para continuar.', type: 'warning' });
             return;
         }
 
         try {
             const res = await api.post('/emprestimos/solicitar', {
-                valor: parseFloat(valor),
-                taxa_juros: parseFloat(taxa),
+                valor: v,
                 parcelas: parseInt(parcelas),
-                aceite_termos: true,
-                tipo_garantia: tipoGarantia,
-                garantia_descricao: (tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') ? garantiaDescricao : null,
-                parceiro_id: (tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') ? parseInt(parceiroIdGarantia) : null,
-                garantidores_ids: (tipoGarantia === 'social' || tipoGarantia === 'hibrida') ? [idAmigo1, idAmigo2] : []
+                aceite_termos: true
             });
-            setMensagem(res.message || 'Solicitação enviada!');
+            setMensagem(res.message || 'Crédito aprovado e depositado!');
             setActiveView('home');
-            setValor(''); setTaxa(''); setParcelas(1);
-            setIdAmigo1(''); setIdAmigo2('');
+            setValor('');
+            setParcelas(1);
+            setPassoSolicitar(1);
             carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
@@ -312,27 +309,6 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             setMensagem('Erro no pagamento avulso: ' + err.message);
         }
     };
-
-    const handleVincularGarantidores = async (solicitacaoId) => {
-        const id1 = parseInt(idAmigo1);
-        const id2 = parseInt(idAmigo2);
-        if (!id1 || id1 <= 0 || !id2 || id2 <= 0) {
-            showModal({ title: 'IDs Inválidos', message: 'Os IDs dos amigos devem ser números positivos.', type: 'error' });
-            return;
-        }
-        try {
-            const res = await api.post(`/emprestimos/vincular-garantidores/${solicitacaoId}`, {
-                user_ids: [id1, id2]
-            });
-            setMensagem(res.message);
-            setIdAmigo1('');
-            setIdAmigo2('');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao vincular amigos: ' + err.message);
-        }
-    };
-
     const handleQuitar = (emprestimoId) => {
         showModal({
             title: 'Liquidar Crédito',
@@ -354,7 +330,6 @@ const DashboardTomador = ({ initialView = 'home' }) => {
         });
     };
 
-
     const handleNotificarDeposito = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
@@ -365,19 +340,22 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             showModal({ title: 'Parceiro Obrigatório', message: 'Selecione o estabelecimento para o depósito.', type: 'warning' });
             return;
         }
+        setLoadingAction(true);
         try {
             await api.post('/financeiro/notificar-deposito', { 
                 valor: v,
                 metodo: metodoDeposito,
                 parceiro_id: metodoDeposito === 'especie' ? parseInt(parceiroIdDeposito) : null
             });
-            setMensagem('Notificação enviada!');
+            showModal({ title: 'Notificação Enviada', message: 'Seu depósito está sendo analisado.', type: 'success' });
             setValorNotificacao('');
             setParceiroIdDeposito('');
             carregarSnapshot();
             setActiveView('home');
         } catch (err) {
             setMensagem('Erro: ' + err.message);
+        } finally {
+            setLoadingAction(false);
         }
     };
 
@@ -416,41 +394,39 @@ const DashboardTomador = ({ initialView = 'home' }) => {
         }
     };
 
-    // Remoção da compra de score direta (Agora é via comportamento)
-    // const confirmarComprarScore = ...
-    // const handleComprarScore = ...
-
-    const handleAceitarGarantia = async (id) => {
+    const handleAportePool = async () => {
+        const v = parseFloat(valorPool);
+        if (!v || v <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+        setLoadingAction(true);
         try {
-            const res = await api.post(`/emprestimos/aceitar-garantia/${id}`);
-            setMensagem(res.message);
+            await api.post('/financeiro/investir-pool', { valor: v });
+            showModal({ title: 'Sucesso!', message: 'Aporte realizado no Fundo Coletivo!', type: 'success' });
+            setValorPool('');
+            setActiveView('home');
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro ao aceitar garantia: ' + err.message);
+            setMensagem('Erro: ' + err.message);
+        } finally {
+            setLoadingAction(false);
         }
     };
 
-    const handleRejeitarGarantia = async (id) => {
-        showModal({
-            title: 'Rejeitar Garantia',
-            message: 'Se você recusar, o empréstimo do seu amigo será cancelado e os valores devolvidos aos investidores. \n\nConfirmar rejeição?',
-            type: 'warning',
-            onConfirm: async () => {
-                closeModal();
-                setLoadingAction(true);
-                try {
-                    const res = await api.post(`/emprestimos/rejeitar-garantia/${id}`);
-                    setMensagem(res.message);
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro ao rejeitar garantia: ' + err.message);
-                } finally {
-                    setLoadingAction(false);
-                }
-            }
-        });
+    const handleResgatePool = async () => {
+        const v = parseFloat(valorPool);
+        if (!v || v <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+        setLoadingAction(true);
+        try {
+            await api.post('/financeiro/resgatar-pool', { valor: v });
+            showModal({ title: 'Sucesso!', message: 'Resgate realizado com sucesso!', type: 'success' });
+            setValorPool('');
+            setActiveView('home');
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + err.message);
+        } finally {
+            setLoadingAction(false);
+        }
     };
-
 
     const confirmarSolicitarVerificacao = async () => {
         if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
@@ -507,7 +483,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
 
     // Render logic
     return (
-        <div className="tomador-dashboard">
+        <div className="cliente-dashboard">
             <header className="mb-1">
                 <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     Olá, {usuario.nome.split(' ')[0]}
@@ -551,35 +527,8 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {/* Top Grid for PC: Balance and Pending Actions */}
             <div className="grid-2">
                 <div>
-                    {/* Alertas de Garantia */}
-                    {garantiasPendentes.length > 0 && (
-                        <div className="card animate-slide-up" style={{ borderColor: 'var(--primary)', background: 'rgba(255,204,0,0.02)' }}>
-                            <div className="flex-between mb-1">
-                                <h3 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Bell size={18} className="text-primary" />
-                                    Pedindo sua Garantia
-                                </h3>
-                                <span className="badge badge-warning">{garantiasPendentes.length}</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {garantiasPendentes.map(p => (
-                                    <div key={p.solicitacao_id} className="info-block flex-between" style={{ padding: '10px', background: 'rgba(255,255,255,0.03)' }}>
-                                        <div>
-                                            <p style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>{p.tomador} te convidou</p>
-                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>R$ {p.valor.toLocaleString('pt-BR')}</p>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button onClick={() => handleAceitarGarantia(p.solicitacao_id)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)' }}>Aceitar</button>
-                                            <button onClick={() => handleRejeitarGarantia(p.solicitacao_id)} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--danger)' }}>Recusar</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Main Balance Card - Nubank Style */}
-                    <div className="card card-actionable" onClick={() => setActiveView('home')}>
+                    <div className="card card-actionable" onClick={() => setActiveView('home')} style={{ marginTop: '0.5rem' }}>
                         <div className="flex-between mb-1" style={{ width: '100%' }}>
                             <div className="flex-between" style={{ gap: '10px' }}>
                                 <HandCoins size={20} color="var(--primary)" />
@@ -591,7 +540,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         <div className="flex-between">
                             <div>
                                 {verSaldo ? (
-                                    <h2 style={{ fontSize: '2.25rem' }}>
+                                    <h2 className="text-clamp-balance">
                                         R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </h2>
                                 ) : (
@@ -608,23 +557,19 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     </div>
                 </div>
 
-                {(usuario.divida_total > 0 || usuario.total_garantias > 0) && (
+                {usuario.divida_total > 0 && (
                     <div className="hide-on-mobile">
-                        {/* PC-only Widget: Resumo Financeiro ou Info */}
+                        {/* PC-only Widget: Resumo Financeiro */}
                         <div className="card" style={{ height: '100%' }}>
-                            <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Atividade</h3>
-                            <div className="grid-2" style={{ gap: '10px' }}>
-                                <div className="info-block">
-                                    <div className="info-label">Dívida Total</div>
-                                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}</div>
+                            <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Dívida</h3>
+                            <div className="info-block" style={{ background: 'rgba(255, 61, 0, 0.03)', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
+                                <div className="info-label">Saldo Devedor Total</div>
+                                <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--danger)' }}>
+                                    R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}
                                 </div>
-                                <div className="info-block">
-                                    <div className="info-label">Garantias</div>
-                                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{usuario.total_garantias || 0} Ativas</div>
-                                </div>
-                            </div>
-                            <div className="mt-1 p-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.8rem' }}>
-                                <p style={{ margin: 0 }}>Lembre-se: manter seu Score acima de 600 libera taxas de juros reduzidas em até 2%.</p>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                    Lembre-se: manter seus pagamentos em dia aumenta seu Score e libera limites maiores de até 1.2x seu Pool.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -651,6 +596,18 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {/* Action Mosaic / Grid - Only visible in 'home' view */}
             {activeView === 'home' && (
                 <div className="action-grid animate-fade-in">
+                    <div 
+                        className="action-btn" 
+                        onClick={() => setActiveView('pool')} 
+                        style={{ 
+                            borderColor: 'var(--primary)', 
+                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15) 0%, rgba(var(--primary-rgb), 0.05) 100%)',
+                            boxShadow: '0 4px 15px rgba(var(--primary-rgb), 0.1)' 
+                        }}
+                    >
+                        <Coins size={32} color="var(--primary)" />
+                        <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Fundo Coletivo</span>
+                    </div>
                     <div className="action-btn" onClick={() => setActiveView('solicitar')}>
                         <PlusCircle size={28} color="var(--primary)" />
                         <span>Solicitar</span>
@@ -692,9 +649,9 @@ const DashboardTomador = ({ initialView = 'home' }) => {
             {activeView === 'solicitar' && (
                 <div className="card">
                     <div className="flex-between mb-1">
-                        <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Novo Pedido de Crédito</h2>
+                        <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Solicitar Crédito Instantâneo</h2>
                         <div style={{ display: 'flex', gap: '4px' }}>
-                            {[1, 2, 3, 4].map(i => (
+                            {[1, 2].map(i => (
                                 <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoSolicitar ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
                             ))}
                         </div>
@@ -703,61 +660,59 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                     {/* PASSO 1: SIMULAÇÃO */}
                     {passoSolicitar === 1 && (
                         <div className="animate-fade-in">
-                            <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Simule o valor e as condições do seu pedido de apoio.</p>
+                            <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 5px 0' }}>Seu limite disponível agora:</p>
+                                <p style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {limiteInfo.limite_disponivel.toLocaleString('pt-BR')}</p>
+                            </div>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                                 <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
-                                    <label style={{ textAlign: 'center', display: 'block' }}>Quanto você precisa?</label>
+                                    <label style={{ textAlign: 'center', display: 'block' }}>Valor do Apoio</label>
                                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <input
                                             type="number"
                                             className="input-field"
                                             placeholder="0,00"
+                                            min="0"
                                             style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
                                             value={valor}
-                                            onChange={(e) => setValor(e.target.value)}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                if (v === '' || parseFloat(v) >= 0) setValor(v);
+                                            }}
                                         />
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '280px' }}>
-                                    <div className="input-group" style={{ flex: 1 }}>
-                                        <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Taxa (% mês)</label>
-                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                className="input-field"
-                                                placeholder="Ex: 5"
-                                                style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
-                                                value={taxa}
-                                                onChange={(e) => setTaxa(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group" style={{ flex: 1 }}>
-                                        <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Prazo (meses)</label>
-                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <input
-                                                type="number"
-                                                className="input-field"
-                                                placeholder="Ex: 12"
-                                                style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '0.9rem' }}
-                                                value={parcelas}
-                                                onChange={(e) => setParcelas(e.target.value)}
-                                            />
-                                        </div>
+                                <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
+                                    <label style={{ textAlign: 'center', display: 'block', fontSize: '0.8rem' }}>Prazo para Devolução (Meses)</label>
+                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <select
+                                            className="input-field"
+                                            style={{ border: 'none', background: 'transparent', margin: 0, padding: '0.75rem', textAlign: 'center', width: '100%', fontSize: '1rem', fontWeight: 700 }}
+                                            value={parcelas}
+                                            onChange={(e) => setParcelas(e.target.value)}
+                                        >
+                                            <option value={1}>1 mês (Parcela Única)</option>
+                                            <option value={2}>2 meses</option>
+                                            <option value={3}>3 meses</option>
+                                            <option value={6}>6 meses</option>
+                                            <option value={12}>12 meses</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
 
-                            {valor && taxa && parcelas && (
+                            {valor && parseFloat(valor) > 0 && (
                                 <div className="info-block mt-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)' }}>
-                                    <div className="info-label">Parcela Estimada</div>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                        R$ {((parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    <div className="flex-between">
+                                        <div className="info-label">Parcela Estimada</div>
+                                        <span className="badge badge-success">5% juros a.m.</span>
                                     </div>
-                                    <small className="text-muted">Total a devolver: R$ {(parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                        R$ {(((parseFloat(valor) * (1 + (0.05 * parcelas))) + (limiteInfo.isento_taxa ? 0 : (parseFloat(valor) <= 50 ? 2 : 4))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                    <small className="text-muted">Total a devolver: R$ {((parseFloat(valor) * (1 + (0.05 * parcelas))) + (limiteInfo.isento_taxa ? 0 : (parseFloat(valor) <= 50 ? 2 : 4))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>
                                 </div>
                             )}
 
@@ -765,7 +720,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                 <button 
                                     className="btn btn-primary" 
                                     style={{ flex: 2 }} 
-                                    disabled={!valor || !taxa || !parcelas || parseFloat(valor) <= 0}
+                                    disabled={!valor || parseFloat(valor) <= 0 || parseFloat(valor) > limiteInfo.limite_disponivel}
                                     onClick={() => setPassoSolicitar(2)}
                                 >
                                     Continuar
@@ -775,149 +730,46 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         </div>
                     )}
 
-                    {/* PASSO 2: ESCOLHA DA GARANTIA */}
+                    {/* PASSO 2: TERMOS E CONFIRMAÇÃO */}
                     {passoSolicitar === 2 && (
                         <div className="animate-fade-in">
-                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Tipo de Garantia</h3>
-                            <p className="text-muted mb-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>Como você deseja garantir o pagamento do seu apoio?</p>
+                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Confirme sua Solicitação</h3>
                             
-                            <div className="grid-2" style={{ gap: '10px', marginBottom: '1rem' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                                    <div 
-                                        className={`card-selecionavel ${tipoGarantia === 'social' ? 'active' : ''}`}
-                                        onClick={() => setTipoGarantia('social')}
-                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'social' ? 'var(--primary)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'social' ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent', borderRadius: '16px' }}
-                                    >
-                                        <Users size={20} color={tipoGarantia === 'social' ? 'var(--primary)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
-                                        <div style={{ fontWeight: 600, fontSize: '0.75rem' }}>Social</div>
-                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>2 Amigos</div>
-                                    </div>
-                                    <div 
-                                        className={`card-selecionavel ${tipoGarantia === 'fisica' ? 'active' : ''}`}
-                                        onClick={() => setTipoGarantia('fisica')}
-                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'fisica' ? 'var(--primary)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'fisica' ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent', borderRadius: '16px' }}
-                                    >
-                                        <Package size={20} color={tipoGarantia === 'fisica' ? 'var(--primary)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
-                                        <div style={{ fontWeight: 600, fontSize: '0.75rem' }}>Física</div>
-                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Item Valor</div>
-                                    </div>
-                                    <div 
-                                        className={`card-selecionavel ${tipoGarantia === 'hibrida' ? 'active' : ''}`}
-                                        onClick={() => setTipoGarantia('hibrida')}
-                                        style={{ padding: '12px 8px', textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: tipoGarantia === 'hibrida' ? 'var(--success)' : 'rgba(255,255,255,0.1)', background: tipoGarantia === 'hibrida' ? 'rgba(0, 230, 118, 0.1)' : 'transparent', borderRadius: '16px' }}
-                                    >
-                                        <Zap size={20} color={tipoGarantia === 'hibrida' ? 'var(--success)' : 'var(--text-muted)'} style={{ margin: '0 auto 8px' }} />
-                                        <div style={{ fontWeight: 700, fontSize: '0.75rem', color: tipoGarantia === 'hibrida' ? 'var(--success)' : 'inherit' }}>Jato ✨</div>
-                                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Social + Fís.</div>
-                                    </div>
+                            <div className="info-block mb-1">
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Valor Solicitado:</span>
+                                    <span style={{ fontWeight: 700 }}>R$ {parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Juros de Apoio (5%):</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>R$ {(parseFloat(valor) * 0.05 * parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Taxa de Operação:</span>
+                                    <span style={{ fontWeight: 700, color: limiteInfo.isento_taxa ? 'var(--success)' : 'var(--danger)' }}>
+                                        {limiteInfo.isento_taxa ? 'ISENTO (Score 500+ / Pool R$ 100+)' : (parseFloat(valor) <= 50 ? 'R$ 2,00' : 'R$ 4,00')}
+                                    </span>
+                                </div>
+                                {!limiteInfo.isento_taxa && (
+                                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                                        Dica: Atingindo Score 500 e Pool R$ 100 seu próximo apoio será **TAXA ZERO**.
+                                    </p>
+                                )}
+                                <div className="flex-between" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', marginTop: '5px' }}>
+                                    <span style={{ fontWeight: 600 }}>Parcela Mensal:</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                        R$ {(((parseFloat(valor) * (1 + (0.05 * parcelas))) + (limiteInfo.isento_taxa ? 0 : (parseFloat(valor) <= 50 ? 2 : 4))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                <div className="flex-between mt-1">
+                                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>Total Devedor (CET):</span>
+                                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                        R$ {((parseFloat(valor) * (1 + (0.05 * parcelas))) + (limiteInfo.isento_taxa ? 0 : (parseFloat(valor) <= 50 ? 2 : 4))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
                                 </div>
                             </div>
 
-                            <div 
-                                className={`card-selecionavel ${tipoGarantia === 'nenhuma' ? 'active' : ''}`}
-                                onClick={() => setTipoGarantia('nenhuma')}
-                                style={{ 
-                                    padding: '12px', 
-                                    textAlign: 'center', 
-                                    cursor: 'pointer', 
-                                    border: '1px solid', 
-                                    borderColor: tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'rgba(255,255,255,0.05)', 
-                                    background: tipoGarantia === 'nenhuma' ? 'rgba(255, 61, 0, 0.05)' : 'rgba(255,255,255,0.02)', 
-                                    borderRadius: '16px',
-                                    marginBottom: '1.5rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '12px'
-                                }}
-                            >
-                                <ShieldAlert size={20} color={tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'var(--text-muted)'} />
-                                <div style={{ textAlign: 'left' }}>
-                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'inherit' }}>Sem Garantia Coletiva</div>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aprovação mais difícil e maior rigor na análise.</div>
-                                </div>
-                            </div>
-
-                            <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {(tipoGarantia === 'social' || tipoGarantia === 'hibrida') && (
-                                    <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <div className="input-group">
-                                            <label>ID Amigo 1</label>
-                                            <input type="number" className="input-field" placeholder="0000" value={idAmigo1} onChange={(e) => setIdAmigo1(e.target.value)} />
-                                        </div>
-                                        <div className="input-group">
-                                            <label>ID Amigo 2</label>
-                                            <input type="number" className="input-field" placeholder="0000" value={idAmigo2} onChange={(e) => setIdAmigo2(e.target.value)} />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {(tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') && (
-                                    <>
-                                        <div className="input-group">
-                                            <label>Descrição do Item</label>
-                                            <input 
-                                                type="text" 
-                                                className="input-field" 
-                                                placeholder="Ex: iPhone 13 Pro Max" 
-                                                value={garantiaDescricao}
-                                                onChange={(e) => setGarantiaDescricao(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="input-group">
-                                            <label>Parceiro para Entrega</label>
-                                            <select 
-                                                className="input-field"
-                                                value={parceiroIdGarantia}
-                                                onChange={(e) => setParceiroIdGarantia(e.target.value)}
-                                            >
-                                                <option value="">Selecione um parceiro...</option>
-                                                {parceiros.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.nome}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                <button 
-                                    className="btn btn-primary" 
-                                    style={{ flex: 2 }} 
-                                    disabled={
-                                        (tipoGarantia === 'social' && (!idAmigo1 || !idAmigo2)) ||
-                                        (tipoGarantia === 'fisica' && (!garantiaDescricao || !parceiroIdGarantia)) ||
-                                        (tipoGarantia === 'hibrida' && (!idAmigo1 || !idAmigo2 || !garantiaDescricao || !parceiroIdGarantia)) ||
-                                        (tipoGarantia === 'nenhuma' && false) // Sempre habilitado para 'nenhuma'
-                                    }
-                                    onClick={() => setPassoSolicitar(3)}
-                                >
-                                    Continuar
-                                </button>
-                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(1)}>Voltar</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PASSO 3: TERMOS E TAXAS */}
-                    {passoSolicitar === 3 && (
-                        <div className="animate-fade-in">
-                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Termos e Compromissos</h3>
-                            
-                            {/* Aviso de Política de Taxa */}
-                            <div style={{ padding: '16px', background: 'rgba(255, 145, 0, 0.07)', border: '1px solid rgba(255, 145, 0, 0.2)', borderRadius: '16px', marginBottom: '1.5rem' }}>
-                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Gift size={20} /> Taxa de Intermediação
-                                </p>
-                                <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                                    • 1º pedido do mês: <strong>ISENTO</strong> <br />
-                                    • A partir do 2º: <strong>R$ 4,00</strong> (taxa de processamento). <br />
-                                    <span style={{ fontSize: '0.7rem', display: 'block', marginTop: '4px' }}>Atenção: A taxa de R$ 4,00 não é devolvida caso não haja investidores.</span>
-                                </p>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
                                 <input
                                     type="checkbox"
                                     id="check-termos"
@@ -926,84 +778,83 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                     onChange={(e) => setAceiteTermos(e.target.checked)}
                                 />
                                 <label htmlFor="check-termos" style={{ fontSize: '0.8rem', color: 'var(--text-main)', cursor: 'pointer', lineHeight: '1.4' }}>
-                                    Estou ciente da política de taxas e concordo com os <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTermos(true); }} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso</span> da plataforma PSY PAY.
+                                    Estou ciente que o valor será depositado instantaneamente e que o resgate do meu capital no Pool ficará retido como garantia até a quitação da dívida.
                                 </label>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                            <div style={{ display: 'flex', gap: '10px' }}>
                                 <button 
                                     className="btn btn-primary" 
                                     style={{ flex: 2 }} 
-                                    disabled={!aceiteTermos}
-                                    onClick={() => setPassoSolicitar(4)}
-                                >
-                                    Revisar Pedido
-                                </button>
-                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(2)}>Voltar</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PASSO 4: REVISÃO FINAL */}
-                    {passoSolicitar === 4 && (
-                        <div className="animate-fade-in">
-                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>Resumo da Solicitação</h3>
-                            
-                            <div className="info-block mb-1">
-                                <div className="flex-between mb-1">
-                                    <span className="text-muted">Valor Desejado:</span>
-                                    <span style={{ fontWeight: 700 }}>R$ {parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex-between mb-1">
-                                    <span className="text-muted">Taxa Oferecida:</span>
-                                    <span style={{ fontWeight: 700 }}>{taxa}% ao mês</span>
-                                </div>
-                                <div className="flex-between mb-1">
-                                    <span className="text-muted">Prazo:</span>
-                                    <span style={{ fontWeight: 700 }}>{parcelas} meses</span>
-                                </div>
-                                <div className="flex-between mb-1">
-                                    <span className="text-muted">Garantia:</span>
-                                    <span style={{ fontWeight: 700, color: tipoGarantia === 'hibrida' ? 'var(--success)' : tipoGarantia === 'nenhuma' ? 'var(--danger)' : 'var(--primary)' }}>
-                                        {tipoGarantia === 'hibrida' ? 'Híbrida (Jato ✨)' : tipoGarantia === 'fisica' ? 'Física (Item)' : tipoGarantia === 'nenhuma' ? 'Nenhuma (Risco Alto)' : 'Social (Amigos)'}
-                                    </span>
-                                </div>
-                                {(tipoGarantia === 'social' || tipoGarantia === 'hibrida') && (
-                                    <div className="text-muted mb-1" style={{ fontSize: '0.75rem', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                        Garantidores: ID {idAmigo1} e ID {idAmigo2}
-                                    </div>
-                                )}
-                                {(tipoGarantia === 'fisica' || tipoGarantia === 'hibrida') && (
-                                    <div className="text-muted mb-1" style={{ fontSize: '0.75rem', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                        Item: {garantiaDescricao} <br />
-                                        Local: {parceiros.find(p => p.id == parceiroIdGarantia)?.nome}
-                                    </div>
-                                )}
-                                <div className="flex-between" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', marginTop: '5px' }}>
-                                    <span style={{ fontWeight: 600 }}>Parcela Mensal:</span>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                        R$ {((parseFloat(valor) * (1 + (parseFloat(taxa) / 100 * parcelas))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <p className="text-muted text-center" style={{ fontSize: '0.75rem', padding: '0 10px' }}>
-                                Ao clicar em confirmar, seu pedido será publicado no mural de oportunidades para análise da comunidade.
-                            </p>
-
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                <button 
-                                    className="btn btn-primary" 
-                                    style={{ flex: 2 }} 
+                                    disabled={!aceiteTermos || loadingAction}
                                     onClick={handleSolicitar}
                                 >
-                                    {loadingAction ? 'Enviando...' : 'Confirmar e Publicar'}
+                                    {loadingAction ? 'Processando...' : 'Confirmar e Receber'}
                                 </button>
-                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(3)}>Voltar</button>
+                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoSolicitar(1)}>Voltar</button>
                             </div>
                         </div>
                     )}
                 </div >
+            )}
+            {activeView === 'pool' && (
+                <div className="card">
+                    <div className="flex-between mb-1">
+                        <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Fundo Coletivo de Liquidez</h2>
+                    </div>
+
+                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        <div className="flex-between">
+                            <span className="text-muted">Seu capital no Pool:</span>
+                            <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>R$ {(usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '8px' }}>
+                            Rendimentos automáticos e pro-rata aplicados em tempo real sobre os juros de crédito.
+                        </p>
+                    </div>
+
+                    <div className="input-group">
+                        <label>Valor da Operação</label>
+                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <input
+                                type="number"
+                                className="input-field"
+                                placeholder="R$ 0,00"
+                                min="0"
+                                style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.3rem', fontWeight: 800 }}
+                                value={valorPool}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    if (v === '' || parseFloat(v) >= 0) setValorPool(v);
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '1.5rem' }}>
+                        <button 
+                            className="btn btn-primary" 
+                            disabled={!valorPool || parseFloat(valorPool) <= 0 || parseFloat(valorPool) > usuario.saldo}
+                            onClick={handleAportePool}
+                        >
+                            <PlusCircle size={18} style={{ marginRight: '8px' }} />
+                            Aportar
+                        </button>
+                        <button 
+                            className="btn btn-outline" 
+                            style={{ color: 'var(--danger)', borderColor: 'rgba(255, 61, 0, 0.2)' }}
+                            disabled={!valorPool || parseFloat(valorPool) <= 0 || parseFloat(valorPool) > usuario.saldo_pool}
+                            onClick={handleResgatePool}
+                        >
+                            <ArrowDownCircle size={18} style={{ marginRight: '8px' }} />
+                            Resgatar
+                        </button>
+                    </div>
+
+                    <p className="text-muted mt-1" style={{ fontSize: '0.7rem', textAlign: 'center' }}>
+                        * O aporte no Fundo Coletivo é a base do seu limite de crédito. Seus pontos aumentam conforme sua liquidez no sistema.
+                    </p>
+                </div>
             )}
             {activeView === 'loja' && (
                 <div className="card">
@@ -1069,9 +920,13 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                                             type="number"
                                             className="input-field"
                                             placeholder="R$ 0,00"
+                                            min="0"
                                             style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
                                             value={valorNotificacao}
-                                            onChange={(e) => setValorNotificacao(e.target.value)}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                if (v === '' || parseFloat(v) >= 0) setValorNotificacao(v);
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -1402,7 +1257,7 @@ const DashboardTomador = ({ initialView = 'home' }) => {
                         {/* PASSO 1: SELEÇÃO DO UPGRADE */}
                         {passoUpgrade === 1 && (
                             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de tomador hoje.</p>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de cooperado hoje.</p>
                                 
                                 <div 
                                     className="clickable" 
@@ -1995,4 +1850,4 @@ const DashboardTomador = ({ initialView = 'home' }) => {
     );
 };
 
-export default DashboardTomador;
+export default DashboardCliente;

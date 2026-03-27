@@ -1,0 +1,108 @@
+from sqlalchemy.orm import Session
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Investimento
+from decimal import Decimal
+import datetime
+
+def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
+    """
+    Calcula o limite de crédito progressivo do usuário.
+    Regras:
+    - Mínimo R$ 100 no Pool para ter crédito.
+    - Começa com R$ 20,00.
+    - Se Score >= 800: Limite de 1.2x o saldo do Pool.
+    """
+    saldo_pool = usuario.saldo_caixa or Decimal("0.00")
+    score = usuario.score or Decimal("0.00")
+
+    if saldo_pool <= Decimal("1.00"):
+        return Decimal("0.00")
+
+    # Regra: Limite Base de R$ 20,00 se tiver saldo no Pool
+    limite_base = Decimal("20.00")
+
+    # Se o score for excelente (Ex: VIP), libera o multiplicador de 1.2x o capital
+    if score >= Decimal("800.00"):
+        return max(limite_base, saldo_pool * Decimal("1.2"))
+    
+    # Lógica de progressão adicional: +10 reais para cada 100 pontos de score acima de 500
+    if score > Decimal("500.00"):
+        bonus_score = ((score - Decimal("500.00")) / Decimal("100.00")) * Decimal("10.00")
+        limite_base += bonus_score
+
+    return limite_base
+
+def verificar_isencao_taxa(usuario: Usuario) -> bool:
+    """
+    Verifica se o usuário é isento da taxa de postagem/solicitação.
+    Regra: Score >= 500 e Saldo Pool > 100.
+    """
+    saldo_pool = usuario.saldo_caixa or Decimal("0.00")
+    score = usuario.score or Decimal("0.00")
+    
+    if score >= Decimal("500.0") and saldo_pool > Decimal("100.00"):
+        return True
+    return False
+
+def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, taxa_adesao: Decimal = Decimal("0.00")) -> SolicitacaoEmprestimo:
+    """
+    Cria e aprova instantaneamente um empréstimo usando o dinheiro da plataforma (Pool).
+    A taxa_adesao (se houver) é somada como custos financeiros (taxas_adicionais).
+    """
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).with_for_update().first()
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+    
+    if plataforma.saldo < valor:
+         # Se a plataforma não tem saldo direto, tenta usar o saldo_caixa da plataforma (Pool)
+         if plataforma.saldo_caixa >= valor:
+             plataforma.saldo_caixa -= valor
+             plataforma.saldo += valor # Move para o saldo para processar a transferência
+         else:
+             raise ValueError("Saldo insuficiente no Pool da Cooperativa para esta operação.")
+
+    # 1. Criar a Solicitação já APROVADA
+    nova_solicitacao = SolicitacaoEmprestimo(
+        usuario_id=usuario.id,
+        valor=valor,
+        taxa_juros=taxa,
+        prazo_meses=prazo,
+        status=StatusSolicitacao.APROVADO,
+        data_criacao=datetime.datetime.utcnow(),
+        proximo_vencimento=datetime.datetime.utcnow() + datetime.timedelta(days=30),
+        aceite_termos=True,
+        taxas_adicionais=taxa_adesao # A taxa de abertura é somada à dívida
+    )
+    db.add(nova_solicitacao)
+    db.flush()
+
+    # 2. Registrar o "Investimento" Único do Sistema
+    investimento_sistema = Investimento(
+        investidor_id=plataforma.id,
+        solicitacao_id=nova_solicitacao.id,
+        valor_investido=valor,
+        is_pool=True
+    )
+    db.add(investimento_sistema)
+
+    # 3. Transferir dinheiro para o tomador
+    plataforma.saldo -= valor
+    usuario.saldo += valor
+
+    # 4. Registrar Transações
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=valor,
+        tipo=TipoTransacao.RECEBIMENTO,
+        status="concluido",
+        detalhes=f"Empréstimo Fintech Aprovado Instantaneamente - Pedido #{nova_solicitacao.id}"
+    ))
+    
+    db.add(Transacao(
+        usuario_id=plataforma.id,
+        valor=valor,
+        tipo=TipoTransacao.INVESTIMENTO,
+        status="concluido",
+        detalhes=f"Aporte Cooperativa para Usuário {usuario.id} - Pedido #{nova_solicitacao.id}"
+    ))
+
+    db.commit()
+    return nova_solicitacao

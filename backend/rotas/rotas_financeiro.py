@@ -165,21 +165,15 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     
     return {"message": msg + " Aguardando processamento manual."}
 
-@router.post("/caixa/aporte")
+@router.post("/investir-pool")
 @limiter.limit("5/minute")
-async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Move saldo da conta principal para o Caixa com blindagem jurídica."""
+async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """Move saldo da conta principal para o Fundo Coletivo (Pool)."""
     # Lock para evitar bit-flipping de saldo
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
-    if not verify_password(dados.senha, usuario.senha_hash):
-        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
-    
-    if not dados.aceite_termos:
-        raise HTTPException(status_code=400, detail="Você deve aceitar os termos de ciência de risco e regras do Pool.")
-
     if usuario.saldo < dados.valor:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente para aporte no Caixa.")
+        raise HTTPException(status_code=400, detail="Saldo insuficiente para investimento no Pool.")
     
     # Registro de Auditoria (IP/Device)
     auditoria = RegistroAuditoria(
@@ -211,49 +205,29 @@ async def aporte_caixa(dados: AporteCaixaRequest, request: Request, db: Session 
     cache_snapshot_data.clear()
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
 
-@router.post("/caixa/resgate")
-async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Resgata saldo do Caixa com blindagem e auditoria."""
+@router.post("/resgatar-pool")
+async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """Resgata saldo do Pool validando dívidas ativas como colateral."""
     # Lock preventivo
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
 
-    if not verify_password(dados.senha, usuario.senha_hash):
-        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
-
-    agora = datetime.datetime.now(TZ_BRASILIA)
-    # REGRA: Apenas entre 19 e 21 de dezembro
-    if not (agora.month == 12 and 19 <= agora.day <= 21):
-          # Auditoria de tentativa de resgate fora de época (importante para o admin)
-          registrar_acao_admin(db, usuario.id, "TENTATIVA_RESGATE_FORA_DATA", alvo_id=usuario.id, detalhes=f"Valor tentado: {dados.valor}", ip=request.client.host)
-          raise HTTPException(
-            status_code=403, 
-            detail="Resgate bloqueado: O saldo do Caixa só pode ser resgatado entre 19 e 21 de Dezembro."
-        )
-
-    # NOVO: Chave Anticalote - Bloqueia resgate e liquida se houver empréstimo ativo
+    # NOVO: Validação de Dívida Ativa (Colateral)
+    # O saldo no Pool garante o empréstimo. O usuário só pode sacar o que exceder a dívida.
     emprestimo_ativo = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.usuario_id == usuario.id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
     ).first()
     
     if emprestimo_ativo:
+        from utils_emprestimo import calcular_divida_total
         divida_total = calcular_divida_total(emprestimo_ativo)
         saldo_disponivel = max(Decimal("0.00"), usuario.saldo_caixa - divida_total)
 
-        # "se for tenta sacar se tiver devendo ai sim e liquidado"
         if dados.valor > saldo_disponivel:
-            valor_liquidacao = min(usuario.saldo_caixa, divida_total)
-            if valor_liquidacao > 0:
-                liquidar_emprestimo_via_pool(usuario, emprestimo_ativo, valor_liquidacao, db)
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Liquidação Forçada: R$ {valor_liquidacao:,.2f} do seu Caixa foram usados para abater sua dívida ativa. Tente resgatar um valor menor (Saldo Disponível: R$ {usuario.saldo_caixa - divida_total if (usuario.saldo_caixa - divida_total) > 0 else 0:,.2f})."
-                )
-            else:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Resgate Negado: Todo o seu saldo no Caixa está bloqueado como garantia do seu empréstimo ativo."
-                )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Saldo Bloqueado: R$ {divida_total:,.2f} do seu Pool estão retidos como garantia do seu empréstimo ativo. Saldo disponível para resgate: R$ {saldo_disponivel:,.2f}."
+            )
 
     if usuario.saldo_caixa < dados.valor:
         raise HTTPException(status_code=400, detail="Saldo no Caixa insuficiente para resgate.")
@@ -275,12 +249,12 @@ async def resgate_caixa(dados: AporteCaixaRequest, request: Request, db: Session
         valor=dados.valor,
         tipo=TipoTransacao.RESGATE_CAIXA,
         status="concluido",
-        detalhes="Resgate do Pool (Autenticado via Senha/IP)",
+        detalhes="Resgate do Pool (Fintech Liquidez Diária)",
         auditoria_id=auditoria.id
     )
     db.add(transacao)
 
-    # NOVO: Perda de Score por resgate (penalidade)
+    # Perda de Score proporcional por resgate (opcional, mantendo para controle de risco)
     atualizar_score(db, usuario.id, dados.valor, "RESGATE_CAIXA")
 
     db.commit()

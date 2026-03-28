@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, StatusSolicitacao
-from sqlalchemy import func, case, and_, text
+from sqlalchemy import func, case, and_, or_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
 from utils_emprestimo import calcular_divida_total
@@ -40,6 +40,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     except Exception as e:
         print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
     
+    
     # Verificar Cache
     if usuario.id in cache_snapshot_data:
         validade, dados = cache_snapshot_data[usuario.id]
@@ -66,6 +67,23 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
         saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
 
+        # 0.1 Calcular Rentabilidade do Pool
+        total_aportado_bruto = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo == TipoTransacao.APORTE_CAIXA,
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
+        
+        total_saque_caixa = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo == TipoTransacao.RESGATE_CAIXA,
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
+        
+        capital_liquido = total_aportado_bruto - total_saque_caixa
+        rendimento_abs = max(Decimal("0.00"), saldo_caixa_total - capital_liquido)
+        rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
+
         snapshot = {
             "perfil": {
                 "id": usuario.id,
@@ -82,6 +100,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "saldo_caixa": float(saldo_caixa_total),
                 "saldo_pool": float(saldo_caixa_total), # Alias para o frontend
                 "saldo_caixa_disponivel": float(saldo_caixa_disponivel),
+                "rendimento_pool_abs": float(rendimento_abs),
+                "rendimento_pool_pct": float(rendimento_pct),
                 "divida_total_pool": float(divida_total_pendente),
                 "is_parceiro": is_parceiro,
                 "parceiro_id": parceiro.id if parceiro else None,
@@ -108,6 +128,59 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "data": data_t.astimezone(TZ_BRASILIA).isoformat()
             })
 
+        # --- NOVO: MARKETPLACE DA COMUNIDADE (CPM ADS) ---
+        print(f"[DEBUG SNAPSHOT] Buscando anúncios da comunidade")
+        from modelos.modelos_db import LinkAfiliado
+        agora = datetime.utcnow()
+        
+        # 1. LIMPEZA INTELIGENTE DO MARKETPLACE
+        # GRÁTIS: expirou (24h) OU views acabaram → DELETA do BD (libera espaço)
+        db.query(LinkAfiliado).filter(
+            LinkAfiliado.is_boosted == False,
+            or_(
+                LinkAfiliado.data_expiracao < agora,
+                LinkAfiliado.visualizacoes_restantes <= 0
+            )
+        ).delete()
+        
+        # PAGO: views acabaram → apenas desativa (pode recomprar)
+        db.query(LinkAfiliado).filter(
+            LinkAfiliado.is_boosted == True,
+            LinkAfiliado.visualizacoes_restantes <= 0,
+            LinkAfiliado.is_active == True
+        ).update({"is_active": False})
+        
+        # PAGO: 30 dias sem atividade (expirado) → DELETA do BD
+        db.query(LinkAfiliado).filter(
+            LinkAfiliado.is_boosted == True,
+            LinkAfiliado.is_active == False,
+            LinkAfiliado.data_expiracao < agora
+        ).delete()
+        
+        db.commit()
+
+        # 2. Buscar 6 anúncios ativos (Premium primeiro, excluindo o próprio usuário)
+        ads_ativos = db.query(LinkAfiliado).filter(
+            LinkAfiliado.is_active == True,
+            LinkAfiliado.visualizacoes_restantes > 0,
+            LinkAfiliado.usuario_id != usuario.id
+        ).order_by(LinkAfiliado.is_boosted.desc(), func.random()).limit(6).all()
+
+        snapshot["comunidade_shop"] = []
+        for ad in ads_ativos:
+            # Views NÃO são consumidas aqui (apenas na listagem).
+            # O consumo real acontece via POST /comunidade/registrar-view quando o usuário clica.
+            snapshot["comunidade_shop"].append({
+                "id": ad.id,
+                "nome": ad.nome_produto,
+                "url": ad.url_afiliado,
+                "img": ad.url_imagem,
+                "valor": float(ad.valor) if ad.valor else 0.00,
+                "patrocinado": ad.is_boosted,
+                "views_restantes": ad.visualizacoes_restantes
+            })
+        db.commit()
+
         # 3. Dados por Perfil (Lógica duplicada aqui para evitar circularidade)
         tipos_receita = [
             TipoTransacao.COMPRA_SCORE, 
@@ -115,9 +188,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             TipoTransacao.TAXA_SAQUE, 
             TipoTransacao.TAXA_INTERMEDIACAO,
             TipoTransacao.TAXA_ESPECIE,
-            TipoTransacao.APORTE_CAPITAL,
             TipoTransacao.TAXA_POSTAGEM,
-            TipoTransacao.RETORNO_INVESTIMENTO
+            TipoTransacao.RETORNO_INVESTIMENTO,
+            TipoTransacao.TAXA_ADM_EMPRESTIMO
         ]
 
         # --- ADMIN DATA ---
@@ -258,13 +331,25 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     if match:
                         juros_via_logs += Decimal(match.group(1))
 
-            # 4. Reconciliação Híbrida:
+            # 4. Cálculo de Crédito Ativo (Empréstimos na rua)
+            total_credito_ativo = db.query(func.sum(SolicitacaoEmprestimo.valor)).filter(
+                SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+            ).scalar() or Decimal("0.00")
+
+            # 5. Reconciliação Híbrida:
             # Se o saldo atual é maior que (Aportes - Resgates), a diferença é lucro histórico (antes dos logs detalhados)
             capital_liquido_investido = total_aportado_pool - total_resgatado_pool
             lucro_reconciliado = max(Decimal("0.00"), usuario.saldo_caixa - capital_liquido_investido)
             
             # Usamos o maior entre a reconciliação e a soma dos logs (para evitar duplicidade ou perdas)
             juros_acumulados_pool = max(lucro_reconciliado, juros_via_logs)
+            
+            # Aportes Institucionais Mensais (Separados das Receitas Orgânicas)
+            aportes_mes = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo == TipoTransacao.APORTE_CAPITAL,
+                Transacao.status == "concluido",
+                Transacao.data_criacao >= primeiro_dia_mes
+            ).scalar() or Decimal("0.00")
 
             snapshot["admin"] = {
                 "pendentes": pendentes_list,
@@ -276,22 +361,40 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_pool_caixa": float(saldo_pool_caixa),
                     "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                     "lucro_acumulado_pool": float(juros_acumulados_pool),
+                    "total_credito_ativo": float(total_credito_ativo),
                     "detalhamento_lucro": {
-                        "taxas_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
+                        "taxa_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
                         "desbloqueio_dados": float(detalhamento_mes.get('desbloqueio_dados', 0)),
                         "kyc_score": float(detalhamento_mes.get('compra_score', 0)),
                         "taxas_saque": float(detalhamento_mes.get('taxa_saque', 0)),
                         "taxa_intermediacao": float(detalhamento_mes.get('taxa_intermediacao', 0)),
                         "taxa_especie": float(detalhamento_mes.get('taxa_especie', 0)),
-                        "aportes_externos": float(detalhamento_mes.get('aporte_capital', 0)),
+                        "taxa_adm_emprestimo": float(detalhamento_mes.get('taxa_adm_emprestimo', 0)),
+                        "aportes_externos": float(aportes_mes),
                         "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0))
                     },
                     "historico_mensal": historico_mes
                 },
                 "emprestimos_para_liberar": [],
-                "solicitacoes_ativas": []
+                "solicitacoes_ativas": [],
+                "gestao_usuarios": [],
+                "gestao_parceiros": []
             }
-
+            
+            # 5. Adicionar lista resumida de usuários para gestão rápida no novo painel
+            from utils_emprestimo import obter_multiplicador_fidelidade
+            usuarios_query = db.query(Usuario).filter(Usuario.id != "000PL").limit(100).all()
+            for u in usuarios_query:
+                snapshot["admin"]["gestao_usuarios"].append({
+                    "id": u.id,
+                    "nome": u.nome,
+                    "cpf": u.cpf,
+                    "saldo": float(u.saldo),
+                    "saldo_caixa": float(u.saldo_caixa),
+                    "score": float(u.score),
+                    "is_verified": u.is_verified,
+                    "is_good_payer": float(obter_multiplicador_fidelidade(u.id, db)) > 1.0
+                })
             # 6. Todas as Solicitações Ativas (Para investimento institucional)
             solicitacoes_ativas = db.query(SolicitacaoEmprestimo).filter(
                 SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
@@ -304,13 +407,24 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "valor": float(sa.valor),
                     "valor_arrecadado": float(sa.valor_arrecadado),
                     "score": float(sa.usuario.score),
-                    "taxa": float(sa.taxa_juros),
-                    "parcelas": sa.prazo_meses,
-                    "sugestao_pool": float(sa.sugestao_pool or 0),
-                    "saldo_caixa_tomador": float(sa.usuario.saldo_caixa or 0)
+                    "taxa": float(sa.taxa_mensal)
                 })
 
-            # 6. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)
+            # 7. Gestão de Parceiros
+            from modelos.modelos_db import Parceiro
+            parceiros_query = db.query(Parceiro).all()
+            for p in parceiros_query:
+                snapshot["admin"]["gestao_parceiros"].append({
+                    "id": p.id,
+                    "nome": p.nome,
+                    "endereco": p.endereco,
+                    "is_active": p.is_active,
+                    "caixa_aberto": p.caixa_aberto,
+                    "saldo_atual": float(p.saldo_caixa_atual),
+                    "comissao": float(p.comissoes_acumuladas)
+                })
+
+            # 8. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)
             stuck_loans = db.query(SolicitacaoEmprestimo).filter(
                 SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
                 SolicitacaoEmprestimo.valor_arrecadado >= SolicitacaoEmprestimo.valor

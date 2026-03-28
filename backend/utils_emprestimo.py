@@ -101,3 +101,29 @@ def processar_expiracoes_interna(db: Session):
         db.commit()
         
     return total_canceladas
+
+def obter_multiplicador_fidelidade(usuario_id: str, db: Session) -> Decimal:
+    """
+    Retorna o multiplicador de lucro baseados no histórico de crédito.
+    Regra: 
+    - 1.5x (Bônus 50%) se tiver empréstimo ativo/pago e estiver rigorosamente em dia.
+    - 1.0x caso contrário.
+    """
+    agora = datetime.datetime.utcnow()
+    
+    # Verifica todos os empréstimos do usuário
+    vincuo_credito = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.usuario_id == usuario_id,
+        SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO])
+    ).all()
+
+    if not vincuo_credito:
+        return Decimal("1.0")
+
+    tem_pagamento = any(s.parcelas_pagas > 0 or s.status == StatusSolicitacao.CONCLUIDO for s in vincuo_credito)
+    tem_atraso = any(s.status == StatusSolicitacao.APROVADO and s.proximo_vencimento < agora for s in vincuo_credito)
+
+    if tem_pagamento and not tem_atraso:
+        return Decimal("1.5")
+    
+    return Decimal("1.0")

@@ -818,17 +818,22 @@ async def sacar_lucro_plataforma(
         raise HTTPException(status_code=400, detail="Valor inválido para o saque.")
 
     # Calcula o lucro total disponível (histórico de taxas)
+    # IMPORTANTE: APORTE_CAPITAL não entra aqui, pois agora vai para o Pool, não para o caixa livre.
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.TAXA_ESPECIE, TipoTransacao.APORTE_CAPITAL, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO]),
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.TAXA_ESPECIE, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO, TipoTransacao.TAXA_ADM_EMPRESTIMO]),
         Transacao.status == "concluido"
     ).all()
     lucro_disponivel = sum(t.valor for t in todas_receitas)
 
     # Subtrai saques anteriores do admin
+    from sqlalchemy import or_
     saques_anteriores = db.query(Transacao).filter(
         Transacao.tipo == TipoTransacao.SAQUE,
-        Transacao.detalhes.like("Saque de lucro da plataforma%"),
-        Transacao.status == "concluido"
+        Transacao.status == "concluido",
+        or_(
+            Transacao.detalhes.like("Saque de lucro da plataforma%"),
+            Transacao.detalhes.like("RESGATE DE LUCRO%")
+        )
     ).all()
     total_sacado = sum(t.valor for t in saques_anteriores)
 
@@ -896,17 +901,20 @@ async def aportar_lucro_plataforma(
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
 
-    plataforma.saldo += dados.valor
+    # NOVO COMPORTAMENTO: Aportes Institucionais vão direto para o Fundo Coletivo (Pool)
+    plataforma.saldo_caixa += dados.valor
+    
     transacao = Transacao(
         usuario_id=plataforma.id,
         valor=dados.valor,
         tipo=TipoTransacao.APORTE_CAPITAL,
         status="concluido",
-        detalhes=f"APORTE EXTERNO (INJETADO POR ADMIN {admin.id}) → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
+        detalhes=f"APORTE INSTITUCIONAL DIRETO NO POOL (ADMIN: {admin.id}) → ORIGEM: {dados.chave_pix} | MOTIVO: {dados.motivo}"
     )
     db.add(transacao)
-    registrar_acao_admin(db, admin.id, "APORTAR_LUCRO_SISTEMA", alvo_id=plataforma.id, detalhes=f"Valor: {dados.valor}, Motivo: {dados.motivo}", ip=request.client.host)
+    registrar_acao_admin(db, admin.id, "APORTAR_CAPITAL_POOL", alvo_id=plataforma.id, detalhes=f"Valor: {dados.valor}, Motivo: {dados.motivo}", ip=request.client.host)
     db.commit()
+    return {"message": "Aporte no Pool realizado com sucesso!"}
 
 @router.post("/admin/reinvestir-lucro-pool")
 async def reinvestir_lucro_pool(

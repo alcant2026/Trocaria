@@ -43,7 +43,10 @@ import {
     Zap,
     Rocket,
     MapPin,
-    Lock
+    Lock,
+    Star,
+    Plus,
+    Flag
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
@@ -101,14 +104,19 @@ const TIPOS_LABEL = {
     pagamento_parcela: 'Pagamento de Parcela',
     taxa_postagem: 'Taxa de Postagem',
     comissao_parceiro: 'Comissão Recebida',
+    aporte_caixa: 'Aporte Caixa',
+    resgate_caixa: 'Resgate Caixa',
+    bonus_pagador_caixa: 'Bônus de Fidelidade',
+    retorno_pool: 'Retorno Fundo Coletivo',
+    retorno_investimento: 'Retorno de Investimento',
 };
 
 // Tipos que são saídas do tipo "taxa/pagamento"
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela']);
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa']);
 // Tipos que são entradas (positivos)
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'resgate_caixa', 'bonus_pagador_caixa', 'retorno_pool', 'retorno_investimento']);
 // Todos os tipos negativos (sem badge CONCLUIDO)
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -118,11 +126,19 @@ const formatarTipo = (tipo, detalhes) => {
     return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
 };
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
-const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' || tipo === 'aporte_caixa' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+
+// Timer regressivo para cards do marketplace
+const MarketTimer = ({ expiresAt }) => {
+    const tempo = useCountdown(expiresAt);
+    if (!tempo || tempo === 'Expirado') return <span className="market-timer market-timer--expired">Expirado</span>;
+    return <span className="market-timer">{tempo}</span>;
+};
 
 
 const DashboardCliente = ({ initialView = 'home' }) => {
     const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
+    const [snapshot, setSnapshot] = useState({});
     const [meusEmprestimos, setMeusEmprestimos] = useState([]);
     const [activeView, setActiveView] = useState(initialView); // 'home', 'solicitar', 'depositar', 'saque', 'score', 'loja'
     const [verSaldo, setVerSaldo] = useState(true);
@@ -168,9 +184,31 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [passoSaque, setPassoSaque] = useState(1);
     const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
-    const [tipoUpgrade, setTipoUpgrade] = useState(null); // 'score' ou 'verificacao'
     const [limiteInfo, setLimiteInfo] = useState({ limite_total: 0, limite_disponivel: 0, isento_taxa: false });
     const [mensagem, setMensagem] = useState(null);
+
+    // Estados do Marketplace
+    const [showPostarLink, setShowPostarLink] = useState(false);
+    const [loadingPostagem, setLoadingPostagem] = useState(false);
+    const [dadosNovoLink, setDadosNovoLink] = useState({ 
+        nome_produto: '', 
+        url_afiliado: '', 
+        url_imagem: '', 
+        valor: '',
+        vendas_texto: '',
+        codigo_2fa: ''
+    });
+    const [showBoostModal, setShowBoostModal] = useState(false);
+    const [boostTarget, setBoostTarget] = useState(null);
+    const [meusLinks, setMeusLinks] = useState([]);
+    const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
+    const [marketplaceLinks, setMarketplaceLinks] = useState([]);
+    const [marketplaceTab, setMarketplaceTab] = useState('explorar'); // 'explorar' ou 'meus'
+    const [pageExplorar, setPageExplorar] = useState(1);
+    const [hasMoreExplorar, setHasMoreExplorar] = useState(false);
+    const [pageMeusLinks, setPageMeusLinks] = useState(1);
+    const [hasMoreMeusLinks, setHasMoreMeusLinks] = useState(false);
+    const [loadingMarket, setLoadingMarket] = useState(false);
 
     useEffect(() => {
         if (mensagem) {
@@ -193,6 +231,72 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setMostrarAlertaRejeicaoState(false);
     };
 
+    const handleSmartPaste = (texto) => {
+        if (!texto) return;
+        
+        const novosDados = { ...dadosNovoLink };
+        
+        // 1. Extrair Preço (R$ 00,00)
+        const priceMatch = texto.match(/R\$\s*(\d+([,.]\d+)?)/i);
+        if (priceMatch) {
+            novosDados.valor = priceMatch[1].replace(',', '.');
+        }
+        
+        // 2. Extrair Vendas (ex: 8mil+ vendas)
+        const salesMatch = texto.match(/(\d+[\w\+\-\.\s]*vendas)/i);
+        if (salesMatch) {
+            novosDados.vendas_texto = salesMatch[1].trim();
+        }
+        
+        // 4. Extrair Nome (primeiras linhas que não sejam preço/links)
+        const lines = texto.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+        if (lines.length > 0 && !lines[0].toLowerCase().includes('http')) {
+            // Se a primeira linha for muito curta ou preço, ignoramos
+            if (!lines[0].match(/R\$/i) && !lines[0].match(/^\d+/) && lines[0].length > 10) {
+                novosDados.nome_produto = lines[0].substring(0, 150);
+            }
+        }
+        
+        setDadosNovoLink(novosDados);
+    };
+
+    const handleDenunciar = async (link) => {
+        if (!confirm(`Deseja denunciar o anúncio "${link.nome_produto}" por conteúdo impróprio ou enganoso?`)) return;
+        
+        try {
+            await api.post('/comunidade/denunciar-link', { link_id: link.id });
+            showModal({ 
+                title: 'Denúncia Enviada', 
+                message: 'Obrigado por sua denúncia. Nossa equipe irá analisar o conteúdo.', 
+                type: 'success' 
+            });
+            // Remover localmente para o usuário não ver mais
+            setMarketplaceLinks(prev => prev.filter(l => l.id !== link.id));
+        } catch (err) {
+            showModal({ 
+                title: 'Erro', 
+                message: err.response?.data?.detail || 'Não foi possível enviar a denúncia.', 
+                type: 'danger' 
+            });
+        }
+    };
+
+    const handleAvaliar = async (linkId, nota) => {
+        try {
+            const res = await api.post('/comunidade/avaliar-link', { link_id: linkId, nota });
+            // Atualizar localmente a nota e o total no feed
+            setMarketplaceLinks(prev => prev.map(l => {
+                if (l.id === linkId) {
+                    return { ...l, nota: res.data.nova_media, total_avaliacoes: res.data.total_avaliacoes };
+                }
+                return l;
+            }));
+            // Feedback silencioso ou pequeno toast seria bom, mas opcional
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Erro ao avaliar');
+        }
+    };
+
     const handleCopiarId = () => {
         navigator.clipboard.writeText(usuario.id);
         setCopiadoId(true);
@@ -207,25 +311,71 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const carregarSnapshot = async () => {
         try {
             const res = await api.get('/snapshot');
-            if (res.perfil) {
-                setUsuario(res.perfil);
-                localStorage.setItem('usuario', JSON.stringify(res.perfil));
+            const data = res.data || res; // Suporte para diferentes formatos de resposta do api.js
+            setSnapshot(data);
+            
+            if (data.perfil) {
+                setUsuario(data.perfil);
+                localStorage.setItem('usuario', JSON.stringify(data.perfil));
             }
-            if (res.cliente_emprestimos) {
-                setMeusEmprestimos(res.cliente_emprestimos || []);
-                // O limite agora vem calculado do backend baseado no Pool + Score
-                const resLimite = await api.get('/emprestimos/limite');
-                setLimiteInfo(resLimite);
+            if (data.cliente_emprestimos) {
+                setMeusEmprestimos(data.cliente_emprestimos || []);
             }
-            if (res.historico) {
-                setHistorico(res.historico);
+            // O limite agora vem calculado do backend baseado no Pool + Score
+            api.get('/emprestimos/limite').then(setLimiteInfo).catch(console.error);
+            
+            if (data.historico) {
+                setHistorico(data.historico);
             }
             
             // Carregar parceiros
-            const resParceiros = await api.get('/financeiro/admin/parceiros');
-            setParceiros(resParceiros || []);
+            api.get('/financeiro/admin/parceiros').then(resP => setParceiros(resP || [])).catch(console.error);
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
+        }
+    };
+
+    const carregarMeusLinksMarketplace = async (reset = false) => {
+        const page = reset ? 1 : pageMeusLinks;
+        setLoadingMarket(true);
+        try {
+            const resp = await api.get(`/comunidade/meus-links?page=${page}&limit=12`);
+            const novosLinks = resp.links || [];
+            if (reset) {
+                setMeusLinksMarketplace(novosLinks);
+                setMeusLinks(novosLinks);
+                setPageMeusLinks(2);
+            } else {
+                setMeusLinksMarketplace(prev => [...prev, ...novosLinks]);
+                setMeusLinks(prev => [...prev, ...novosLinks]);
+                setPageMeusLinks(prev => prev + 1);
+            }
+            setHasMoreMeusLinks(resp.has_more || false);
+        } catch (err) {
+            console.error('Erro ao carregar meus links:', err);
+        } finally {
+            setLoadingMarket(false);
+        }
+    };
+
+    const carregarExplorar = async (reset = false) => {
+        const page = reset ? 1 : pageExplorar;
+        setLoadingMarket(true);
+        try {
+            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12`);
+            const novosLinks = resp.links || [];
+            if (reset) {
+                setMarketplaceLinks(novosLinks);
+                setPageExplorar(2);
+            } else {
+                setMarketplaceLinks(prev => [...prev, ...novosLinks]);
+                setPageExplorar(prev => prev + 1);
+            }
+            setHasMoreExplorar(resp.has_more || false);
+        } catch (err) {
+            console.error('Erro ao carregar feed explorar:', err);
+        } finally {
+            setLoadingMarket(false);
         }
     };
 
@@ -248,6 +398,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
     useEffect(() => {
         carregarSnapshot();
+        if (activeView === 'marketplace') {
+            carregarMeusLinksMarketplace(true);
+            carregarExplorar(true);
+        }
     }, [activeView]);
 
     const handleSolicitar = async (e) => {
@@ -593,55 +747,68 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 </div>
             )}
 
-            {/* Action Mosaic / Grid - Only visible in 'home' view */}
+            {/* Action Mosaic / Grid - Home View Content */}
             {activeView === 'home' && (
-                <div className="action-grid animate-fade-in">
-                    <div 
-                        className="action-btn" 
-                        onClick={() => setActiveView('pool')} 
-                        style={{ 
-                            borderColor: 'var(--primary)', 
-                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15) 0%, rgba(var(--primary-rgb), 0.05) 100%)',
-                            boxShadow: '0 4px 15px rgba(var(--primary-rgb), 0.1)' 
-                        }}
-                    >
-                        <Coins size={32} color="var(--primary)" />
-                        <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Fundo Coletivo</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('solicitar')}>
-                        <PlusCircle size={28} color="var(--primary)" />
-                        <span>Solicitar</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('depositar')}>
-                        <ArrowUpCircle size={28} />
-                        <span>Depositar</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('saque')}>
-                        <ArrowDownCircle size={28} />
-                        <span>Sacar</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('historico')}>
-                        <History size={28} />
-                        <span>Histórico</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('contratos')}>
-                        <LayoutDashboard size={28} />
-                        <span>Contratos</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('score')}>
-                        <ShieldCheck size={28} />
-                        <span>Upgrade</span>
-                    </div>
-                    <div className="action-btn" onClick={() => setActiveView('loja')}>
-                        <ShoppingBag size={28} color="var(--primary)" />
-                        <span>Loja</span>
-                    </div>
-                    {usuario.is_parceiro && (
-                        <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-                            <Store size={28} color="var(--warning)" />
-                            <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+                <div className="animate-fade-in">
+                    {/* Alerta de Rejeição Recente */}
+                    {mostrarAlertaRejeicao && historico.some(h => h.status === 'falhou') && (
+                        <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', position: 'relative' }}>
+                            <button
+                                onClick={fecharAlertaRejeicao}
+                                style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7 }}
+                            >
+                                ✕
+                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <AlertCircle size={20} />
+                                <strong style={{ fontSize: '0.9rem' }}>Atenção: Você tem solicitações rejeitadas</strong>
+                            </div>
+                            <p style={{ margin: '8px 0 0 28px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                                Verifique o motivo no histórico abaixo ou no detalhe da atividade.
+                            </p>
                         </div>
                     )}
+
+                    <div className="action-grid animate-fade-in">
+                        <div className="action-btn" onClick={() => setActiveView('pool')} style={{ borderColor: 'var(--primary)', background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15) 0%, rgba(var(--primary-rgb), 0.05) 100%)', boxShadow: '0 4px 15px rgba(var(--primary-rgb), 0.1)' }}>
+                            <Coins size={32} color="var(--primary)" />
+                            <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Fundo Coletivo</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('solicitar')}>
+                            <PlusCircle size={28} color="var(--primary)" />
+                            <span>Solicitar</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('depositar')}>
+                            <ArrowUpCircle size={28} />
+                            <span>Depositar</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('saque')}>
+                            <ArrowDownCircle size={28} />
+                            <span>Sacar</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('historico')}>
+                            <History size={28} />
+                            <span>Histórico</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('contratos')}>
+                            <LayoutDashboard size={28} />
+                            <span>Contratos</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('score')}>
+                            <ShieldCheck size={28} />
+                            <span>Upgrade</span>
+                        </div>
+                        <div className="action-btn" onClick={() => { setActiveView('marketplace'); carregarMeusLinksMarketplace(); }}>
+                            <ShoppingBag size={28} color="var(--primary)" />
+                            <span>Marketplace</span>
+                        </div>
+                        {usuario.is_parceiro && (
+                            <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
+                                <Store size={28} color="var(--warning)" />
+                                <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -808,7 +975,17 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <span className="text-muted">Seu capital no Pool:</span>
                             <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>R$ {(usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '8px' }}>
+                        {usuario.rendimento_pool_pct >= 0 ? (
+                            <div className="flex-between mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                                    +{usuario.rendimento_pool_pct.toFixed(2)}% <span className="text-muted" style={{ fontWeight: 'normal' }}>de Rendimento</span>
+                                </span>
+                                <span className="text-muted text-xs">
+                                    (+ R$ {(usuario.rendimento_pool_abs || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                </span>
+                            </div>
+                        ) : null}
+                        <p style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '8px' }}>
                             Rendimentos automáticos e pro-rata aplicados em tempo real sobre os juros de crédito.
                         </p>
                     </div>
@@ -1461,30 +1638,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 )
             }
 
-            {
-                activeView === 'home' && (
-                    <>
-                        {/* Alerta de Rejeição Recente */}
-                        {mostrarAlertaRejeicao && historico.some(h => h.status === 'falhou') && (
-                            <div className="alert alert-danger mb-1" style={{ maxWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', position: 'relative' }}>
-                                <button
-                                    onClick={fecharAlertaRejeicao}
-                                    style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7 }}
-                                >
-                                    ✕
-                                </button>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <AlertCircle size={20} />
-                                    <strong style={{ fontSize: '0.9rem' }}>Atenção: Você tem solicitações rejeitadas</strong>
-                                </div>
-                                <p style={{ margin: '8px 0 0 28px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
-                                    Verifique o motivo no histórico abaixo ou no detalhe da atividade.
-                                </p>
-                            </div>
-                        )}
-                    </>
-                )
-            }
 
             {
                 activeView === 'historico' && (
@@ -1823,19 +1976,291 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 })()}
                             </>
                         )}
-                        
-                        {/* NOVO MENU DO CAIXA DO LOJISTA */}
-                        {activeView === 'caixa_parceiro' && usuario?.is_parceiro && (
-                            <CaixaParceiro 
-                                onUpdate={carregarSnapshot}
-                                usuario={usuario}
-                            />
-                        )}
-                        {/* Removido botão redundante global */}
+                        {/* Removido botão redundante no rodapé */}
                     </div>
                 )
             }
-            {/* Modal Premium Unificado */}
+
+            {/* MENU DO CAIXA DO LOJISTA */}
+            {activeView === 'caixa_parceiro' && usuario?.is_parceiro && (
+                <CaixaParceiro 
+                    onUpdate={carregarSnapshot}
+                    usuario={usuario}
+                />
+            )}
+
+            {/* --- VIEW: MARKETPLACE (COMUNIDADE) --- */}
+            {activeView === 'marketplace' && (
+                <div className="marketplace-container animate-fade-in">
+                    <div className="marketplace-header mb-1">
+                        <div className="marketplace-tabs">
+                            <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
+                            <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anúncios</button>
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px' }}>
+                            <Plus size={16} /> Novo Anúncio
+                        </button>
+                    </div>
+
+                    {marketplaceTab === 'explorar' ? (
+                        marketplaceLinks.length > 0 ? (
+                            <>
+                                <div className="marketplace-grid">
+                                    {marketplaceLinks.map(l => (
+                                        <div key={l.id} className={`market-card ${l.patrocinado ? 'market-card--boosted' : 'market-card--free'}`}>
+                                            <div className="market-img-wrapper">
+                                                <img src={l.url_imagem} alt={l.nome_produto} loading="lazy" />
+                                                {l.patrocinado ? (
+                                                    <div className="market-badge market-badge--gold"><Zap size={10} /> DESTAQUE</div>
+                                                ) : (
+                                                    <div className="market-badge market-badge--free"><Clock size={10} /> 24H</div>
+                                                )}
+                                                <button 
+                                                    className="market-report-btn" 
+                                                    title="Denunciar" 
+                                                    onClick={(e) => { 
+                                                        e.preventDefault(); 
+                                                        e.stopPropagation(); 
+                                                        handleDenunciar(l); 
+                                                    }}
+                                                >
+                                                    <Flag size={12} />
+                                                </button>
+                                                {l.valor > 0 && <div className="market-price-tag">R$ {l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>}
+                                            </div>
+                                            <div className="market-info">
+                                                <h3 className="market-title">{l.nome_produto}</h3>
+                                                <div className="market-meta">
+                                                    <span className="market-author">por {l.anunciante}</span>
+                                                    <span className="market-views"><Eye size={11} /> {l.views_totais || 0}</span>
+                                                </div>
+                                                <div className="market-rating-row">
+                                                    <div className="market-stars">
+                                                        {[1, 2, 3, 4, 5].map((s) => {
+                                                            const isDono = l.usuario_id === usuario?.id;
+                                                            return (
+                                                                <Star 
+                                                                    key={s} 
+                                                                    size={10} 
+                                                                    className={isDono ? "" : "star-item-mini"} 
+                                                                    fill={s <= (l.nota || 0) ? "var(--warning)" : "transparent"} 
+                                                                    color={s <= (l.nota || 0) ? "var(--warning)" : "var(--text-muted)"} 
+                                                                    style={{ opacity: s <= (l.nota || 0) ? 1 : 0.4, cursor: isDono ? 'default' : 'pointer' }} 
+                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!isDono) handleAvaliar(l.id, s); }} 
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <span className="market-sales-count">{l.nota ? Number(l.nota).toFixed(1) : '0.0'} ({l.total_avaliacoes || 0})</span>
+                                                </div>
+                                                {!l.patrocinado && l.expires_at && <div className="market-timer-row"><Timer size={11} /><MarketTimer expiresAt={l.expires_at} /></div>}
+                                                <a href={l.url_afiliado} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm market-cta" onClick={() => { api.post('/comunidade/registrar-view', { link_id: l.id }).catch(() => {}); }}>Ver Produto</a>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {hasMoreExplorar && (
+                                    <div className="market-load-more">
+                                        <button className="btn btn-secondary btn-sm" onClick={() => carregarExplorar()} disabled={loadingMarket}>
+                                            {loadingMarket ? <RefreshCw className="animate-spin" size={14} /> : 'Carregar Mais Produtos'}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="market-empty">
+                                <ShoppingBag size={48} />
+                                <p>Nenhum produto em destaque no momento.</p>
+                                <button className="btn btn-link" onClick={() => setShowPostarLink(true)}>Seja o primeiro a anunciar!</button>
+                            </div>
+                        )
+                    ) : (
+                        meusLinksMarketplace.length > 0 ? (
+                            <>
+                                <div className="marketplace-grid">
+                                    {meusLinksMarketplace.map(l => {
+                                        const expirado = l.expires_at && new Date(l.expires_at) < new Date();
+                                        const semViews = (l.views_restantes || 0) <= 0;
+                                        const inativo = !l.is_active || expirado || semViews;
+
+                                        return (
+                                            <div key={l.id} className={`market-card ${inativo ? 'market-card--inactive' : ''}`} style={{ borderColor: inativo ? 'rgba(255,61,0,0.2)' : 'rgba(var(--primary-rgb), 0.2)' }}>
+                                                <div className="market-img-wrapper">
+                                                    <img src={l.url_imagem} alt={l.nome_produto} style={{ opacity: inativo ? 0.4 : 1 }} />
+                                                    {l.is_boosted ? (
+                                                        <div className="market-badge market-badge--gold"><Zap size={10} /> PAGO</div>
+                                                    ) : (
+                                                        <div className="market-badge market-badge--free"><Clock size={10} /> GRÁTIS</div>
+                                                    )}
+                                                    {inativo && (
+                                                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 3 }}>
+                                                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '1px' }}>{semViews ? 'Sem Views' : 'Expirado'}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="market-info">
+                                                    <h4 className="market-title">{l.nome_produto}</h4>
+                                                    <div className="market-rating-row" style={{ marginTop: '-4px', marginBottom: '8px', justifyContent: 'center' }}>
+                                                        <div className="market-stars">
+                                                            {[1, 2, 3, 4, 5].map((star) => (
+                                                                <Star key={star} size={10} fill={star <= (l.nota || 0) ? "var(--warning)" : "transparent"} color={star <= (l.nota || 0) ? "var(--warning)" : "var(--text-muted)"} />
+                                                            ))}
+                                                        </div>
+                                                        {l.vendas_texto && <span className="market-sales-count">{l.vendas_texto}</span>}
+                                                    </div>
+                                                    <div className="market-stats-row">
+                                                        <div className="market-stat"><span className="market-stat-value">{l.views_restantes || 0}</span><span className="market-stat-label">RESTANTES</span></div>
+                                                        <div className="market-stat-divider"></div>
+                                                        <div className="market-stat"><span className="market-stat-value">{l.views_totais || 0}</span><span className="market-stat-label">CLIQUES</span></div>
+                                                        <div className="market-stat-divider"></div>
+                                                        <div className="market-stat"><span className="market-stat-value" style={{ color: expirado ? 'var(--danger)' : 'inherit' }}>{l.expires_at ? new Date(l.expires_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span><span className="market-stat-label">EXPIRA</span></div>
+                                                    </div>
+                                                    {inativo && l.is_boosted ? (
+                                                        <button className="btn btn-primary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '36px', fontSize: '0.75rem', marginTop: 'auto' }}><Rocket size={14} /> Reativar com Views</button>
+                                                    ) : !inativo ? (
+                                                        <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '36px', fontSize: '0.75rem', marginTop: 'auto' }}><Zap size={14} /> Turbinar Alcance</button>
+                                                    ) : (
+                                                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anúncio grátis encerrado</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {hasMoreMeusLinks && (
+                                    <div className="market-load-more">
+                                        <button className="btn btn-secondary btn-sm" onClick={() => carregarMeusLinksMarketplace()} disabled={loadingMarket}>
+                                            {loadingMarket ? <RefreshCw className="animate-spin" size={14} /> : 'Carregar Mais Meus Links'}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="market-empty">
+                                <PlusCircle size={48} />
+                                <p>Você ainda não tem anúncios.</p>
+                                <button className="btn btn-link" onClick={() => setShowPostarLink(true)}>Postar meu primeiro link</button>
+                            </div>
+                        )
+                    )}
+                </div>
+            )}
+
+            <ModalPremium
+                isOpen={showPostarLink}
+                onClose={() => { 
+                    setShowPostarLink(false); 
+                    setDadosNovoLink({ nome_produto: '', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' }); 
+                }}
+                title="Novo Anúncio Grátis"
+                type="info"
+            >
+                <div style={{ textAlign: 'left' }}>
+                    <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Anuncie grátis por 24h com 50 views. Preencha os dados ou use a colagem inteligente.</p>
+                    
+                    <div className="input-group mb-1">
+                        <label style={{ color: 'var(--primary)', fontWeight: 600 }}>✨ Colagem Inteligente (Smart Paste)</label>
+                        <textarea 
+                            className="smart-paste-area" 
+                            placeholder="Cole aqui a descrição completa do produto para auto-preenchimento..."
+                            onChange={(e) => handleSmartPaste(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="input-group mb-1">
+                        <label>Nome do Produto</label>
+                        <input className="input-field" value={dadosNovoLink.nome_produto} onChange={(e) => setDadosNovoLink({...dadosNovoLink, nome_produto: e.target.value})} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div className="input-group mb-1">
+                            <label>Valor (R$)</label>
+                            <input 
+                                type="number" 
+                                className="input-field" 
+                                placeholder="0,00"
+                                value={dadosNovoLink.valor} 
+                                onChange={(e) => setDadosNovoLink({...dadosNovoLink, valor: e.target.value})} 
+                            />
+                        </div>
+                        <div className="input-group mb-1">
+                            <label>Vendas (texto)</label>
+                            <input 
+                                className="input-field" 
+                                placeholder="Ex: 8mil+ vendas"
+                                value={dadosNovoLink.vendas_texto} 
+                                onChange={(e) => setDadosNovoLink({...dadosNovoLink, vendas_texto: e.target.value})} 
+                            />
+                        </div>
+                    </div>
+
+                    <div className="input-group mb-1">
+                        <label>URL Imagem</label>
+                        <input className="input-field" value={dadosNovoLink.url_imagem} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_imagem: e.target.value})} />
+                    </div>
+
+                    <div className="input-group mb-1">
+                        <label>Seu Link Afiliado/WhatsApp</label>
+                        <input className="input-field" value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
+                    </div>
+
+                    <div className="input-group mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.15)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: 700 }}>
+                            <Lock size={14} /> Código 2FA (Authenticator)
+                        </label>
+                        <input 
+                            className="input-field" 
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="000000"
+                            style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '8px', fontWeight: 800 }}
+                            value={dadosNovoLink.codigo_2fa || ''}
+                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, codigo_2fa: e.target.value.replace(/\D/g, '')})}
+                        />
+                    </div>
+
+                    <button className="btn btn-primary w-full mt-1" disabled={!dadosNovoLink.codigo_2fa || dadosNovoLink.codigo_2fa.length < 6} onClick={async () => {
+                        try {
+                            await api.post('/comunidade/postar-link', dadosNovoLink);
+                            setShowPostarLink(false);
+                            setDadosNovoLink({ nome_produto: '', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' });
+                            carregarMeusLinksMarketplace();
+                            showModal({ title: 'Sucesso!', message: 'Anúncio publicado com sucesso!', type: 'success' });
+                        } catch (err) { 
+                            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao postar', type: 'danger' }); 
+                        }
+                    }}>Publicar Agora</button>
+                </div>
+            </ModalPremium>
+
+            <ModalPremium
+                isOpen={showBoostModal}
+                onClose={() => setShowBoostModal(false)}
+                title="Turbinar Produto"
+                type="warning"
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {[
+                        { id: 1, v: 500, p: 5 },
+                        { id: 2, v: 1500, p: 12 },
+                        { id: 3, v: 5000, p: 35 }
+                    ].map(pkg => (
+                        <div key={pkg.id} className="card-minimal flex-between clickable" onClick={async () => {
+                            try {
+                                await api.post('/comunidade/comprar-views', { link_id: boostTarget.id, pacote_id: pkg.id });
+                                setShowBoostModal(false);
+                                carregarSnapshot();
+                                showModal({ title: 'Ativado!', message: pkg.v + ' views adicionadas.', type: 'success' });
+                            } catch (err) { alert('Erro ao turbinar'); }
+                        }}>
+                            <div><p className="font-bold">{pkg.v} Views</p></div>
+                            <span className="text-primary font-bold">R$ {pkg.p}</span>
+                        </div>
+                    ))}
+                </div>
+            </ModalPremium>
+
             <ModalPremium
                 isOpen={modalPremium.isOpen}
                 onClose={closeModal}
@@ -1846,7 +2271,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 confirmText={modalPremium.confirmText}
                 loading={loadingAction}
             />
-        </div >
+        </div>
     );
 };
 

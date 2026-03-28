@@ -30,6 +30,7 @@ class TipoTransacao(enum.Enum):
     BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
     RETORNO_POOL = "retorno_pool"
     COMISSAO_PARCEIRO = "comissao_parceiro"
+    TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
@@ -175,8 +176,22 @@ class LinkAfiliado(Base):
     nome_produto = Column(String(150), nullable=False)
     url_afiliado = Column(String(500), nullable=False)
     url_imagem = Column(String(500), nullable=True)
+    valor = Column(Numeric(10, 2), default=0.00)
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Novos campos para Marketplace
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+    is_boosted = Column(Boolean, default=False)
+    visualizacoes_restantes = Column(Integer, default=50) # Bônus inicial de 50 views
+    visualizacoes_totais = Column(Integer, default=0)
+    data_expiracao = Column(DateTime, default=lambda: datetime.datetime.utcnow() + datetime.timedelta(hours=24))
+    nota = Column(Numeric(2, 1), default=0.0)  # Rating 0.0 a 5.0 (média)
+    total_avaliacoes = Column(Integer, default=0)
+    vendas_texto = Column(String(50), nullable=True)  # Ex: "8mil+ vendas"
+    denuncias_count = Column(Integer, default=0)
+
+    usuario = relationship("Usuario")
 
 class AcaoAdmin(Base):
     __tablename__ = "acoes_admin"
@@ -190,3 +205,27 @@ class AcaoAdmin(Base):
     data_acao = Column(DateTime, default=datetime.datetime.utcnow)
 
     admin = relationship("Usuario")
+
+class DenunciaLink(Base):
+    __tablename__ = "denuncias_links"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
+    motivo = Column(String(200), nullable=True)
+    data_denuncia = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    link = relationship("LinkAfiliado")
+    usuario = relationship("Usuario")
+
+class AvaliacaoLink(Base):
+    __tablename__ = "avaliacoes_links"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
+    nota = Column(Integer, nullable=False) # 1 a 5
+    data_avaliacao = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    link = relationship("LinkAfiliado")
+    usuario = relationship("Usuario")

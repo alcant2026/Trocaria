@@ -163,6 +163,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         confirmText: 'Confirmar'
     });
     const [loadingAction, setLoadingAction] = useState(false);
+    const [qrCodeData, setQrCodeData] = useState({ 
+        qr_code: '', 
+        qr_code_base64: '', 
+        payment_id: '',
+        expires_at: null 
+    });
+    const [timeLeft, setTimeLeft] = useState(null);
 
     const closeModal = () => setModalPremium(prev => ({ ...prev, isOpen: false }));
     const showModal = (config) => setModalPremium({ ...config, isOpen: true });
@@ -226,7 +233,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     }, [mensagem]);
 
     // Auto-Sync PIX Polling + Timer: Fecha o QR Code sozinho quando o pagamento cai ou expira
-    const [timeLeft, setTimeLeft] = useState(null);
 
     useEffect(() => {
         let interval;
@@ -566,13 +572,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         });
     };
 
-    const [qrCodeData, setQrCodeData] = useState({ 
-        qr_code: '', 
-        qr_code_base64: '', 
-        payment_id: '',
-        expires_at: null 
-    });
-    const [timeLeft, setTimeLeft] = useState(null);
 
     const handleGerarPix = async () => {
         const v = parseFloat(valorNotificacao);

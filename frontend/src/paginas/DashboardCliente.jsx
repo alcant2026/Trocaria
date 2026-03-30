@@ -887,6 +887,17 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <p style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {limiteInfo.limite_disponivel.toLocaleString('pt-BR')}</p>
                             </div>
                             
+                            {!usuario.is_verified && (
+                                <div className="info-block mb-1" style={{ background: 'rgba(255, 145, 0, 0.08)', border: '1px solid rgba(255, 145, 0, 0.2)', padding: '10px', borderRadius: '12px' }}>
+                                    <p style={{ color: 'var(--warning)', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                                        <ShieldAlert size={14} /> Conta Não Verificada
+                                    </p>
+                                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', marginTop: '4px', lineHeight: '1.3' }}>
+                                        Seu limite está restrito ao seu saldo em garantia. Para liberar o crédito base de R$ 20,00 e bônus de Score, faça o envio de documentos no menu <strong>Upgrade</strong>.
+                                    </p>
+                                </div>
+                            )}
+                            
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                                 <div className="input-group" style={{ width: '100%', maxWidth: '280px' }}>
                                     <label style={{ textAlign: 'center', display: 'block' }}>Valor do Apoio</label>

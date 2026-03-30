@@ -29,7 +29,12 @@ def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
     if saldo_pool <= Decimal("1.00"):
         return Decimal("0.00")
 
-    # Regra: Limite Base de R$ 20,00 se tiver saldo no Pool
+    # NOVO: Trava de Segurança KYC
+    # Se não for verificado, o limite é estritamente o que ele tem no Pool (Garantia 1:1)
+    if not usuario.is_verified:
+        return saldo_pool
+
+    # Regra: Limite Base de R$ 20,00 se tiver saldo no Pool (Apenas para VERIFICADOS)
     limite_base = Decimal("20.00")
 
     # Se o score for excelente (Ex: VIP), libera o multiplicador de 1.2x o capital

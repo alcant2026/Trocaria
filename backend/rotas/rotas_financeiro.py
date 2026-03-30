@@ -354,30 +354,54 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
 
 @router.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"status": "error", "message": "Payload inválido"}
+        
     action = payload.get("action")
     type_ = payload.get("type")
+    
+    logger.info(f"🔔 WEBHOOK MP: Action={action}, Type={type_}")
     
     if (action and "payment" in action) or type_ == "payment":
         payment_id = payload.get("data", {}).get("id")
         if not payment_id:
+            logger.warning("🔔 WEBHOOK MP: ID do pagamento não encontrado no payload.")
             return {"status": "ignored"}
             
         if not sdk: 
+            logger.error("🔔 WEBHOOK MP: SDK não configurado no .env")
             return {"status": "error", "message": "MP não configurado"}
             
+        logger.info(f"🔔 WEBHOOK MP: Buscando info do pagamento {payment_id}")
         payment_info = sdk.payment().get(payment_id)
         if payment_info.get("status") == 200:
             payment = payment_info.get("response", {})
             status_mp = payment.get("status")
+            status_detail = payment.get("status_detail")
+            valor_mp = Decimal(str(payment.get("transaction_amount")))
+            
+            logger.info(f"🔔 WEBHOOK MP: Pagamento {payment_id} está {status_mp} ({status_detail}) - Valor: {valor_mp}")
             
             if status_mp == "approved":
+                # Tenta achar a transação de 3 formas: ID exato, Valor/Método ou Valor/Última Pendente
                 transacao = db.query(Transacao).filter(Transacao.detalhes.like(f"%ID: {payment_id}%")).first()
+                
+                if not transacao:
+                    transacao = db.query(Transacao).filter(
+                        Transacao.valor == valor_mp,
+                        Transacao.status == "pendente",
+                        Transacao.metodo == "pix"
+                    ).order_by(Transacao.id.desc()).first()
+                
                 if transacao and transacao.status == "pendente":
                     usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
                     if usuario:
                         usuario.saldo += transacao.valor
                         transacao.status = "concluido"
+                        if f"ID: {payment_id}" not in transacao.detalhes:
+                            transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
                         
                         fee_details = payment.get("fee_details", [])
                         total_fee = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
@@ -389,8 +413,15 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         
                         atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
                         db.commit()
+                        logger.info(f"✅ WEBHOOK MP: Saldo de R$ {transacao.valor} creditado para {usuario.nome}")
                         cache_snapshot_data.pop(usuario.id, None)
                         cache_snapshot_data.pop("000PL", None)
+                    else:
+                        logger.error(f"❌ WEBHOOK MP: Usuário {transacao.usuario_id} não encontrado no DB.")
+                elif transacao and transacao.status == "concluido":
+                    logger.info(f"ℹ️ WEBHOOK MP: Pagamento {payment_id} já foi processado anteriormente.")
+                else:
+                    logger.warning(f"⚠️ WEBHOOK MP: Nenhuma transação pendente encontrada para o pagamento {payment_id}")
                     
     return {"status": "success"}
 
@@ -400,15 +431,20 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
     Rota de emergência para o administrador forçar a sincronização de um Pix 
     caso o Webhook tenha falhado ou não esteja configurado.
     """
+    logger.info(f"🛠️ SYNC MANUAL: Iniciando para ID {payment_id} por {admin.nome}")
     if not sdk:
         raise HTTPException(status_code=500, detail="SDK Mercado Pago não configurado.")
 
     payment_info = sdk.payment().get(payment_id)
     if payment_info.get("status") != 200:
+        logger.error(f"❌ SYNC MANUAL: Pagamento {payment_id} não encontrado no MP API.")
         raise HTTPException(status_code=404, detail="Pagamento não encontrado no Mercado Pago.")
 
     payment = payment_info.get("response", {})
     status_mp = payment.get("status")
+    valor_mp = Decimal(str(payment.get("transaction_amount")))
+
+    logger.info(f"🛠️ SYNC MANUAL: Status no MP é {status_mp}")
 
     if status_mp != "approved":
         return {"status": "error", "message": f"O pagamento ainda está com status: {status_mp}"}
@@ -417,8 +453,7 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
     transacao = db.query(Transacao).filter(Transacao.detalhes.like(f"%ID: {payment_id}%")).first()
     
     if not transacao:
-         # Se não achou a transação pelo ID exato, tenta achar a última pendente de Pix (segurança secundária)
-         valor_mp = Decimal(str(payment.get("transaction_amount")))
+         logger.info(f"🛠️ SYNC MANUAL: Buscando transação genérica de Pix no valor de R$ {valor_mp}")
          transacao = db.query(Transacao).filter(
              Transacao.valor == valor_mp, 
              Transacao.status == "pendente", 
@@ -426,9 +461,11 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
          ).order_by(Transacao.id.desc()).first()
 
     if not transacao:
+        logger.error(f"❌ SYNC MANUAL: Nenhuma transação pendente compatível encontrada para o valor {valor_mp}")
         raise HTTPException(status_code=404, detail="Não encontramos transação pendente compatível no banco.")
 
     if transacao.status == "concluido":
+        logger.info(f"🛠️ SYNC MANUAL: Transação {transacao.id} já estava concluída.")
         return {"status": "success", "message": "Este pagamento já foi creditado."}
 
     # Credita o saldo ao usuário
@@ -443,12 +480,67 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
         atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
         db.commit()
         
+        logger.info(f"✅ SYNC MANUAL: R$ {transacao.valor} creditados para {usuario.nome} com sucesso!")
         from rotas.rotas_snapshot import cache_snapshot_data
         cache_snapshot_data.pop(usuario.id, None)
         
         return {"status": "success", "message": f"R$ {transacao.valor} creditado para {usuario.nome}!"}
 
     return {"status": "error", "message": "Usuário não encontrado."}
+
+@router.get("/meu-pix/sync/{payment_id}")
+async def sincronizar_meu_pix(payment_id: str, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """
+    Permite que o próprio usuário solicite a conferência do seu Pix se o Webhook atrasar.
+    """
+    if not sdk:
+        raise HTTPException(status_code=500, detail="SDK Mercado Pago não configurado.")
+
+    payment_info = sdk.payment().get(payment_id)
+    if payment_info.get("status") != 200:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado no Mercado Pago.")
+
+    payment = payment_info.get("response", {})
+    status_mp = payment.get("status")
+    
+    if status_mp != "approved":
+        return {"status": "error", "message": f"O seu pagamento está com status: {status_mp}"}
+
+    # Busca a transação pendente do próprio usuário
+    transacao = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.detalhes.like(f"%ID: {payment_id}%")
+    ).first()
+    
+    if not transacao:
+         # Tenta pelo valor/método se não achar pelo ID no detalhe
+         valor_mp = Decimal(str(payment.get("transaction_amount")))
+         transacao = db.query(Transacao).filter(
+             Transacao.usuario_id == usuario.id,
+             Transacao.valor == valor_mp, 
+             Transacao.status == "pendente", 
+             Transacao.metodo == "pix"
+         ).order_by(Transacao.id.desc()).first()
+
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Não encontramos nenhuma solicitação de Pix pendente para este pagamento na sua conta.")
+
+    if transacao.status == "concluido":
+        return {"status": "success", "message": "Este pagamento já foi creditado no seu saldo!"}
+
+    # Credita o saldo
+    usuario_db = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
+    usuario_db.saldo += transacao.valor
+    transacao.status = "concluido"
+    if f"ID: {payment_id}" not in transacao.detalhes:
+        transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
+    transacao.detalhes += " | Sincronizado pelo Próprio Usuário"
+    
+    atualizar_score(db, usuario_db.id, transacao.valor, "DEPOSITO")
+    db.commit()
+    
+    cache_snapshot_data.pop(usuario_db.id, None)
+    return {"status": "success", "message": f"Sucesso! R$ {transacao.valor} foi adicionado ao seu saldo."}
 
 # --- Checkout Físico (Painel Parceiro) ---
 class ParceiroVerificarRequest(BaseModel):

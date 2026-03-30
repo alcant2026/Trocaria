@@ -508,6 +508,26 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
+
+    const handleSincronizarPix = async () => {
+        setLoadingAction(true);
+        try {
+            const res = await api.get(`/financeiro/meu-pix/sync/${qrCodeData.payment_id}`);
+            if (res.status === 'success') {
+                showModal({ title: 'Sucesso', message: res.message, type: 'success' });
+                setExibirModalDeposito(false);
+                setPassoDeposito(1);
+                carregarSnapshot();
+            } else {
+                showModal({ title: 'Atenção', message: res.message, type: 'warning' });
+            }
+        } catch (err) {
+            showModal({ title: 'Aguarde', message: 'Pagamento ainda não detectado. Tente novamente em 1 minuto.', type: 'info' });
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
     const handleNotificarDeposito = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
@@ -1207,6 +1227,16 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <div className="info-label">Valor a pagar</div>
                                             <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                                         </div>
+                                        
+                                        <button 
+                                            className="btn btn-primary" 
+                                            style={{ width: '100%', marginBottom: '10px' }}
+                                            onClick={handleSincronizarPix}
+                                            disabled={loadingAction}
+                                        >
+                                            {loadingAction ? 'Verificando...' : 'Já realizei o pagamento'}
+                                        </button>
+                                        
                                         <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>
                                             Assim que você pagar, o saldo atualizará automaticamente em até 10 segundos aqui na sua tela.
                                         </p>

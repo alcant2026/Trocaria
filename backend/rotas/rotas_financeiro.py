@@ -488,6 +488,41 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
 
     return {"status": "error", "message": "Usuário não encontrado."}
 
+@router.get("/meu-pix/sync/{payment_id}")
+async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Sincroniza um pagamento PIX específico do usuário logado para fechamento automático de QR Code."""
+    if not sdk:
+        raise HTTPException(status_code=500, detail="SDK Mercado Pago não configurado.")
+
+    payment_info = sdk.payment().get(payment_id)
+    if payment_info.get("status") != 200:
+        return {"status": "pending", "message": "Pagamento não encontrado ou ainda processando."}
+
+    payment = payment_info.get("response", {})
+    if payment.get("status") == "approved":
+        # Busca a transação pendente associada
+        transacao = db.query(Transacao).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.status == "pendente",
+            Transacao.detalhes.like(f"%ID: {payment_id}%")
+        ).first()
+
+        if transacao:
+            usuario_db = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
+            usuario_db.saldo += transacao.valor
+            transacao.status = "concluido"
+            transacao.detalhes += " | Sincronizado via Polling Automático"
+            
+            atualizar_score(db, usuario_db.id, transacao.valor, "DEPOSITO")
+            db.commit()
+            
+            from rotas.rotas_snapshot import cache_snapshot_data
+            cache_snapshot_data.pop(usuario.id, None)
+            
+            return {"status": "success", "message": "Pagamento aprovado e saldo creditado!"}
+    
+    return {"status": "pending", "message": "Pagamento ainda não aprovado."}
+
 @router.get("/meu-pix/sync-all")
 async def sincronizar_meus_pix_todos(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """

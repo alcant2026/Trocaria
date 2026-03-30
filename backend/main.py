@@ -110,14 +110,10 @@ async def startup_db_setup():
         
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
-# Incluir Rotas
-app.include_router(rotas_auth.router)
-app.include_router(rotas_emprestimo.router)
-app.include_router(rotas_score.router)
-app.include_router(rotas_financeiro.router)
-app.include_router(rotas_snapshot.router)
-app.include_router(rotas_parceiros_caixa.router)
-app.include_router(rotas_comunidade.router)
+# Incluir Rotas (Com e sem prefixo /api para evitar 404)
+for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade]:
+    app.include_router(router_module.router, prefix="/api")
+    app.include_router(router_module.router)
 
 @app.get("/p")
 def ping_curto():

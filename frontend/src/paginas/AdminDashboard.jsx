@@ -247,7 +247,7 @@ const AdminDashboard = () => {
 
                 <nav className="sidebar-nav">
                     <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-                        <LayoutDashboard size={20} /> <span>Dashboard</span>
+                        <LayoutDashboard size={20} /> <span>Fiscal Hub</span>
                     </div>
                     <div className={`nav-item ${activeTab === 'pendentes' ? 'active' : ''}`} onClick={() => setActiveTab('pendentes')}>
                         <ListTodo size={20} /> <span>Aprovações</span>
@@ -278,8 +278,8 @@ const AdminDashboard = () => {
             <main className="admin-main">
                 <header className="admin-header">
                     <div className="header-title">
-                        <h1>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
-                        <p className="text-muted">Gestão centralizada da economia Psy Pay.</p>
+                        <h1>{activeTab === 'dashboard' ? 'Fiscal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
+                        <p className="text-muted">Gestão estratégica e financeira da economia Psy Pay.</p>
                     </div>
                     
                     <div className="header-actions">
@@ -302,30 +302,44 @@ const AdminDashboard = () => {
                         <div className="stats-grid">
                             <StatCard 
                                 label="Custódia Total" 
-                                value={`R$ ${fiscal.saldo_usuarios_gerenciado?.toLocaleString('pt-BR')}`}
+                                value={`R$ ${fiscal.saldo_usuarios_gerenciado?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={Users}
                                 color="var(--primary)"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Lucro Acumulado" 
-                                value={`R$ ${fiscal.lucro_plataforma_historico?.toLocaleString('pt-BR')}`}
+                                label="Lucro Líquido Real" 
+                                value={`R$ ${fiscal.lucro_real_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={TrendingUp}
                                 color="var(--success)"
                                 trend={null}
                             />
                             <StatCard 
+                                label="Taxas Mercado Pago" 
+                                value={`R$ ${fiscal.total_taxas_mp?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                icon={CreditCard}
+                                color="#ff4d4d"
+                                trend={null}
+                            />
+                            <StatCard 
+                                label="Custos Infra (Mensal)" 
+                                value={`R$ ${fiscal.custos_infra_estimados?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                icon={Zap}
+                                color="var(--warning)"
+                                trend={null}
+                            />
+                            <StatCard 
                                 label="Liquidez do Pool" 
-                                value={`R$ ${fiscal.saldo_pool_caixa?.toLocaleString('pt-BR')}`}
+                                value={`R$ ${fiscal.saldo_pool_caixa?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={Banknote}
                                 color="var(--secondary)"
                                 trend={null}
                             />
                             <StatCard 
                                 label="Crédito Ativo" 
-                                value={`R$ ${fiscal.total_credito_ativo?.toLocaleString('pt-BR') || '0,00'}`}
+                                value={`R$ ${fiscal.total_credito_ativo?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`}
                                 icon={ShieldCheck}
-                                color="var(--warning)"
+                                color="#4da6ff"
                                 trend={null}
                             />
                         </div>

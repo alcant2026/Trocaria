@@ -488,59 +488,55 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
 
     return {"status": "error", "message": "Usuário não encontrado."}
 
-@router.get("/meu-pix/sync/{payment_id}")
-async def sincronizar_meu_pix(payment_id: str, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+@router.get("/meu-pix/sync-all")
+async def sincronizar_meus_pix_todos(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """
-    Permite que o próprio usuário solicite a conferência do seu Pix se o Webhook atrasar.
+    Busca TODAS as transações de Pix pendentes do usuário e tenta sincronizar com o Mercado Pago.
+    Isso serve como uma limpeza de 'limbo' para o usuário.
     """
     if not sdk:
         raise HTTPException(status_code=500, detail="SDK Mercado Pago não configurado.")
 
-    payment_info = sdk.payment().get(payment_id)
-    if payment_info.get("status") != 200:
-        raise HTTPException(status_code=404, detail="Pagamento não encontrado no Mercado Pago.")
-
-    payment = payment_info.get("response", {})
-    status_mp = payment.get("status")
-    
-    if status_mp != "approved":
-        return {"status": "error", "message": f"O seu pagamento está com status: {status_mp}"}
-
-    # Busca a transação pendente do próprio usuário
-    transacao = db.query(Transacao).filter(
+    transacoes_pendentes = db.query(Transacao).filter(
         Transacao.usuario_id == usuario.id,
-        Transacao.detalhes.like(f"%ID: {payment_id}%")
-    ).first()
-    
-    if not transacao:
-         # Tenta pelo valor/método se não achar pelo ID no detalhe
-         valor_mp = Decimal(str(payment.get("transaction_amount")))
-         transacao = db.query(Transacao).filter(
-             Transacao.usuario_id == usuario.id,
-             Transacao.valor == valor_mp, 
-             Transacao.status == "pendente", 
-             Transacao.metodo == "pix"
-         ).order_by(Transacao.id.desc()).first()
+        Transacao.status == "pendente",
+        Transacao.metodo == "pix"
+    ).all()
 
-    if not transacao:
-        raise HTTPException(status_code=404, detail="Não encontramos nenhuma solicitação de Pix pendente para este pagamento na sua conta.")
+    if not transacoes_pendentes:
+        return {"status": "success", "message": "Você não tem transações de Pix pendentes para sincronizar."}
 
-    if transacao.status == "concluido":
-        return {"status": "success", "message": "Este pagamento já foi creditado no seu saldo!"}
+    total_creditado = Decimal("0")
+    count = 0
 
-    # Credita o saldo
-    usuario_db = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
-    usuario_db.saldo += transacao.valor
-    transacao.status = "concluido"
-    if f"ID: {payment_id}" not in transacao.detalhes:
-        transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
-    transacao.detalhes += " | Sincronizado pelo Próprio Usuário"
-    
-    atualizar_score(db, usuario_db.id, transacao.valor, "DEPOSITO")
+    for transacao in transacoes_pendentes:
+        # Tenta extrair o payment_id dos detalhes
+        import re
+        match = re.search(r"ID: (\d+)", transacao.detalhes)
+        if match:
+            payment_id = match.group(1)
+            payment_info = sdk.payment().get(payment_id)
+            if payment_info.get("status") == 200:
+                payment = payment_info.get("response", {})
+                if payment.get("status") == "approved":
+                    # Credita o saldo
+                    usuario_db = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
+                    usuario_db.saldo += transacao.valor
+                    transacao.status = "concluido"
+                    transacao.detalhes += " | Sincronizado por Varredura Manual"
+                    
+                    atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+                    total_creditado += transacao.valor
+                    count += 1
+                    logger.info(f"✅ SYNC-ALL: R$ {transacao.valor} creditado para {usuario.nome} (ID MP: {payment_id})")
+
     db.commit()
+    if count > 0:
+        from rotas.rotas_snapshot import cache_snapshot_data
+        cache_snapshot_data.pop(usuario.id, None)
+        return {"status": "success", "message": f"Sucesso! Identificamos {count} pagamentos e R$ {total_creditado} foi adicionado ao seu saldo."}
     
-    cache_snapshot_data.pop(usuario_db.id, None)
-    return {"status": "success", "message": f"Sucesso! R$ {transacao.valor} foi adicionado ao seu saldo."}
+    return {"status": "error", "message": "Nenhum pagamento aprovado foi encontrado no Mercado Pago para as suas solicitações pendentes."}
 
 # --- Checkout Físico (Painel Parceiro) ---
 class ParceiroVerificarRequest(BaseModel):

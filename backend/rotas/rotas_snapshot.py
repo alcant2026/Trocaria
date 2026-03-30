@@ -284,6 +284,29 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # 4. Lucro Disponível (Cálculo Virtual para consistência com rotas_financeiro)
             lucro_disponivel_virtual = max(Decimal("0.00"), total_lucro_historico - total_sacado_admin - total_investido_institucional - total_comissoes_pendentes)
 
+            # 4.1 Cálculo de Taxas Operacionais (Mercado Pago absorvido)
+            import re
+            total_taxas_mp = Decimal("0.00")
+            # Buscar transações que mencionem taxa MP nos detalhes
+            trans_taxas = db.query(Transacao.detalhes).filter(
+                Transacao.detalhes.like("%Taxa MP Absorb:%"),
+                Transacao.status == "concluido"
+            ).all()
+            for t_det in trans_taxas:
+                if t_det.detalhes:
+                    match = re.search(r"Taxa MP Absorb: R\$ ([\d\.]+)", t_det.detalhes)
+                    if match:
+                        total_taxas_mp += Decimal(match.group(1))
+
+            # 4.2 Custos Fixos de Infraestrutura (Estimados)
+            # Render: ~R$ 35.00 (Plano Starter) | Neon: R$ 0.00 (Free Tier)
+            custo_render = Decimal("35.00")
+            custo_neon = Decimal("0.00")
+            total_infra = custo_render + custo_neon
+
+            # 4.3 Lucro Real Líquido (Abatendo taxas e infra)
+            lucro_real_liquido = max(Decimal("0.00"), lucro_disponivel_virtual - total_taxas_mp - total_infra)
+
             agora_br = datetime.now(TZ_BRASILIA)
             primeiro_dia_mes = agora_br.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -380,7 +403,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_usuarios_gerenciado": float(saldo_usuarios),
                     "lucro_plataforma_total": float(lucro_mensal_plataforma),
                     "lucro_plataforma_historico": float(total_lucro_historico),
-                    "lucro_disponivel": float(lucro_disponivel_virtual), 
+                    "lucro_disponivel": float(lucro_disponivel_virtual),
+                    "lucro_real_liquido": float(lucro_real_liquido),
+                    "total_taxas_mp": float(total_taxas_mp),
+                    "custos_infra_estimados": float(total_infra),
                     "saldo_pool_caixa": float(saldo_pool_caixa),
                     "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                     "lucro_acumulado_pool": float(juros_acumulados_pool),

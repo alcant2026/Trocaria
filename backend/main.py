@@ -119,13 +119,13 @@ app.include_router(rotas_snapshot.router)
 app.include_router(rotas_parceiros_caixa.router)
 app.include_router(rotas_comunidade.router)
 
-@app.get("/test-deploy")
-def test_deploy():
-    return {"message": "Deploy PSY PAY alcançou o servidor - 11h58"}
+@app.get("/p")
+def ping_curto():
+    return {"msg": "servidor_ativo_13h04"}
 
 @app.get("/")
 def home():
-    return {"status": "online", "message": "PSY PAY API ativa"}
+    return {"status": "online", "message": "PSY PAY API ATIVA - 13:04"}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

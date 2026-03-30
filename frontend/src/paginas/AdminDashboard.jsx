@@ -27,7 +27,10 @@ import {
     Undo2,
     Calendar,
     ArrowDown,
-    RefreshCw
+    RefreshCw,
+    Sparkles,
+    Star,
+    Eye
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -351,7 +354,7 @@ const AdminDashboard = () => {
                                     <span className="text-primary text-xs font-bold pointer" onClick={() => setActiveTab('pendentes')}>VER TODAS</span>
                                 </div>
                                 {pendentes.length === 0 ? (
-                                    <div className="empty-state">Tudo em dia por aqui! ✨</div>
+                                    <div className="empty-state">Tudo em dia por aqui! <Sparkles size={14} style={{ display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} /></div>
                                 ) : (
                                     pendentes.slice(0, 3).map(p => (
                                         <div key={p.transacao_id} className="revenue-item row-hover">
@@ -432,9 +435,9 @@ const AdminDashboard = () => {
                                                             <p className="font-bold">{p.usuario_nome}</p>
                                                             {p.tipo === 'desbloqueio_dados' && (
                                                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                                                    {p.tem_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'rg')}>👁️ RG</button>}
-                                                                    {p.tem_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'renda')}>👁️ Renda</button>}
-                                                                    {p.tem_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'residencia')}>👁️ Res.</button>}
+                                                                    {p.tem_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'rg')}><Eye size={12} /> RG</button>}
+                                                                    {p.tem_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'renda')}><Eye size={12} /> Renda</button>}
+                                                                    {p.tem_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'residencia')}><Eye size={12} /> Res.</button>}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -653,8 +656,8 @@ const AdminDashboard = () => {
                                                 <div className="flex-start gap-1">
                                                     R$ {u.saldo_caixa.toLocaleString('pt-BR')}
                                                     {u.is_good_payer && (
-                                                        <span className="loyalty-badge" title="Bônus Fidelidade 1.5x Ativo">
-                                                            ⭐ 1.5x
+                                                        <span className="loyalty-badge" title="Bônus Fidelidade 1.5x Ativo" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Star size={12} color="var(--warning)" fill="var(--warning)" /> 1.5x
                                                         </span>
                                                     )}
                                                 </div>

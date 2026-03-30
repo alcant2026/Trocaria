@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 import TermosUso from '../componentes/TermosUso';
 import SeletorCustom from '../componentes/SeletorCustom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, X } from 'lucide-react';
 
 const Registro = () => {
     const [formData, setFormData] = useState({
@@ -213,7 +213,7 @@ const Registro = () => {
                 {showTermos && (
                     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                         <div className="card slide-up" style={{ maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-                            <button onClick={() => setShowTermos(false)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                            <button onClick={() => setShowTermos(false)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}><X size={20} /></button>
                             <TermosUso onConfirm={() => { setAceiteTermos(true); setShowTermos(false); }} />
                         </div>
                     </div>

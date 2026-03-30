@@ -46,7 +46,12 @@ import {
     Lock,
     Star,
     Plus,
-    Flag
+    Flag,
+    Sparkles,
+    AlertTriangle,
+    DollarSign,
+    Landmark,
+    PartyPopper
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
@@ -231,7 +236,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     if (res.status === 'success') {
                         clearInterval(interval);
                         showModal({ 
-                            title: 'Pagamento Confirmado! 🎉', 
+                            title: 'Pagamento Confirmado! <PartyPopper size={20} style={{ display: "inline", verticalAlign: "middle" }} />', 
                             message: 'Seu depósito foi processado e o saldo já está disponível na sua conta.', 
                             type: 'success' 
                         });
@@ -759,7 +764,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {mensagem && (
                 <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} `}>
                     <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
-                    <button onClick={() => setMensagem('')} className="alert-close">✕</button>
+                    <button onClick={() => setMensagem('')} className="alert-close"><X size={16} /></button>
                 </div>
             )}
 
@@ -842,7 +847,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 onClick={fecharAlertaRejeicao}
                                 style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.7 }}
                             >
-                                ✕
+                                <X size={16} />
                             </button>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <AlertCircle size={20} />
@@ -1409,8 +1414,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 />
                                             </div>
                                             {parseFloat(valorSaque) > usuario.saldo && (
-                                                <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
-                                                    ⚠️ Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                    <AlertTriangle size={14} /> Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
                                                 </p>
                                             )}
                                         </div>

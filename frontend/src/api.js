@@ -23,17 +23,28 @@ const api = {
         });
 
         if (!response.ok) {
-            if (response.status === 401) {
-                window.dispatchEvent(new Event('psypay_unauthorized'));
-            }
             let errorMessage = 'Erro na requisição';
+            let errorData = {};
             try {
-                const errorData = await response.json();
+                errorData = await response.json();
                 errorMessage = errorData.detail || errorMessage;
             } catch {
                 const text = await response.text().catch(() => '');
                 if (text) errorMessage = text;
             }
+
+            // Só faz logout automático se for erro de SESSÃO (token ausente/expirado)
+            // NÃO fazer logout para erros de validação de negócio (ex: código 2FA inválido)
+            if (response.status === 401) {
+                const errosDeNegocio = ['2fa', 'código', 'inválido', 'expirado'];
+                const ehErroNegocio = errosDeNegocio.some(termo => 
+                    errorMessage.toLowerCase().includes(termo)
+                );
+                if (!ehErroNegocio) {
+                    window.dispatchEvent(new Event('psypay_unauthorized'));
+                }
+            }
+
             throw new Error(errorMessage);
         }
 

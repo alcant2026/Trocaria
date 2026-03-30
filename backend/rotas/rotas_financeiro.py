@@ -807,17 +807,16 @@ async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuari
     if not parceiro:
         raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
     
-    # Verificar se existem transações vinculadas a este parceiro
-    transacoes = db.query(Transacao).filter(Transacao.parceiro_id == id).first()
-    if transacoes:
-        # Se houver histórico, não deletamos, apenas inativamos (segurança de auditoria)
-        parceiro.is_active = False
-        db.commit()
-        return {"message": "Parceiro possui histórico de movimentações e foi apenas inativado por segurança."}
+    # REGRA DE NEGÓCIO: Sempre inativar (Soft Delete) para preservar histórico financeiro
+    parceiro.is_active = False
     
-    db.delete(parceiro)
+    # SEGURANÇA: Se o caixa estiver aberto, fechar automaticamente para evitar saldos "órfãos"
+    if parceiro.caixa_aberto:
+        parceiro.caixa_aberto = False
+        # O saldo_caixa_atual permanece registrado no parceiro inativo para fins de auditoria
+    
     db.commit()
-    return {"message": "Parceiro removido com sucesso!"}
+    return {"message": "Parceiro desativado e caixa encerrado com sucesso!"}
 
 @router.get("/admin/pendentes")
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):

@@ -480,9 +480,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "taxa": float(sa.taxa_mensal)
                 })
 
-            # 7. Gestão de Parceiros
+            # 7. Gestão de Parceiros (Apenas ativos para o HUB)
             from modelos.modelos_db import Parceiro
-            parceiros_query = db.query(Parceiro).all()
+            parceiros_query = db.query(Parceiro).filter(Parceiro.is_active == True).all()
             for p in parceiros_query:
                 snapshot["admin"]["gestao_parceiros"].append({
                     "id": p.id,

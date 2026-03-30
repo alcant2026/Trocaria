@@ -30,7 +30,8 @@ import {
     RefreshCw,
     Sparkles,
     Star,
-    Eye
+    Eye,
+    Trash2
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -104,6 +105,11 @@ const AdminDashboard = () => {
 
     const [kycPendentes, setKycPendentes] = useState([]);
     
+    // Estado para Exclusão de Parceiro
+    const [showExcluirParceiroModal, setShowExcluirParceiroModal] = useState(false);
+    const [parceiroParaExcluir, setParceiroParaExcluir] = useState(null);
+    const [loadingExclusao, setLoadingExclusao] = useState(false);
+
     // Limits
     const [showLimiteModal, setShowLimiteModal] = useState(false);
     const [limiteData, setLimiteData] = useState({ id: null, valor: '' });
@@ -143,6 +149,22 @@ const AdminDashboard = () => {
             window.open(url, '_blank');
         } catch (err) {
             setMensagem('Erro ao baixar documento: ' + err.message);
+        }
+    };
+
+    const handleExcluirParceiro = async () => {
+        if (!parceiroParaExcluir) return;
+        setLoadingExclusao(true);
+        try {
+            await api.delete(`/financeiro/admin/parceiros/${parceiroParaExcluir.id}`);
+            setMensagem(`Parceiro ${parceiroParaExcluir.nome} desativado com sucesso.`);
+            setShowExcluirParceiroModal(false);
+            carregarSnapshot(); // Recarrega para limpar a lista
+        } catch (err) {
+            setMensagem('Erro ao excluir parceiro: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingExclusao(false);
+            setParceiroParaExcluir(null);
         }
     };
 
@@ -583,6 +605,7 @@ const AdminDashboard = () => {
                                             <th>Endereço</th>
                                             <th>Saldo Atual</th>
                                             <th>Comissões</th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -602,6 +625,18 @@ const AdminDashboard = () => {
                                                 <td className="text-xs text-muted">{p.endereco}</td>
                                                 <td className="text-primary font-bold">R$ {p.saldo_atual.toLocaleString('pt-BR')}</td>
                                                 <td className="text-success">R$ {p.comissao.toLocaleString('pt-BR')}</td>
+                                                <td>
+                                                    <button 
+                                                        className="btn btn-outline btn-danger text-xs p-1"
+                                                        title="Excluir Parceiro"
+                                                        onClick={() => {
+                                                            setParceiroParaExcluir(p);
+                                                            setShowExcluirParceiroModal(true);
+                                                        }}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -772,6 +807,17 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             </ModalPremium>
+            {/* Modal de Exclusão de Parceiro */}
+            <ModalPremium
+                isOpen={showExcluirParceiroModal}
+                onClose={() => setShowExcluirParceiroModal(false)}
+                title="Excluir Parceiro?"
+                message={`Deseja realmente desativar o parceiro "${parceiroParaExcluir?.nome}"? Isso encerrará automaticamente o caixa do ponto de forma irreversível.`}
+                type="error"
+                onConfirm={handleExcluirParceiro}
+                confirmText="Sim, Desativar"
+                loading={loadingExclusao}
+            />
         </div>
     );
 };

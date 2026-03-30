@@ -73,7 +73,6 @@ const App = () => {
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('usuario');
-        localStorage.removeItem('psy pay_cookies_accepted'); // Resetar para garantir novo aceite se necessário
         setUser(null);
         window.location.hash = 'login';
     };

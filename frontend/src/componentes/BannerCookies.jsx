@@ -59,7 +59,7 @@ const BannerCookies = ({ usuario, onUpdate }) => {
                     <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>Controle de Privacidade</h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: 0 }}>
                         Utilizamos cookies para melhorar sua experiência e garantir a segurança das transações. 
-                        Ao continuar, você concorda com nossa <a href="/privacidade" style={{ color: 'var(--primary)', fontWeight: 600 }}>Política de Privacidade</a>.
+                        Ao continuar, você concorda com nossa <a href="#privacidade" style={{ color: 'var(--primary)', fontWeight: 600 }}>Política de Privacidade</a>.
                     </p>
                 </div>
                 <button 

@@ -417,7 +417,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
                             if plataforma:
                                 plataforma.saldo -= total_fee
-                                transacao.detalhes += f" | Taxa MP Absorb: R$ {total_fee}"
+                                transacao.detalhes += f" | [Taxa Intermediação: R$ {total_fee}]"
                         
                         atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
                         db.commit()

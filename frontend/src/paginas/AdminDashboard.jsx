@@ -318,7 +318,7 @@ const AdminDashboard = () => {
                                 trend={null}
                             />
                             <StatCard 
-                                label="Taxas Mercado Pago" 
+                                label="Custo Intermediação (Checkout Pro)" 
                                 value={`R$ ${fiscal.total_taxas_mp?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={CreditCard}
                                 color="#ff4d4d"

@@ -289,12 +289,16 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             total_taxas_mp = Decimal("0.00")
             # Buscar transações que mencionem taxa MP nos detalhes
             trans_taxas = db.query(Transacao.detalhes).filter(
-                Transacao.detalhes.like("%Taxa MP Absorb:%"),
+                or_(
+                    Transacao.detalhes.like("%Taxa MP Absorb:%"),
+                    Transacao.detalhes.like("%[Taxa Intermediação:%")
+                ),
                 Transacao.status == "concluido"
             ).all()
             for t_det in trans_taxas:
                 if t_det.detalhes:
-                    match = re.search(r"Taxa MP Absorb: R\$ ([\d\.]+)", t_det.detalhes)
+                    # Tenta capturar no formato novo ou antigo
+                    match = re.search(r"(?:Taxa MP Absorb|Taxa Intermediação): R\$ ([\d\.]+)", t_det.detalhes)
                     if match:
                         total_taxas_mp += Decimal(match.group(1))
 

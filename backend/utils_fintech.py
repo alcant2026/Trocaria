@@ -7,12 +7,24 @@ def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
     """
     Calcula o limite de crédito progressivo do usuário.
     Regras:
-    - Mínimo R$ 100 no Pool para ter crédito.
-    - Começa com R$ 20,00.
-    - Se Score >= 800: Limite de 1.2x o saldo do Pool.
+    - Se limite_credito_personalizado estiver definido, usa ele (Override).
+    - Se Score >= 700 e is_verified, ganha crédito progressivo mesmo sem saldo no pool.
+    - Mínimo R$ 100 no Pool para ter crédito base se as condições acima não atendidas.
     """
+    if usuario.limite_credito_personalizado is not None:
+        return usuario.limite_credito_personalizado
+
     saldo_pool = usuario.saldo_caixa or Decimal("0.00")
     score = usuario.score or Decimal("0.00")
+    
+    # Regra: Microcrédito Progressivo (Zero Pool)
+    if usuario.is_verified and score >= Decimal("700.00"):
+        if score >= Decimal("900.00"):
+            return Decimal("500.00")
+        elif score >= Decimal("800.00"):
+            return Decimal("200.00")
+        else:
+            return Decimal("50.00")
 
     if saldo_pool <= Decimal("1.00"):
         return Decimal("0.00")

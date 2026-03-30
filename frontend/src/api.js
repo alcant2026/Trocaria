@@ -8,7 +8,7 @@ const api = {
         const token = api.getToken();
         const headers = { ...options.headers };
 
-        if (!options.isBlob) {
+        if (!options.isBlob && !options.isMultipart) {
             headers['Content-Type'] = 'application/json';
         }
 
@@ -46,8 +46,24 @@ const api = {
 
     async get(endpoint) { return this.request(endpoint, { method: 'GET' }); },
     async getBlob(endpoint) { return this.request(endpoint, { method: 'GET', isBlob: true }); },
-    async post(endpoint, body) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); },
-    async put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }); },
+    async post(endpoint, body, options = {}) { 
+        const isFormData = body instanceof FormData;
+        return this.request(endpoint, { 
+            method: 'POST', 
+            body: isFormData ? body : JSON.stringify(body),
+            isMultipart: isFormData,
+            ...options 
+        }); 
+    },
+    async put(endpoint, body, options = {}) { 
+        const isFormData = body instanceof FormData;
+        return this.request(endpoint, { 
+            method: 'PUT', 
+            body: isFormData ? body : JSON.stringify(body),
+            isMultipart: isFormData,
+            ...options 
+        }); 
+    },
     async delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); },
 };
 

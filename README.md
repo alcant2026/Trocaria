@@ -1,85 +1,44 @@
-# 🚀 cred+ | Plataforma P2P de Crédito Ético
+# 🚀 Psy Pay | Plataforma Fintech de Crédito Direto
 
-O **cred+** é uma solução moderna de empréstimos *Peer-to-Peer* (P2P), conectando pessoas que precisam de crédito a investidores que buscam rentabilidade. Focada em segurança, transparência e agilidade, a plataforma elimina intermediários bancários tradicionais.
+O **Psy Pay** é uma solução avançada e sustentável de crédito automatizado, combinada com uma rede social orgânica e ferramentas integradas de gestão de afiliados. Utilizamos um **Pool de Liquidez Centralizado**, gerido pela plataforma, para financiar micro-créditos mediante regras rigorosas (Score e KYC), eliminando a burocracia bancária.
 
----
+## 🌟 Principais Funcionalidades
 
-## ✨ Funcionalidades Principais
+### 1. Motor de Crédito Central (Pool de Liquidez)
+- **Gestão Centralizada do Capital**: Apenas o Administrador gerencia as injeções de capital no Pool, que servem para sustentar as linhas de crédito ativas em toda a plataforma.
+- **Micro-Crédito Automatizado**: Empréstimos são financiados integralmente pelo caixa do sistema, aprovados sob regras restritas de negócio.
+- **Score Dinâmico e Desbloqueio KYC**: O limite de crédito baseia-se em um Score gamificado. Usuários realizam o pagamento da "Taxa KYC" para destravar seus primeiros limites de empréstimo (receita 100% da plataforma).
 
-### 🏦 Para o Tomador (Empréstimo)
-- **Solicitação Ágil**: Peça crédito em segundos com taxas competitivas.
-- **Garantia Social**: Sistema de garantidores via ID de amigos para aumentar a confiança.
-- **Transparência Total**: Visualização clara de parcelas, juros e prazos.
-- **Score Dinâmico**: Evolução do perfil conforme o histórico de pagamentos.
+### 2. Fiscal Hub Centralizado (Admin)
+- Monitoramento de saúde financeira e auditoria em tempo real.
+- **Receita Operacional Isolada**: O lucro livre da empresa advém de:
+  - 10% de taxa administrativa sobre o pagamento de cada parcela de empréstimo.
+  - Taxas Mágicas (Marketplace Ads).
+  - Intermediação de transações em caixas físicos e Taxas de Saque.
+- **Ações de Caixa Seguras**: Ferramentas de *Injetar Capital* (direto para o Pool de empréstimos) e *Resgatar Lucro* (exclusivo para o cofre de Receita Livre da Startup).
 
-### 💰 Para o Investidor
-- **Mercado de Oportunidades**: Escolha onde investir com base no score e perfil do tomador.
-- **Rentabilidade Real**: Lucros líquidos calculados automaticamente (já descontada a taxa de performance de 10%).
-- **Gestão de Carteira**: Acompanhe recebimentos, ativos e fluxo de caixa diário.
-- **Segurança de Dados**: Desbloqueio seguro de perfis para análise detalhada.
+### 3. Comunidade & Marketplace
+- Rede social integrada estilo "Twitter/X", focada no ecossistema interno.
+- **Loja de Afiliados (Marketplace)**: Sistema onde os usuários podem impulsionar produtos e publicações pagando por *Views* dinâmicas. Toda a receita de Ads é revertida limpa para o fluxo operacional (Lucro) do sistema.
 
----
-
-## 🛡️ Segurança e Tecnologia
-
-### 🔐 Mentalidade Zero Trust
-- **Validação de Sangue Frio**: Todas as transações são validadas em múltiplas camadas (Frontend + Backend) para impedir valores negativos ou inconsistentes.
-- **Autenticação Robusta**: Proteção via JWT e suporte a Segundo Fator de Autenticação (2FA) para saques.
-- **LGPD Compliance**: Dados sensíveis protegidos e anonimizados onde necessário.
-
-### 🛠️ Stack Tecnológica
-- **Backend**: Python 3.10+ com **FastAPI** (Alta performance e assincronismo).
-- **Frontend**: React.js com **Vite** e Tailwind-like styles para UX premium.
-- **Banco de Dados**: PostgreSQL com suporte nativo a indexação financeira.
-- **Infraestrutura**: Configurado para deploy contínuo (CI/CD) no **Render**.
+### 4. Caixas Físicos Parceiros
+- Digitalização do dinheiro vivo via redes de lojistas autorizados.
+- Geração instantânea de token para saques/depósitos presenciais.
 
 ---
+## 🛠️ Stack Tecnológica
 
-## 🚀 Como Começar (Ambiente Local)
+### Frontend
+- **React + Vite** (JavaScript)
+- Context API & Custom Hooks.
+- Vanilla CSS (Acessibilidade WCAG e Design Premium Glassmorphism).
 
-### Pré-requisitos
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL ativo
+### Backend
+- **Python + FastAPI** (Alta performance assíncrona).
+- **SQLAlchemy** (ORM).
+- **PostgreSQL / Neon DB** (Para Cloud Production) e **SQLite** (Para Dev Engine).
+- Autenticação avançada via Token + MFA (2FA).
 
-### 1. Configurando o Backend
-```bash
-# Entre na pasta e crie o ambiente
-cd backend
-python -m venv .venv
-source .venv/bin/activate  # No Windows: .venv\Scripts\activate
-
-# Instale as dependências
-pip install -r requirements.txt
-
-# Inicie a API
-python main.py
-```
-*Acesse a documentação Swagger em `/docs`.*
-
-### 2. Configurando o Frontend
-```bash
-# Em outro terminal
-cd frontend
-npm install
-npm run dev
-```
-*O sistema estará disponível em `http://localhost:3000`.*
-
----
-
-## 🌍 Deploy Produção
-
-Para colocar o sistema no ar de forma profissional, consulte o nosso [Guia de Deploy (Render + GitHub)](/DEPLOY.md).
-
----
-
-## 📜 Regras de Negócio e Taxas
-- **Custo de Solicitação**: R$ 4,00 (Taxa administrativa).
-- **Taxa de Performance**: 10% sobre os juros recebidos pelo investidor.
-- **Janelas de Expiração**: 4 horas para pedidos sem lances e 5 dias para o ciclo total.
-- **Precisão Financeira**: Uso obrigatório da biblioteca `decimal` em todos os cálculos.
-
----
-
-*Desenvolvido com foco em democratização financeira e segurança de dados.*
+## 📊 Estrutura Lógica do Capital
+- **Lucro Acumulado**: Reflete apenas o dinheiro orgânico gerado como taxa do sistema que está disponível para Resgate pelo dono do aplicativo.
+- **Liquidez do Pool**: O caixa de capital protegido da plataforma (sob gestão do Admin), bloqueado de resgates corriqueiros para o empreendedor, e dedicado 100% aos financiamentos de usuários (Empréstimo Direto).

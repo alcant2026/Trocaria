@@ -281,3 +281,24 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* --- BOTÕES KYC MINI --- */
+.btn-doc-mini {
+    background: rgba(0, 245, 255, 0.1);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    margin-left: 4px;
+}
+
+.btn-doc-mini:hover {
+    background: var(--primary);
+    color: #000;
+    transform: translateY(-1px);
+}

@@ -1,53 +1,41 @@
-# Mapa de Rotas do Backend - Peer
+# 🗺️ Mapeamento de Rotas da API (Psy Pay)
 
-Este documento lista todas as rotas do sistema e serve como controle para os testes e documentação da API.
+Este documento centraliza todas as principais rotas ativas criadas no Backend FastAPI da Psycho Pay.
 
-## ✅ Autenticação (`/auth`)
-- `POST /auth/registrar` - Registro de novo usuário (Validação de CPF, Nome e Email)
-- `POST /auth/login` - Login, geração de Token JWT e dados iniciais
-- `GET /auth/perfil` - Obter dados detalhados do usuário logado
-- `POST /auth/2fa/gerar` - Gerar segredo e QR Code (Base64) do 2FA
-- `POST /auth/2fa/ativar` - Ativar 2FA definitivamente com código TOTP
-- `POST /auth/2fa/desativar` - Desativar 2FA com validação de senha e código
-- `DELETE /auth/excluir-conta` - Anonimização e exclusão lógica (LGPD)
+---
+## 🌐 `rotas_snapshot.py` (Dashboard Central)
+**`GET /snapshot`**
+- Ponto de entrada mais crítico da plataforma. Retorna um pacote massivo unificado (O `snapshot`) contendo informações da conta do cliente, histórico de empréstimos (Status Tomador e Investidor) e o **Fiscal Hub** do Administrador de uma única vez.
+- Economiza conexões de banco de dados por ter limite de CACHE nativo (15s).
 
-## 💰 Empréstimos (`/emprestimos`)
-- `POST /emprestimos/solicitar` - Criar nova solicitação de crédito
-- `POST /emprestimos/vincular-garantidores/{id}` - Vincular 2 IDs de amigos para garantia social (Pós-meta)
-- `POST /emprestimos/aceitar-garantia/{id}` - Aceite do amigo como garantidor (Assinatura Digital)
-- `GET /emprestimos/listar` - Listar oportunidades pendentes (Filtro por desbloqueio)
-- `POST /emprestimos/desbloquear-dados/{id}` - Pagar R$ 15 para visualizar dados do tomador
-- `GET /emprestimos/meus-emprestimos` - Lista detalhada de empréstimos do tomador
-- `POST /emprestimos/pagar-parcela/{id}` - Pagamento de parcela com cálculo de mora
-- `POST /emprestimos/quitar-total/{id}` - Quitação integral antecipada (Amortização)
-- `POST /emprestimos/pagamento-avulso/{id}` - Pagamento de qualquer valor (Taxa R$ 1,50)
-- `GET /emprestimos/contrato/pdf/{id}` - Download do contrato profissional assinado em PDF
-- `GET /emprestimos/contrato/{id}` - Texto base do contrato (Legacy/Texto)
-- `POST /emprestimos/admin/verificar-inadimplencia` - Job de auditoria para penalizar inadimplentes com Score 0 (Admin)
+---
+## 🔐 `rotas_auth.py` (Perfil & Autenticação)
+**`POST /auth/login`**: Valida a dupla Senha/Digitalização MFA e emite o Bearer Token.
+**`GET /auth/perfil`**: Dados do usuário cru e configuração da conta.
+**`POST /auth/kyc-pay`**: Endpoint onde novos usuários pagam a validação (Desbloqueio a R$35,00) que gera Lucro Direto da Plataforma (`000PL`).
 
-## 📈 Investidor (`/investidor`)
-- `POST /investidor/desbloquear/{id}` - Alias para desbloqueio de dados do tomador
-- `GET /investidor/meus-investimentos` - Histórico de sessões de análise (Desbloqueios)
-- `GET /investidor/carteira` - Dashboard de performance e rentabilidade dos ativos
-- `POST /investidor/investir/{id}` - Realizar aporte em um pedido (Blindagem Jurídica)
-- `POST /investidor/processar-expiracoes` - Job de gestão de tempo (Jobs de 4h e 5d)
+---
+## 💳 `rotas_financeiro.py` (Transações e Admin)
 
-## 🏦 Financeiro (`/financeiro`)
-- `POST /financeiro/solicitar-saque` - Retirada via PIX (Exige 2FA e mesma titularidade)
-- `POST /financeiro/notificar-deposito` - Aviso de depósito para crédito de saldo
-- `GET /financeiro/meu-historico` - Extrato detalhado (Últimas 10 transações)
-- `GET /financeiro/admin/pendentes` - Fila de transações aguardando aprovação (Admin)
-- `POST /financeiro/admin/confirmar/{id}` - Efetivar Depósito ou Saque (Admin)
-- `POST /financeiro/admin/confirmar-verificacao/{id}` - Aprovar Selo Verificado/KYC (Admin)
-- `POST /financeiro/admin/rejeitar/{id}` - Rejeitar transação com motivo (Admin)
-- `GET /financeiro/admin/fiscal` - Relatório consolidado de Custódia e Lucros (Admin)
-- `POST /financeiro/admin/sacar-lucro` - Resgate de lucros da plataforma para o admin
-- `POST /financeiro/depositar-manual` - Crédito forçado por ID de usuário (Admin/Teste)
+### Fundo Coletivo (Clientes)
+**`POST /financeiro/investir-pool`**: O usuário injeta dinheiro no caixa livre do Pool P2P.
+**`POST /financeiro/resgatar-pool`**: O investidor saca a quantia líquida que possui parada no Pool.
 
-## 🎯 Score (`/score`)
-- `POST /score/comprar` - Compra pontual de reputação (R$ 35 -> +1.5 pts)
-- `POST /score/solicitar-verificacao` - Iniciar processo de verificação humana
-- `POST /score/atualizar-decaimento` - Job de redução orgânica diária (-0.5 pts)
+### Fiscal Hub (Admin - 000PL)
+**`POST /financeiro/admin/aportar-lucro`** *(Renomeado para Aportar no Pool)*
+- **Objetivo**: Aporte Institucional. Injeta capital direto no `saldo_caixa` (Fundo P2P) como forma de infligir liquidez.
+**`POST /financeiro/admin/sacar-lucro`** 
+- **Objetivo**: Retirada do "Lucro Acumulado". Apenas fundos orgânicos recolhidos via *Taxas/Comissões* e *Ads* são elegíveis.
 
-## ⚙️ Global
-- `GET /` - Check de saúde da API (Health Check)
+---
+## 📱 `rotas_comunidade.py` (Social e Marketplace)
+**`GET /comunidade/feed`**: Extrai as publicações curadas pela comunidade interna.
+**`POST /comunidade/comprar-views`** *(Marketplace Ads)*:
+- O usuário paga para turbinar um Link. O valor é 100% transferido para o caixa puro da startup `000PL.saldo` (Lucro Livre) sendo listado na seção *Marketplace Ads* do Painel Fiscal.
+**`POST /comunidade/registrar-view`**: Consome 1 visão restante do anúncio afiliado ao clicar.
+
+---
+## 🏦 `rotas_emprestimo.py` (Motor de Crédito)
+**`GET /emprestimos/limite`**: Verifica o trunfo e o fator Score do Tomador atual cruzando com o **Pool de Liquidez** geral ativo.
+**`POST /emprestimos/solicitar`**: Solicitação que congela crédito P2P do Fundo Coletivo se for aprovado instantaneamente pelo bot.
+**`POST /emprestimos/{id}/pagar-parcela`**: Executa a operação que tira do Tomador final e envia *90% do valor dos juros de volta para capitalização do Pool (divisão pro-rata)* e destina *10% do juro real para a carteira Startup (Lucro de Gestão)*.

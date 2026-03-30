@@ -1,86 +1,38 @@
-# 🚀 Guia Definitivo: Deploy Completo (GitHub + Render)
+# 🚀 Psy Pay | Guia Oficial de Deploy (Render & Neon DB)
 
-Este guia contém o passo a passo exato para versionar o seu código no **GitHub** e colocá-lo no ar no **Render**, garantindo que o backend, o frontend e o banco de dados funcionem perfeitamente.
+Este guia cobre todos os passos para hospedar a **psy pay** usando infraestruturas modernas: **Render** (Node + Python Hosting) e **Neon.tech** (PostgreSQL Serverless).
 
----
+## 1️⃣ Configurando Banco de Dados no Neon.tech
+Como o aplicativo está programado nativamente com SQLAlchemy, sua migração banco é praticamente autônoma.
+1. Crie uma conta no [Neon.tech](https://neon.tech/) e crie um novo projeto.
+2. Copie a `Connection String` (URL). 
+   - Exemplo: `postgresql://seu_usuario:sua_senha@ep-bold-surf-12345.sa-east-1.aws.neon.tech/neondb`
+3. Seu arquivo `database.py` já conta com filtros de "Limites de Conexões" para o Neon e bloqueio inteligente de `sslmode`. **Nenhuma alteração de código é necessária.**
 
-## 💾 Passo 1: Preparação e GitHub (Obrigatório)
+## 2️⃣ Variáveis de Ambiente (.env) Global
+Você deve adicionar no seu painel da Render, tanto para o Frontend quanto para o Backend.
+- `DATABASE_URL=postgresql://sua...string...do...neon`
+- `VITE_API_URL=https://api.suaurlrender.com` (apenas para frontend)
 
-O Render precisa ler os arquivos do seu repositório no GitHub para fazer o deploy automático sempre que você atualizar o código.
-
-1. **Crie um repositório** no seu GitHub (Ex: nomeie como `cred-plus`).
-2. **Conecte a sua pasta local** ao GitHub:
-   ```bash
-   # Dentro da pasta do projeto
-   git init
-   git add .
-   git commit -m "feat: setup completo para produção"
-   git remote add origin https://github.com/seu-usuario/cred-plus.git
-   git branch -M main
-   git push -u origin main
-   ```
-3. **Atualizações futuras**: Sempre que mudar algo, rode:
-   ```bash
-   git add .
-   git commit -m "descrição da mudança"
-   git push origin main
-   ```
-   *O Render detectará o push e atualizará o site sozinho!*
-
----
-
-## 🏗️ Passo 2: Banco de Dados (PostgreSQL)
-
-O Render oferece um banco nativo, mas você também pode usar serviços como o **Neon.tech**.
-
-1. No painel do Render, clique em **New +** > **PostgreSQL**.
-2. **Name**: `cred-plus-db`
-3. Após criar, copie a **Internal Database URL** (para uso dentro do Render).
-
----
-
-## ⚙️ Passo 3: Backend (Web Service)
-
-O backend é a API que processa os dados.
-
-1. Clique em **New +** > **Web Service**.
-2. Conecte o repositório que você criou no Passo 1.
-3. **Configurações Principais**:
-   - **Name**: `cred-plus-api`
-   - **Root Directory**: `backend`
+## 3️⃣ Subindo o Backend (Render)
+1. Crie um **Web Service** no [Render](https://dashboard.render.com).
+2. Conecte com seu GitHub (`krkn12/peer`).
+3. Defina as configurações:
    - **Environment**: `Python 3`
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 90`
-4. **Variáveis de Ambiente (Advanced > Add Environment Variable)**:
-   - `DATABASE_URL`: (URL do banco do Passo 2)
-   - `SECRET_KEY`: (Crie uma chave longa e aleatória)
-   - `FRONTEND_URL`: `https://cred-plus-front.onrender.com`
-   - `ACCESS_TOKEN_EXPIRE_MINUTES`: `1440`
+   - **Start Command**: `gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app`
+     *(Usar 2 workers impede que as conexões saturem o Neon Database).*
+4. Insira a `DATABASE_URL` no menu "Environment".
+5. O sistema criará sozinho as 8 tabelas financeiras ao processar o primeiro ping. Após isso, registre a conta principal da plataforma via App Frontend e marque-a como Administrador (com a ajuda de seu painel do DB e do script criado, se necessário).
 
----
-
-## 🎨 Passo 4: Frontend (Static Site)
-
-1. Clique em **New +** > **Static Site**.
-2. Conecte o mesmo repositório do GitHub.
-3. **Configurações Principais**:
-   - **Name**: `cred-plus-front`
-   - **Root Directory**: `frontend`
+## 4️⃣ Subindo o Frontend (Render)
+1. Crie um **Static Site** no [Render](https://dashboard.render.com).
+2. Conecte com o GitHub e selecione a pasta frontend do seu repositório *(configure Root Directory = `frontend`)*.
+3. Defina as configurações:
    - **Build Command**: `npm install && npm run build`
    - **Publish Directory**: `dist`
-4. **Variáveis de Ambiente (Environment)**:
-   - `VITE_API_URL`: `https://cred-plus-api.onrender.com` (A URL do seu backend no Passo 3)
+4. Na aba "Environment", defina a `VITE_API_URL` apontando para o link do backend web service criado no Passo 3.
 
----
-
-## ✅ Passo 5: Verificação e Manutenção
-
-1. **Acesso**: Entre na URL do frontend gerada no Passo 4.
-2. **Logs**: Se algo falhar, olhe a aba **Logs** no painel do seu serviço no Render.
-3. **Auto-Deploy**: Toda vez que você fizer `git push`, o Render reconstrói o sistema automaticamente.
-
-> [!WARNING]
-> **Segurança**: Nunca compartilhe URLs com senhas. O Render gerencia isso com segurança nas variáveis de ambiente.
-
-> [!TIP]
-> **Custom Domain**: Você pode conectar seu próprio domínio (`.com.br`) na aba **Settings > Custom Domains** de cada serviço no Render.
+## ✅ Tratamento de Erros Comuns
+- **CORS Bloqueado no Frontend**: Caso seu link do frontend seja novo (ex: `app.psypay.com`), ele deve ser incluído na lista de `CORS_ORIGINS` no `main.py` do Backend.
+- **Neon fechando Conexão**: Não use mais de 2 `workers` web. O Free Tier permite máximo 10 conexões. Nossa lógica no `database.py` segura esse teto nativamente se `"neon.tech"` constar na `DATABASE_URL`.

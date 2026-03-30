@@ -60,6 +60,7 @@ class Usuario(Base):
     is_admin = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    limite_credito_personalizado = Column(Numeric(precision=20, scale=2), nullable=True)
     
     telefone = Column(String(20), nullable=True)
     cidade = Column(String(100), nullable=True)
@@ -228,4 +229,19 @@ class AvaliacaoLink(Base):
     data_avaliacao = Column(DateTime, default=datetime.datetime.utcnow)
     
     link = relationship("LinkAfiliado")
+    usuario = relationship("Usuario")
+
+class DocumentoVerificacao(Base):
+    __tablename__ = "documentos_verificacao"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, unique=True)
+    caminho_rg = Column(String(500), nullable=True)
+    caminho_renda = Column(String(500), nullable=True)
+    caminho_residencia = Column(String(500), nullable=True)
+    status = Column(String(50), default="pendente") # pendente, aprovado, rejeitado
+    motivo_rejeicao = Column(String(200), nullable=True)
+    data_envio = Column(DateTime, default=datetime.datetime.utcnow)
+    data_analise = Column(DateTime, nullable=True)
+    
     usuario = relationship("Usuario")

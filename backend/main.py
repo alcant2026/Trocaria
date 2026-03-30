@@ -19,6 +19,8 @@ origins = [
     "capacitor://localhost",   # Capacitor iOS
     "https://cred30.site",
     "https://www.cred30.site",
+    "https://cred320.site",
+    "https://www.cred320.site",
     "https://psy-pay-front.onrender.com",
     "https://psy-pay.onrender.com",
     "https://peer-5gq5.onrender.com",
@@ -44,25 +46,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# Middleware de Segurança
-@app.middleware("http")
-async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; "
-        "connect-src 'self' http://localhost:3000 http://localhost:5173 http://localhost capacitor: "
-        "https://cred30.site https://www.cred30.site "
-        "https://psy-pay-front.onrender.com https://psy-pay-api.onrender.com https://psy-pay-5gq5.onrender.com "
-        "https://peer-5gq5.onrender.com https://peer-front.onrender.com https://peer-api.onrender.com;"
-    )
-    return response
+# Middleware de Segurança (Simplificado para evitar conflitos de CORS)
+# Os headers de segurança podem ser habilitados via Proxy ou em Produção Final.
 
 app.add_middleware(
     CORSMiddleware,
@@ -83,6 +68,7 @@ def get_db():
 @app.on_event("startup")
 async def startup_db_setup():
     print("🚀 SISTEMA: Iniciando processo de boot...")
+    os.makedirs("uploads", exist_ok=True)
     
     try:
         Base.metadata.create_all(bind=engine)
@@ -117,6 +103,11 @@ async def startup_db_setup():
     except Exception as e:
         print(f"ERRO NO BOOT DE DB: {e}")
 
+    # Criar pasta de uploads se não existir
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+        print("📁 Pasta 'uploads' criada com sucesso!")
+        
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
 # Incluir Rotas

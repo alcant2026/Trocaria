@@ -184,6 +184,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [passoSaque, setPassoSaque] = useState(1);
     const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
+    const [tipoUpgrade, setTipoUpgrade] = useState(null);
     const [limiteInfo, setLimiteInfo] = useState({ limite_total: 0, limite_disponivel: 0, isento_taxa: false });
     const [mensagem, setMensagem] = useState(null);
 
@@ -220,6 +221,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     }, [mensagem]);
 
     const [kycDetails, setKycDetails] = useState('');
+    const [fotoRG, setFotoRG] = useState(null);
+    const [fotoRenda, setFotoRenda] = useState(null);
+    const [fotoResidencia, setFotoResidencia] = useState(null);
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
     );
@@ -484,6 +488,26 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         });
     };
 
+    const [qrCodeData, setQrCodeData] = useState({ qr_code: '', qr_code_base64: '', payment_id: '' });
+
+    const handleGerarPix = async () => {
+        const v = parseFloat(valorNotificacao);
+        if (!v || v <= 0) {
+            showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
+            return;
+        }
+        setLoadingAction(true);
+        try {
+            const res = await api.post('/financeiro/pix/gerar', { valor: v });
+            setQrCodeData(res);
+            setPassoDeposito(2); // Avança pra tela do QR Code pix
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.response?.data?.detail || err.message, type: 'error' });
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
     const handleNotificarDeposito = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
@@ -583,18 +607,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     };
 
     const confirmarSolicitarVerificacao = async () => {
-        if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
+        if (!fotoRG || !fotoRenda || !fotoResidencia) return showModal({ title: 'Documentos Incompletos', message: 'Anexe os 3 documentos (RG, Renda e Residência) para prosseguir.', type: 'warning' });
         setLoadingAction(true);
         try {
-            const res = await api.post('/score/solicitar-verificacao', { detalhes: kycDetails });
-            showModal({ title: 'Solicitação Enviada', message: res.message, type: 'success' });
+            const formData = new FormData();
+            formData.append('detalhes', kycDetails || '');
+            formData.append('foto_rg', fotoRG);
+            formData.append('foto_renda', fotoRenda);
+            formData.append('foto_residencia', fotoResidencia);
+
+            const res = await api.post('/score/solicitar-verificacao', formData, { 
+                isMultipart: true 
+            });
+            showModal({ title: 'Solicitação Enviada', message: res.data ? res.data.message : res.message, type: 'success' });
             setKycDetails('');
+            setFotoRG(null);
+            setFotoRenda(null);
+            setFotoResidencia(null);
             setPassoUpgrade(1);
             setTipoUpgrade(null);
             setActiveView('home');
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro ao solicitar verificação: ' + err.message);
+            setMensagem('Erro ao solicitar verificação: ' + (err.response?.data?.detail || err.message));
         } finally {
             setLoadingAction(false);
         }
@@ -604,7 +639,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (!kycDetails) return showModal({ title: 'Campo Obrigatório', message: 'Informe os detalhes do envio para prosseguir.', type: 'warning' });
         showModal({
             title: 'Solicitar Verificação',
-            message: 'Taxa de análise humana: R$ 35,00. \nDeseja prosseguir com a solicitação?',
+            message: 'Deseja prosseguir com a solicitação de verificação do seu perfil? (Grátis)',
             type: 'info',
             onConfirm: async () => {
                 closeModal();
@@ -1113,74 +1148,112 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         className="btn btn-primary" 
                                         style={{ width: '100%' }} 
                                         onClick={() => {
-                                            if (parseFloat(valorNotificacao) > 0) setPassoDeposito(2);
-                                            else showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+                                            if (parseFloat(valorNotificacao) > 0) {
+                                                if (metodoDeposito === 'pix') {
+                                                    handleGerarPix();
+                                                } else {
+                                                    setPassoDeposito(2);
+                                                }
+                                            } else {
+                                                showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+                                            }
                                         }}
+                                        disabled={loadingAction}
                                     >
-                                        Continuar
+                                        {loadingAction && metodoDeposito === 'pix' ? 'Gerando...' : 'Continuar'}
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* PASSO 2: INSTRUÇÕES */}
+                        {/* PASSO 2: INSTRUÇÕES OU QR CODE PIX */}
                         {passoDeposito === 2 && (
                             <div className="animate-fade-in">
                                 {metodoDeposito === 'pix' ? (
-                                    <>
-                                        <p className="mb-1">Tudo pronto! Agora realize a transferência PIX:</p>
-                                        <div className="info-block mb-1 text-center" style={{ position: 'relative', background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
-                                            <div className="info-label">Chave PIX (E-mail)</div>
-                                            <div className="info-value" style={{ fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                91980177874
-                                                <button
-                                                    onClick={copiarPix}
-                                                    style={{ background: 'none', border: 'none', color: copiadoPix ? 'var(--success)' : 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-                                                >
-                                                    {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
-                                                </button>
+                                    <div className="text-center">
+                                        <p className="mb-1 text-muted">Aguardando pagamento do PIX abaixo:</p>
+                                        <img 
+                                            src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} 
+                                            alt="QR Code PIX" 
+                                            style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem', border: '2px solid var(--primary)' }} 
+                                        />
+                                        
+                                        <div className="info-block mb-1" style={{ position: 'relative' }}>
+                                            <div className="info-label">Pix Copia e Cola</div>
+                                            <div className="info-value" style={{ 
+                                                fontSize: '0.8rem', 
+                                                wordBreak: 'break-all', 
+                                                background: 'rgba(255,255,255,0.05)', 
+                                                padding: '10px', 
+                                                borderRadius: '8px',
+                                                userSelect: 'all'
+                                            }}>
+                                                {qrCodeData.qr_code}
                                             </div>
-                                            {copiadoPix && <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>Copiado para o clipboard!</p>}
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(qrCodeData.qr_code);
+                                                    setCopiadoPix(true);
+                                                    setTimeout(() => setCopiadoPix(false), 2000);
+                                                }}
+                                                className="btn btn-outline"
+                                                style={{ width: '100%', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                            >
+                                                {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
+                                                {copiadoPix ? 'Código Copiado!' : 'Copiar Código PIX'}
+                                            </button>
                                         </div>
                                         <div className="info-block mb-1">
                                             <div className="info-label">Valor a pagar</div>
                                             <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                                         </div>
-                                    </>
-                                ) : (
-                                    <div className="input-group">
-                                        <label>Escolha o Estabelecimento Parceiro</label>
-                                        <select
-                                            className="input-field"
-                                            value={parceiroIdDeposito}
-                                            onChange={(e) => setParceiroIdDeposito(e.target.value)}
-                                            style={{ marginBottom: '1rem' }}
-                                        >
-                                            <option value="">Selecione um local...</option>
-                                            {parceiros.map(p => (
-                                                <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
-                                            ))}
-                                        </select>
-                                        <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+                                        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>
+                                            Assim que você pagar, o saldo atualizará automaticamente em até 10 segundos aqui na sua tela.
+                                        </p>
+                                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => {
+                                            setPassoDeposito(1);
+                                            setActiveView('home');
+                                            carregarSnapshot();
+                                        }}>
+                                            Voltar ao Início
+                                        </button>
                                     </div>
-                                )}
+                                ) : (
+                                    <>
+                                        <div className="input-group">
+                                            <label>Escolha o Estabelecimento Parceiro</label>
+                                            <select
+                                                className="input-field"
+                                                value={parceiroIdDeposito}
+                                                onChange={(e) => setParceiroIdDeposito(e.target.value)}
+                                                style={{ marginBottom: '1rem' }}
+                                            >
+                                                <option value="">Selecione um local...</option>
+                                                {parceiros.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+                                        </div>
 
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ flex: 2 }} 
-                                        disabled={metodoDeposito === 'especie' && !parceiroIdDeposito}
-                                        onClick={() => setPassoDeposito(3)}
-                                    >
-                                        Já realizei o Pagamento
-                                    </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoDeposito(1)}>Voltar</button>
-                                </div>
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 2 }} 
+                                                disabled={!parceiroIdDeposito}
+                                                onClick={() => setPassoDeposito(3)}
+                                            >
+                                                Já realizei o Pagamento
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoDeposito(1)}>Voltar</button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
-                        {/* PASSO 3: CONFIRMAÇÃO FINAL */}
-                        {passoDeposito === 3 && (
+                        {/* PASSO 3: CONFIRMAÇÃO FINAL (Apenas Espécie) */}
+                        {passoDeposito === 3 && metodoDeposito === 'especie' && (
                             <div className="animate-fade-in text-center" style={{ padding: '1rem 0' }}>
                                 <div style={{ background: 'rgba(var(--success-rgb), 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                                     <CheckCircle2 size={40} color="var(--success)" />
@@ -1190,7 +1263,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     Estamos verificando seu depósito de <strong>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>.
                                 </p>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>
-                                    O saldo aparecerá na sua conta assim que o pagamento for confirmado.
+                                    O saldo aparecerá na sua conta assim que o pagamento for confirmado pelo Parceiro.
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
@@ -1436,66 +1509,80 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de cooperado hoje.</p>
                                 
-                                <div 
-                                    className="clickable" 
-                                    style={{ 
-                                        padding: '1.2rem', 
-                                        background: tipoUpgrade === 'score' ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(var(--primary-rgb), 0.05)', 
-                                        borderRadius: '16px', 
-                                        border: tipoUpgrade === 'score' ? '1px solid var(--primary)' : '1px solid rgba(var(--primary-rgb), 0.1)', 
-                                        marginBottom: '10px',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                    onClick={() => setTipoUpgrade('score')}
-                                >
-                                    <h3 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
-                                        <Zap size={18} /> Novo Sistema de Score
-                                    </h3>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
-                                        Agora você ganha score conforme seu comportamento financeiro na plataforma.
-                                    </p>
-                                    <div style={{ marginTop: '5px', fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>Clique para ver como pontuar</div>
-                                </div>
+                                    {(!usuario.is_verified || usuario.kyc_status === 'pendente') && (
+                                        <div 
+                                            className="card-minimal clickable" 
+                                            style={{ 
+                                                background: usuario.kyc_status === 'pendente' ? 'rgba(var(--primary-rgb), 0.08)' : 'rgba(var(--success-rgb), 0.08)', 
+                                                padding: '1.5rem', 
+                                                borderRadius: '20px', 
+                                                border: usuario.kyc_status === 'pendente' ? '2px solid rgba(var(--primary-rgb), 0.2)' : '2px solid rgba(var(--success-rgb), 0.2)',
+                                                transition: 'all 0.2s ease',
+                                                marginBottom: '1rem',
+                                                opacity: usuario.kyc_status === 'pendente' ? 0.8 : 1,
+                                                cursor: usuario.kyc_status === 'pendente' ? 'default' : 'pointer'
+                                            }}
+                                            onClick={() => {
+                                                if (usuario.kyc_status === 'pendente') return;
+                                                setTipoUpgrade('verificacao');
+                                                setPassoUpgrade(2);
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                <div style={{ background: usuario.kyc_status === 'pendente' ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(var(--success-rgb), 0.15)', padding: '12px', borderRadius: '14px' }}>
+                                                    {usuario.kyc_status === 'pendente' ? <Clock size={28} color="var(--primary)" /> : <ShieldCheck size={28} color="var(--success)" />}
+                                                </div>
+                                                <div style={{ textAlign: 'left' }}>
+                                                    <h3 style={{ fontSize: '1rem', marginBottom: '4px', color: usuario.kyc_status === 'pendente' ? 'var(--primary)' : 'var(--success)', fontWeight: 800 }}>
+                                                        {usuario.kyc_status === 'pendente' ? 'Solicitação em Análise' : 'Verificação de Conta'}
+                                                    </h3>
+                                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                        {usuario.kyc_status === 'pendente' ? 'Nossa equipe está revisando seus documentos.' : 'Envie seus documentos para obter o selo e liberar crédito.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ 
+                                                    fontSize: '0.75rem', 
+                                                    fontWeight: 700, 
+                                                    color: usuario.kyc_status === 'pendente' ? 'var(--primary)' : 'var(--success)', 
+                                                    background: usuario.kyc_status === 'pendente' ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(var(--success-rgb), 0.1)', 
+                                                    padding: '4px 10px', 
+                                                    borderRadius: '6px' 
+                                                }}>
+                                                    {usuario.kyc_status === 'pendente' ? 'Aguarde 24h' : 'GRÁTIS'}
+                                                </span>
+                                                <div style={{ color: usuario.kyc_status === 'pendente' ? 'var(--text-muted)' : 'var(--success)', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                    {usuario.kyc_status === 'pendente' ? 'Análise em curso' : 'Começar Agora →'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                {!usuario.is_verified && (
                                     <div 
                                         className="card-minimal clickable" 
                                         style={{ 
-                                            background: tipoUpgrade === 'verificacao' ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(255,255,255,0.03)', 
+                                            background: 'rgba(var(--primary-rgb), 0.05)', 
                                             padding: '1.2rem', 
                                             borderRadius: '16px', 
-                                            border: tipoUpgrade === 'verificacao' ? '1px solid var(--primary)' : '1px solid transparent',
+                                            border: '1px solid rgba(var(--primary-rgb), 0.1)',
                                             transition: 'all 0.2s ease'
                                         }}
-                                        onClick={() => setTipoUpgrade('verificacao')}
+                                        onClick={() => {
+                                            setTipoUpgrade('score');
+                                            setPassoUpgrade(2);
+                                        }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ background: 'rgba(var(--success-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
-                                                <ShieldCheck size={24} color="var(--success)" />
-                                            </div>
-                                            <div style={{ textAlign: 'left' }}>
-                                                <h3 style={{ fontSize: '1rem', marginBottom: '2px' }}>Verificação de Conta</h3>
-                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Selo de verificado e maior confiança.</p>
-                                            </div>
-                                            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                                <span style={{ fontWeight: 800, color: 'var(--success)' }}>R$ 35,00</span>
-                                            </div>
-                                        </div>
+                                        <h3 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
+                                            <Zap size={18} /> Novo Sistema de Score
+                                        </h3>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
+                                            Descubra como ganhar pontos e melhorar seu limite.
+                                        </p>
+                                        <div style={{ marginTop: '5px', fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>Clique para ver as regras</div>
                                     </div>
-                                )}
-
-                                <div style={{ marginTop: '1rem' }}>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ width: '100%' }} 
-                                        disabled={!tipoUpgrade}
-                                        onClick={() => setPassoUpgrade(2)}
-                                    >
-                                        Continuar
-                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
                         {/* PASSO 2: DETALHES E INSTRUÇÕES */}
                         {passoUpgrade === 2 && (
@@ -1531,14 +1618,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <p style={{ margin: 0 }}>O Score máximo é 1000. Recompensamos quem ajuda o ecossistema a crescer!</p>
                                         </div>
 
-                                        <div className="mt-1">
-                                            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setActiveView('home')}>Entendido</button>
+                                        <div className="mt-1" style={{ display: 'flex', gap: '10px' }}>
+                                            <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setActiveView('home')}>Entendido</button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="animate-fade-in">
                                         <h3 className="mb-1" style={{ fontSize: '1.1rem' }}>Sua Privacidade em 1º Lugar</h3>
-                                        <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Não armazenamos fotos de documentos localmente para sua segurança total (LGPD).</p>
+                                        <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Não armazenamos fotos de documentos na nuvem de forma pública para sua segurança total (LGPD).</p>
                                         
                                         {/* Exibir motivo de rejeição anterior se houver */}
                                         {(() => {
@@ -1557,53 +1645,77 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         })()}
 
                                         <div className="input-group mb-1">
-                                            <label style={{ fontSize: '0.8rem' }}>Link do Google Drive ou Imgur com seus documentos:</label>
-                                            <textarea
-                                                className="input-field"
-                                                style={{ minHeight: '80px', fontSize: '0.85rem' }}
-                                                placeholder="https://drive.google.com/..."
-                                                value={kycDetails}
-                                                onChange={(e) => setKycDetails(e.target.value)}
-                                            />
+                                            <div style={{ 
+                                                display: 'flex', 
+                                                flexDirection: 'column', 
+                                                gap: '10px' 
+                                            }}>
+                                                {/* CAMPO 1: RG */}
+                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRG ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRG ? 'var(--success)' : 'var(--text-main)' }}>
+                                                        1. Foto do RG ou CNH (Frente e Verso) {fotoRG && '✅'}
+                                                    </label>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*,.pdf" 
+                                                        onChange={(e) => setFotoRG(e.target.files[0])} 
+                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
+                                                    />
+                                                </div>
+
+                                                {/* CAMPO 2: RESIDENCIA */}
+                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoResidencia ? 'var(--success)' : 'var(--text-main)' }}>
+                                                        2. Comprovante de Residência {fotoResidencia && '✅'}
+                                                    </label>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*,application/pdf" 
+                                                        onChange={(e) => setFotoResidencia(e.target.files[0])} 
+                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
+                                                    />
+                                                </div>
+
+                                                {/* CAMPO 3: RENDA */}
+                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRenda ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRenda ? 'var(--success)' : 'var(--text-main)' }}>
+                                                        3. Comprovante de Renda {fotoRenda && '✅'}
+                                                    </label>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*,application/pdf" 
+                                                        onChange={(e) => setFotoRenda(e.target.files[0])} 
+                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-muted" style={{ fontSize: '0.7rem' }}>Ou descreva como nos enviou (ex: via WhatsApp).</p>
+                                        
+                                        <div className="input-group mb-1">
+                                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Mensagem Opcional ao Avaliador:</label>
+                                            <textarea className="input-field" rows="2" placeholder="Ex: Mudei de endereço ontem..." value={kycDetails} onChange={(e) => setKycDetails(e.target.value)}></textarea>
+                                        </div>
+                                        <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--success-rgb), 0.05)', border: '1px solid rgba(var(--success-rgb), 0.1)', marginTop: '1rem' }}>
+                                            <div className="info-label">Custo do Upgrade</div>
+                                            <div className="info-value" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>
+                                                GRÁTIS
+                                            </div>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este serviço não possui custo para cooperados.</p>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ flex: 2 }} 
+                                                disabled={tipoUpgrade === 'verificacao' && (!fotoRG || !fotoRenda || !fotoResidencia)}
+                                                onClick={() => setPassoUpgrade(3)}
+                                            >
+                                                Confirmar Solicitação
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
+                                        </div>
                                     </div>
                                 )}
-
-                                <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)' }}>
-                                    <div className="info-label">Custo do Upgrade</div>
-                                    <div className="info-value" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>
-                                        R$ 35,00
-                                    </div>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>O valor será descontado do seu saldo atual.</p>
-                                </div>
-
-                                <div className="info-block mb-1">
-                                    <div className="flex-between">
-                                        <span style={{ fontSize: '0.85rem' }}>Seu Saldo:</span>
-                                        <strong style={{ color: usuario.saldo >= 35 ? 'var(--success)' : 'var(--danger)' }}>
-                                            R$ {parseFloat(usuario.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </strong>
-                                    </div>
-                                </div>
-
-                                {usuario.saldo < 35 && (
-                                    <div className="alert alert-warning mb-1" style={{ fontSize: '0.8rem', padding: '10px' }}>
-                                        <AlertCircle size={16} /> Você não tem saldo suficiente. <button onClick={() => setActiveView('depositar')} style={{ background: 'none', border: 'none', color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 700 }}>Fazer Depósito</button>
-                                    </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ flex: 2 }} 
-                                        disabled={(tipoUpgrade === 'verificacao' && !kycDetails) || usuario.saldo < 35}
-                                        onClick={() => setPassoUpgrade(3)}
-                                    >
-                                        Pagar com Saldo
-                                    </button>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
-                                </div>
                             </div>
                         )}
 
@@ -1626,7 +1738,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         onClick={tipoUpgrade === 'score' ? () => setMensagem('O score agora cresce com o seu uso da plataforma.') : confirmarSolicitarVerificacao}
                                         disabled={loadingAction}
                                     >
-                                        {loadingAction ? 'Processando...' : 'Finalizar e Pagar com Saldo'}
+                                        {loadingAction ? 'Processando...' : 'Enviar para Análise (Grátis)'}
                                     </button>
                                     <button className="btn btn-secondary" onClick={() => setPassoUpgrade(2)} disabled={loadingAction}>Revisar</button>
                                 </div>

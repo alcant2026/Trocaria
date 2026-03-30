@@ -5,6 +5,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
+import os
+import mercadopago
+
+# Inicializa SDK Mercado Pago
+mp_access_token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
+sdk = mercadopago.SDK(mp_access_token) if mp_access_token else None
+from fastapi.responses import FileResponse
 from decimal import Decimal
 import datetime
 from datetime import timezone, timedelta
@@ -286,6 +293,107 @@ async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(g
     cache_snapshot_data.clear()
     return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar."}
 
+class DepositoPixRequest(BaseModel):
+    valor: Decimal = Field(gt=0)
+
+@router.post("/pix/gerar")
+async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    if not sdk:
+        raise HTTPException(status_code=500, detail="Integração com Mercado Pago não configurada no servidor.")
+    
+    payment_data = {
+        "transaction_amount": float(dados.valor),
+        "description": f"Depósito Psy Pay - {usuario.nome}",
+        "payment_method_id": "pix",
+        "payer": {
+            "email": usuario.email,
+            "first_name": usuario.nome.split(" ")[0] if usuario.nome else "User",
+            "last_name": usuario.nome.split(" ")[-1] if usuario.nome and " " in usuario.nome else "Client",
+            "identification": {
+                "type": "CPF",
+                "number": usuario.cpf.replace(".", "").replace("-", "") if usuario.cpf else "00000000000"
+            }
+        }
+    }
+    
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
+    
+    if result.get("status") not in [200, 201]:
+        logger.error(f"Erro Mercado Pago: {payment}")
+        error_msg = "Não foi possível gerar o código PIX. Verifique suas credenciais no .env"
+        if payment.get("message") == "Unauthorized use of live credentials":
+            error_msg = "Erro: Você está usando chaves de PRODUÇÃO em localhost. Use chaves de TESTE (Sandbox)."
+        elif result.get("status") == 401:
+            error_msg = "Erro: Token do Mercado Pago inválido ou expirado."
+            
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    payment_id = payment.get("id")
+    qr_code = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code")
+    qr_code_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64")
+    
+    nova_transacao = Transacao(
+        usuario_id=usuario.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.DEPOSITO,
+        status="pendente",
+        metodo="pix",
+        detalhes=f"Pix MP Gerado | ID: {payment_id}"
+    )
+    db.add(nova_transacao)
+    db.commit()
+    cache_snapshot_data.clear()
+    
+    return {
+        "message": "PIX gerado com sucesso.",
+        "qr_code": qr_code,
+        "qr_code_base64": qr_code_base64,
+        "payment_id": payment_id
+    }
+
+@router.post("/webhook/mercadopago")
+async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
+    payload = await request.json()
+    action = payload.get("action")
+    type_ = payload.get("type")
+    
+    if (action and "payment" in action) or type_ == "payment":
+        payment_id = payload.get("data", {}).get("id")
+        if not payment_id:
+            return {"status": "ignored"}
+            
+        if not sdk: 
+            return {"status": "error", "message": "MP não configurado"}
+            
+        payment_info = sdk.payment().get(payment_id)
+        if payment_info.get("status") == 200:
+            payment = payment_info.get("response", {})
+            status_mp = payment.get("status")
+            
+            if status_mp == "approved":
+                transacao = db.query(Transacao).filter(Transacao.detalhes.like(f"%ID: {payment_id}%")).first()
+                if transacao and transacao.status == "pendente":
+                    usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
+                    if usuario:
+                        usuario.saldo += transacao.valor
+                        transacao.status = "concluido"
+                        
+                        fee_details = payment.get("fee_details", [])
+                        total_fee = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
+                        if total_fee > 0:
+                            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+                            if plataforma:
+                                plataforma.saldo -= total_fee
+                                transacao.detalhes += f" | Taxa MP Absorb: R$ {total_fee}"
+                        
+                        atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+                        db.commit()
+                        cache_snapshot_data.pop(usuario.id, None)
+                        cache_snapshot_data.pop("000PL", None)
+                    
+    return {"status": "success"}
+
 # --- Checkout Físico (Painel Parceiro) ---
 class ParceiroVerificarRequest(BaseModel):
     cliente_id: str
@@ -510,14 +618,37 @@ async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuari
 
 @router.get("/admin/pendentes")
 async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    pendentes = db.query(Transacao).join(Usuario).filter(
+    
+    subq_gasto = db.query(
+        Transacao.usuario_id,
+        func.coalesce(func.sum(Transacao.valor), 0).label('total_gasto')
+    ).filter(
+        Transacao.tipo.in_([
+            TipoTransacao.TAXA_SAQUE, TipoTransacao.COMPRA_SCORE, 
+            TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_INTERMEDIACAO, 
+            TipoTransacao.TAXA_CONVENIENCIA
+        ]),
+        Transacao.status == "concluido"
+    ).group_by(Transacao.usuario_id).subquery()
+
+    pendentes_query = db.query(Transacao, func.coalesce(subq_gasto.c.total_gasto, 0)).join(Usuario).outerjoin(
+        subq_gasto, Transacao.usuario_id == subq_gasto.c.usuario_id
+    ).filter(
         Transacao.status == "pendente",
         Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.SAQUE, TipoTransacao.DESBLOQUEIO_DADOS]),
-        Transacao.parceiro_id == None
+        Transacao.parceiro_id == None,
+        ~Transacao.detalhes.like("%Pix MP Gerado%") # Ocultar MP que é automatico
+    ).order_by(
+        func.coalesce(subq_gasto.c.total_gasto, 0).desc(),
+        Usuario.score.desc(),
+        func.coalesce(Usuario.saldo_caixa, 0).desc(),
+        Transacao.data_criacao.asc()
     ).all()
     
     resultado = []
-    for t in pendentes:
+    for t_row in pendentes_query:
+        t = t_row[0]
+        total_gasto = float(t_row[1])
         data = t.data_criacao
         if data.tzinfo is None:
             data = data.replace(tzinfo=timezone.utc)
@@ -525,7 +656,7 @@ async def listar_pendentes(db: Session = Depends(get_db), admin: Usuario = Depen
 
         resultado.append({
             "transacao_id": t.id,
-            "usuario_nome": t.usuario.nome,
+            "usuario_nome": f"{t.usuario.nome} [🏆 R$ {total_gasto:.2f} | Score {float(t.usuario.score):.0f} | Pool R$ {float(t.usuario.saldo_caixa or 0):.0f}]",
             "usuario_cpf": t.usuario.cpf,
             "usuario_verificado": t.usuario.is_verified,
             "valor": float(t.valor),
@@ -625,6 +756,16 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
         msg = f"Saque de R$ {transacao.valor} para {usuario.nome} marcado como enviado!"
         # NOVO: Perda de score por Saque (Penalidade)
         atualizar_score(db, usuario.id, transacao.valor, "SAQUE")
+    elif transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
+        # Lógica de Verificação de Conta (KYC)
+        usuario.is_verified = True
+        # Tentar localizar os documentos para marcar como aprovados
+        from modelos.modelos_db import DocumentoVerificacao
+        docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario.id, DocumentoVerificacao.status == "pendente").first()
+        if docs:
+            docs.status = "aprovado"
+            docs.data_analise = datetime.datetime.now(datetime.timezone.utc)
+        msg = f"Identidade de {usuario.nome} verificada com sucesso!"
     else:
         msg = f"Transação de {usuario.nome} confirmada!"
     
@@ -633,6 +774,55 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
     db.commit()
     cache_snapshot_data.clear()
     return {"message": msg}
+
+@router.get("/admin/kyc-pendentes")
+async def listar_kyc_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    from modelos.modelos_db import DocumentoVerificacao
+    docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.status == "pendente").all()
+    resultado = []
+    for d in docs:
+        resultado.append({
+            "usuario_id": d.usuario_id,
+            "usuario_nome": d.usuario.nome,
+            "usuario_cpf": d.usuario.cpf,
+            "data_envio": d.data_envio.isoformat(),
+            "tem_rg": bool(d.caminho_rg),
+            "tem_renda": bool(d.caminho_renda),
+            "tem_residencia": bool(d.caminho_residencia),
+        })
+    return resultado
+
+@router.get("/admin/view-doc/{usuario_id}/{tipo_doc}")
+async def view_documento(usuario_id: str, tipo_doc: str, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    from modelos.modelos_db import DocumentoVerificacao
+    doc = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documentos não encontrados")
+    
+    path = None
+    if tipo_doc == "rg": path = doc.caminho_rg
+    elif tipo_doc == "renda": path = doc.caminho_renda
+    elif tipo_doc == "residencia": path = doc.caminho_residencia
+    
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado no servidor")
+        
+    return FileResponse(path)
+
+class LimiteManualRequest(BaseModel):
+    limite: Optional[Decimal] = None
+
+@router.put("/admin/cliente/{usuario_id}/limite")
+async def atualizar_limite_manual(usuario_id: str, dados: LimiteManualRequest, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    cliente = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    
+    cliente.limite_credito_personalizado = dados.limite
+    db.commit()
+    from rotas.rotas_snapshot import cache_snapshot_data
+    cache_snapshot_data.pop(usuario_id, None)
+    return {"message": f"Limite manual atualizado para {dados.limite if dados.limite is not None else 'Automático'}."}
 
 @router.post("/admin/confirmar-verificacao/{transacao_id}")
 async def confirmar_verificacao(transacao_id: int, request: Request, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
@@ -643,6 +833,13 @@ async def confirmar_verificacao(transacao_id: int, request: Request, db: Session
     usuario = transacao.usuario
     usuario.is_verified = True
     transacao.status = "concluido"
+    
+    from modelos.modelos_db import DocumentoVerificacao
+    doc = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario.id, DocumentoVerificacao.status == "pendente").first()
+    if doc:
+        doc.status = "aprovado"
+        doc.data_analise = datetime.datetime.utcnow()
+
     registrar_acao_admin(db, admin.id, "CONFIRMAR_VERIFICACAO", alvo_id=usuario.id, detalhes=f"Transacao: {transacao.id}", ip=request.client.host)
     db.commit()
     return {"message": f"Identidade de {usuario.nome} verificada com sucesso!"}
@@ -663,6 +860,15 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
     
     transacao.status = "falhou"
     transacao.detalhes = f"REJEITADO: {motivo}"
+    
+    if transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
+        from modelos.modelos_db import DocumentoVerificacao
+        doc = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario.id, DocumentoVerificacao.status == "pendente").first()
+        if doc:
+            doc.status = "rejeitado"
+            doc.motivo_rejeicao = motivo
+            doc.data_analise = datetime.datetime.utcnow()
+
     registrar_acao_admin(db, admin.id, "REJEITAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Motivo: {motivo}", ip=request.client.host)
     db.commit()
     cache_snapshot_data.clear()

@@ -99,6 +99,12 @@ const AdminDashboard = () => {
     const [acaoData, setAcaoData] = useState({ valor: '', chave_pix: '', motivo: '' });
     const [loadingAcao, setLoadingAcao] = useState(false);
 
+    const [kycPendentes, setKycPendentes] = useState([]);
+    
+    // Limits
+    const [showLimiteModal, setShowLimiteModal] = useState(false);
+    const [limiteData, setLimiteData] = useState({ id: null, valor: '' });
+
     useEffect(() => {
         carregarSnapshot();
     }, []);
@@ -108,6 +114,10 @@ const AdminDashboard = () => {
         try {
             const res = await api.get('/snapshot');
             setSnapshot(res);
+            try {
+                const kycRes = await api.get('/financeiro/admin/kyc-pendentes');
+                setKycPendentes(kycRes || []);
+            } catch(e) { console.error("Erro kyc", e); }
         } catch (err) {
             setMensagem('Erro ao carregar dados: ' + (err.response?.data?.detail || err.message));
         } finally {
@@ -123,6 +133,33 @@ const AdminDashboard = () => {
     const parceiros = adminData.gestao_parceiros || [];
 
     // --- LOGICA DE AÇÕES ---
+    const handleAbrirDocumento = async (usuario_id, tipo) => {
+        try {
+            const blob = await api.getBlob(`/financeiro/admin/view-doc/${usuario_id}/${tipo}`);
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (err) {
+            setMensagem('Erro ao baixar documento: ' + err.message);
+        }
+    };
+
+    const handleAjustarLimite = async () => {
+        setLoadingAcao(true);
+        try {
+            const limitVal = parseFloat(limiteData.valor.replace(',', '.'));
+            await api.put(`/financeiro/admin/cliente/${limiteData.id}/limite`, {
+                limite: isNaN(limitVal) ? null : limitVal
+            });
+            setMensagem('Limite atualizado com sucesso.');
+            setShowLimiteModal(false);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro ao definir limite: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingAcao(false);
+        }
+    };
+
     const handleAprovar = async (id, tipo) => {
         try {
             const res = await api.post(`/financeiro/admin/confirmar/${id}`, { tipo });
@@ -377,17 +414,26 @@ const AdminDashboard = () => {
                                                 <div className="flex-start gap-1">
                                                     <div className="user-avatar">{p.usuario_nome.charAt(0)}</div>
                                                     <div>
-                                                        <p className="font-bold">{p.usuario_nome}</p>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <p className="font-bold">{p.usuario_nome}</p>
+                                                            {p.tipo === 'desbloqueio_dados' && (
+                                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                                    {p.tem_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'rg')}>👁️ RG</button>}
+                                                                    {p.tem_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'renda')}>👁️ Renda</button>}
+                                                                    {p.tem_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'residencia')}>👁️ Res.</button>}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         <p className="text-xs text-muted">CPF: {p.usuario_cpf}</p>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className={`status-pill ${p.tipo === 'deposito' ? 'status-success' : 'status-danger'}`}>
+                                                <span className={`status-pill ${p.tipo === 'deposito' ? 'status-success' : 'status-danger'}`} style={p.tipo === 'desbloqueio_dados' ? {background: 'var(--primary)', color: 'white'} : {}}>
                                                     {TIPOS_LABEL[p.tipo]}
                                                 </span>
                                             </td>
-                                            <td className="font-bold">R$ {p.valor.toLocaleString('pt-BR')}</td>
+                                            <td className="font-bold">{p.tipo === 'desbloqueio_dados' ? 'GRÁTIS' : `R$ ${p.valor.toLocaleString('pt-BR')}`}</td>
                                             <td className="text-muted text-xs">{formatarDataBR(p.data)}</td>
                                             <td>
                                                 <div className="flex-start gap-1">
@@ -600,9 +646,14 @@ const AdminDashboard = () => {
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>
-                                                    {u.is_verified ? 'Verificado' : 'Pendente'}
-                                                </span>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    <span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>
+                                                        {u.is_verified ? 'Verificado' : 'Pendente'}
+                                                    </span>
+                                                    <button className="btn btn-outline text-xs" onClick={() => { setLimiteData({ id: u.id, valor: '' }); setShowLimiteModal(true); }}>
+                                                        Ajustar Limite
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -673,6 +724,33 @@ const AdminDashboard = () => {
                             placeholder={acaoTipo === 'saque' ? 'Ex: Distribuição de lucros aos sócios...' : 'Ex: Aporte do investidor, injetado no mercado...'}
                             value={acaoData.motivo}
                             onChange={(e) => setAcaoData({ ...acaoData, motivo: e.target.value })}
+                        />
+                    </div>
+                </div>
+            </ModalPremium>
+
+            {/* Modal de Customização de Limite */}
+            <ModalPremium
+                isOpen={showLimiteModal}
+                onClose={() => setShowLimiteModal(false)}
+                title="Ajuste de Limite Personalizado"
+                message="Defina um teto de crédito manual para este usuário (Mestre). Deixe em branco se quiser devolver o usuário para a regra automática de Algoritmo do Score."
+                type="info"
+                onConfirm={handleAjustarLimite}
+                confirmText="Salvar Limite"
+                loading={loadingAcao}
+            >
+                <div style={{ textAlign: 'left', marginTop: '1rem' }}>
+                    <div className="input-group mb-1">
+                        <label>Novo Limite Permitido (R$)</label>
+                        <input
+                            type="number"
+                            className="input-field"
+                            placeholder="Deixe em branco para usar o Robô/Algoritmo"
+                            value={limiteData.valor}
+                            onChange={(e) => setLimiteData({ ...limiteData, valor: e.target.value })}
+                            min="0.00"
+                            step="0.01"
                         />
                     </div>
                 </div>

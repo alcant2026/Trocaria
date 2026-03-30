@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from decimal import Decimal
 import datetime
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao
+import os
+import secrets
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, DocumentoVerificacao
 from database import get_db
 
 from rotas.rotas_auth import obter_usuario_logado
@@ -19,50 +21,88 @@ async def consultar_score(usuario: Usuario = Depends(obter_usuario_logado)):
     return {"score": float(usuario.score)}
 
 @router.post("/solicitar-verificacao")
-async def solicitar_verificacao(dados: SolicitacaoVerificacao, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+async def solicitar_verificacao_com_docs(
+    detalhes: str = Form(""),
+    foto_rg: UploadFile = File(None),
+    foto_renda: UploadFile = File(None),
+    foto_residencia: UploadFile = File(None),
+    db: Session = Depends(get_db), 
+    usuario_logado: Usuario = Depends(obter_usuario_logado)
+):
     """
-    O tomador paga R$ 35,00 para solicitar a verificação humana (Selo Verificado).
+    O tomador solicita a verificação humana (Selo Verificado) de forma GRATUITA,
+    submetendo os comprovantes de forma criptografada para análise do Admin.
     """
-    # LOCK
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
 
     if usuario.is_verified:
         raise HTTPException(status_code=400, detail="Sua conta já está verificada.")
-
-    pagamento_anterior = db.query(Transacao).filter(
-        Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS
-    ).first()
-
-    custo = Decimal("35.00")
-    if not pagamento_anterior:
-        if usuario.saldo < custo:
-            raise HTTPException(status_code=400, detail="Saldo insuficiente para taxa de verificação (R$ 35,00).")
-        # Deduzir saldo apenas se for o primeiro pagamento
-        usuario.saldo -= custo
         
-        # Creditar lucro à plataforma (000PL) com LOCK
-        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-        if plataforma:
-            plataforma.saldo += custo
+    # Verificar se já existe documento pendente
+    doc_pendente = db.query(DocumentoVerificacao).filter(
+        DocumentoVerificacao.usuario_id == usuario.id,
+        DocumentoVerificacao.status == "pendente"
+    ).first()
+    if doc_pendente:
+        raise HTTPException(status_code=400, detail="Você já tem uma solicitação em análise.")
 
-        detalhe_pagamento = "Pagamento Taxa KYC"
-    else:
-        detalhe_pagamento = "Reenvio de Documentos (Isento de Nova Taxa)"
-    
-    # Registrar transação de solicitação (o admin verá isso no painel)
+    # Verificação agora é gratuita para evitar atrito (Padrão Nubank/Inter)
+    custo = Decimal("0.00")
+    detalhe_pagamento = "Solicitação de Verificação (Grátis)"
+        
+        
+    # Salvar Arquivos Localmente de forma segura
+    def salvar_arquivo(arquivo: UploadFile, tipo_doc: str) -> str:
+        if not arquivo or not arquivo.filename: return None
+        token = secrets.token_hex(8)
+        extensao = arquivo.filename.split('.')[-1][:5]
+        nome_seguro = f"{usuario.id}_{tipo_doc}_{token}.{extensao}"
+        caminho_completo = os.path.join("uploads", nome_seguro)
+        try:
+            with open(caminho_completo, "wb") as f:
+                f.write(arquivo.file.read())
+            return caminho_completo
+        except Exception as e:
+            print("Erro ao salvar arquivo:", e)
+            return None
+
+    path_rg = salvar_arquivo(foto_rg, "rg")
+    path_renda = salvar_arquivo(foto_renda, "renda")
+    path_residencia = salvar_arquivo(foto_residencia, "residencia")
+
+    # Registrar Transação (Histórico apenas)
     nova_transacao = Transacao(
         usuario_id=usuario.id,
-        valor=custo if not pagamento_anterior else Decimal("0.00"),
+        valor=Decimal("0.00"),
         tipo=TipoTransacao.DESBLOQUEIO_DADOS, 
         status="pendente",
-        detalhes=f"{detalhe_pagamento}: {dados.detalhes}" if dados.detalhes else f"{detalhe_pagamento}"
+        detalhes=f"{detalhe_pagamento}: {detalhes}" if detalhes else f"{detalhe_pagamento}"
     )
-
     db.add(nova_transacao)
-    db.commit()
+    
+    # Criar ou Atualizar Registro de Documento para o Painel Admin
+    docs_existentes = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario.id).first()
+    
+    if docs_existentes:
+        docs_existentes.caminho_rg = path_rg
+        docs_existentes.caminho_renda = path_renda
+        docs_existentes.caminho_residencia = path_residencia
+        docs_existentes.status = "pendente"
+        docs_existentes.data_envio = datetime.datetime.utcnow()
+        docs_existentes.data_analise = None
+        docs_existentes.motivo_rejeicao = None
+    else:
+        novo_doc = DocumentoVerificacao(
+            usuario_id=usuario.id,
+            caminho_rg=path_rg,
+            caminho_renda=path_renda,
+            caminho_residencia=path_residencia,
+            status="pendente"
+        )
+        db.add(novo_doc)
 
-    return {"message": "Solicitação enviada! O processamento é automático e o tempo varia conforme seu Score — quanto maior, mais rápido.", "saldo": float(usuario.saldo)}
+    db.commit()
+    return {"message": "Documentos enviados com sucesso! Aguarde a análise do administrador.", "saldo": float(usuario.saldo)}
 
 @router.post("/atualizar-decaimento")
 async def processar_decaimento_diario(db: Session = Depends(get_db)):

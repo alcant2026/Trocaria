@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, StatusSolicitacao
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, StatusSolicitacao, DocumentoVerificacao
 from sqlalchemy import func, case, and_, or_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
@@ -54,6 +54,13 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         from modelos.modelos_db import Parceiro
         parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
         is_parceiro = parceiro is not None
+
+        # Verificar Status KYC (Documentos Pendentes)
+        kyc_pendente = db.query(DocumentoVerificacao).filter(
+            DocumentoVerificacao.usuario_id == usuario.id,
+            DocumentoVerificacao.status == "pendente"
+        ).first()
+        kyc_status = "pendente" if kyc_pendente else ("verificado" if usuario.is_verified else "nenhum")
         
         # 0. Calcular Dívida Total Pendente (Skin in the game guarantee)
         divida_total_pendente = Decimal("0.00")
@@ -92,6 +99,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "score": float(usuario.score),
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,
+                "kyc_status": kyc_status,
                 "cpf": usuario.cpf,
                 "chave_pix": usuario.chave_pix,
                 "cidade": usuario.cidade,
@@ -207,8 +215,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             for p in pendentes_raw:
                 data_p = p.data_criacao
                 if data_p.tzinfo is None: data_p = data_p.replace(tzinfo=timezone.utc)
-                pendentes_list.append({
+                
+                info_p = {
                     "transacao_id": p.id,
+                    "usuario_id": p.usuario.id,
                     "usuario_nome": p.usuario.nome,
                     "usuario_cpf": p.usuario.cpf,
                     "usuario_verificado": p.usuario.is_verified,
@@ -216,8 +226,21 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "valor": float(p.valor),
                     "tipo": p.tipo.value,
                     "detalhes": p.detalhes,
-                    "data": data_p.astimezone(TZ_BRASILIA).isoformat()
-                })
+                    "data": data_p.astimezone(TZ_BRASILIA).isoformat(),
+                    "tem_rg": False,
+                    "tem_renda": False,
+                    "tem_residencia": False
+                }
+
+                # Se for KYC, buscar se tem arquivos vinculados
+                if p.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
+                    docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == p.usuario.id, DocumentoVerificacao.status == "pendente").first()
+                    if docs:
+                        info_p["tem_rg"] = bool(docs.caminho_rg)
+                        info_p["tem_renda"] = bool(docs.caminho_renda)
+                        info_p["tem_residencia"] = bool(docs.caminho_residencia)
+
+                pendentes_list.append(info_p)
 
             # Fiscal Resumo Otimizado (Lógica replicada de rotas_financeiro para evitar circularidade)
 

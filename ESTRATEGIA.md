@@ -1,6 +1,6 @@
-# 🚀 Auditoria e Próximos Passos: Estratégia Peer
+# 🚀 Auditoria e Próximos Passos: Estratégia de Pool Centralizado
 
-Este documento apresenta uma auditoria técnica da plataforma atual e o roteiro para transformá-la em uma Fintech de escala nacional, mantendo a segurança e o menor custo operacional possível.
+Este documento apresenta uma auditoria técnica da plataforma atual e o roteiro para transformá-la em uma Fintech (Sociedade de Crédito Direto) de escala nacional, mantendo a segurança e o menor custo operacional possível.
 
 ## 📋 Auditoria Atual (Estado da Arte)
 
@@ -42,7 +42,7 @@ Este documento apresenta uma auditoria técnica da plataforma atual e o roteiro 
 | :--- | :--- | :--- | :--- |
 | **Lançamento** | Render Free + Neon Free | **R$ 0,00** | Validação com primeiros 100 usuários. |
 | **Crescimento** | Render Starter + Neon Pro | **~R$ 100/mês** | Suportar até 5.000 usuários ativos. |
-| **Profissional** | AWS/GCP (Kubernetes) | **Sob Demanda** | Transformação em SEP (Instituição P2P). |
+| **Profissional** | AWS/GCP (Kubernetes) | **Sob Demanda** | Autorização BACEN como SCD (Sociedade de Crédito Direto). |
 
 > [!IMPORTANT]
 > O segredo do lucro na Fintech não é gastar muito em infra, mas sim ter **taxas saudáveis** e **inadimplência baixa**. Foque no seu algoritmo de Score enquanto a tecnologia aguenta a tração!

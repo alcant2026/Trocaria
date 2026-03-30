@@ -431,8 +431,29 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             }
             
             # 5. Adicionar lista resumida de usuários para gestão rápida no novo painel
-            from utils_emprestimo import obter_multiplicador_fidelidade
+            # OTIMIZAÇÃO: Busca em lote para evitar N+1 no loop
             usuarios_query = db.query(Usuario).filter(Usuario.id != "000PL").limit(100).all()
+            user_ids = [u.id for u in usuarios_query]
+            
+            # Pré-busca de empréstimos para cálculo de fidelidade em lote
+            all_loans = db.query(SolicitacaoEmprestimo).filter(
+                SolicitacaoEmprestimo.usuario_id.in_(user_ids),
+                SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO])
+            ).all()
+
+            # Mapeamento de fidelidade por usuário
+            agora_utc = datetime.utcnow()
+            fidelidade_map = {uid: False for uid in user_ids}
+            
+            for uid in user_ids:
+                u_loans = [l for l in all_loans if l.usuario_id == uid]
+                if not u_loans: continue
+                
+                tem_pagamento = any(l.parcelas_pagas > 0 or l.status == StatusSolicitacao.CONCLUIDO for l in u_loans)
+                tem_atraso = any(l.status == StatusSolicitacao.APROVADO and l.proximo_vencimento < agora_utc for l in u_loans)
+                if tem_pagamento and not tem_atraso:
+                    fidelidade_map[uid] = True
+
             for u in usuarios_query:
                 snapshot["admin"]["gestao_usuarios"].append({
                     "id": u.id,
@@ -442,7 +463,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "saldo_caixa": float(u.saldo_caixa),
                     "score": float(u.score),
                     "is_verified": u.is_verified,
-                    "is_good_payer": float(obter_multiplicador_fidelidade(u.id, db)) > 1.0
+                    "is_good_payer": fidelidade_map.get(u.id, False)
                 })
             # 6. Todas as Solicitações Ativas (Para investimento institucional)
             solicitacoes_ativas = db.query(SolicitacaoEmprestimo).filter(

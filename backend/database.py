@@ -46,10 +46,10 @@ pool_args = {
 engine_args = {}
 
 if not is_sqlite:
-    # No Neon Free, o limite de conexões é baixo (~10). 
-    # Com 2 workers, manter pool_size=2 e max_overflow=0 evita o erro.
-    pool_args["pool_size"] = 2
-    pool_args["max_overflow"] = 0
+    # No Neon Free, o limite de conexões é baixo (~10-20). 
+    # Aumentamos para 5 com 10 de overflow para evitar travamentos sob carga média.
+    pool_args["pool_size"] = 5
+    pool_args["max_overflow"] = 10
 else:
     engine_args["connect_args"] = {"check_same_thread": False}
 

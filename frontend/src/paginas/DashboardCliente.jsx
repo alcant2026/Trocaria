@@ -225,13 +225,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     }, [mensagem]);
 
-    // Auto-Sync PIX Polling: Fecha o QR Code sozinho quando o pagamento cai
+    // Auto-Sync PIX Polling + Timer: Fecha o QR Code sozinho quando o pagamento cai ou expira
+    const [timeLeft, setTimeLeft] = useState(null);
+
     useEffect(() => {
         let interval;
         if (qrCodeData.payment_id && activeView === 'depositar' && passoDeposito === 2) {
+            // Polling de Status
             interval = setInterval(async () => {
                 try {
-                    // Faz a verificação silenciosa no servidor
                     const res = await api.get(`/financeiro/meu-pix/sync/${qrCodeData.payment_id}`);
                     if (res.status === 'success') {
                         clearInterval(interval);
@@ -242,18 +244,59 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         });
                         setActiveView('home');
                         setPassoDeposito(1);
-                        setQrCodeData({ qr_code: '', qr_code_base64: '', payment_id: '' });
+                        setQrCodeData({ qr_code: '', qr_code_base64: '', payment_id: '', expires_at: null });
                         carregarSnapshot();
+                    } else if (res.status === 'expired') {
+                        clearInterval(interval);
+                        showModal({ 
+                            title: 'PIX Expirado', 
+                            message: 'O tempo para pagamento deste PIX esgotou. Por favor, gere um novo código.', 
+                            type: 'error' 
+                        });
+                        setPassoDeposito(1);
+                        setActiveView('home');
+                        setQrCodeData({ qr_code: '', qr_code_base64: '', payment_id: '', expires_at: null });
                     }
                 } catch (err) {
-                    // Erros de polling (ex: pagto ainda pendente) são ignorados para manter a tentativa
+                    // Erros silenciosos
                 }
-            }, 5000); // Verifica a cada 5 segundos
+            }, 5000);
+
+            // Temporizador Regressivo
+            const timerInterval = setInterval(() => {
+                if (qrCodeData.expires_at) {
+                    const diff = new Date(qrCodeData.expires_at).getTime() - new Date().getTime();
+                    if (diff <= 0) {
+                        clearInterval(timerInterval);
+                        setTimeLeft(0);
+                    } else {
+                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                        setTimeLeft(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
+                    }
+                }
+            }, 1000);
+
+            return () => {
+                clearInterval(interval);
+                clearInterval(timerInterval);
+            };
         }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [qrCodeData.payment_id, activeView, passoDeposito]);
+    }, [qrCodeData.payment_id, qrCodeData.expires_at, activeView, passoDeposito]);
+
+    // Efeito para fechar quando o tempo acaba
+    useEffect(() => {
+        if (timeLeft === 0) {
+            showModal({ 
+                title: 'Tempo Esgotado', 
+                message: 'O código PIX expirou. Gere um novo se desejar depositar.', 
+                type: 'warning' 
+            });
+            setQrCodeData({ qr_code: '', qr_code_base64: '', payment_id: '', expires_at: null });
+            setPassoDeposito(1);
+            setActiveView('home');
+        }
+    }, [timeLeft]);
 
     const [kycDetails, setKycDetails] = useState('');
     const [fotoRG, setFotoRG] = useState(null);
@@ -523,7 +566,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         });
     };
 
-    const [qrCodeData, setQrCodeData] = useState({ qr_code: '', qr_code_base64: '', payment_id: '' });
+    const [qrCodeData, setQrCodeData] = useState({ 
+        qr_code: '', 
+        qr_code_base64: '', 
+        payment_id: '',
+        expires_at: null 
+    });
+    const [timeLeft, setTimeLeft] = useState(null);
 
     const handleGerarPix = async () => {
         const v = parseFloat(valorNotificacao);
@@ -1238,6 +1287,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 {metodoDeposito === 'pix' ? (
                                     <div className="text-center">
                                         <p className="mb-1 text-muted">Aguardando pagamento do PIX abaixo:</p>
+                                        
+                                        {timeLeft && (
+                                            <div className="badge-notification bg-dark mb-1" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 20px', color: 'var(--primary)', borderRadius: '25px', fontSize: '0.85rem', fontWeight: 800, border: '1px solid rgba(var(--primary-rgb), 0.2)' }}>
+                                                <Clock size={16} /> Expira em: {timeLeft}
+                                            </div>
+                                        )}
                                         <img 
                                             src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} 
                                             alt="QR Code PIX" 

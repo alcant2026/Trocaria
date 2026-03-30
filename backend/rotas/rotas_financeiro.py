@@ -301,10 +301,17 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
     if not sdk:
         raise HTTPException(status_code=500, detail="Integração com Mercado Pago não configurada no servidor.")
     
+    # Expiração em 30 minutos
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    expiracao = agora + datetime.timedelta(minutes=30)
+    # Formato MP: 2023-08-22T12:00:00.000-04:00
+    expiracao_iso = expiracao.isoformat(timespec='milliseconds')
+    
     payment_data = {
         "transaction_amount": float(dados.valor),
         "description": f"Depósito Psy Pay - {usuario.nome}",
         "payment_method_id": "pix",
+        "date_of_expiration": expiracao_iso,
         "payer": {
             "email": usuario.email,
             "first_name": usuario.nome.split(" ")[0] if usuario.nome else "User",
@@ -349,7 +356,8 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         "message": "PIX gerado com sucesso.",
         "qr_code": qr_code,
         "qr_code_base64": qr_code_base64,
-        "payment_id": payment_id
+        "payment_id": payment_id,
+        "expires_at": expiracao_iso
     }
 
 @router.post("/webhook/mercadopago")
@@ -499,7 +507,9 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
         return {"status": "pending", "message": "Pagamento não encontrado ou ainda processando."}
 
     payment = payment_info.get("response", {})
-    if payment.get("status") == "approved":
+    status_mp = payment.get("status")
+    
+    if status_mp == "approved":
         # Busca a transação pendente associada
         transacao = db.query(Transacao).filter(
             Transacao.usuario_id == usuario.id,
@@ -521,6 +531,20 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
             
             return {"status": "success", "message": "Pagamento aprovado e saldo creditado!"}
     
+    elif status_mp in ["cancelled", "expired", "rejected"]:
+        # Marcar como expirado no banco para "limpar" os registros pendentes do usuário
+        transacao = db.query(Transacao).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.status == "pendente",
+            Transacao.detalhes.like(f"%ID: {payment_id}%")
+        ).first()
+        
+        if transacao:
+            transacao.status = "expirado"
+            transacao.detalhes += f" | Finalizado no MP como: {status_mp}"
+            db.commit()
+            return {"status": "expired", "message": "Este PIX expirou ou foi cancelado."}
+
     return {"status": "pending", "message": "Pagamento ainda não aprovado."}
 
 @router.get("/meu-pix/sync-all")

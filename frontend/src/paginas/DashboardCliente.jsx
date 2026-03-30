@@ -220,6 +220,36 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     }, [mensagem]);
 
+    // Auto-Sync PIX Polling: Fecha o QR Code sozinho quando o pagamento cai
+    useEffect(() => {
+        let interval;
+        if (qrCodeData.payment_id && activeView === 'depositar' && passoDeposito === 2) {
+            interval = setInterval(async () => {
+                try {
+                    // Faz a verificação silenciosa no servidor
+                    const res = await api.get(`/financeiro/meu-pix/sync/${qrCodeData.payment_id}`);
+                    if (res.status === 'success') {
+                        clearInterval(interval);
+                        showModal({ 
+                            title: 'Pagamento Confirmado! 🎉', 
+                            message: 'Seu depósito foi processado e o saldo já está disponível na sua conta.', 
+                            type: 'success' 
+                        });
+                        setActiveView('home');
+                        setPassoDeposito(1);
+                        setQrCodeData({ qr_code: '', qr_code_base64: '', payment_id: '' });
+                        carregarSnapshot();
+                    }
+                } catch (err) {
+                    // Erros de polling (ex: pagto ainda pendente) são ignorados para manter a tentativa
+                }
+            }, 5000); // Verifica a cada 5 segundos
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [qrCodeData.payment_id, activeView, passoDeposito]);
+
     const [kycDetails, setKycDetails] = useState('');
     const [fotoRG, setFotoRG] = useState(null);
     const [fotoRenda, setFotoRenda] = useState(null);
@@ -515,7 +545,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             const res = await api.get(`/financeiro/meu-pix/sync/${qrCodeData.payment_id}`);
             if (res.status === 'success') {
                 showModal({ title: 'Sucesso', message: res.message, type: 'success' });
-                setExibirModalDeposito(false);
+                setActiveView('home');
                 setPassoDeposito(1);
                 carregarSnapshot();
             } else {

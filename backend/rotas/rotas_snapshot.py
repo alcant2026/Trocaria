@@ -304,7 +304,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             
             # 4.2 Custos Fixos de Infraestrutura (Estimados)
             # Render: ~R$ 35.00 (Plano Starter) | Neon: R$ 0.00 (Free Tier)
-            custo_render = Decimal("35.00")
+            custo_render = Decimal("0.00")
             custo_neon = Decimal("0.00")
             total_infra = custo_render + custo_neon
 

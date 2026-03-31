@@ -333,6 +333,13 @@ const AdminDashboard = () => {
                                 trend={null}
                             />
                             <StatCard 
+                                label="Receita Bruta (Mês)" 
+                                value={`R$ ${fiscal.lucro_plataforma_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                icon={TrendingUp}
+                                color="var(--primary)"
+                                trend={null}
+                            />
+                            <StatCard 
                                 label="Lucro Líquido Real" 
                                 value={`R$ ${fiscal.lucro_real_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={TrendingUp}

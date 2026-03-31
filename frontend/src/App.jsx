@@ -175,8 +175,8 @@ const App = () => {
                         <a href="#pool" className={`nav-item ${page === 'pool' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <TrendingUp size={20} /> Fundo Coletivo
                         </a>
-                        <a href="#loja" className={`nav-item ${page === 'loja' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <ShoppingBag size={20} /> Loja
+                        <a href="#marketplace" className={`nav-item ${page === 'marketplace' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                            <ShoppingBag size={20} /> Marketplace
                         </a>
                         {user.is_admin && (
                             <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
@@ -221,11 +221,11 @@ const App = () => {
                 {page === 'login' && <div className="card text-center"><h2>Você está logado.</h2><button className="btn btn-primary" onClick={() => window.location.hash = 'cliente'}>Ir para o Início</button></div>}
                 {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
                 {page === 'pool' && <DashboardCliente initialView="pool" />}
-                {page === 'loja' && <DashboardCliente initialView="loja" />}
+                {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'seguranca' && <Seguranca />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
-                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'seguranca', 'loja', 'privacidade'].includes(page)) && <DashboardCliente />}
+                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'seguranca', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
             </main>
             {/* Modal de Exclusão Crítica */}
             {modalExcluir && (

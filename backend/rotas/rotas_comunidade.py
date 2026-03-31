@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink, HistoricoClique
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
 import pyotp
+import random
 
 router = APIRouter(prefix="/comunidade", tags=["Comunidade"])
 
@@ -32,9 +34,9 @@ class CompraViewsRequest(BaseModel):
     pacote_id: int # 1: 500 views (R$ 5), 2: 1500 views (R$ 12), 3: 5000 views (R$ 35)
 
 PRECO_VIEWS = {
-    1: {"views": 500, "preco": Decimal("5.00")},
-    2: {"views": 1500, "preco": Decimal("12.00")},
-    3: {"views": 5000, "preco": Decimal("35.00")},
+    1: {"views": 500, "preco": Decimal("5.00"), "ponto_min": 1, "ponto_max": 5},
+    2: {"views": 1500, "preco": Decimal("12.00"), "ponto_min": 5, "ponto_max": 15},
+    3: {"views": 5000, "preco": Decimal("35.00"), "ponto_min": 15, "ponto_max": 50},
 }
 
 @router.post("/postar-link")
@@ -114,6 +116,8 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
     # 3. Atualizar Link
     link.visualizacoes_restantes += views
     link.is_boosted = True
+    link.ponto_min = pacote["ponto_min"]
+    link.ponto_max = pacote["ponto_max"]
     # Estender expiração para longa duração (ex: +30 dias de vida no banco)
     link.data_expiracao = datetime.datetime.utcnow() + datetime.timedelta(days=30)
     
@@ -151,6 +155,7 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
             "views_restantes": l.visualizacoes_restantes,
             "views_totais": l.visualizacoes_totais,
             "is_boosted": l.is_boosted,
+            "ponto_max": int(l.ponto_max or 1),
             "nota": float(l.nota) if l.nota else 0.0,
             "vendas_texto": l.vendas_texto or "",
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None,
@@ -189,6 +194,7 @@ async def explorar_comunidade(page: int = 1, limit: int = 12, db: Session = Depe
             "total_avaliacoes": l.total_avaliacoes or 0,
             "vendas_texto": l.vendas_texto or "",
             "views_totais": l.visualizacoes_totais,
+            "ponto_max": int(l.ponto_max or 1),
             "anunciante": anunciante.nome.split(' ')[0] if anunciante else "Anônimo",
             "usuario_id": l.usuario_id,
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None
@@ -205,19 +211,75 @@ class RegistrarViewRequest(BaseModel):
     link_id: int
 
 @router.post("/registrar-view")
-async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_db)):
+async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_db), authorization: Optional[str] = Header(None)):
     """
     Registra um clique real no link do produto.
     Consome 1 view restante e incrementa o total.
-    Quando as views acabam e o link não é boosted, ele desaparece do feed.
     """
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
     link = db.query(LinkAfiliado).filter(
         LinkAfiliado.id == dados.link_id,
         LinkAfiliado.is_active == True
     ).first()
     
     if not link:
-        return {"ok": True}  # Silencioso para não quebrar UX
+        return {"ok": True}
+
+    # LOGICA DE PONTOS (Membro Premium)
+    # Tenta obter o usuário via token manualmente se fornecido (para evitar erro se deslogado)
+    usuario_id = None
+    if token:
+        from rotas.rotas_auth import verificar_token_manual
+        usuario_id = verificar_token_manual(token)
+    
+    if usuario_id:
+        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).with_for_update().first()
+        
+        # SEGURANÇA: Bloquear se for o próprio dono do link
+        is_proprio_link = link.usuario_id == usuario.id
+        
+        if usuario and usuario.is_subscriber and not is_proprio_link:
+            # SEGURANÇA: Verificar se já clicou neste link nas últimas 24 horas
+            vinte_quatro_horas_atras = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+            ja_clicou = db.query(HistoricoClique).filter(
+                HistoricoClique.usuario_id == usuario.id,
+                HistoricoClique.link_id == link.id,
+                HistoricoClique.data_clique >= vinte_quatro_horas_atras
+            ).first()
+
+            if not ja_clicou:
+                # Registro novo clique no histórico para trava de 24h
+                novo_clique = HistoricoClique(usuario_id=usuario.id, link_id=link.id)
+                db.add(novo_clique)
+                
+                # Regra de Pontos Aleatórios
+                pontos_ganhos = 1
+                if link.is_boosted and link.ponto_max > 1:
+                    pontos_ganhos = random.randint(link.ponto_min, link.ponto_max)
+                
+                usuario.pontos_marketplace += pontos_ganhos
+                
+                # CONVERSÃO AUTOMÁTICA: 1000 pontos = R$ 0,10
+                if usuario.pontos_marketplace >= 1000:
+                    valor_credito = Decimal("0.10")
+                    
+                    # Tira do lucro da plataforma (000PL)
+                    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+                    if plataforma and plataforma.saldo >= valor_credito:
+                        plataforma.saldo -= valor_credito
+                        usuario.saldo += valor_credito
+                        usuario.pontos_marketplace -= 1000
+                        
+                        # Registrar transação de bonificação
+                        db.add(Transacao(
+                            usuario_id=usuario.id,
+                            valor=valor_credito,
+                            tipo=TipoTransacao.RETORNO_POOL,
+                            status="concluido",
+                            detalhes="Conversão Automática: 1.000 Pontos Marketplace → Saldo"
+                        ))
     
     # Consumir 1 view
     if link.visualizacoes_restantes > 0:
@@ -227,15 +289,9 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
     # Se views acabaram, aplicar regra
     if link.visualizacoes_restantes <= 0:
         if not link.is_boosted:
-            # GRÁTIS: deleta do BD direto (libera espaço)
             db.delete(link)
-            db.commit()
-            return {"ok": True, "views_restantes": 0, "removido": True}
         else:
-            # PAGO: apenas desativa (anunciante pode recomprar views)
             link.is_active = False
-            db.commit()
-            return {"ok": True, "views_restantes": 0, "desativado": True}
     
     db.commit()
     return {"ok": True, "views_restantes": link.visualizacoes_restantes}

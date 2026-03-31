@@ -1,24 +1,25 @@
-from modelos.modelos_db import SessionLocal, Transacao, Usuario
-from sqlalchemy import desc
+import sqlite3
+import os
 
-def check_transactions():
-    db = SessionLocal()
+db_path = 'cred_plus.db'
+if not os.path.exists(db_path):
+    print("Banco de dados não encontrado.")
+else:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Adicionar colunas se não existirem
     try:
-        # Pega as últimas 5 transações
-        transacoes = db.query(Transacao).order_by(desc(Transacao.id)).limit(5).all()
-        print("--- ÚLTIMAS TRANSAÇÕES ---")
-        for t in transacoes:
-            print(f"ID: {t.id} | Usuário: {t.usuario_id} | Valor: {t.valor} | Tipo: {t.tipo} | Status: {t.status} | Detalhes: {t.detalhes}")
-            
-        # Pega o usuário 367MD (mencionado nos logs anteriores) ou o último que fez transação
-        if transacoes:
-            uid = transacoes[0].usuario_id
-            user = db.query(Usuario).filter(Usuario.id == uid).first()
-            if user:
-                print(f"\n--- USUÁRIO {uid} ---")
-                print(f"Nome: {user.nome} | Saldo: {user.saldo} | Score: {user.score}")
-    finally:
-        db.close()
+        cursor.execute("ALTER TABLE links_afiliados ADD COLUMN ponto_min INTEGER DEFAULT 1")
+        print("Coluna ponto_min adicionada.")
+    except sqlite3.OperationalError:
+        print("Coluna ponto_min já existe ou erro ao adicionar.")
 
-if __name__ == "__main__":
-    check_transactions()
+    try:
+        cursor.execute("ALTER TABLE links_afiliados ADD COLUMN ponto_max INTEGER DEFAULT 1")
+        print("Coluna ponto_max adicionada.")
+    except sqlite3.OperationalError:
+        print("Coluna ponto_max já existe ou erro ao adicionar.")
+        
+    conn.commit()
+    conn.close()

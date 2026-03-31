@@ -116,13 +116,20 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
                 "comissoes_acumuladas": float(parceiro.comissoes_acumuladas or 0) if parceiro else 0.0,
                 "saldo_caixa_atual": float(parceiro.saldo_caixa_atual or 0) if parceiro else 0.0,
+                "is_subscriber": usuario.is_subscriber,
+                "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
+                "pontos_marketplace": usuario.pontos_marketplace,
             },
             "historico": []
         }
 
-        # 2. Histórico (Top 10)
+        # 2. Histórico (Top 10) - Filtrando taxas administrativas que o usuário não quer ver (KYC/Score)
         print(f"[DEBUG SNAPSHOT] Buscando histórico")
-        transacoes = db.query(Transacao).filter(Transacao.usuario_id == usuario.id).order_by(Transacao.data_criacao.desc()).limit(10).all()
+        transacoes = db.query(Transacao).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo != TipoTransacao.DESBLOQUEIO_DADOS,
+            Transacao.tipo != TipoTransacao.COMPRA_SCORE
+        ).order_by(Transacao.data_criacao.desc()).limit(10).all()
         for t in transacoes:
             data_t = t.data_criacao
             if data_t.tzinfo is None:
@@ -198,7 +205,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             TipoTransacao.TAXA_ESPECIE,
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.RETORNO_INVESTIMENTO,
-            TipoTransacao.TAXA_ADM_EMPRESTIMO
+            TipoTransacao.TAXA_ADM_EMPRESTIMO,
+            TipoTransacao.ASSINATURA
         ]
 
         # --- ADMIN DATA ---
@@ -420,7 +428,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "taxa_especie": float(detalhamento_mes.get('taxa_especie', 0)),
                         "taxa_adm_emprestimo": float(detalhamento_mes.get('taxa_adm_emprestimo', 0)),
                         "aportes_externos": float(aportes_mes),
-                        "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0))
+                        "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0)),
+                        "assinaturas": float(detalhamento_mes.get('assinatura', 0))
                     },
                     "historico_mensal": historico_mes
                 },

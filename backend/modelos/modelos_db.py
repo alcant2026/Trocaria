@@ -31,6 +31,7 @@ class TipoTransacao(enum.Enum):
     RETORNO_POOL = "retorno_pool"
     COMISSAO_PARCEIRO = "comissao_parceiro"
     TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
+    ASSINATURA = "assinatura"
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
@@ -79,6 +80,11 @@ class Usuario(Base):
 
     codigo_recuperacao_hash = Column(String(200), nullable=True)
     expiracao_recuperacao = Column(DateTime, nullable=True)
+
+    # NOVO: Assinatura Premium Marketplace
+    is_subscriber = Column(Boolean, default=False)
+    assinatura_expira_em = Column(DateTime, nullable=True)
+    pontos_marketplace = Column(Integer, default=0)
 
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
@@ -191,6 +197,10 @@ class LinkAfiliado(Base):
     total_avaliacoes = Column(Integer, default=0)
     vendas_texto = Column(String(50), nullable=True)  # Ex: "8mil+ vendas"
     denuncias_count = Column(Integer, default=0)
+    
+    # Controle de pontos (Gamificação)
+    ponto_min = Column(Integer, default=1)
+    ponto_max = Column(Integer, default=1)
 
     usuario = relationship("Usuario")
 
@@ -245,3 +255,15 @@ class DocumentoVerificacao(Base):
     data_analise = Column(DateTime, nullable=True)
     
     usuario = relationship("Usuario")
+
+class HistoricoClique(Base):
+    """Tabela para garantir que cliques sejam únicos para ganho de pontos (máx 1 per Link per User per 24h)."""
+    __tablename__ = "historico_cliques_marketplace"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
+    data_clique = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    usuario = relationship("Usuario")
+    link = relationship("LinkAfiliado")

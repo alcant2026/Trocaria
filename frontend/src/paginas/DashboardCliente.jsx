@@ -114,14 +114,15 @@ const TIPOS_LABEL = {
     bonus_pagador_caixa: 'Bônus de Fidelidade',
     retorno_pool: 'Retorno Fundo Coletivo',
     retorno_investimento: 'Retorno de Investimento',
+    assinatura: 'Assinatura Premium',
 };
 
 // Tipos que são saídas do tipo "taxa/pagamento"
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa']);
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa', 'assinatura']);
 // Tipos que são entradas (positivos)
 const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'resgate_caixa', 'bonus_pagador_caixa', 'retorno_pool', 'retorno_investimento']);
 // Todos os tipos negativos (sem badge CONCLUIDO)
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa', 'assinatura']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -148,6 +149,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [activeView, setActiveView] = useState(initialView); // 'home', 'solicitar', 'depositar', 'saque', 'score', 'loja'
     const [verSaldo, setVerSaldo] = useState(true);
     const [aceiteTermos, setAceiteTermos] = useState(false);
+    
+    // NOVO: Assinatura Premium
+    const [showAssinarModal, setShowAssinarModal] = useState(false);
+    const [loadingAssinatura, setLoadingAssinatura] = useState(false);
     const [showTermos, setShowTermos] = useState(false);
     const [copiadoPix, setCopiadoPix] = useState(false);
     const [copiadoId, setCopiadoId] = useState(false);
@@ -385,6 +390,24 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
+    const handleAssinarPlano = async () => {
+        setLoadingAssinatura(true);
+        try {
+            const res = await api.post('/financeiro/assinar-plano');
+            carregarSnapshot();
+            setShowAssinarModal(false);
+            showModal({ 
+                title: 'Parabéns!', 
+                message: res.message || 'Agora você é um membro Premium Psy Pay!', 
+                type: 'success' 
+            });
+        } catch (err) { 
+            showModal({ title: 'Assinatura', message: err.message, type: 'danger' }); 
+        } finally { 
+            setLoadingAssinatura(false); 
+        }
+    };
+
     const handleCopiarId = () => {
         navigator.clipboard.writeText(usuario.id);
         setCopiadoId(true);
@@ -417,7 +440,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             }
             
             // Carregar parceiros
-            api.get('/financeiro/admin/parceiros').then(resP => setParceiros(resP || [])).catch(console.error);
+            api.get('/financeiro/parceiros').then(resP => setParceiros(resP || [])).catch(console.error);
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
         }
@@ -1420,7 +1443,27 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                         </div>
 
-                        {!usuario.two_factor_enabled ? (
+                        {!usuario.is_verified ? (
+                            <div className="text-center" style={{ padding: '1rem' }}>
+                                <ShieldAlert size={48} color="var(--danger)" style={{ margin: '0 auto 1rem' }} />
+                                <p className="mb-1" style={{ fontWeight: 600 }}>Conta Não Verificada</p>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Para realizar saques, sua identidade precisa estar verificada. Envie seus documentos (RG, Renda e Residência) e aguarde a aprovação.</p>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} 
+                                        onClick={() => {
+                                            setTipoUpgrade('verificacao');
+                                            setPassoUpgrade(2);
+                                            setActiveView('score');
+                                        }}
+                                    >
+                                        Enviar Documentos
+                                    </button>
+                                    <button className="btn btn-secondary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => setActiveView('home')}>Voltar</button>
+                                </div>
+                            </div>
+                        ) : !usuario.two_factor_enabled ? (
                             <div className="text-center" style={{ padding: '1rem' }}>
                                 <ShieldAlert size={48} color="var(--warning)" style={{ margin: '0 auto 1rem' }} />
                                 <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
@@ -1726,21 +1769,41 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <p className="text-muted mb-1 text-center" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>Diferente de sistemas antigos, no PSY PAY seu score reflete sua confiança real.</p>
                                         
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)' }}>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>💰 Depósitos</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +1.0 ponto a cada R$ 100,00 depositados.</div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <PlusCircle size={20} color="var(--primary)" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Depósitos</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +1.0 ponto a cada R$ 100,00 depositados.</div>
+                                                </div>
                                             </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--warning)' }}>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>🏦 Aporte no Pool (Caixa)</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos a cada R$ 100,00 aplicados no Pool.</div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--warning)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(255, 145, 0, 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <Landmark size={20} color="var(--warning)" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Aporte no Pool (Caixa)</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos a cada R$ 100,00 aplicados no Pool.</div>
+                                                </div>
                                             </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--success)' }}>
-                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '4px' }}>✅ Pagamentos em Dia</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos fixos por cada parcela paga rigorosamente em dia.</div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--success)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(var(--success-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <CheckCircle2 size={20} color="var(--success)" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Pagamentos em Dia</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos fixos por cada parcela paga rigorosamente em dia.</div>
+                                                </div>
                                             </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,61,0,0.05)', padding: '12px', borderLeft: '4px solid var(--danger)' }}>
-                                                <div style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--danger)', marginBottom: '4px' }}>⚠️ Saques/Resgates</div>
-                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O score diminui (-2.0 pts) ao retirar liquidez da plataforma.</div>
+                                            <div className="info-block" style={{ background: 'rgba(255,61,0,0.05)', padding: '12px', borderLeft: '4px solid var(--danger)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(255, 61, 0, 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <ArrowDownCircle size={20} color="var(--danger)" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--danger)', marginBottom: '2px' }}>Saques/Resgates</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O score diminui (-2.0 pts) ao retirar liquidez da plataforma.</div>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -2244,6 +2307,51 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </button>
                     </div>
 
+                    {/* BANNER PREMIUM / PONTOS */}
+                    {usuario.is_subscriber ? (
+                        <div style={{ 
+                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.2) 0%, rgba(0,0,0,0.4) 100%)', 
+                            padding: '15px', 
+                            borderRadius: '16px', 
+                            marginBottom: '1.5rem', 
+                            border: '1px solid rgba(var(--primary-rgb), 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <h4 style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                                    <Zap size={18} fill="var(--primary)" /> MEMBRO PREMIUM ATIVO
+                                </h4>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Você ganha 1 ponto por cada link aberto. A cada 1.000 pontos = R$ 0,10 de saldo!</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Seus Pontos</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)' }}>{usuario.pontos_marketplace || 0} <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>pts</span></div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ 
+                            background: 'linear-gradient(135deg, rgba(255,214,0,0.1) 0%, rgba(0,0,0,0.6) 100%)', 
+                            padding: '15px', 
+                            borderRadius: '16px', 
+                            marginBottom: '1.5rem', 
+                            border: '1px solid rgba(255,214,0,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '15px'
+                        }}>
+                            <div style={{ background: 'rgba(255,214,0,0.1)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <Zap size={24} color="#FFD600" fill="#FFD600" />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#FFD600' }}>Seja um Membro Premium Marketplace</h4>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe 1 ponto por link aberto e converta em saldo real automaticamente!</p>
+                            </div>
+                            <button className="btn btn-primary btn-sm" style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px' }} onClick={() => setShowAssinarModal(true)}>ASSINAR R$ 19,99</button>
+                        </div>
+                    )}
+
                     {marketplaceTab === 'explorar' ? (
                         marketplaceLinks.length > 0 ? (
                             <>
@@ -2253,7 +2361,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <div className="market-img-wrapper">
                                                 <img src={l.url_imagem} alt={l.nome_produto} loading="lazy" />
                                                 {l.patrocinado ? (
-                                                    <div className="market-badge market-badge--gold"><Zap size={10} /> DESTAQUE</div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '10px', left: '10px', zIndex: 2 }}>
+                                                        <div className="market-badge market-badge--gold" style={{ position: 'static' }}><Zap size={10} /> DESTAQUE</div>
+                                                        {usuario.is_subscriber && l.ponto_max > 1 && (
+                                                            <div className="market-badge" style={{ position: 'static', background: 'var(--success)', color: '#000', fontWeight: 900, border: 'none' }}>
+                                                                + ATÉ {l.ponto_max} PTS
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <div className="market-badge market-badge--free"><Clock size={10} /> 24H</div>
                                                 )}
@@ -2513,6 +2628,28 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 confirmText={modalPremium.confirmText}
                 loading={loadingAction}
             />
+
+            {/* Modal de Assinatura Premium */}
+            <ModalPremium
+                isOpen={showAssinarModal}
+                onClose={() => setShowAssinarModal(false)}
+                title="🔥 Upgrade Premium Marketplace"
+                message="Deseja ativar sua assinatura Premium por R$ 19,99 (30 dias)? Você ganhará pontos por cliques que viram saldo real!"
+                type="info"
+                onConfirm={handleAssinarPlano}
+                confirmText="Ativar Agora (R$ 19,99)"
+                loading={loadingAssinatura}
+            >
+                <div style={{ textAlign: 'left', marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '10px', color: 'var(--primary)' }}>Vantagens da Assinatura:</p>
+                    <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '15px' }}>
+                        <li>Ganhe 1 ponto para cada clique em "Ver Produto".</li>
+                        <li>A cada 1.000 pontos, receba R$ 0,10 direto no saldo.</li>
+                        <li>Badge exclusivo de Membro Premium no Marketplace.</li>
+                        <li>Ajuda a plataforma a crescer e aumentar o Fundo Coletivo.</li>
+                    </ul>
+                </div>
+            </ModalPremium>
         </div>
     );
 };

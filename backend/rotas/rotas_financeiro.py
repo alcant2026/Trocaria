@@ -94,6 +94,12 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     if not verify_password(dados.senha, usuario.senha_hash):
         raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
     
+    if not usuario.is_verified:
+        raise HTTPException(
+            status_code=403, 
+            detail="Conta não verificada: Para sua segurança, saques são permitidos apenas para contas com documentos validados (Identidade, Renda e Residência)."
+        )
+
     if not usuario.two_factor_enabled:
         raise HTTPException(
             status_code=403, 
@@ -767,6 +773,12 @@ async def sacar_comissoes_parceiro(db: Session = Depends(get_db), parceiro_user:
 async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     return db.query(Parceiro).order_by(Parceiro.nome).all()
 
+@router.get("/parceiros")
+async def listar_parceiros_publico(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Endpoint público para usuários verem os pontos de saque/depósito em espécie."""
+    parceiros = db.query(Parceiro).filter(Parceiro.is_active == True, Parceiro.caixa_aberto == True).order_by(Parceiro.nome).all()
+    return [{"id": p.id, "nome": p.nome, "endereco": p.endereco} for p in parceiros]
+
 class ParceiroCreate(BaseModel):
     nome: str
     endereco: str
@@ -1047,7 +1059,7 @@ async def confirmar_verificacao(transacao_id: int, request: Request, db: Session
     return {"message": f"Identidade de {usuario.nome} verificada com sucesso!"}
 
 @router.post("/admin/rejeitar/{transacao_id}")
-async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = "Dados inválidos ou documento ilegível", db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = Body(..., embed=True), db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     transacao = db.query(Transacao).filter(Transacao.id == transacao_id).first()
     if not transacao or transacao.status != "pendente":
         raise HTTPException(status_code=404, detail="Transação pendente não encontrada.")
@@ -1076,6 +1088,52 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
     cache_snapshot_data.clear()
     return {"message": f"Transacao de {usuario.nome} rejeitada. Motivo: {motivo}"}
 
+@router.post("/assinar-plano")
+async def assinar_plano_premium(db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """Ativa o plano de assinatura de R$ 19,99/mês."""
+    PRECO_ASSINATURA = Decimal("19.99")
+    
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    
+    if usuario.saldo < PRECO_ASSINATURA:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. O plano Premium custa R$ {PRECO_ASSINATURA}.")
+
+    # Deduzir saldo
+    usuario.saldo -= PRECO_ASSINATURA
+    
+    # Benefício do Plano: 30 dias de Premium
+    agora = datetime.datetime.utcnow()
+    if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
+        # Se já for assinante, adiciona 30 dias à expiração atual
+        usuario.assinatura_expira_em += datetime.timedelta(days=30)
+    else:
+        # Se não for ou venceu, começa de agora
+        usuario.is_subscriber = True
+        usuario.assinatura_expira_em = agora + datetime.timedelta(days=30)
+
+    # Registrar Transação
+    transacao = Transacao(
+        usuario_id=usuario.id,
+        valor=PRECO_ASSINATURA,
+        tipo=TipoTransacao.ASSINATURA,
+        status="concluido",
+        detalhes="Ativação de Plano Premium Marketplace (30 dias)"
+    )
+    db.add(transacao)
+    
+    # O valor vai para o lucro da plataforma
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+    if plataforma:
+        plataforma.saldo += PRECO_ASSINATURA
+
+    db.commit()
+    cache_snapshot_data.clear()
+    
+    return {
+        "message": "Parabéns! Você agora é um membro Premium Psy Pay.",
+        "expira_em": usuario.assinatura_expira_em.isoformat()
+    }
+
 @router.get("/admin/fiscal")
 async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     """
@@ -1100,7 +1158,8 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
             TipoTransacao.TAXA_ESPECIE,
             TipoTransacao.APORTE_CAPITAL,
             TipoTransacao.TAXA_POSTAGEM,
-            TipoTransacao.RETORNO_INVESTIMENTO
+            TipoTransacao.RETORNO_INVESTIMENTO,
+            TipoTransacao.ASSINATURA
         ]
 
         # 4. Lucro Total Histórico (Agregado no SQL)
@@ -1191,7 +1250,8 @@ async def obter_resumo_fiscal(db: Session = Depends(get_db), admin: Usuario = De
                 "taxas_saque": float(detalhamento_historico.get('taxa_saque', 0)),
                 "taxa_intermediacao": float(detalhamento_historico.get('taxa_intermediacao', 0)),
                 "aportes_externos": float(detalhamento_historico.get('aporte_capital', 0)),
-                "retorno_investimento": float(detalhamento_historico.get('retorno_investimento', 0))
+                "retorno_investimento": float(detalhamento_historico.get('retorno_investimento', 0)),
+                "assinaturas": float(detalhamento_historico.get('assinatura', 0))
             },
             "saldo_pool_caixa": float(db.query(func.sum(Usuario.saldo_caixa)).scalar() or 0),
             "historico_mensal": historico_formatado

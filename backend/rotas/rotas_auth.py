@@ -213,6 +213,13 @@ async def obter_usuario_logado(token: str = Depends(oauth2_scheme), db: Session 
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Erro ao validar credenciais. Por favor, faça login novamente."
         )
+def verificar_token_manual(token: str) -> str | None:
+    """Decodifica um token e retorna o sub (id do usuário) se válido."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub")
+    except Exception:
+        return None
 
 async def exigir_admin(usuario: Usuario = Depends(obter_usuario_logado)):
     if not usuario.is_admin:
@@ -282,7 +289,10 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
             "score": float(usuario.score),
             "is_admin": usuario.is_admin,
             "is_verified": usuario.is_verified,
-            "two_factor_enabled": usuario.two_factor_enabled
+            "two_factor_enabled": usuario.two_factor_enabled,
+            "is_subscriber": usuario.is_subscriber,
+            "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
+            "pontos_marketplace": usuario.pontos_marketplace
         }
     }
 
@@ -301,7 +311,10 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "cidade": usuario.cidade,
         "estado": usuario.estado,
         "two_factor_enabled": usuario.two_factor_enabled,
-        "aceite_cookies": usuario.aceite_cookies
+        "aceite_cookies": usuario.aceite_cookies,
+        "is_subscriber": usuario.is_subscriber,
+        "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
+        "pontos_marketplace": usuario.pontos_marketplace
     }
 
 @router.post("/aceitar-cookies")

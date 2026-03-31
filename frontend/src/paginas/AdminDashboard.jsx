@@ -525,6 +525,10 @@ const AdminDashboard = () => {
                                         <span className="info-label text-secondary">Marketplace Ads</span>
                                         <span className="font-bold text-secondary">R$ {fiscal.detalhamento_lucro.taxa_postagem?.toLocaleString('pt-BR')}</span>
                                     </div>
+                                    <div className="revenue-item" style={{ border: '1px solid #FFD600', background: 'rgba(255, 214, 0, 0.05)' }}>
+                                        <span className="info-label" style={{ color: '#FFD600' }}>Assinaturas Premium</span>
+                                        <span className="font-bold" style={{ color: '#FFD600' }}>R$ {fiscal.detalhamento_lucro.assinaturas?.toLocaleString('pt-BR')}</span>
+                                    </div>
                                 </div>
                             </section>
 

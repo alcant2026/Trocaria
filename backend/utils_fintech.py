@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Investimento
 from decimal import Decimal
 import datetime
@@ -68,13 +69,28 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).with_for_update().first()
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     
+    # 0. Verificar Liquidez Global do Pool (Regra de 30% de Reserva)
+    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+    # Apenas 70% da liquidez total pode ser emprestada (30% reservado para saques)
+    reservado = total_pool * Decimal("0.30")
+    disponivel_emprestimo = total_pool - reservado
+    
+    if valor > disponivel_emprestimo:
+        raise ValueError(
+            f"Liquidez insuficiente no Pool. Para segurança do sistema, mantemos uma reserva de 30% para resgates. "
+            f"Disponível para novos empréstimos: R$ {disponivel_emprestimo:,.2f}"
+        )
+
     if plataforma.saldo < valor:
          # Se a plataforma não tem saldo direto, tenta usar o saldo_caixa da plataforma (Pool)
          if plataforma.saldo_caixa >= valor:
              plataforma.saldo_caixa -= valor
              plataforma.saldo += valor # Move para o saldo para processar a transferência
          else:
-             raise ValueError("Saldo insuficiente no Pool da Cooperativa para esta operação.")
+             # Se mesmo assim não for no saldo da 000PL, mas houver no pool global, 
+             # o saldo da 000PL pode ficar temporariamente negativo (lastreado pelos outros usuários)
+             # pois a cooperativa garante a operação.
+             plataforma.saldo += valor 
 
     # 1. Criar a Solicitação já APROVADA
     nova_solicitacao = SolicitacaoEmprestimo(

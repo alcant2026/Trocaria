@@ -206,11 +206,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.RETORNO_INVESTIMENTO,
             TipoTransacao.TAXA_ADM_EMPRESTIMO,
-            TipoTransacao.ASSINATURA
+            TipoTransacao.ASSINATURA,
+            TipoTransacao.APORTE_CAPITAL
         ]
 
         # --- ADMIN DATA ---
         if usuario.is_admin:
+            # Configurações de tempo para a visão fiscal de 30 dias
+            from datetime import timedelta
+            agora_br = datetime.now(TZ_BRASILIA)
+            data_30_dias_atras = agora_br - timedelta(days=30)
+            
             print(f"[DEBUG SNAPSHOT] Iniciando bloco ADMIN")
             # Pendências
             pendentes_raw = db.query(Transacao).join(Usuario).filter(
@@ -295,39 +301,61 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # 4.1 Cálculo de Taxas Operacionais (1% de cada PIX no Checkout Pro)
             total_pix_recebido = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.metodo == "pix",
-                Transacao.tipo == "deposito",
+                Transacao.tipo.in_([TipoTransacao.DEPOSITO, TipoTransacao.APORTE_CAPITAL]),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
             
             # Taxa Padrão: 1% (R$ 0.01 por cada R$ 1.00)
             total_taxas_mp = (total_pix_recebido * Decimal("0.01"))
             
-            # 4.2 Custos Fixos de Infraestrutura (Estimados)
-            # Render: ~R$ 35.00 (Plano Starter) | Neon: R$ 0.00 (Free Tier)
+            # 4.2 Custos Fixos de Infraestrutura (Mensais/Deduções)
+            # Render: R$ 0.00 (Por enquanto no Free Tier conforme solicitado)
             custo_render = Decimal("0.00")
             custo_neon = Decimal("0.00")
             total_infra = custo_render + custo_neon
+            
+            # 4.2.1 Custos com Prêmios e Cashback (Marketplace Points)
+            # Esses valores são deduzidos do lucro da plataforma (000PL)
+            total_premios_marketplace = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo == TipoTransacao.RETORNO_POOL,
+                Transacao.detalhes.like("%Pontos Marketplace%"),
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
 
-            # 4.3 Lucro Real Líquido (Abatendo taxas e infra)
-            lucro_real_liquido = max(Decimal("0.00"), lucro_disponivel_virtual - total_taxas_mp - total_infra)
+            # 4.3 Lucro Real Líquido (Abatendo taxas, infra e prêmios)
+            lucro_real_liquido = max(Decimal("0.00"), lucro_disponivel_virtual - total_taxas_mp - total_infra - total_premios_marketplace)
 
             # 4.4 Custódia Total Estimada (Líquido esperado sem considerar dívida externa)
             custodia_total_estimada = (saldo_pool_caixa + p_saldo_caixa)
 
-            agora_br = datetime.now(TZ_BRASILIA)
-            primeiro_dia_mes = agora_br.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-            receitas_mes_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
+            # 5. Detalhamento de Receitas (HISTÓRICO ACUMULADO por padrão)
+            # Nota: Trocamos o detalhamento de 'mes' para 'historia' para não aparecer zerado no dia 1º.
+            receitas_totais_query = db.query(Transacao.tipo, func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),
-                Transacao.status == "concluido",
-                Transacao.data_criacao >= primeiro_dia_mes
+                Transacao.status == "concluido"
             ).group_by(Transacao.tipo).all()
 
-            detalhamento_mes = {t.name.lower(): Decimal("0.00") for t in tipos_receita}
-            for tipo, soma in receitas_mes_query:
-                detalhamento_mes[tipo.value] = soma
+            detalhamento_total = {t.name.lower(): Decimal("0.00") for t in tipos_receita}
+            for tipo, soma in receitas_totais_query:
+                detalhamento_total[tipo.value] = soma
 
-            lucro_mensal_plataforma = sum(detalhamento_mes.values())
+            # 5.2 Receita Bruta (Últimos 30 dias - Rolling Window)
+            lucro_mensal_plataforma_bruto = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo.in_(tipos_receita),
+                Transacao.status == "concluido",
+                Transacao.data_criacao >= data_30_dias_atras
+            ).scalar() or Decimal("0.00")
+
+            # Prêmios do mês
+            premios_mensais = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo == TipoTransacao.RETORNO_POOL,
+                Transacao.detalhes.like("%Pontos Marketplace%"),
+                Transacao.status == "concluido",
+                Transacao.data_criacao >= data_30_dias_atras
+            ).scalar() or Decimal("0.00")
+
+            # Receita Bruta Real (Dedução imediata de bônus)
+            lucro_mensal_plataforma = max(Decimal("0.00"), lucro_mensal_plataforma_bruto - premios_mensais)
 
             # Histórico Mensal
             print(f"[DEBUG SNAPSHOT] Buscando histórico mensal (GROUP BY)")
@@ -340,18 +368,20 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 trunc_fn.label("mes"),
                 func.sum(case((Transacao.tipo == TipoTransacao.DEPOSITO, Transacao.valor), else_=0)).label("depositos"),
                 func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, ~Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("saques"),
-                func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro"),
+                func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro_bruto"),
+                func.sum(case((and_(Transacao.tipo == TipoTransacao.RETORNO_POOL, Transacao.detalhes.like("%Pontos Marketplace%")), Transacao.valor), else_=0)).label("premios"),
                 func.sum(case((and_(Transacao.tipo == TipoTransacao.SAQUE, Transacao.detalhes.like("RESGATE DE LUCRO %")), Transacao.valor), else_=0)).label("lucro_sacado")
             ).filter(Transacao.status == "concluido").group_by(trunc_fn).order_by(text("mes DESC")).limit(12).all()
 
             historico_mes = []
             for h in historico_raw:
+                lucro_liquido_mensal = max(Decimal("0.00"), (h.lucro_bruto or 0) - (h.premios or 0))
                 historico_mes.append({
                     "mes": h.mes,
                     "total_entrada": float(h.depositos or 0),
                     "total_saida": float(h.saques or 0),
-                    "receita_plataforma": float(h.lucro or 0),
-                    "total_sacado": float(h.lucro_sacado or 0)
+                    "lucro": float(lucro_liquido_mensal),
+                    "lucro_sacado": float(h.lucro_sacado or 0)
                 })
 
             # Calcular Juros Acumulados no Pool para o Admin (Lógica Híbrida)
@@ -397,11 +427,11 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # Usamos o maior entre a reconciliação e a soma dos logs (para evitar duplicidade ou perdas)
             juros_acumulados_pool = max(lucro_reconciliado, juros_via_logs)
             
-            # Aportes Institucionais Mensais (Separados das Receitas Orgânicas)
+            # Aportes Institucionais (Últimos 30 dias)
             aportes_mes = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo == TipoTransacao.APORTE_CAPITAL,
                 Transacao.status == "concluido",
-                Transacao.data_criacao >= primeiro_dia_mes
+                Transacao.data_criacao >= data_30_dias_atras
             ).scalar() or Decimal("0.00")
 
             snapshot["admin"] = {
@@ -420,16 +450,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "lucro_acumulado_pool": float(juros_acumulados_pool),
                         "total_credito_ativo": float(total_credito_ativo),
                     "detalhamento_lucro": {
-                        "taxa_postagem": float(detalhamento_mes.get('taxa_postagem', 0)),
-                        "desbloqueio_dados": float(detalhamento_mes.get('desbloqueio_dados', 0)),
-                        "kyc_score": float(detalhamento_mes.get('compra_score', 0)),
-                        "taxas_saque": float(detalhamento_mes.get('taxa_saque', 0)),
-                        "taxa_intermediacao": float(detalhamento_mes.get('taxa_intermediacao', 0)),
-                        "taxa_especie": float(detalhamento_mes.get('taxa_especie', 0)),
-                        "taxa_adm_emprestimo": float(detalhamento_mes.get('taxa_adm_emprestimo', 0)),
-                        "aportes_externos": float(aportes_mes),
-                        "retorno_investimento": float(detalhamento_mes.get('retorno_investimento', 0)),
-                        "assinaturas": float(detalhamento_mes.get('assinatura', 0))
+                        "taxa_postagem": float(detalhamento_total.get('taxa_postagem', 0)),
+                        "desbloqueio_dados": float(detalhamento_total.get('desbloqueio_dados', 0)),
+                        "kyc_score": float(detalhamento_total.get('compra_score', 0)),
+                        "taxas_saque": float(detalhamento_total.get('taxa_saque', 0)),
+                        "taxa_intermediacao": float(detalhamento_total.get('taxa_intermediacao', 0)),
+                        "taxa_especie": float(detalhamento_total.get('taxa_especie', 0)),
+                        "taxa_adm_emprestimo": float(detalhamento_total.get('taxa_adm_emprestimo', 0)),
+                        "aportes_externos": float(detalhamento_total.get('aporte_capital', 0)),
+                        "retorno_investimento": float(detalhamento_total.get('retorno_investimento', 0)),
+                        "assinaturas": float(detalhamento_total.get('assinatura', 0)),
+                        "premios_marketplace": float(total_premios_marketplace)
                     },
                     "historico_mensal": historico_mes
                 },

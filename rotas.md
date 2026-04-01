@@ -1,41 +1,45 @@
-# 🗺️ Mapeamento de Rotas da API (Psy Pay)
+# 🚀 Arquitetura de Rotas - Psy Pay Backend
 
-Este documento centraliza todas as principais rotas ativas criadas no Backend FastAPI da Psycho Pay.
-
----
-## 🌐 `rotas_snapshot.py` (Dashboard Central)
-**`GET /snapshot`**
-- Ponto de entrada mais crítico da plataforma. Retorna um pacote massivo unificado (O `snapshot`) contendo informações da conta do cliente, histórico de empréstimos (Status Tomador e Investidor) e o **Fiscal Hub** do Administrador de uma única vez.
-- Economiza conexões de banco de dados por ter limite de CACHE nativo (15s).
+Este documento fornece um mapeamento completo de todos os arquivos que compõem o motor (backend) do Psy Pay, divididos por responsabilidade.
 
 ---
-## 🔐 `rotas_auth.py` (Perfil & Autenticação)
-**`POST /auth/login`**: Valida a dupla Senha/Digitalização MFA e emite o Bearer Token.
-**`GET /auth/perfil`**: Dados do usuário cru e configuração da conta.
-**`POST /auth/kyc-pay`**: Endpoint onde novos usuários pagam a validação (Desbloqueio a R$35,00) que gera Lucro Direto da Plataforma (`000PL`).
+
+## 🏗️ 1. Orquestração e Deploy
+Arquivos que iniciam e configuram o servidor.
+*   `main.py`: Ponto de entrada do FastAPI. Onde as rotas são acopladas.
+*   `start.sh`: Script de inicialização automática (Uvicorn + Gunicorn).
+*   `render.yaml`: Configuração de infraestrutura para hospedagem na nuvem (Render/Neon).
+*   `.env`: Variáveis de ambiente sensíveis (Chaves MP, DB_URL, JWT_SECRET).
+
+## 🗄️ 2. Camada de Dados (`backend/modelos/`)
+Definição de como os dados são salvos.
+*   `database.py`: Gerenciador de conexão com o banco de dados (Engine/Session).
+*   `modelos/modelos_db.py`: Tabelas do sistema (Usuário, Transação, Empréstimo, Ads).
+
+## 🧠 3. Lógica de Negócio & Motores (`backend/utils_*.py`)
+A inteligência por trás dos cálculos e regras de dinheiro.
+*   `utils_fintech.py`: Motor do Fundo Coletivo (Pool), Liquidez e Reserva de 30%.
+*   `utils_score.py`: Algoritmo que calcula o Score (0-1000) baseado no comportamento.
+*   `utils_emprestimo.py`: Cálculos de juros, parcelas e projeções financeiras.
+*   `auditoria_saldo.py`: Sistema que verifica se o saldo dos usuários é real ou manipulado.
+
+## 🛡️ 4. Segurança e Filtros
+*   `limitador.py`: Controle de taxa (Rate Limiting) para evitar ataques de spam e brute force.
+
+## 🚀 5. Rotas de API (`backend/rotas/`)
+Os arquivos que respondem às requisições do Frontend:
+*   `rotas_auth.py`: Login, Registro e Segurança (2FA).
+*   `rotas_financeiro.py`: Depósitos PIX, Saques e Gestão Admin.
+*   `rotas_comunidade.py`: Marketplace, Ads, Pontos e Gamificação.
+*   `rotas_emprestimo.py`: Simulações e tomadas de crédito institucional.
+*   `rotas_snapshot.py`: Dashboard e Relatórios Fiscais (Fiscal Hub).
+*   `rotas_score.py`: Análise de risco e limites de crédito.
+*   `rotas_parceiros_caixa.py`: Gestão de depósitos em dinheiro físico.
 
 ---
-## 💳 `rotas_financeiro.py` (Transações e Admin)
-
-### Fundo Coletivo (Clientes)
-**`POST /financeiro/investir-pool`**: O usuário injeta dinheiro no caixa livre do Pool P2P.
-**`POST /financeiro/resgatar-pool`**: O investidor saca a quantia líquida que possui parada no Pool.
-
-### Fiscal Hub (Admin - 000PL)
-**`POST /financeiro/admin/aportar-lucro`** *(Renomeado para Aportar no Pool)*
-- **Objetivo**: Aporte Institucional. Injeta capital direto no `saldo_caixa` (Fundo P2P) como forma de infligir liquidez.
-**`POST /financeiro/admin/sacar-lucro`** 
-- **Objetivo**: Retirada do "Lucro Acumulado". Apenas fundos orgânicos recolhidos via *Taxas/Comissões* e *Ads* são elegíveis.
+> [!NOTE]
+> Todos os arquivos acima são essenciais para o funcionamento do ecossistema Psy Pay. Qualquer alteração em `utils_*.py` impacta diretamente os cálculos de lucro e risco.
 
 ---
-## 📱 `rotas_comunidade.py` (Social e Marketplace)
-**`GET /comunidade/feed`**: Extrai as publicações curadas pela comunidade interna.
-**`POST /comunidade/comprar-views`** *(Marketplace Ads)*:
-- O usuário paga para turbinar um Link. O valor é 100% transferido para o caixa puro da startup `000PL.saldo` (Lucro Livre) sendo listado na seção *Marketplace Ads* do Painel Fiscal.
-**`POST /comunidade/registrar-view`**: Consome 1 visão restante do anúncio afiliado ao clicar.
-
----
-## 🏦 `rotas_emprestimo.py` (Motor de Crédito)
-**`GET /emprestimos/limite`**: Verifica o trunfo e o fator Score do Tomador atual cruzando com o **Pool de Liquidez** geral ativo.
-**`POST /emprestimos/solicitar`**: Solicitação que congela crédito P2P do Fundo Coletivo se for aprovado instantaneamente pelo bot.
-**`POST /emprestimos/{id}/pagar-parcela`**: Executa a operação que tira do Tomador final e envia *90% do valor dos juros de volta para capitalização do Pool (divisão pro-rata)* e destina *10% do juro real para a carteira Startup (Lucro de Gestão)*.
+> [!NOTE]
+> Todas as rotas críticas (saques e transferências) exigem **2FA ativo** e as rotas administrativas exigem permissão de **Superusuário (Admin)**.

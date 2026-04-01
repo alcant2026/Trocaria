@@ -425,7 +425,9 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 plataforma.saldo -= total_fee
                                 transacao.detalhes += f" | [Taxa Intermediação: R$ {total_fee}]"
                         
-                        atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+                        if usuario.id != "000PL":
+                            atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+                        
                         db.commit()
                         logger.info(f"✅ WEBHOOK MP: Saldo de R$ {transacao.valor} creditado para {usuario.nome}")
                         cache_snapshot_data.pop(usuario.id, None)
@@ -491,7 +493,9 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
             transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
         transacao.detalhes += " | Sincronizado Manualmente pelo Admin"
         
-        atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+        if usuario.id != "000PL":
+            atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+        
         db.commit()
         
         logger.info(f"✅ SYNC MANUAL: R$ {transacao.valor} creditados para {usuario.nome} com sucesso!")
@@ -1496,6 +1500,66 @@ async def resgatar_pool_para_lucro(
     registrar_acao_admin(db, admin.id, "RESGATAR_POOL_PARA_LUCRO", alvo_id=plataforma.id, detalhes=f"Valor: {dados}", ip=None)
     db.commit()
     return {"message": "Sucesso! Capital e juros retornaram ao Lucro.", "novo_saldo_pool": float(admin.saldo_caixa)}
+
+@router.post("/admin/aporte-capital/gerar")
+async def gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Gera um PIX do Mercado Pago para injeção de capital institucional (000PL)."""
+    if not sdk:
+        raise HTTPException(status_code=500, detail="Integração com Mercado Pago não configurada.")
+    
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    expiracao = agora + datetime.timedelta(minutes=30)
+    expiracao_iso = expiracao.isoformat(timespec='milliseconds')
+    
+    payment_data = {
+        "transaction_amount": float(dados.valor),
+        "description": f"Aporte Institucional Psy Pay - Admin {admin.id}",
+        "payment_method_id": "pix",
+        "date_of_expiration": expiracao_iso,
+        "payer": {
+            "email": admin.email, # O admin é o pagador
+            "first_name": "ADMIN",
+            "last_name": "PSY PAY",
+            "identification": {
+                "type": "CPF",
+                "number": admin.cpf.replace(".", "").replace("-", "")
+            }
+        }
+    }
+    
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
+    
+    if result.get("status") not in [200, 201]:
+        logger.error(f"Erro MP Admin: {payment}")
+        raise HTTPException(status_code=400, detail="Erro ao gerar aporte via Mercado Pago.")
+        
+    payment_id = payment.get("id")
+    qr_code = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code")
+    qr_code_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64")
+    
+    # Registra a transação para a PLATAFORMA (000PL)
+    nova_transacao = Transacao(
+        usuario_id="000PL",
+        valor=dados.valor,
+        tipo=TipoTransacao.APORTE_CAPITAL,
+        status="pendente",
+        metodo="pix",
+        detalhes=f"Aporte Institucional Gerado via MP | ID: {payment_id} | Origem: Admin {admin.id}"
+    )
+    db.add(nova_transacao)
+    db.commit()
+    cache_snapshot_data.clear()
+    
+    return {
+        "message": "PIX de Aporte gerado com sucesso.",
+        "qr_code": qr_code,
+        "qr_code_base64": qr_code_base64,
+        "payment_id": payment_id,
+        "expires_at": expiracao_iso
+    }
 
 class InvestimentoAdminRequest(BaseModel):
     solicitacao_id: int

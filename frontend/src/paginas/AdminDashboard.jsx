@@ -109,6 +109,7 @@ const AdminDashboard = () => {
     const [showExcluirParceiroModal, setShowExcluirParceiroModal] = useState(false);
     const [parceiroParaExcluir, setParceiroParaExcluir] = useState(null);
     const [loadingExclusao, setLoadingExclusao] = useState(false);
+    const [pixData, setPixData] = useState(null); // { qr_code, qr_code_base64, payment_id }
 
     // Limits
     const [showLimiteModal, setShowLimiteModal] = useState(false);
@@ -117,6 +118,29 @@ const AdminDashboard = () => {
     useEffect(() => {
         carregarSnapshot();
     }, []);
+
+    useEffect(() => {
+        let interval;
+        if (pixData && pixData.payment_id) {
+            interval = setInterval(verificarStatusPagamento, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [pixData]);
+
+    const verificarStatusPagamento = async () => {
+        if (!pixData || !pixData.payment_id) return;
+        try {
+            const res = await api.get(`/financeiro/admin/sync-pix/${pixData.payment_id}`);
+            if (res.status === 'success' || res.message?.includes('aprovado')) {
+                setMensagem('Aporte Institucional de R$ ' + acaoData.valor + ' confirmado automaticamente!');
+                setPixData(null);
+                setShowAcaoModal(false);
+                carregarSnapshot();
+            }
+        } catch (e) {
+            console.error("Erro no polling do aporte", e);
+        }
+    };
 
     const carregarSnapshot = async () => {
         setLoading(true);
@@ -223,7 +247,17 @@ const AdminDashboard = () => {
     const confirmarAcaoCaixa = async () => {
         setLoadingAcao(true);
         try {
-            const endpoint = acaoTipo === 'saque' ? '/financeiro/admin/sacar-lucro' : '/financeiro/admin/aportar-lucro';
+            if (acaoTipo === 'aporte') {
+                // NOVO FLUXO: Mercado Pago AUTOMÁTICO
+                const res = await api.post('/financeiro/admin/aporte-capital/gerar', {
+                    valor: parseFloat(acaoData.valor.replace(',', '.'))
+                });
+                setPixData(res);
+                return; // Não fecha o modal ainda, espera o PIX
+            }
+
+            // FLUXO ANTIGO: Saque de Lucro (Manual)
+            const endpoint = '/financeiro/admin/sacar-lucro';
             const res = await api.post(endpoint, {
                 valor: parseFloat(acaoData.valor.replace(',', '.')),
                 chave_pix: acaoData.chave_pix,
@@ -536,6 +570,10 @@ const AdminDashboard = () => {
                                         <span className="info-label" style={{ color: '#FFD600' }}>Assinaturas Premium</span>
                                         <span className="font-bold" style={{ color: '#FFD600' }}>R$ {fiscal.detalhamento_lucro.assinaturas?.toLocaleString('pt-BR')}</span>
                                     </div>
+                                    <div className="revenue-item" style={{ border: '1px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.05)' }}>
+                                        <span className="info-label" style={{ color: '#ff4d4d' }}>Bonificações (Marketplace)</span>
+                                        <span className="font-bold" style={{ color: '#ff4d4d' }}>- R$ {fiscal.detalhamento_lucro.premios_marketplace?.toLocaleString('pt-BR')}</span>
+                                    </div>
                                 </div>
                             </section>
 
@@ -749,47 +787,71 @@ const AdminDashboard = () => {
             {/* Modal Ações de Caixa */}
             <ModalPremium
                 isOpen={showAcaoModal}
-                onClose={() => setShowAcaoModal(false)}
+                onClose={() => { setShowAcaoModal(false); setPixData(null); }}
                 title={acaoTipo === 'saque' ? 'Resgatar Lucro Líquido' : 'Injetar Capital na Plataforma'}
                 message={acaoTipo === 'saque' ? 'Retirada de lucro disponível direto do caixa livre da Psy Pay.' : 'Aporte de recurso externo para aumentar o patrimônio da plataforma.'}
                 type={acaoTipo === 'saque' ? 'warning' : 'info'}
                 onConfirm={confirmarAcaoCaixa}
-                confirmText={acaoTipo === 'saque' ? 'Confirmar Resgate' : 'Confirmar Aporte'}
+                confirmText={pixData ? null : (acaoTipo === 'saque' ? 'Confirmar Resgate' : 'Gerar PIX de Aporte')}
                 loading={loadingAcao}
             >
-                <div style={{ textAlign: 'left', marginTop: '1rem' }}>
-                    <div className="input-group mb-1">
-                        <label>Valor (R$)</label>
-                        <input
-                            type="number"
-                            className="input-field"
-                            placeholder="0.00"
-                            value={acaoData.valor}
-                            onChange={(e) => setAcaoData({ ...acaoData, valor: e.target.value })}
-                            min="0.01"
-                            step="0.01"
-                        />
+                {pixData ? (
+                    <div className="pix-container animate-fade-in" style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--primary-low)' }}>
+                        <p className="text-primary font-bold mb-1">Aporte de R$ {acaoData.valor}</p>
+                        <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} alt="QR Code PIX Admin" className="qr-img mb-1" style={{ width: '200px', margin: '0 auto', border: '4px solid white', borderRadius: '8px' }} />
+                        
+                        <div className="input-group">
+                            <label className="text-xs">Código Copia e Cola</label>
+                            <div className="flex-start gap-1">
+                                <input readOnly value={pixData.qr_code} className="input-field text-xs" style={{ background: 'var(--bg-dark)' }} />
+                                <button className="btn btn-primary btn-sm" onClick={() => copiarPix(pixData.qr_code, 'pix-admin')}>
+                                    {pixCopiado === 'pix-admin' ? <Check size={14} /> : <Copy size={14} />}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-2 text-xs text-muted flex-center gap-1">
+                            <RefreshCw size={12} className="animate-spin" />
+                            Aguardando confirmação do pagamento...
+                        </div>
                     </div>
-                    <div className="input-group mb-1">
-                        <label>Chave PIX {acaoTipo === 'saque' ? 'de Destino (Para onde vai o dinheiro)' : 'de Origem (De onde veio o dinheiro)'}</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ex: financeiro@psypay.com"
-                            value={acaoData.chave_pix}
-                            onChange={(e) => setAcaoData({ ...acaoData, chave_pix: e.target.value })}
-                        />
+                ) : (
+                    <div style={{ textAlign: 'left', marginTop: '1rem' }}>
+                        <div className="input-group mb-1">
+                            <label>Valor (R$)</label>
+                            <input
+                                type="number"
+                                className="input-field"
+                                placeholder="0.00"
+                                value={acaoData.valor}
+                                onChange={(e) => setAcaoData({ ...acaoData, valor: e.target.value })}
+                                min="0.01"
+                                step="0.01"
+                            />
+                        </div>
+                        {acaoTipo === 'saque' && (
+                            <div className="input-group mb-1">
+                                <label>Chave PIX de Destino</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Ex: financeiro@psypay.com"
+                                    value={acaoData.chave_pix}
+                                    onChange={(e) => setAcaoData({ ...acaoData, chave_pix: e.target.value })}
+                                />
+                            </div>
+                        )}
+                        <div className="input-group">
+                            <label>Motivo ou Justificativa</label>
+                            <textarea
+                                className="input-field"
+                                placeholder={acaoTipo === 'saque' ? 'Ex: Distribuição de lucros aos sócios...' : 'Ex: Aporte institucional para liquidez de crédito...'}
+                                value={acaoData.motivo}
+                                onChange={(e) => setAcaoData({ ...acaoData, motivo: e.target.value })}
+                            />
+                        </div>
                     </div>
-                    <div className="input-group">
-                        <label>Motivo ou Justificativa</label>
-                        <textarea
-                            className="input-field"
-                            placeholder={acaoTipo === 'saque' ? 'Ex: Distribuição de lucros aos sócios...' : 'Ex: Aporte do investidor, injetado no mercado...'}
-                            value={acaoData.motivo}
-                            onChange={(e) => setAcaoData({ ...acaoData, motivo: e.target.value })}
-                        />
-                    </div>
-                </div>
+                )}
             </ModalPremium>
 
             {/* Modal de Customização de Limite */}

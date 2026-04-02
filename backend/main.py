@@ -55,6 +55,14 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+# Middleware para Log de Plataforma (Apenas Log, sem Banco)
+@app.middleware("http")
+async def log_plataforma(request: Request, call_next):
+    plataforma = request.headers.get("X-Platform", "web").upper()
+    print(f"📡 [{plataforma}] {request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
+
 # Dependência do DB
 def get_db():
     db = SessionLocal()

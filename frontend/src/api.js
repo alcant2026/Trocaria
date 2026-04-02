@@ -25,6 +25,10 @@ const api = {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
+        // Identificação de Plataforma (Web vs Android/iOS)
+        const platform = isCapacitor ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'mobile') : 'web';
+        headers['X-Platform'] = platform;
+
         const response = await fetch(`${BASE_URL}${endpoint}`, {
             ...options,
             headers,

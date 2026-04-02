@@ -120,8 +120,12 @@ def ping_curto():
     return {"msg": "servidor_ativo_13h04"}
 
 @app.get("/")
-def home():
-    return {"status": "online", "message": "PSY PAY API ATIVA - 13:04"}
+async def root():
+    return {"status": "online", "message": "Psy Pay API"}
+
+@app.get("/api")
+async def api_root():
+    return {"status": "online", "message": "Psy Pay API Gateway"}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

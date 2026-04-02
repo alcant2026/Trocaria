@@ -20,6 +20,7 @@ import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
+import LoadingScreen from './componentes/LoadingScreen';
 
 const App = () => {
     const [loading, setLoading] = useState(true);
@@ -88,19 +89,7 @@ const App = () => {
         return () => window.removeEventListener('psypay_unauthorized', handleUnauthorized);
     }, [logout]);
 
-    if (loading) return (
-        <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '100vh', 
-            background: '#0a0a0a', 
-            color: '#00ff00',
-            fontFamily: 'monospace'
-        }}>
-            Carregando Psy Pay...
-        </div>
-    );
+    if (loading) return <LoadingScreen message="Inicializando Psy Pay..." />;
 
     const botaoWhatsapp = (
         <a 

@@ -11,7 +11,7 @@ const LoadingScreen = ({ message = "Carregando Psy Pay..." }) => {
       width: '100vw',
       background: 'radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)',
       color: '#ffffff',
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       position: 'fixed',
       top: 0,
       left: 0,
@@ -30,7 +30,7 @@ const LoadingScreen = ({ message = "Carregando Psy Pay..." }) => {
           transform: 'translate(-50%, -50%)',
           width: '120px',
           height: '120px',
-          background: 'rgba(0, 255, 0, 0.15)',
+          background: 'rgba(255, 204, 0, 0.15)',
           borderRadius: '50%',
           filter: 'blur(30px)',
           animation: 'pulseGlow 2s infinite ease-in-out'
@@ -51,7 +51,7 @@ const LoadingScreen = ({ message = "Carregando Psy Pay..." }) => {
             cy="50"
             r="45"
             fill="none"
-            stroke="var(--primary, #00ff00)"
+            stroke="#FFCC00"
             strokeWidth="3"
             strokeDasharray="283"
             strokeDashoffset="70"
@@ -71,17 +71,17 @@ const LoadingScreen = ({ message = "Carregando Psy Pay..." }) => {
           transform: 'translate(-50%, -50%)',
           fontSize: '2rem'
         }}>
-          🚀
+          💰
         </div>
       </div>
 
       {/* Texto de Carregamento */}
       <h2 style={{
         fontSize: '1.2rem',
-        fontWeight: '500',
+        fontWeight: '600',
         letterSpacing: '1px',
         margin: 0,
-        background: 'linear-gradient(90deg, #fff, #00ff00, #fff)',
+        background: 'linear-gradient(90deg, #fff, #FFCC00, #fff)',
         backgroundSize: '200% auto',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
@@ -92,12 +92,13 @@ const LoadingScreen = ({ message = "Carregando Psy Pay..." }) => {
 
       <p style={{
         marginTop: '0.8rem',
-        fontSize: '0.8rem',
+        fontSize: '0.75rem',
         color: 'rgba(255,255,255,0.4)',
         letterSpacing: '2px',
-        textTransform: 'uppercase'
+        textTransform: 'uppercase',
+        fontWeight: 'bold'
       }}>
-        Iniciando Motores Financeiros
+        Processando Conexão Segura
       </p>
 
       <style>

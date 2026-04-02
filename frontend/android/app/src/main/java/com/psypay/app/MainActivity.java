@@ -1,4 +1,4 @@
-package com.peer.app;
+package com.psypay.app;
 
 import com.getcapacitor.BridgeActivity;
 

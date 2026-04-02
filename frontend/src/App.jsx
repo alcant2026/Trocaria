@@ -1,135 +1,123 @@
-import React, { useState, useEffect } from 'react';
-import Login from './paginas/Login';
-import Registro from './paginas/Registro';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  ArrowDownUp, 
+  TrendingUp, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X,
+  Shield,
+  ShoppingBag
+} from 'lucide-react';
+import api from './api';
 import DashboardCliente from './paginas/DashboardCliente';
 import AdminDashboard from './paginas/AdminDashboard';
+import Login from './paginas/Login';
+import Registro from './paginas/Registro';
 import Seguranca from './paginas/Seguranca';
-import { Wallet, Settings, LogOut, ArrowDownUp, TrendingUp, User, Menu, X, MessageCircle, Shield, ShoppingBag } from 'lucide-react';
-import './index.css';
-import TemporizadorInatividade from './componentes/TemporizadorInatividade';
-import BannerCookies from './componentes/BannerCookies';
 import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
+import BannerCookies from './componentes/BannerCookies';
+import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 
 const App = () => {
-    const whatsappLink = 'https://wa.me/5591980177874';
-    const [page, setPage] = useState('login');
+    const [loading, setLoading] = useState(true);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState(null);
     const [menuAberto, setMenuAberto] = useState(false);
+    const [page, setPage] = useState('login');
     const [modalExcluir, setModalExcluir] = useState(false);
-    const [servidorPronto, setServidorPronto] = useState(false);
 
-    useEffect(() => {
-        // Verificar se o servidor está acordado (Cold Start Render)
-        const checkServer = async () => {
-            try {
-                const response = await fetch(import.meta.env.VITE_API_URL || 'http://localhost:8000');
-                if (response.ok || response.status === 404) {
-                    setServidorPronto(true);
-                }
-            } catch (err) {
-                console.log("Aguardando servidor...");
-                setTimeout(checkServer, 3000);
-            }
-        };
-        checkServer();
-
-        const handleHashChange = () => {
-            const hash = window.location.hash.replace('#', '') || 'login';
-            setPage(hash);
-        };
-
-        window.addEventListener('hashchange', handleHashChange);
-        handleHashChange();
-
-        // Verificar se já está logado
-        const savedUser = localStorage.getItem('usuario');
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
-        }
-
-        // Adicionar ouvinte para logout automático quando token for recusado pela API (401)
-        const handleUnauthorized = () => {
-            console.warn("Sessão expirada. Realizando logout automático.");
-            localStorage.removeItem('token');
-            localStorage.removeItem('usuario');
-            setUser(null);
-            window.location.hash = 'login';
-        };
-        window.addEventListener('psypay_unauthorized', handleUnauthorized);
-
-        return () => {
-            window.removeEventListener('hashchange', handleHashChange);
-            window.removeEventListener('psypay_unauthorized', handleUnauthorized);
+    const atualizarPerfil = useCallback(async () => {
+        try {
+            const data = await api.get('/usuarios/perfil');
+            setUser(data);
+        } catch (err) {
+            console.error('Erro ao atualizar perfil:', err);
         }
     }, []);
 
     const onLogin = (userData) => {
         setUser(userData);
-        window.location.hash = 'cliente'; 
+        setIsAuthenticated(true);
+        window.location.hash = 'cliente';
     };
 
-    const logout = () => {
+    const logout = useCallback(() => {
         localStorage.removeItem('token');
-        localStorage.removeItem('usuario');
+        setIsAuthenticated(false);
         setUser(null);
         window.location.hash = 'login';
-    };
+    }, []);
 
-    const atualizarPerfil = async () => {
-        try {
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash.replace('#', '') || 'login';
+            setPage(hash);
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        handleHashChange();
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
+    useEffect(() => {
+        const init = async () => {
+            const timeout = setTimeout(() => setLoading(false), 3000);
             const token = localStorage.getItem('token');
-            if (!token) return;
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/perfil`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data);
-                localStorage.setItem('usuario', JSON.stringify(data));
+            if (token) {
+                try {
+                    const data = await api.get('/usuarios/perfil');
+                    if (data && data.nome) {
+                        setUser(data);
+                        setIsAuthenticated(true);
+                    } else {
+                        localStorage.removeItem('token');
+                    }
+                } catch (err) {
+                    localStorage.removeItem('token');
+                }
             }
-        } catch (err) {
-            console.error("Erro ao atualizar perfil:", err);
-        }
-    };
+            clearTimeout(timeout);
+            setLoading(false);
+        };
+        init();
+        
+        const handleUnauthorized = () => logout();
+        window.addEventListener('psypay_unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('psypay_unauthorized', handleUnauthorized);
+    }, [logout]);
+
+    if (loading) return (
+        <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh', 
+            background: '#0a0a0a', 
+            color: '#00ff00',
+            fontFamily: 'monospace'
+        }}>
+            Carregando Psy Pay...
+        </div>
+    );
 
     const botaoWhatsapp = (
-        <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Falar no WhatsApp"
-            className="whatsapp-float"
-            title="Falar no WhatsApp"
+        <a 
+            href="https://wa.me/5511999999999" 
+            className="whatsapp-float" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            aria-label="Contato WhatsApp"
         >
-            <MessageCircle size={32} fill="currentColor" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
         </a>
     );
 
-    if (!servidorPronto) {
-        return (
-            <div className="splash-container">
-                <div className="splash-logo"></div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        if (page === 'registro') {
-            return (
-                <>
-                    <Registro />
-                    {botaoWhatsapp}
-                </>
-            );
-        }
-        if (page === 'privacidade') {
-            return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
-        }
-        if (page === 'recuperar-senha') {
-            return <RecuperarSenha />;
-        }
+    if (!isAuthenticated) {
+        if (page === 'registro') return <><Registro />{botaoWhatsapp}</>;
+        if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
+        if (page === 'recuperar-senha') return <RecuperarSenha />;
         return (
             <>
                 <Login onLogin={onLogin} />
@@ -143,33 +131,28 @@ const App = () => {
         <div className="app-container">
             <nav className="navbar">
                 <div className="navbar-container">
-                    <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'tomador'; }}>
+                    <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'cliente'; }}>
                         <Logo size={28} />
                     </a>
 
-                    <div className="nav-controls">
-                        <div className="avatar-trigger hide-on-mobile" onClick={() => setMenuAberto(true)}>
-                            <div className="avatar-circle">
-                                {user.nome[0].toUpperCase()}
-                            </div>
+                    <div className="nav-user-preview">
+                        <div className="user-info">
+                            <div className="user-avatar">{user.nome[0].toUpperCase()}</div>
                             <span className="user-firstname">{user.nome.split(' ')[0]}</span>
                         </div>
-
                         <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)} aria-label="Abrir Menu">
                             {menuAberto ? <X size={26} /> : <Menu size={26} />}
                         </button>
                     </div>
                 </div>
 
-
                 <div className={`mobile-overlay ${menuAberto ? 'open' : ''}`} onClick={() => setMenuAberto(false)}></div>
-
                 <div className={`mobile-drawer ${menuAberto ? 'open' : ''}`}>
                     <div className="nav-links">
                         <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Menu</h2>
                         </div>
-                        <a href="#cliente" className={`nav-item ${page === 'cliente' || page === 'tomador' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                        <a href="#cliente" className={`nav-item ${['cliente', 'tomador'].includes(page) ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
                         </a>
                         <a href="#pool" className={`nav-item ${page === 'pool' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
@@ -189,27 +172,18 @@ const App = () => {
                     </div>
                     <div className="drawer-footer">
                         <div className="footer-user-info">
-                            <div className="footer-avatar">
-                                {user.nome[0].toUpperCase()}
-                            </div>
+                            <div className="footer-avatar">{user.nome[0].toUpperCase()}</div>
                             <div className="footer-texts">
                                 <span className="footer-name">{user.nome.split(' ')[0]}</span>
                                 <span className="footer-sub">Perfil Ativo</span>
                             </div>
                         </div>
-
                         <div className="footer-actions">
                             <button className="btn-logout" onClick={logout}>
                                 <LogOut size={18} />
                                 <span>Sair</span>
                             </button>
-                            <button
-                                className="btn-delete-account"
-                                onClick={() => {
-                                    setMenuAberto(false);
-                                    setModalExcluir(true);
-                                }}
-                            >
+                            <button className="btn-delete-account" onClick={() => { setMenuAberto(false); setModalExcluir(true); }}>
                                 Excluir Conta (LGPD)
                             </button>
                         </div>
@@ -218,7 +192,12 @@ const App = () => {
             </nav>
 
             <main className="main-content">
-                {page === 'login' && <div className="card text-center"><h2>Você está logado.</h2><button className="btn btn-primary" onClick={() => window.location.hash = 'cliente'}>Ir para o Início</button></div>}
+                {page === 'login' && (
+                    <div className="card text-center">
+                        <h2>Você está logado.</h2>
+                        <button className="btn btn-primary" onClick={() => window.location.hash = 'cliente'}>Ir para o Início</button>
+                    </div>
+                )}
                 {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
                 {page === 'pool' && <DashboardCliente initialView="pool" />}
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
@@ -227,7 +206,7 @@ const App = () => {
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
                 {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'seguranca', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
             </main>
-            {/* Modal de Exclusão Crítica */}
+
             {modalExcluir && (
                 <div className="modal-overlay">
                     <div className="modal-card" style={{ borderColor: 'var(--danger)' }}>
@@ -237,24 +216,17 @@ const App = () => {
                         <h2 style={{ color: 'var(--danger)' }}>Excluir Conta?</h2>
                         <p>Esta ação é <strong>irreversível</strong>. Seus dados serão anonimizados seguindo as regras da <strong>LGPD</strong>.</p>
                         <p style={{ fontSize: '0.8rem' }}>Você perderá acesso imediato à plataforma.</p>
-
                         <div className="flex-center-column mt-2" style={{ gap: '15px' }}>
                             <button className="btn btn-danger" onClick={async () => {
                                 setModalExcluir(false);
                                 try {
-                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/excluir-conta`, {
+                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://peer-5gq5.onrender.com/api'}/usuarios/excluir-conta`, {
                                         method: 'DELETE',
                                         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                                     });
-                                    const data = await res.json();
-                                    if (res.ok) {
-                                        logout();
-                                    } else {
-                                        alert(data.detail || 'Erro ao excluir conta.');
-                                    }
-                                } catch (err) {
-                                    alert('Erro de conexão.');
-                                }
+                                    if (res.ok) logout();
+                                    else alert('Erro ao excluir conta.');
+                                } catch (err) { alert('Erro de conexão.'); }
                             }}>Sim, Excluir Agora</button>
                             <button className="btn btn-secondary" onClick={() => setModalExcluir(false)}>Manter Minha Conta</button>
                         </div>

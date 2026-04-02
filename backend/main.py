@@ -37,6 +37,15 @@ if frontend_url:
 origins = list(dict.fromkeys(origins))
 print(f"🚀 CORS ORIGINS: {origins}")
 
+# Configuração de CORS - Deve vir DEPOIS de outros middlewares para executar PRIMEIRO na requisição
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 from limitador import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -45,17 +54,6 @@ from slowapi import _rate_limit_exceeded_handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
-
-# Middleware de Segurança (Simplificado para evitar conflitos de CORS)
-# Os headers de segurança podem ser habilitados via Proxy ou em Produção Final.
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Dependência do DB
 def get_db():

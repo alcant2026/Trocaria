@@ -1,4 +1,13 @@
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const productionUrl = 'https://peer-5gq5.onrender.com/api';
+const viteUrl = import.meta.env.VITE_API_URL;
+const androidDevUrl = import.meta.env.VITE_API_URL_ANDROID || (import.meta.env.PROD ? productionUrl : 'http://10.0.2.2:8000');
+const iosDevUrl = import.meta.env.VITE_API_URL_IOS || (import.meta.env.PROD ? productionUrl : 'http://localhost:8000');
+const fallbackUrl = '/api';
+
+const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+const BASE_URL = isCapacitor
+    ? (viteUrl || androidDevUrl)
+    : (viteUrl || fallbackUrl);
 
 const api = {
     getToken: () => localStorage.getItem('token'),

@@ -15,7 +15,10 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "capacitor:icons": "npx @capacitor/assets generate --android --assetPath ./public",
+        "capacitor:sync": "npx cap sync android",
+        "capacitor:prepare": "npx cap sync android && npx cap open android"
     },
     "devDependencies": {
         "@capacitor/assets": "^3.0.5",

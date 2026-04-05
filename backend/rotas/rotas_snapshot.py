@@ -482,14 +482,18 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             ).scalar() or Decimal("0.00")
             # --- MÉTRICAS DE HARDWARE (REAL-TIME) ---
             try:
-                cpu_uso = psutil.cpu_percent(interval=0.1) # Pequeno delay para leitura real
+                cpu_uso = psutil.cpu_percent(interval=0.1)
+                cpu_threads = psutil.cpu_count(logical=True)
                 ram = psutil.virtual_memory()
+                ram_total_gb = round(ram.total / (1024**3), 1)
                 ram_uso = ram.percent
-                print(f"📊 HARDWARE: CPU {cpu_uso}% | RAM {ram_uso}%")
+                print(f"📊 HARDWARE: CPU {cpu_uso}% ({cpu_threads} threads) | RAM {ram_uso}% ({ram_total_gb}GB)")
             except Exception as e:
                 print(f"Erro ao coletar métricas de hardware: {e}")
                 cpu_uso = 0
+                cpu_threads = 0
                 ram_uso = 0
+                ram_total_gb = 0
 
             # 8. Saques Concluídos Recentemente (Para Auditoria de Recebimento)
             concluidos_raw = db.query(Transacao).join(Usuario).filter(
@@ -528,7 +532,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "lucro_acumulado_pool": float(juros_acumulados_pool),
                         "total_credito_ativo": float(total_credito_ativo),
                         "cpu_uso": cpu_uso,
+                        "cpu_threads": cpu_threads,
                         "ram_uso": ram_uso,
+                        "ram_total": ram_total_gb,
                     "detalhamento_lucro": {
                         "taxa_postagem": float(detalhamento_total.get('taxa_postagem', 0)),
                         "desbloqueio_dados": float(detalhamento_total.get('desbloqueio_dados', 0)),

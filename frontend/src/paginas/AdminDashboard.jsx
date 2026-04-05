@@ -648,7 +648,7 @@ const AdminDashboard = () => {
                                 <h3>Saúde do Sistema</h3>
                                 <div className="mt-1">
                                     <div className="flex-between">
-                                        <div className="stat-label">Processamento (CPU)</div>
+                                        <div className="stat-label">Processamento (CPU) - {fiscal.cpu_threads || 0} Threads</div>
                                         <span className="text-xs font-bold" style={{ color: (fiscal.cpu_uso > 80) ? 'var(--danger)' : 'var(--primary)' }}>{fiscal.cpu_uso?.toFixed(1) || '0.0'}%</span>
                                     </div>
                                     <div className="progress-bar-bg mb-1">
@@ -661,7 +661,7 @@ const AdminDashboard = () => {
                                         ></div>
                                     </div>
                                     <div className="flex-between" style={{ marginTop: '0.5rem' }}>
-                                        <div className="stat-label">Memória RAM</div>
+                                        <div className="stat-label">Memória RAM - {fiscal.ram_total || 0} GB</div>
                                         <span className="text-xs font-bold" style={{ color: (fiscal.ram_uso > 90) ? 'var(--danger)' : 'var(--success)' }}>{fiscal.ram_uso?.toFixed(1) || '0.0'}%</span>
                                     </div>
                                     <div className="progress-bar-bg">

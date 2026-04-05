@@ -20,7 +20,7 @@ CACHE_TTL_SEG = 15 # 15 segundos de "paz" para o banco de dados
 
 # Versão do cache — incrementar aqui força invalidação de todos os snapshots cacheados
 # quando o servidor reinicia com novos campos no perfil
-CACHE_VERSION = "v3_comissoes_acumuladas"
+CACHE_VERSION = "v4_hardware_metrics"
 
 @router.get("/snapshot")
 @router.get("/snapshot/")
@@ -483,9 +483,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # --- MÉTRICAS DE HARDWARE (REAL-TIME) ---
             try:
                 cpu_uso = psutil.cpu_percent(interval=0.1)
-                cpu_threads = psutil.cpu_count(logical=True)
+                cpu_threads = psutil.cpu_count(logical=True) or 1
                 ram = psutil.virtual_memory()
                 ram_total_gb = round(ram.total / (1024**3), 1)
+                if ram_total_gb < 0.1: ram_total_gb = 0.5 # Mínimo para planos free
                 ram_uso = ram.percent
                 print(f"📊 HARDWARE: CPU {cpu_uso}% ({cpu_threads} threads) | RAM {ram_uso}% ({ram_total_gb}GB)")
             except Exception as e:

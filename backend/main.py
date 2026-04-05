@@ -10,6 +10,9 @@ from utils_db import sincronizar_esquema, executar_limpeza_banco
 
 app = FastAPI(title="PSY PAY API P2P")
 
+# Configuração de Pastas
+os.makedirs("uploads", exist_ok=True)
+
 # Configuração de CORS - Aceita Front de Produção, Local e Mobile (Capacitor)
 frontend_url = os.getenv("FRONTEND_URL", "")
 origins = [

@@ -16,3 +16,4 @@ slowapi
 fpdf2==2.8.7
 mercadopago
 psutil
+httpx

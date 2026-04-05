@@ -19,7 +19,7 @@ def atualizar_score(db: Session, usuario_id: str, valor: Decimal, tipo_acao: str
         # +1.0 a cada R$ 100,00 depositados
         ganho_ou_perda = valor / Decimal("100.0") * Decimal("1.0")
     
-    elif tipo_acao == "APORTE_CAIXA":
+    elif tipo_acao == "APORTE_POOL":
         # +2.0 a cada R$ 100,00 aportados no Pool
         ganho_ou_perda = valor / Decimal("100.0") * Decimal("2.0")
         
@@ -35,7 +35,7 @@ def atualizar_score(db: Session, usuario_id: str, valor: Decimal, tipo_acao: str
         # -2.0 a cada R$ 100,00 sacados (Penalidade 2x vs Depósito)
         ganho_ou_perda = -(valor / Decimal("100.0") * Decimal("2.0"))
         
-    elif tipo_acao == "RESGATE_CAIXA":
+    elif tipo_acao == "RESGATE_POOL":
         # -4.0 a cada R$ 100,00 resgatados do Pool (Penalidade 2x vs Aporte)
         ganho_ou_perda = -(valor / Decimal("100.0") * Decimal("4.0"))
 

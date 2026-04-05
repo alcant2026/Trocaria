@@ -51,10 +51,14 @@ import {
     AlertTriangle,
     DollarSign,
     Landmark,
-    PartyPopper
+    PartyPopper,
+    Info,
+    QrCode,
+    FileDown
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
+import BannerCookies from '../componentes/BannerCookies';
 import CaixaParceiro from './CaixaParceiro';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 
@@ -111,6 +115,10 @@ const TIPOS_LABEL = {
     comissao_parceiro: 'Comissão Recebida',
     aporte_caixa: 'Aporte Caixa',
     resgate_caixa: 'Resgate Caixa',
+    aporte_pool: 'Aporte no Fundo',
+    resgate_pool: 'Resgate do Fundo',
+    abertura_gaveta: 'Fundo p/ Gaveta',
+    fechamento_gaveta: 'Fechamento de Caixa',
     bonus_pagador_caixa: 'Bônus de Fidelidade',
     retorno_pool: 'Retorno Fundo Coletivo',
     retorno_investimento: 'Retorno de Investimento',
@@ -118,11 +126,11 @@ const TIPOS_LABEL = {
 };
 
 // Tipos que são saídas do tipo "taxa/pagamento"
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa', 'assinatura']);
+const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa', 'aporte_pool', 'abertura_gaveta', 'assinatura']);
 // Tipos que são entradas (positivos)
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'resgate_caixa', 'bonus_pagador_caixa', 'retorno_pool', 'retorno_investimento']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'resgate_caixa', 'resgate_pool', 'fechamento_gaveta', 'bonus_pagador_caixa', 'retorno_pool', 'retorno_investimento']);
 // Todos os tipos negativos (sem badge CONCLUIDO)
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa', 'assinatura']);
+const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa', 'aporte_pool', 'abertura_gaveta', 'assinatura']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -132,7 +140,7 @@ const formatarTipo = (tipo, detalhes) => {
     return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
 };
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
-const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' || tipo === 'aporte_caixa' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' || tipo === 'aporte_caixa' || tipo === 'aporte_pool' || tipo === 'abertura_gaveta' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
 // Timer regressivo para cards do marketplace
 const MarketTimer = ({ expiresAt }) => {
@@ -143,12 +151,22 @@ const MarketTimer = ({ expiresAt }) => {
 
 
 const DashboardCliente = ({ initialView = 'home' }) => {
-    const [usuario, setUsuario] = useState({ nome: '', saldo: 0, score: 0 });
-    const [snapshot, setSnapshot] = useState({});
-    const [meusEmprestimos, setMeusEmprestimos] = useState([]);
-    const [activeView, setActiveView] = useState(initialView); // 'home', 'solicitar', 'depositar', 'saque', 'score', 'loja'
+    const [usuario, setUsuario] = useState(() => {
+        const cached = localStorage.getItem('usuario_snapshot');
+        return cached ? JSON.parse(cached) : { nome: '', saldo: 0, score: 0 };
+    });
+    const [snapshot, setSnapshot] = useState(() => {
+        const cached = localStorage.getItem('full_snapshot');
+        return cached ? JSON.parse(cached) : {};
+    });
+    const [meusEmprestimos, setMeusEmprestimos] = useState(() => {
+        const cached = localStorage.getItem('meus_emprestimos_snapshot');
+        return cached ? JSON.parse(cached) : [];
+    });
+    const [activeView, setActiveView] = useState(initialView); 
     const [verSaldo, setVerSaldo] = useState(true);
     const [aceiteTermos, setAceiteTermos] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
     
     // NOVO: Assinatura Premium
     const [showAssinarModal, setShowAssinarModal] = useState(false);
@@ -196,6 +214,35 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [parcelas, setParcelas] = useState(1);
     const [senhaSaque, setSenhaSaque] = useState('');
     const [showSenhaSaque, setShowSenhaSaque] = useState(false);
+
+    // Relatório PDF (Receita Federal)
+    const [showModalRelatorio, setShowModalRelatorio] = useState(false);
+    const [anoRelatorio, setAnoRelatorio] = useState(new Date().getFullYear());
+    const [loadingPDF, setLoadingPDF] = useState(false);
+
+    const handleDownloadPDF = async () => {
+        try {
+            setLoadingPDF(true);
+            const res = await api.getBlob(`/financeiro/relatorio/pdf?ano=${anoRelatorio}`);
+            
+            // Tratamento de blob para download direto
+            const blob = res.data || res;
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `INFORME_PSY_PAY_${usuario.nome.replace(/\s+/g, '_')}_${anoRelatorio}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            setMensagem('Informe gerado com sucesso!');
+            setShowModalRelatorio(false);
+        } catch (err) {
+            console.error('Erro ao baixar PDF:', err);
+            setMensagem('Erro ao gerar relatório. Tente novamente.');
+        } finally {
+            setLoadingPDF(false);
+        }
+    };
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [passoDeposito, setPassoDeposito] = useState(1);
     const [passoSaque, setPassoSaque] = useState(1);
@@ -227,6 +274,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [pageMeusLinks, setPageMeusLinks] = useState(1);
     const [hasMoreMeusLinks, setHasMoreMeusLinks] = useState(false);
     const [loadingMarket, setLoadingMarket] = useState(false);
+
+    const isFirstLoad = !usuario.nome && !isOffline;
 
     useEffect(() => {
         if (mensagem) {
@@ -414,7 +463,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setTimeout(() => setCopiadoId(false), 2000);
     };
 
-    const [historico, setHistorico] = useState([]);
+    const [historico, setHistorico] = useState(() => {
+        const cached = localStorage.getItem('historico_snapshot');
+        return cached ? JSON.parse(cached) : [];
+    });
     const [paginaHist, setPaginaHist] = useState(1);
     const [paginaContratos, setPaginaContratos] = useState(1);
     const ITENS_POR_PAGINA = 5;
@@ -422,27 +474,34 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const carregarSnapshot = async () => {
         try {
             const res = await api.get('/snapshot');
-            const data = res.data || res; // Suporte para diferentes formatos de resposta do api.js
+            const data = res.data || res;
             setSnapshot(data);
+            localStorage.setItem('full_snapshot', JSON.stringify(data));
             
             if (data.perfil) {
                 setUsuario(data.perfil);
-                localStorage.setItem('usuario', JSON.stringify(data.perfil));
+                localStorage.setItem('usuario_snapshot', JSON.stringify(data.perfil));
             }
             if (data.cliente_emprestimos) {
                 setMeusEmprestimos(data.cliente_emprestimos || []);
+                localStorage.setItem('meus_emprestimos_snapshot', JSON.stringify(data.cliente_emprestimos));
             }
-            // O limite agora vem calculado do backend baseado no Pool + Score
+            
             api.get('/emprestimos/limite').then(setLimiteInfo).catch(console.error);
             
             if (data.historico) {
                 setHistorico(data.historico);
+                localStorage.setItem('historico_snapshot', JSON.stringify(data.historico));
             }
             
-            // Carregar parceiros
+            // Carregar parceiros (silent refresh)
             api.get('/financeiro/parceiros').then(resP => setParceiros(resP || [])).catch(console.error);
+            
+            setIsOffline(false);
         } catch (err) {
             console.error('Erro ao carregar snapshot:', err);
+            // Se falhar a conexão, marcamos como offline mas mantemos os dados do cache
+            setIsOffline(true);
         }
     };
 
@@ -787,12 +846,78 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `contrato_psy pay_${id}.pdf`);
+            link.setAttribute('download', `contrato_psypay_${id}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
         } catch (err) {
             console.error('Erro ao baixar contrato:', err);
+        }
+    };
+
+    const handleReverPix = async (transacaoId) => {
+        setLoadingAction(true);
+        try {
+            const res = await api.get(`/financeiro/deposito/pix-detalhes/${transacaoId}`);
+            setQrCodeData({
+                qr_code: res.qr_code,
+                qr_code_base64: res.qr_code_base64,
+                payment_id: res.payment_id
+            });
+            setValorNotificacao(res.valor);
+            
+            // Calcular tempo restante se disponível
+            if (res.expires_at) {
+                const exp = new Date(res.expires_at);
+                const agora = new Date();
+                const diff = Math.floor((exp - agora) / 1000);
+                if (diff > 0) {
+                    const min = Math.floor(diff / 60);
+                    const seg = diff % 60;
+                    setTimeLeft(`${min}:${seg < 10 ? '0' : ''}${seg}`);
+                } else {
+                    setTimeLeft('Expirado');
+                }
+            }
+
+            setMetodoDeposito('pix');
+            setPassoDeposito(2);
+            setActiveView('depositar');
+            showModal({ 
+                title: 'QR Code Recuperado', 
+                message: 'Você foi redirecionado para a tela de pagamento do seu depósito pendente.', 
+                type: 'success' 
+            });
+        } catch (err) {
+            showModal({ 
+                title: 'Erro ao Recuperar PIX', 
+                message: err.response?.data?.detail || 'Não foi possível carregar os dados deste PIX agora.', 
+                type: 'danger' 
+            });
+        } finally {
+            setLoadingAction(false);
+        }
+    };
+
+    const handleConfirmarRecebimento = async (id) => {
+        if (!confirm('Deseja confirmar que recebeu o PIX deste saque corretamente na sua conta?')) return;
+        setLoadingAction(true);
+        try {
+            await api.post(`/financeiro/confirmar-recebimento/${id}`);
+            showModal({ 
+                title: 'Confirmado!', 
+                message: 'Obrigado por confirmar o recebimento. Isso ajuda na segurança da nossa comunidade.', 
+                type: 'success' 
+            });
+            carregarSnapshot();
+        } catch (err) {
+            showModal({ 
+                title: 'Erro na Confirmação', 
+                message: err.message || 'Não foi possível confirmar o recebimento agora.', 
+                type: 'danger' 
+            });
+        } finally {
+            setLoadingAction(false);
         }
     };
 
@@ -823,6 +948,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         {copiadoId ? <Check size={12} /> : <Copy size={12} />}
                         {usuario.id}
                     </div>
+                    {isOffline && (
+                        <div className="badge bg-warning text-dark animate-pulse" style={{ fontSize: '0.65rem', padding: '4px 10px', borderRadius: '20px', fontWeight: 800, marginLeft: '10px' }}>
+                             Offline
+                        </div>
+                    )}
                     {usuario.is_verified ? (
                         <ShieldCheck size={24} color="var(--success)" title="Conta Verificada" />
                     ) : (
@@ -833,43 +963,74 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             </header>
 
             {mensagem && (
-                <div className={`alert ${typeof mensagem === 'string' && mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} `}>
+                <div className={`alert ${typeof mensagem === 'string' && (mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('não') || mensagem.toLowerCase().includes('falha')) ? 'alert-danger animate-shake' : 'alert-success'} `}>
+                    <div className="alert-icon">
+                        {typeof mensagem === 'string' && (mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('não') || mensagem.toLowerCase().includes('falha')) ? (
+                            <AlertCircle size={20} />
+                        ) : (
+                            <CheckCircle size={20} />
+                        )}
+                    </div>
                     <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
                     <button onClick={() => setMensagem('')} className="alert-close"><X size={16} /></button>
                 </div>
             )}
 
             {/* Top Grid for PC: Balance and Pending Actions */}
-            <div className="grid-2">
-                <div>
-                    {/* Main Balance Card - Nubank Style */}
-                    <div className="card card-actionable" onClick={() => setActiveView('home')} style={{ marginTop: '0.5rem' }}>
-                        <div className="flex-between mb-1" style={{ width: '100%' }}>
-                            <div className="flex-between" style={{ gap: '10px' }}>
-                                <HandCoins size={20} color="var(--primary)" />
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Minha Conta</span>
+            <div className="dashboard-grid">
+                {/* CARD DE SALDO */}
+                <div className="card balance-card">
+                    {isFirstLoad ? (
+                        <div className="skeleton-loading" style={{ height: '160px' }}></div>
+                    ) : (
+                        <>
+                            <div className="flex-between mb-1">
+                                <span className="text-muted">Saldo Disponível</span>
+                                <div className="balance-actions">
+                                    <button className="btn-icon" onClick={() => setVerSaldo(!verSaldo)}>
+                                        {verSaldo ? <Eye size={18} /> : <EyeOff size={18} />}
+                                    </button>
+                                    <RefreshCw 
+                                        size={18} 
+                                        className={`cursor-pointer ${loadingAction ? 'animate-spin' : ''}`} 
+                                        onClick={carregarSnapshot} 
+                                    />
+                                </div>
                             </div>
-                            <ChevronRight size={18} color="var(--text-muted)" />
-                        </div>
+                            <div className="balance-value">
+                                <span className="currency">R$</span>
+                                <span className="amount">
+                                    {verSaldo ? usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '••••••'}
+                                </span>
+                            </div>
+                            
+                            {/* EXIBIÇÃO PROEMINENTE DO PSY ID 🆔 */}
+                            <div className="flex-between mt-1" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ textAlign: 'left' }}>
+                                    <span className="text-muted" style={{ fontSize: '0.65rem', display: 'block', fontWeight: 800 }}>MEU PSY ID (Atendimento)</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '2px' }}>{usuario.id}</span>
+                                </div>
+                                <button 
+                                    onClick={handleCopiarId}
+                                    style={{ background: 'var(--primary)', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', color: '#000' }}
+                                >
+                                    {copiadoId ? 'COPIADO!' : 'COPIAR'}
+                                </button>
+                            </div>
 
-                        <div className="flex-between">
-                            <div>
-                                {verSaldo ? (
-                                    <h2 className="text-clamp-balance">
-                                        R$ {(usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </h2>
-                                ) : (
-                                    <div style={{ height: '40px', width: '180px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                                )}
-                                <p style={{ fontSize: '0.85rem', marginTop: '12px' }}>
-                                    Score Financeiro: <span className="text-primary" style={{ fontWeight: 800 }}>{(usuario.score || 0).toFixed(1)}</span>
-                                </p>
+                            <div className="balance-footer mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                                <div className="flex-between">
+                                    <div className="flex-center" style={{ gap: '5px', fontSize: '0.8rem', color: 'var(--success)', fontWeight: 600 }}>
+                                        <TrendingUp size={14} /> 
+                                        <span>+{(usuario.rendimento_pool_pct || 0).toFixed(2)}% do Pool</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                                        PSY SCORE: <span className="text-primary">{(usuario.score || 0).toFixed(1)}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); setVerSaldo(!verSaldo); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '10px' }}>
-                                {verSaldo ? <Eye size={24} /> : <EyeOff size={24} />}
-                            </button>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
 
                 {usuario.divida_total > 0 && (
@@ -968,6 +1129,33 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <Store size={28} color="var(--warning)" />
                                 <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
                             </div>
+                        )}
+                    </div>
+                    
+                    <h3 className="section-title">Últimas Atividades</h3>
+                    <div className="activity-list">
+                        {isFirstLoad ? (
+                            [1,2,3].map(i => <div key={i} className="skeleton-loading skeleton-card"></div>)
+                        ) : historico.length === 0 ? (
+                            <div className="empty-state">
+                                <Clock size={32} />
+                                <p>Nenhuma atividade recente.</p>
+                            </div>
+                        ) : (
+                            historico.slice(0, 5).map((h, i) => (
+                                <div key={h.id} className="activity-item">
+                                    <div className="activity-icon">
+                                        {TIPOS_ENTRADA.has(h.tipo) ? <ArrowUpCircle size={20} color="var(--success)" /> : <ArrowDownCircle size={20} color="var(--danger)" />}
+                                    </div>
+                                    <div className="activity-info">
+                                        <span className="activity-title">{formatarTipo(h.tipo, h.detalhes)}</span>
+                                        <span className="activity-date">{new Date(h.data).toLocaleDateString()}</span>
+                                    </div>
+                                    <span className="activity-value" style={{ color: corValor(h.tipo) }}>
+                                        {prefixoValor(h.tipo)} R$ {h.valor.toLocaleString('pt-BR')}
+                                    </span>
+                                </div>
+                            ))
                         )}
                     </div>
                 </div>
@@ -1142,22 +1330,35 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Fundo Coletivo de Liquidez</h2>
                     </div>
 
-                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                        <div className="flex-between">
-                            <span className="text-muted">Seu capital no Pool:</span>
-                            <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>R$ {(usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        {usuario.rendimento_pool_pct >= 0 ? (
-                            <div className="flex-between mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                                    +{usuario.rendimento_pool_pct.toFixed(2)}% <span className="text-muted" style={{ fontWeight: 'normal' }}>de Rendimento</span>
-                                </span>
-                                <span className="text-muted text-xs">
-                                    (+ R$ {(usuario.rendimento_pool_abs || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                </span>
-                            </div>
-                        ) : null}
-                        <p style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '8px' }}>
+                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {isFirstLoad ? (
+                            <div className="skeleton-loading" style={{ height: '100px' }}></div>
+                        ) : (
+                            <>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted" style={{ fontSize: '0.85rem' }}>Saldo Total no Fundo:</span>
+                                    <span style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--primary)' }}>
+                                        R$ {(usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ background: 'rgba(var(--success-rgb), 0.05)', padding: '8px', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Rendimento</div>
+                                        <div style={{ color: 'var(--success)', fontWeight: 800, fontSize: '1rem' }}>
+                                            +{(usuario.rendimento_pool_pct || 0).toFixed(2)}%
+                                        </div>
+                                    </div>
+                                    <div style={{ background: 'rgba(var(--success-rgb), 0.05)', padding: '8px', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Ganho</div>
+                                        <div style={{ color: 'var(--success)', fontWeight: 800, fontSize: '1rem' }}>
+                                            R$ {(usuario.rendimento_pool_abs || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        <p style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '12px', textAlign: 'center' }}>
                             Rendimentos automáticos e pro-rata aplicados em tempo real sobre os juros de crédito.
                         </p>
                     </div>
@@ -1242,6 +1443,16 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <div className="animate-fade-in">
                                 <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Quanto deseja adicionar e como prefere pagar?</p>
                                 
+                                <div className="info-block mb-2" style={{ background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)', padding: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                        <ShieldCheck size={18} color="var(--primary)" style={{ marginTop: '2px' }} />
+                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
+                                            <strong>Transparência Fase Beta (MVP)</strong><br />
+                                            Como plataforma experimental de crédito digital, os recebimentos são processados diretamente pelo Gestor Fundador. Seus créditos e rendimentos são registrados pelo sistema sob os termos de uso.
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div className="input-group mb-1">
                                     <label>Escolha o Método</label>
                                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -1311,15 +1522,20 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <p className="mb-1 text-muted">Aguardando pagamento do PIX abaixo:</p>
                                         
                                         {timeLeft && (
-                                            <div className="badge-notification bg-dark mb-1" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 20px', color: 'var(--primary)', borderRadius: '25px', fontSize: '0.85rem', fontWeight: 800, border: '1px solid rgba(var(--primary-rgb), 0.2)' }}>
-                                                <Clock size={16} /> Expira em: {timeLeft}
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                                                <div className="badge-notification bg-dark" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', color: 'var(--primary)', borderRadius: '30px', fontSize: '0.9rem', fontWeight: 800, border: '1px solid rgba(var(--primary-rgb), 0.3)', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+                                                    <Clock size={18} className="animate-pulse" /> Expira em: {timeLeft}
+                                                </div>
                                             </div>
                                         )}
-                                        <img 
-                                            src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} 
-                                            alt="QR Code PIX" 
-                                            style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem', border: '2px solid var(--primary)' }} 
-                                        />
+                                        
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                                            <img 
+                                                src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} 
+                                                alt="QR Code PIX" 
+                                                style={{ width: '220px', height: '220px', borderRadius: '16px', border: '3px solid var(--primary)', padding: '10px', background: '#fff' }} 
+                                            />
+                                        </div>
                                         
                                         <div className="info-block mb-1" style={{ position: 'relative' }}>
                                             <div className="info-label">Pix Copia e Cola</div>
@@ -1373,30 +1589,45 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     </div>
                                 ) : (
                                     <>
+                                        <div className="text-center mb-1">
+                                            <div style={{ background: 'rgba(255, 145, 0, 0.1)', border: '1px solid var(--warning)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px' }}>SEU CÓDIGO DE ATENDIMENTO</p>
+                                                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--warning)', letterSpacing: '4px', margin: 0 }}>{usuario.id}</h2>
+                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '10px' }}>Apresente este código ao parceiro lojista</p>
+                                            </div>
+                                        </div>
+
                                         <div className="input-group">
-                                            <label>Escolha o Estabelecimento Parceiro</label>
+                                            <label>Onde você está?</label>
                                             <select
                                                 className="input-field"
                                                 value={parceiroIdDeposito}
                                                 onChange={(e) => setParceiroIdDeposito(e.target.value)}
                                                 style={{ marginBottom: '1rem' }}
                                             >
-                                                <option value="">Selecione um local...</option>
+                                                <option value="">Buscar loja próxima...</option>
                                                 {parceiros.map(p => (
                                                     <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
                                                 ))}
                                             </select>
-                                            <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center' }}>Vá até o local escolhido para realizar o depósito em espécie com o atendente.</p>
+                                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', fontSize: '0.75rem', lineHeight: '1.5' }}>
+                                                <p style={{ margin: 0 }}><strong>Como funciona:</strong></p>
+                                                <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+                                                    <li>Entregue o dinheiro físico ao lojista.</li>
+                                                    <li>O saldo cairá na sua conta <strong>na hora</strong>.</li>
+                                                    <li>Taxa de serviço: <strong>5%</strong> (cobrada no ato).</li>
+                                                </ul>
+                                            </div>
                                         </div>
 
                                         <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
                                             <button 
                                                 className="btn btn-primary" 
-                                                style={{ flex: 2 }} 
+                                                style={{ flex: 2, background: 'var(--warning)', color: '#000' }} 
                                                 disabled={!parceiroIdDeposito}
                                                 onClick={() => setPassoDeposito(3)}
                                             >
-                                                Já realizei o Pagamento
+                                                Entendi, Continuar
                                             </button>
                                             <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoDeposito(1)}>Voltar</button>
                                         </div>
@@ -1421,7 +1652,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
                                     <button className="btn btn-primary" onClick={handleNotificarDeposito} disabled={loadingAction}>
-                                        {loadingAction ? 'Processando...' : 'Confirmar e Notificar'}
+                                        <CheckCircle size={18} /> {loadingAction ? 'Processando...' : 'Confirmar e Notificar'}
                                     </button>
                                     <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)} disabled={loadingAction}>Revisar Dados</button>
                                 </div>
@@ -1498,36 +1729,113 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             </div>
                                         </div>
 
-                                        <div className="input-group">
-                                            <label>Quanto deseja sacar?</label>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <input
-                                                    type="number"
-                                                    className="input-field"
-                                                    placeholder="R$ 0,00"
-                                                    style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
-                                                    value={valorSaque}
-                                                    onChange={(e) => setValorSaque(e.target.value)}
-                                                />
-                                            </div>
-                                            {parseFloat(valorSaque) > usuario.saldo && (
-                                                <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                                    <AlertTriangle size={14} /> Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                                </p>
-                                            )}
-                                        </div>
+                                        {metodoSaque === 'especie' ? (
+                                            <div className="animate-slide-up">
+                                                <div className="input-group mb-1">
+                                                    <label>Onde deseja sacar?</label>
+                                                    <select
+                                                        className="input-field"
+                                                        value={parceiroIdSaque}
+                                                        onChange={(e) => setParceiroIdSaque(e.target.value)}
+                                                    >
+                                                        <option value="">Selecione um Parceiro Próximo...</option>
+                                                        {parceiros.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
 
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                            <button 
-                                                className="btn btn-primary" 
-                                                style={{ flex: 2 }} 
-                                                disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo}
-                                                onClick={() => setPassoSaque(2)}
-                                            >
-                                                Continuar
-                                            </button>
-                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSaque(1); }}>Voltar</button>
-                                        </div>
+                                                <div className="input-group mb-1">
+                                                    <label>Quanto deseja sacar?</label>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--primary)' }}>R$</span>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field"
+                                                            placeholder="0,00"
+                                                            style={{ paddingLeft: '40px', fontSize: '1.2rem', fontWeight: 700 }}
+                                                            value={valorSaque}
+                                                            onChange={(e) => setValorSaque(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {valorSaque && parseFloat(valorSaque) > 0 && (
+                                                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                        <div className="flex-between mb-1" style={{ fontSize: '0.75rem' }}>
+                                                            <span className="text-muted">Taxa de Serviço (5%):</span>
+                                                            <span className="text-danger">- R$ {(parseFloat(valorSaque || 0) * 0.05).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="flex-between" style={{ fontSize: '0.9rem', fontWeight: 700 }}>
+                                                            <span>Você receberá na loja:</span>
+                                                            <span className="text-success">R$ {(parseFloat(valorSaque || 0) * 0.95).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                                    <button 
+                                                        className="btn btn-primary" 
+                                                        style={{ flex: 2, background: 'var(--warning)', color: '#000' }} 
+                                                        disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo || !parceiroIdSaque || loadingAction}
+                                                        onClick={async () => {
+                                                            setLoadingAction(true);
+                                                            try {
+                                                                const res = await api.post('/financeiro/saque/reservar', {
+                                                                    valor: parseFloat(valorSaque),
+                                                                    parceiro_id: parseInt(parceiroIdSaque),
+                                                                    senha_saque: '1234' // Placeholder
+                                                                });
+                                                                showModal({ title: 'Reserva Realizada!', message: res.message, type: 'success' });
+                                                                setActiveView('home');
+                                                                carregarSnapshot();
+                                                            } catch (err) {
+                                                                showModal({ title: 'Erro na Reserva', message: err.message, type: 'danger' });
+                                                            } finally {
+                                                                setLoadingAction(false);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {loadingAction ? 'Reservando...' : 'Reservar Saque Agora'}
+                                                    </button>
+                                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Cancelar</button>
+                                                </div>
+                                            </div>
+
+                                        ) : (
+                                            <div className="animate-slide-up">
+                                                <div className="input-group">
+                                                    <label>Quanto deseja sacar?</label>
+                                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field"
+                                                            placeholder="R$ 0,00"
+                                                            style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
+                                                            value={valorSaque}
+                                                            onChange={(e) => setValorSaque(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    {parseFloat(valorSaque) > usuario.saldo && (
+                                                        <p className="text-danger mt-1" style={{ fontSize: '0.8rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                            <AlertTriangle size={14} /> Saldo insuficiente (Disponível: R$ {usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                                    <button 
+                                                        className="btn btn-primary" 
+                                                        style={{ flex: 2 }} 
+                                                        disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo}
+                                                        onClick={() => setPassoSaque(2)}
+                                                    >
+                                                        Próximo
+                                                    </button>
+                                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSaque(1); }}>Voltar</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1946,12 +2254,28 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
             {
                 activeView === 'historico' && (
-                    <div className="card">
+                    <div className="card animate-fade-in">
                         <div className="flex-between mb-1">
-                            <h3>Últimas Atividades</h3>
-                            <History size={18} color="var(--text-muted)" />
+                            <div>
+                                <h2 style={{ fontSize: '1.1rem', color: 'var(--primary)', margin: 0 }}>Histórico Detalhado</h2>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Consulte todas as suas movimentações financeiras.</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button 
+                                    className="btn btn-outline btn-sm" 
+                                    style={{ gap: '6px', fontSize: '0.75rem', padding: '8px 12px' }}
+                                    onClick={() => setShowModalRelatorio(true)}
+                                >
+                                    <FileDown size={14} /> Informe IRPF
+                                </button>
+                                <History size={18} color="var(--text-muted)" />
+                            </div>
                         </div>
-                        {historico.length === 0 ? (
+                        {isFirstLoad ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {[1,2,3,4,5].map(i => <div key={i} className="skeleton-loading skeleton-card"></div>)}
+                            </div>
+                        ) : historico.length === 0 ? (
                             <p className="text-muted text-center" style={{ fontSize: '0.85rem' }}>Nenhuma movimentação recente.</p>
                         ) : (
                             <>
@@ -1979,6 +2303,49 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 61, 0, 0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
                                                     <AlertCircle size={14} color="var(--danger)" />
                                                     <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600 }}>{h.detalhes}</p>
+                                                </div>
+                                            )}
+
+                                            {/* BOTÃO PARA REVER PIX (Depósitos Pendentes) */}
+                                            {h.tipo === 'deposito' && h.metodo === 'pix' && h.status === 'pendente' && (
+                                                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <button 
+                                                        className="btn btn-outline" 
+                                                        style={{ width: '100%', fontSize: '0.75rem', padding: '8px', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                                        onClick={() => handleReverPix(h.id)}
+                                                        disabled={loadingAction}
+                                                    >
+                                                        <QrCode size={14} /> Pagar Agora
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* BOTÃO DE CONFIRMAÇÃO DE RECEBIMENTO (Saques Concluídos) */}
+                                            {h.tipo === 'saque' && h.status === 'concluido' && (
+                                                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    {h.confirmado_cliente ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                            <CheckCircle size={16} /> Você confirmou o recebimento em {new Date(h.data_confirmacao_cliente).toLocaleDateString('pt-BR')} às {new Date(h.data_confirmacao_cliente).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="alert alert-info animate-slide-down" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '10px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                <div className="alert-icon">
+                                                                    <Info size={20} />
+                                                                </div>
+                                                                <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
+                                                                    Deseja confirmar que recebeu o PIX deste saque corretamente na sua conta?
+                                                                </p>
+                                                            </div>
+                                                            <button 
+                                                                className="btn btn-primary" 
+                                                                style={{ width: '100%', fontSize: '0.75rem', padding: '10px' }}
+                                                                onClick={() => handleConfirmarRecebimento(h.id)}
+                                                            >
+                                                                <CheckCircle size={16} /> Confirmei o Recebimento
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -2286,13 +2653,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 )
             }
 
-            {/* MENU DO CAIXA DO LOJISTA */}
-            {activeView === 'caixa_parceiro' && usuario?.is_parceiro && (
-                <CaixaParceiro 
-                    onUpdate={carregarSnapshot}
-                    usuario={usuario}
-                />
-            )}
+
 
             {/* --- VIEW: MARKETPLACE (COMUNIDADE) --- */}
             {activeView === 'marketplace' && (
@@ -2353,7 +2714,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     )}
 
                     {marketplaceTab === 'explorar' ? (
-                        marketplaceLinks.length > 0 ? (
+                        loadingMarket && marketplaceLinks.length === 0 ? (
+                            <div className="marketplace-grid">
+                                {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-loading" style={{ height: '280px', borderRadius: '16px' }}></div>)}
+                            </div>
+                        ) : marketplaceLinks.length > 0 ? (
                             <>
                                 <div className="marketplace-grid">
                                     {marketplaceLinks.map(l => (
@@ -2432,7 +2797,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                         )
                     ) : (
-                        meusLinksMarketplace.length > 0 ? (
+                        loadingMarket && meusLinksMarketplace.length === 0 ? (
+                            <div className="marketplace-grid">
+                                {[1,2,3].map(i => <div key={i} className="skeleton-loading" style={{ height: '280px', borderRadius: '16px' }}></div>)}
+                            </div>
+                        ) : meusLinksMarketplace.length > 0 ? (
                             <>
                                 <div className="marketplace-grid">
                                     {meusLinksMarketplace.map(l => {
@@ -2535,7 +2904,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <input 
                                 type="number" 
                                 className="input-field" 
-                                placeholder="0,00"
+                                placeholder="R$ 0,00"
                                 value={dadosNovoLink.valor} 
                                 onChange={(e) => setDadosNovoLink({...dadosNovoLink, valor: e.target.value})} 
                             />
@@ -2650,6 +3019,48 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </ul>
                 </div>
             </ModalPremium>
+            <BannerCookies usuario={usuario} onUpdate={carregarSnapshot} />
+
+            {/* MODAL PARA SELEÇÃO DE ANO DO RELATÓRIO PDF */}
+            {showModalRelatorio && (
+                <div className="modal-overlay">
+                    <div className="modal-card">
+                        <div className="modal-icon" style={{ background: 'rgba(var(--primary-rgb), 0.1)', color: 'var(--primary)' }}>
+                            <FileDown size={32} />
+                        </div>
+                        <h2>Informe de Rendimentos</h2>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                            Escolha o ano-calendário para gerar o documento oficial de auxílio à Receita Federal (IRPF).
+                        </p>
+                        
+                        <div className="input-group" style={{ marginBottom: '20px' }}>
+                            <label>Selecione o Ano</label>
+                            <select 
+                                className="input-field" 
+                                value={anoRelatorio} 
+                                onChange={(e) => setAnoRelatorio(parseInt(e.target.value))}
+                                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                            >
+                                {[2026, 2025, 2024, 2023, 2022].map(ano => (
+                                    <option key={ano} value={ano} style={{ background: '#1a1a1a' }}>{ano}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex-center-column" style={{ gap: '15px', width: '100%' }}>
+                            <button 
+                                className="btn btn-primary" 
+                                style={{ width: '100%' }}
+                                onClick={handleDownloadPDF}
+                                disabled={loadingPDF}
+                            >
+                                {loadingPDF ? <RefreshCw className="animate-spin" size={18} /> : 'Gerar e Baixar PDF'}
+                            </button>
+                            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowModalRelatorio(false)}>Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

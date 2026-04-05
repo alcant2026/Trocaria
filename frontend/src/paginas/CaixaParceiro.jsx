@@ -1,338 +1,460 @@
-import React, { useState } from 'react';
-import { Store, Search, CheckCircle, AlertTriangle, UserCheck, X, DollarSign, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Store, Search, CheckCircle, AlertTriangle, UserCheck, X, DollarSign, RefreshCw, ArrowUpCircle, ArrowDownCircle, Clock, Lock, Play } from 'lucide-react';
 import api from '../api';
 
 const CaixaParceiro = ({ onUpdate, usuario }) => {
-    const [clienteId, setClienteId] = useState('');
-    const [valor, setValor] = useState('');
+    const [activeTab, setActiveTab] = useState('caixa');
     const [loading, setLoading] = useState(false);
-    const [loadingSaque, setLoadingSaque] = useState(false);
-    const [resultado, setResultado] = useState(null);
-    const [erro, setErro] = useState(null);
-    const [sucesso, setSucesso] = useState(null);
-    const [confirmando, setConfirmando] = useState(false);
-    const [activeTab, setActiveTab] = useState('caixa'); // 'caixa' ou 'garantia'
-    const [motivoReprovacao, setMotivoReprovacao] = useState('');
+    const [erro, setErro] = useState('');
+    const [sucesso, setSucesso] = useState('');
+    
+    // Estados do Formulário de Intermediação
+    const [codigoCliente, setCodigoCliente] = useState('');
+    const [valor, setValor] = useState('');
+    const [tipoOp, setTipoOp] = useState('deposito');
+    const [simulacao, setSimulacao] = useState(null);
+    const [fundoReserva, setFundoReserva] = useState('');
 
-    const handleSacarComissao = async () => {
-        setErro(null);
-        setSucesso(null);
-        setLoadingSaque(true);
-        try {
-            const res = await api.post('/financeiro/parceiro/sacar-comissoes');
-            setSucesso(res.message || 'Comissões transferidas para sua carteira!');
-            if (onUpdate) onUpdate();
-        } catch (err) {
-            setErro(err.message || 'Erro ao sacar comissões.');
-        } finally {
-            setLoadingSaque(false);
-        }
+    const limparMensagens = () => {
+        setErro('');
+        setSucesso('');
     };
 
-    const handleBuscar = async () => {
-        setErro(null);
-        setSucesso(null);
-        setResultado(null);
-
-        const cid = clienteId.trim();
-        if (!cid) return setErro("Digite o ID do Cliente.");
-
-        if (activeTab === 'caixa') {
-            const v = parseFloat((valor || '').replace(',', '.'));
-            if (!v || v <= 0) return setErro("Digite o Valor da Operação.");
-
-            setLoading(true);
-            try {
-                const res = await api.post('/financeiro/parceiro/transacoes/verificar', {
-                    cliente_id: cid,
-                    valor: v
-                });
-                setResultado(res.transacao || res);
-            } catch (err) {
-                setErro(err.message || "Nenhuma transação pendente encontrada.");
-            } finally {
-                setLoading(false);
-            }
-        } else {
-            setLoading(true);
-            try {
-                const res = await api.post('/emprestimos/parceiro/verificar-garantia', {
-                    cliente_id: cid
-                });
-                setResultado(res);
-            } catch (err) {
-                setErro(err.message || "Nenhuma garantia física pendente.");
-            } finally {
-                setLoading(false);
-            }
+    const handleAbrirCaixa = async () => {
+        if (!fundoReserva || parseFloat(fundoReserva) < 10) {
+            setErro("O fundo de reserva mínimo é de R$ 10,00!");
+            return;
         }
-    };
-
-    const handleConfirmar = async () => {
-        if (!resultado) return;
-        setConfirmando(true);
         setLoading(true);
+        limparMensagens();
         try {
-            const res = await api.post('/financeiro/parceiro/transacoes/confirmar', {
-                transacao_id: resultado.id
-            });
-            setSucesso(res.message || "Transação confirmada com sucesso! Comissão creditada.");
-            setResultado(null);
-            setClienteId('');
-            setValor('');
-            if (onUpdate) onUpdate();
-        } catch (err) {
-            setErro(err.message || "Erro ao confirmar a transação.");
-        } finally {
-            setLoading(false);
-            setConfirmando(false);
-        }
-    };
-
-    const handleAvaliarGarantia = async (decisao) => {
-        if (!resultado) return;
-        setLoading(true);
-        try {
-            const res = await api.post('/emprestimos/parceiro/avaliar-garantia', {
-                solicitacao_id: resultado.id,
-                decisao: decisao,
-                motivo: motivoReprovacao
-            });
+            const valorFinal = fundoReserva.replace(',', '.');
+            const res = await api.post('/parceiros/abrir-caixa', { valor_gaveta: parseFloat(valorFinal) });
             setSucesso(res.message);
-            setResultado(null);
-            setClienteId('');
-            setMotivoReprovacao('');
             if (onUpdate) onUpdate();
         } catch (err) {
-            setErro(err.message || "Erro ao avaliar garantia.");
+            setErro(err.message || "Erro ao abrir o caixa.");
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <div className="animate-fade-in card" style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-            <div className="flex-between mb-1" style={{ borderBottom: '1px solid rgba(255, 145, 0, 0.2)', paddingBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Store size={24} color="var(--warning)" />
-                    <div>
-                        <h2 style={{ fontSize: '1.2rem', color: 'var(--warning)', margin: 0 }}>Terminal Parceiro</h2>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Geração de Saldo & Garantias</p>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: '5px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '10px' }}>
-                    <button 
-                        onClick={() => { setActiveTab('caixa'); setResultado(null); }}
-                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: activeTab === 'caixa' ? 'var(--warning)' : 'transparent', color: activeTab === 'caixa' ? '#000' : 'var(--text-muted)', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                        Caixa
-                    </button>
-                    <button 
-                        onClick={() => { setActiveTab('garantia'); setResultado(null); }}
-                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: activeTab === 'garantia' ? 'var(--warning)' : 'transparent', color: activeTab === 'garantia' ? '#000' : 'var(--text-muted)', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                        Garantias
-                    </button>
-                </div>
-            </div>
+    const handleFecharCaixa = async () => {
+        const totalDevolvido = (usuario?.saldo_caixa_inicial || 0) + (usuario?.comissoes_acumuladas || 0);
+        const mensagemConfirma = `Você está encerrando o turno.\n\n` +
+                                `- Fundo de Reserva: R$ ${usuario?.saldo_caixa_inicial?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+                                `- Comissões D+0: R$ ${usuario?.comissoes_acumuladas?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+                                `Total de R$ ${totalDevolvido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} será transferido para sua conta digital.\n\n` +
+                                `O saldo remanescente da gaveta física deve permanecer com você.\n\n` +
+                                `Deseja confirmar o encerramento?`;
 
-            <div style={{ padding: '10px 0' }}>
-                {/* Card de Comissões com botão de saque */}
-                <div style={{ background: 'rgba(255, 145, 0, 0.1)', border: '1px solid rgba(255,145,0,0.3)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                <DollarSign size={14} color="var(--warning)" />
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>COMISSÕES ACUMULADAS</span>
-                            </div>
-                            <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--warning)', margin: 0 }}>
-                                R$ {(usuario?.comissoes_acumuladas || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>0.5% por operação confirmada</p>
+        if (!window.confirm(mensagemConfirma)) return;
+        
+        setLoading(true);
+        limparMensagens();
+        try {
+            const res = await api.post('/parceiros/fechar-caixa');
+            setSucesso(res.message);
+            if (onUpdate) onUpdate();
+        } catch (err) {
+            setErro(err.message || "Erro ao fechar o caixa.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSimularOperacao = async () => {
+        limparMensagens();
+        
+        if (!codigoCliente) {
+            setErro("Digite o ID do Cliente para buscar ou simular.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // 1. SEMPRE tentamos buscar um saque reservado primeiro (Independente do que o lojista marcou) 🔍
+            try {
+                const res = await api.get(`/parceiros/buscar-saque-pendente/${codigoCliente}`);
+                setSimulacao({
+                    id: res.transacao_id,
+                    isReserva: true,
+                    bruto: res.valor_bruto,
+                    entrega: res.valor_entrega,
+                    taxaPlataforma: res.taxa_plataforma,
+                    cliente: res.cliente_nome
+                });
+                setValor(res.valor_bruto.toString());
+                setTipoOp('saque'); // Muda automaticamente para Saque
+                setLoading(false);
+                return; 
+            } catch (e) {
+                // Se der erro 404, apenas ignoramos e tentamos o fluxo de depósito (se for o caso)
+                if (tipoOp === 'saque' && e.status === 404) {
+                    setErro("Nenhum saque reservado encontrado para este ID.");
+                    setSimulacao(null);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 2. Fluxo de Depósito (Simulação Manual) 💰
+            if (tipoOp === 'deposito') {
+                const v = parseFloat(valor);
+                if (!v || v <= 0) {
+                    setErro("Informe o valor do DEPÓSITO para simular.");
+                    setLoading(false);
+                    return;
+                }
+                
+                const taxaPlataforma = v * 0.05;
+                const valorLiquido = v - taxaPlataforma;
+                const comissaoLoja = v * ((usuario?.taxa_loja || 0) / 100);
+
+                setSimulacao({
+                    bruto: v,
+                    taxa: taxaPlataforma,
+                    liquido: valorLiquido,
+                    comissao: comissaoLoja
+                });
+            }
+        } catch (err) {
+            setErro(err.message || "Erro ao processar consulta.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConfirmarOperacao = async () => {
+        setLoading(true);
+        limparMensagens();
+        try {
+            // Se for uma reserva pendente, usamos a rota de confirmação de entrega
+            if (simulacao?.isReserva) {
+                const res = await api.post('/parceiros/confirmar-entrega', { transacao_id: simulacao.id });
+                setSucesso(res.message);
+            } else {
+                // Fluxo padrão para depósitos
+                const payload = {
+                    codigo_cliente: codigoCliente,
+                    valor: parseFloat(valor),
+                    tipo_operacao: tipoOp
+                };
+                const res = await api.post('/parceiros/intermediar', payload);
+                setSucesso(res.message);
+            }
+            
+            setCodigoCliente('');
+            setValor('');
+            setSimulacao(null);
+            if (onUpdate) onUpdate();
+        } catch (err) {
+            setErro(err.message || "Erro ao processar operação.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Auto-Busca quando o ID está completo (5 caracteres) 🔍
+    useEffect(() => {
+        if (codigoCliente.length === 5) {
+            handleSimularOperacao();
+        }
+    }, [codigoCliente]);
+
+    const handleTrocarPlano = async (novoPrazo) => {
+        setLoading(true);
+        limparMensagens();
+        try {
+            const res = await api.patch('/parceiros/configurar-plano', { prazo: novoPrazo });
+            setSucesso(res.message);
+            if (onUpdate) onUpdate();
+        } catch (err) {
+            setErro(err.message || "Erro ao trocar plano.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- TELA DE CAIXA FECHADO (DESIGN PREMIUM HARMONIZADO) ---
+    if (!usuario?.caixa_aberto && activeTab === 'caixa') {
+        return (
+            <div className="animate-fade-in" style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                <div className="card" style={{ 
+                    textAlign: 'center', 
+                    padding: '40px 30px', 
+                    maxWidth: '450px', 
+                    width: '100%', 
+                    borderRadius: 'var(--radius-lg)'
+                }}>
+                    <div style={{ 
+                        width: '90px', 
+                        height: '90px', 
+                        background: 'rgba(var(--primary-rgb), 0.1)', 
+                        borderRadius: '28px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        margin: '0 auto 25px',
+                        border: '1px solid var(--border-color)',
+                        position: 'relative'
+                    }}>
+                        <Lock size={42} style={{ color: 'var(--primary)' }} />
+                        <div style={{ position: 'absolute', top: -5, right: -5, width: '12px', height: '12px', background: 'var(--danger)', borderRadius: '50%', border: '2px solid var(--background)' }} />
+                    </div>
+
+                    <h2 className="text-clamp-h2" style={{ fontWeight: 800, marginBottom: '10px' }}>Turno Encerrado</h2>
+                    <p className="text-muted" style={{ fontSize: '0.95rem', marginBottom: '35px' }}>
+                        Abra o seu turno para começar a transacionar. O valor do fundo de reserva será **debitado** do seu saldo digital.
+                    </p>
+
+                    {/* Status de Saldo Disponível */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '30px' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 15px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                            <span className="text-muted" style={{ fontSize: '0.65rem', display: 'block', textTransform: 'uppercase', fontWeight: 800 }}>Saldo Disponível</span>
+                            <span className="text-primary" style={{ fontSize: '1.2rem', fontWeight: 900 }}>R$ {usuario?.saldo?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
-                        <button
-                            className="btn btn-primary"
-                            style={{ background: 'var(--warning)', color: '#000', fontSize: '0.8rem', padding: '0.6rem 1rem' }}
-                            onClick={handleSacarComissao}
-                            disabled={loadingSaque || !usuario?.comissoes_acumuladas || usuario.comissoes_acumuladas <= 0}
-                        >
-                            {loadingSaque ? 'Transferindo...' : 'Sacar para Carteira'}
-                        </button>
                     </div>
-                </div>
 
-                <p style={{ fontSize: '0.85rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-                    <AlertTriangle size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} color="var(--warning)" />
-                    <strong>Auditoria Cega:</strong> Solicite o ID e o valor exato apresentado no App do cliente para confirmar a baixa física.
-                </p>
-
-                {sucesso && (
-                    <div className="alert alert-success" style={{ position: 'static', transform: 'none', margin: '0 0 1rem 0', width: '100%', maxWidth: 'none' }}>
-                        <CheckCircle size={18} />
-                        <span>{sucesso}</span>
-                    </div>
-                )}
-
-                {erro && (
-                    <div className="alert alert-danger" style={{ position: 'static', transform: 'none', margin: '0 0 1rem 0', width: '100%', maxWidth: 'none' }}>
-                        <AlertTriangle size={18} />
-                        <span>{erro}</span>
-                    </div>
-                )}
-
-                <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: activeTab === 'caixa' ? '1fr 1fr' : '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div className="input-group">
-                        <label>ID do Cliente</label>
-                        <input
-                            type="text"
-                            name="cliente_id_busca"
-                            id="cliente_id_busca"
-                            autoComplete="off"
-                            className="input-field"
-                            placeholder="Ex: 8a4c21"
-                            value={clienteId}
-                            onChange={(e) => { setClienteId(e.target.value); setErro(null); setSucesso(null); }}
-                            disabled={loading}
-                        />
-                    </div>
-                    {activeTab === 'caixa' && (
-                        <div className="input-group">
-                            <label>Valor (R$)</label>
-                            <input
-                                type="number"
-                                name="valor_operacao_caixa"
-                                id="valor_operacao_caixa"
-                                autoComplete="off"
-                                className="input-field"
+                    <div className="input-group" style={{ textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                        <div className="flex-between mb-1">
+                            <label className="custom-select-label" style={{ color: 'var(--primary)' }}>Fundo de Reserva</label>
+                            <button 
+                                onClick={() => setFundoReserva(usuario?.saldo?.toString())}
+                                className="badge badge-success"
+                                style={{ cursor: 'pointer', border: 'none' }}
+                            >
+                                USAR SALDO
+                            </button>
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--success)', fontSize: '1.4rem' }}>R$</div>
+                            <input 
+                                type="number" 
+                                className="input-field" 
                                 placeholder="0,00"
-                                step="0.01"
-                                value={valor}
-                                onChange={(e) => { setValor(e.target.value); setErro(null); setSucesso(null); }}
-                                disabled={loading}
+                                value={fundoReserva}
+                                onChange={(e) => setFundoReserva(e.target.value)}
+                                style={{ paddingLeft: '50px', fontSize: '1.6rem', fontWeight: 900 }}
                             />
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                {!resultado ? (
-                    <button
-                        className="btn btn-primary mt-1"
-                        style={{ background: 'var(--warning)', width: '100%' }}
-                        onClick={handleBuscar}
-                        disabled={loading || !clienteId || (activeTab === 'caixa' && !valor)}
-                    >
-                        {loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
-                        {loading ? 'Buscando...' : activeTab === 'caixa' ? 'Buscar Pedido Pendente' : 'Verificar Garantia'}
+                    <button className="btn btn-primary btn-full" onClick={handleAbrirCaixa} disabled={loading} style={{ height: '60px' }}>
+                        {loading ? <RefreshCw className="animate-spin" size={24} /> : <Play fill="currentColor" size={20} />}
+                        ABRIR CAIXA E TRABALHAR
                     </button>
-                ) : (
-                    <div className="animate-slide-up">
-                        <div className="card" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--success)', marginBottom: '0' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
-                                <div style={{ background: 'rgba(0, 230, 118, 0.1)', padding: '10px', borderRadius: '12px' }}>
-                                    <UserCheck size={24} color="var(--success)" />
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--success)' }}>{activeTab === 'caixa' ? 'Pedido Encontrado' : 'Solicitação Localizada'}</h3>
-                                    <p style={{ margin: 0, fontSize: '0.75rem' }}>{resultado.cliente_nome}</p>
+
+                    {erro && <div className="alert alert-danger mt-1">{erro}</div>}
+                    {sucesso && <div className="alert alert-success mt-1">{sucesso}</div>}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="terminal-parceiro animate-fade-in" style={{ padding: '15px' }}>
+            {/* Header Harmonizado */}
+            <div className="flex-between mb-2">
+                <div>
+                    <h1 className="text-clamp-h2" style={{ fontWeight: 800, color: 'var(--primary)', marginBottom: '2px' }}>Terminal Parceiro</h1>
+                    <p className="text-muted" style={{ fontSize: '0.75rem', margin: 0 }}>Gestão de Caixa & Comissões</p>
+                </div>
+                <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <span className="custom-select-label" style={{ fontSize: '0.6rem', color: 'var(--primary)' }}>Sua Taxa Atual</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 900, display: 'block' }}>{usuario?.taxa_loja || 0}% <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Comissão</span></span>
+                </div>
+            </div>
+
+            {/* Dashboard Mini Cards Glass style */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                <div className="card" style={{ padding: '15px', marginBottom: 0 }}>
+                    <span className="custom-select-label" style={{ fontSize: '0.6rem' }}>COMISSÃO DISPONÍVEL</span>
+                    <div className="text-success" style={{ fontSize: '1.2rem', fontWeight: 900 }}>R$ {usuario?.comissoes_acumuladas?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                </div>
+                <div className="card" style={{ padding: '15px', marginBottom: 0 }}>
+                    <span className="custom-select-label" style={{ fontSize: '0.6rem' }}>AGUARDANDO (D+{usuario?.prazo || 0})</span>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--warning)' }}>R$ {usuario?.comissoes_pendentes?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                </div>
+            </div>
+
+            {/* Tabs de Navegação Estilo PSY PAY (Ajustado) */}
+            <div className="flex mb-2" style={{ gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '18px', border: '1px solid var(--border-color)', justifyContent: 'space-between' }}>
+                {[
+                    { id: 'caixa', label: 'CAIXA' },
+                    { id: 'garantias', label: 'GARANTIAS' },
+                    { id: 'config', label: 'CONFIG' }
+                ].map(tab => (
+                    <button 
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)} 
+                        className={`flex-1 p-1 rounded-xl font-bold text-xs transition-all ${activeTab === tab.id ? 'bg-primary text-black' : 'text-muted'}`}
+                        style={{ 
+                            background: activeTab === tab.id ? 'var(--primary)' : 'transparent', 
+                            color: activeTab === tab.id ? '#000' : 'var(--text-muted)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            minWidth: '80px'
+                        }}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Conteúdo: CAIXA */}
+            {activeTab === 'caixa' && (
+                <div className="animate-fade-in">
+                    <div className="card mb-2" style={{ border: '1px solid var(--border-color)', padding: '20px' }}>
+                        <div className="flex-between mb-2">
+                            <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Nova Operação</h3>
+                            <div className="flex" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '10px' }}>
+                                <button onClick={() => setTipoOp('deposito')} className={`text-xs p-1 px-3 rounded-md transition-all ${tipoOp === 'deposito' ? 'bg-success text-black font-bold' : 'text-muted'}`} style={{ background: tipoOp === 'deposito' ? 'var(--success)' : 'transparent', color: tipoOp === 'deposito' ? '#000' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Depósito</button>
+                                <button onClick={() => setTipoOp('saque')} className={`text-xs p-1 px-3 rounded-md transition-all ${tipoOp === 'saque' ? 'bg-danger text-white font-bold' : 'text-muted'}`} style={{ background: tipoOp === 'saque' ? 'var(--danger)' : 'transparent', color: tipoOp === 'saque' ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Saque</button>
+                            </div>
+                        </div>
+
+                        <div className="input-group">
+                            <label>Código do Cliente (ID)</label>
+                            <div style={{ position: 'relative' }}>
+                                <Search size={16} className="text-primary" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                                <input type="text" className="input-field" placeholder="Ex: A1B2C" value={codigoCliente} onChange={(e) => setCodigoCliente(e.target.value.toUpperCase())} style={{ paddingLeft: '40px' }} />
+                            </div>
+                        </div>
+                        
+                        {tipoOp === 'deposito' && (
+                            <div className="input-group animate-slide-up">
+                                <label>Valor do Depósito (R$)</label>
+                                <div style={{ position: 'relative' }}>
+                                    <DollarSign size={16} className="text-primary" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                                    <input type="number" className="input-field" placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} style={{ paddingLeft: '40px', fontSize: '1.2rem', fontWeight: 700 }} />
                                 </div>
                             </div>
+                        )}
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
-                                <div className="info-block" style={{ padding: '12px' }}>
-                                    <div className="flex-between">
-                                        <span className="info-label">Tipo de Operação</span>
-                                        <span className="badge" style={{ background: 'rgba(255, 145, 0, 0.2)', color: 'var(--warning)', fontSize: '0.65rem' }}>
-                                            {(resultado.tipo || '').toUpperCase()}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                {activeTab === 'garantia' && (
-                                    <div className="info-block" style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)' }}>
-                                        <div className="info-label">Item a ser Avaliado</div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '5px' }}>{resultado.descricao}</div>
-                                    </div>
-                                )}
-
-                                <div className="info-block" style={{ padding: '12px' }}>
-                                    <div className="flex-between">
-                                        <span className="info-label">{activeTab === 'caixa' ? 'Valor Esperado' : 'Valor do Empréstimo'}</span>
-                                        <span style={{ fontSize: '1rem', fontWeight: 700 }}>R$ {Number(resultado.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                </div>
-
-                                {activeTab === 'caixa' && resultado.valor_liquido && (
-                                    <div className="info-block" style={{ padding: '12px', border: '1px solid var(--success)', background: 'rgba(0, 230, 118, 0.05)' }}>
-                                        <div className="flex-between">
-                                            <span className="info-label" style={{ color: 'var(--success)' }}>{resultado.tipo === 'Depósito' ? 'Crédito ao Cliente' : 'Entrega em Espécie'}</span>
-                                            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {Number(resultado.valor_liquido).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {activeTab === 'caixa' ? (
-                                confirmando ? (
-                                    <div className="info-block" style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)', textAlign: 'center' }}>
-                                        <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--text-main)' }}>
-                                            Confirma o recebimento/entrega física deste valor?
-                                        </p>
-                                        <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                            <button className="btn btn-secondary" onClick={() => setConfirmando(false)} disabled={loading}>
-                                                Cancelar
-                                            </button>
-                                            <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={handleConfirmar} disabled={loading}>
-                                                {loading ? 'Confirmando...' : 'Sim, Confirmar'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button className="btn btn-secondary" onClick={() => { setResultado(null); setErro(null); }} disabled={loading}>
-                                            Voltar
-                                        </button>
-                                        <button className="btn btn-primary" style={{ background: 'var(--success)' }} onClick={() => setConfirmando(true)} disabled={loading}>
-                                            Processar
-                                        </button>
-                                    </div>
-                                )
-                            ) : (
-                                <div className="animate-fade-in">
-                                    <div className="input-group mb-1">
-                                        <label>Motivo (Se reprovado)</label>
-                                        <input 
-                                            type="text" 
-                                            className="input-field" 
-                                            placeholder="Ex: Objeto não condiz com o valor" 
-                                            value={motivoReprovacao}
-                                            onChange={(e) => setMotivoReprovacao(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="input-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button 
-                                            className="btn btn-secondary" 
-                                            style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} 
-                                            onClick={() => handleAvaliarGarantia('reprovar')} 
-                                            disabled={loading || !motivoReprovacao}
-                                        >
-                                            Reprovar
-                                        </button>
-                                        <button 
-                                            className="btn btn-primary" 
-                                            style={{ background: 'var(--success)' }} 
-                                            onClick={() => handleAvaliarGarantia('aprovar')} 
-                                            disabled={loading}
-                                        >
-                                            {loading ? 'Processando...' : 'Aprovar Item'}
-                                        </button>
-                                    </div>
-                                    <button className="btn btn-outline mt-1" style={{ width: '100%' }} onClick={() => setResultado(null)}>Voltar</button>
-                                </div>
-                            )}
+                        <button 
+                            className="btn btn-primary btn-full mt-1" 
+                            onClick={handleSimularOperacao}
+                            disabled={loading || !codigoCliente}
+                            style={{ height: '50px', fontSize: '1rem' }}
+                        >
+                            {loading ? <RefreshCw className="animate-spin" size={20} /> : <Search size={20} />}
+                            {loading ? 'BUSCANDO...' : 'BUSCAR PEDIDOS'}
+                        </button>
+                        
+                        <div className="alert mt-1" style={{ padding: '10px', background: 'rgba(255,145,0,0.05)', border: '1px dashed var(--warning)' }}>
+                            <AlertTriangle size={14} className="text-warning" />
+                            <span style={{ fontSize: '0.7rem', color: 'var(--warning)' }}>Taxa de serviço de 5% aplicada ao cliente.</span>
                         </div>
                     </div>
-                )}
-            </div>
+
+                    <button className="btn btn-outline btn-full" onClick={handleFecharCaixa} disabled={loading} style={{ opacity: 0.7 }}>
+                        Encerrar Turno e Liquidar Comissões
+                    </button>
+                </div>
+            )}
+
+            {/* Conteúdo: CONFIGURAÇÕES */}
+            {activeTab === 'config' && (
+                <div className="animate-fade-in">
+                    <div className="card">
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '20px', color: 'var(--primary)' }}>Configurações de Recebimento</h3>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {[
+                                { prazo: 0, taxa: 1, label: 'Fast (Na Hora)', color: 'var(--success)', desc: 'Ideal para capital de giro imediato.' },
+                                { prazo: 14, taxa: 2, label: 'Standard (14 dias)', color: 'var(--warning)', desc: 'Equilíbrio entre comissão e espera.' },
+                                { prazo: 35, taxa: 3, label: 'Premium (35 dias)', color: '#a855f7', desc: 'Melhor lucro para quem pode esperar.' }
+                            ].map(plano => {
+                                // Forçamos a comparação numérica para garantir o destaque correto
+                                const isActive = Number(usuario?.prazo) === Number(plano.prazo);
+                                
+                                return (
+                                    <div 
+                                        key={plano.prazo}
+                                        onClick={() => handleTrocarPlano(plano.prazo)}
+                                        className="card-actionable"
+                                        style={{
+                                            padding: '16px',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: `2px solid ${isActive ? 'var(--primary)' : 'var(--border-color)'}`,
+                                            background: isActive ? 'rgba(255,204,0,0.08)' : 'rgba(255,255,255,0.02)',
+                                            margin: 0,
+                                            boxShadow: isActive ? '0 0 15px rgba(255,204,0,0.1)' : 'none'
+                                        }}
+                                    >
+                                        <div className="flex-between mb-1">
+                                            <div className="flex" style={{ gap: '10px' }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: plano.color }} />
+                                                <span style={{ fontWeight: 800, color: isActive ? 'var(--primary)' : 'white' }}>{plano.label}</span>
+                                            </div>
+                                            <div style={{ fontWeight: 900, color: plano.color, fontSize: '1.1rem' }}>{plano.taxa}%</div>
+                                        </div>
+                                        <p className="text-muted" style={{ fontSize: '0.75rem', margin: 0 }}>{plano.desc}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Confirmação Glass */}
+            {simulacao && (
+                <div className="modal-overlay">
+                    <div className="modal-card animate-slide-up" style={{ maxWidth: '400px' }}>
+                        <div className="flex-between mb-2">
+                            <h3 style={{ fontWeight: 800 }}>{simulacao.isReserva ? 'Confirmar Entrega' : 'Simulação de Operação'}</h3>
+                            <button className="btn-close" onClick={() => setSimulacao(null)}><X size={20} /></button>
+                        </div>
+                        
+                        <div className="info-block mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', textAlign: 'center' }}>
+                            <span className="text-muted" style={{ fontSize: '0.7rem' }}>{simulacao.isReserva ? 'CLIENTE IDENTIFICADO' : 'VALOR BRUTO'}</span>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)' }}>
+                                {simulacao.isReserva ? simulacao.cliente : `R$ ${simulacao.bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                            </div>
+                        </div>
+
+                        {simulacao.isReserva ? (
+                            <div className="card mb-1" style={{ background: 'rgba(255, 61, 0, 0.05)', border: '1px solid rgba(255, 61, 0, 0.2)' }}>
+                                <div className="text-center">
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 800 }}>MUITO IMPORTANTE: ENTREGAR EM MÃOS</span>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--danger)', margin: '10px 0' }}>
+                                        R$ {simulacao.entrega.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
+                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O valor bruto de R$ {simulacao.bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} será creditado em sua conta digital.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex-between mb-1">
+                                    <span className="text-muted">Crédito p/ Cliente:</span>
+                                    <span className="text-success" style={{ fontWeight: 700 }}>R$ {simulacao.liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex-between mb-1" style={{ fontSize: '0.9rem' }}>
+                                    <span className="text-muted">Taxa Plataforma (5%):</span>
+                                    <span style={{ color: 'var(--danger)' }}>R$ {simulacao.taxa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex-between mb-1" style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <span className="text-muted">Sua Comissão ({usuario?.taxa_loja || 0}%):</span>
+                                    <span className="text-success" style={{ fontWeight: 800 }}>+ R$ {simulacao.comissao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="flex gap-1 mt-2">
+                            <button className="btn btn-primary flex-1" onClick={handleConfirmarOperacao} disabled={loading} style={{ background: simulacao.isReserva ? 'var(--danger)' : 'var(--primary)' }}>
+                                {loading ? <RefreshCw className="animate-spin" size={18} /> : (simulacao.isReserva ? 'Confirmar Entrega Dinheiro' : 'Executar Operação')}
+                            </button>
+                        </div>
+                        {erro && <div className="alert alert-danger mt-1">{erro}</div>}
+                    </div>
+                </div>
+            )}
+
+            {/* Notificações Harmonizadas */}
+            {erro && <div className="alert alert-danger mt-1 animate-bounce" onClick={() => setErro('')}><AlertTriangle size={20} />{erro}</div>}
+            {sucesso && <div className="alert alert-success mt-1 animate-fade-in" onClick={() => setSucesso('')}><CheckCircle size={20} />{sucesso}</div>}
         </div>
     );
 };

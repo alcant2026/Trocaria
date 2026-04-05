@@ -27,6 +27,10 @@ class TipoTransacao(enum.Enum):
     RETORNO_INVESTIMENTO = "retorno_investimento"
     APORTE_CAIXA = "aporte_caixa"
     RESGATE_CAIXA = "resgate_caixa"
+    APORTE_POOL = "aporte_pool"
+    RESGATE_POOL = "resgate_pool"
+    ABERTURA_GAVETA = "abertura_gaveta"
+    FECHAMENTO_GAVETA = "fechamento_gaveta"
     BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
     RETORNO_POOL = "retorno_pool"
     COMISSAO_PARCEIRO = "comissao_parceiro"
@@ -93,7 +97,7 @@ class SolicitacaoEmprestimo(Base):
     __tablename__ = "solicitacoes_emprestimo"
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"))
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), index=True)
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
@@ -111,7 +115,7 @@ class SolicitacaoEmprestimo(Base):
     data_expiracao_4h = Column(DateTime, nullable=True) # Janela para entrega física
     data_expiracao_5d = Column(DateTime, nullable=True) # Prazo total para captação (se houver)
 
-    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
+    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True, index=True)
     parceiro = relationship("Parceiro")
 
     aceite_termos = Column(Boolean, default=False)
@@ -129,8 +133,8 @@ class Investimento(Base):
     __tablename__ = "investimentos"
 
     id = Column(Integer, primary_key=True, index=True)
-    investidor_id = Column(String(5), ForeignKey("usuarios.id"))
-    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"))
+    investidor_id = Column(String(5), ForeignKey("usuarios.id"), index=True)
+    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"), index=True)
     valor_investido = Column(Numeric(precision=20, scale=2), nullable=False)
     pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0)
     data_investimento = Column(DateTime, default=datetime.datetime.utcnow)
@@ -143,15 +147,21 @@ class Transacao(Base):
     __tablename__ = "transacoes"
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"))
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), index=True)
+    payment_id = Column(String(100), index=True, nullable=True) # ID externo (Mercado Pago, etc)
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     tipo = Column(Enum(TipoTransacao, name="tipo_transacao", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     status = Column(String(50), default="pendente", index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
     detalhes = Column(Text, nullable=True)
-    metodo = Column(String, default="pix")
-    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True)
+    metodo = Column(String, default="pix", index=True)
+    parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True, index=True)
+    
+    # NOVOS: Protocolo de Recebimento do Cliente (Feedback)
+    confirmado_cliente = Column(Boolean, default=False)
+    data_confirmacao_cliente = Column(DateTime, nullable=True)
+    data_liquidacao = Column(DateTime, nullable=True, index=True) # Data em que a comissão será liberada
     
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
@@ -165,14 +175,19 @@ class Parceiro(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
     endereco = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, index=True)
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
     caixa_aberto = Column(Boolean, default=False)
     saldo_caixa_inicial = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa_atual = Column(Numeric(precision=20, scale=2), default=0)
     comissoes_acumuladas = Column(Numeric(precision=20, scale=2), default=0)
+    comissoes_pendentes = Column(Numeric(precision=20, scale=2), default=0) # D+14 / D+35
+    
+    # NOVOS: Regras de Recebíveis
+    prazo_liquidacao = Column(Integer, default=0) # 0, 14, 35 dias
+    taxa_comissao = Column(Numeric(precision=5, scale=2), default=0.00) # Porcentagem
     
     usuario = relationship("Usuario")
 
@@ -188,7 +203,7 @@ class LinkAfiliado(Base):
     data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Novos campos para Marketplace
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
     is_boosted = Column(Boolean, default=False)
     visualizacoes_restantes = Column(Integer, default=50) # Bônus inicial de 50 views
     visualizacoes_totais = Column(Integer, default=0)
@@ -261,8 +276,8 @@ class HistoricoClique(Base):
     __tablename__ = "historico_cliques_marketplace"
     
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
-    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True)
     data_clique = Column(DateTime, default=datetime.datetime.utcnow)
     
     usuario = relationship("Usuario")

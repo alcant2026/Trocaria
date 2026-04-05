@@ -61,7 +61,7 @@ def verificar_isencao_taxa(usuario: Usuario) -> bool:
         return True
     return False
 
-def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, taxa_adesao: Decimal = Decimal("0.00")) -> SolicitacaoEmprestimo:
+def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, taxa_adesao: Decimal = Decimal("0.00"), ip_cliente: str = None) -> SolicitacaoEmprestimo:
     """
     Cria e aprova instantaneamente um empréstimo usando o dinheiro da plataforma (Pool).
     A taxa_adesao (se houver) é somada como custos financeiros (taxas_adicionais).
@@ -93,16 +93,20 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
              plataforma.saldo += valor 
 
     # 1. Criar a Solicitação já APROVADA
+    agora = datetime.datetime.utcnow()
     nova_solicitacao = SolicitacaoEmprestimo(
         usuario_id=usuario.id,
         valor=valor,
         taxa_juros=taxa,
         prazo_meses=prazo,
         status=StatusSolicitacao.APROVADO,
-        data_criacao=datetime.datetime.utcnow(),
-        proximo_vencimento=datetime.datetime.utcnow() + datetime.timedelta(days=30),
+        data_criacao=agora,
+        proximo_vencimento=agora + datetime.timedelta(days=30),
         aceite_termos=True,
-        taxas_adicionais=taxa_adesao # A taxa de abertura é somada à dívida
+        taxas_adicionais=taxa_adesao,
+        data_aceite=agora,
+        ip_aceite=ip_cliente,
+        cpf_aceite=usuario.cpf
     )
     db.add(nova_solicitacao)
     db.flush()

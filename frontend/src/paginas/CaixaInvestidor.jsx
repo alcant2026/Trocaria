@@ -123,10 +123,22 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
 
             {/* ERROR ALERT */}
             {mensagem?.type === 'error' && (
-                <div className="alert alert-danger mb-1">
-                    <AlertTriangle size={18} />
+                <div className="alert alert-danger animate-shake mb-1">
+                    <div className="alert-icon">
+                        <AlertTriangle size={20} />
+                    </div>
                     <span>{mensagem.text}</span>
-                    <X size={18} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMensagem(null)} />
+                    <button onClick={() => setMensagem(null)} className="alert-close"><X size={16} /></button>
+                </div>
+            )}
+
+            {mensagem?.type === 'success' && (
+                <div className="alert alert-success animate-slide-down mb-1">
+                    <div className="alert-icon">
+                        <CheckCircle size={20} />
+                    </div>
+                    <span>{mensagem.text}</span>
+                    <button onClick={() => setMensagem(null)} className="alert-close"><X size={16} /></button>
                 </div>
             )}
 
@@ -166,7 +178,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                         <div className="grid-2" style={{ gap: '10px' }}>
                             <button className="btn btn-secondary" onClick={resetar}>Voltar</button>
                             <button className="btn btn-primary" onClick={() => setEtapa('aporte_termos')} disabled={!valorAporte || valorAporte <= 0}>
-                                Continuar
+                                <TrendingUp size={18} /> Continuar
                             </button>
                         </div>
                     </div>
@@ -235,6 +247,7 @@ const CaixaInvestidor = ({ usuario, onUpdate, showModal, closeModal }) => {
                             </div>
                         </div>
                         <button className="btn btn-primary w-full" onClick={handleAporteFinal} disabled={loading || !senha}>
+                            {loading ? <RefreshCw className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
                             {loading ? 'Processando...' : 'Confirmar e Finalizar'}
                         </button>
                     </div>

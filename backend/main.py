@@ -1,11 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
-from utils_db import sincronizar_esquema
+from utils_db import sincronizar_esquema, executar_limpeza_banco
 
 app = FastAPI(title="PSY PAY API P2P")
 
@@ -83,6 +84,7 @@ async def startup_db_setup():
 
     try:
         sincronizar_esquema(Base, engine)
+        executar_limpeza_banco(engine)
         
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao
@@ -116,8 +118,8 @@ async def startup_db_setup():
         
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
-# Incluir Rotas (Com e sem prefixo /api para evitar 404)
-for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade]:
+# Cadastro dos roteadores com e sem prefixo /api para compatibilidade
+for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal]:
     app.include_router(router_module.router, prefix="/api")
     app.include_router(router_module.router)
 
@@ -132,6 +134,9 @@ async def root():
 @app.get("/api")
 async def api_root():
     return {"status": "online", "message": "Psy Pay API Gateway"}
+
+# Montar a pasta de uploads como estática para visualização do Admin
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

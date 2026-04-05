@@ -7,6 +7,8 @@
         "@capacitor/android": "^8.2.0",
         "@capacitor/cli": "^8.2.0",
         "@capacitor/core": "^8.2.0",
+        "@capacitor/splash-screen": "^8.2.0",
+        "@capacitor/status-bar": "^8.2.0",
         "lucide-react": "^0.575.0",
         "qrcode.react": "^4.2.0",
         "react": "^18.2.0",

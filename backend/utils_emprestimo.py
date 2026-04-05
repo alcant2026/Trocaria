@@ -92,15 +92,15 @@ def processar_expiracoes_interna(db: Session):
         SolicitacaoEmprestimo.data_expiracao_5d < agora
     ).all()
     
-    total_canceladas = 0
+    usuarios_afetados = set()
     for s in (expiradas_4h + expiradas_5d):
         s.status = StatusSolicitacao.CANCELADO
-        total_canceladas += 1
+        usuarios_afetados.add(s.usuario_id)
         
-    if total_canceladas > 0:
+    if usuarios_afetados:
         db.commit()
         
-    return total_canceladas
+    return usuarios_afetados
 
 def obter_multiplicador_fidelidade(usuario_id: str, db: Session) -> Decimal:
     """
@@ -127,3 +127,37 @@ def obter_multiplicador_fidelidade(usuario_id: str, db: Session) -> Decimal:
         return Decimal("1.5")
     
     return Decimal("1.0")
+
+def processar_inadimplencia_coletiva_automatica(db: Session):
+    """
+    Varredura automática para execução da Cláusula 3.3 do Contrato.
+    Regra: Atraso > 5 dias -> Liquidação Automática via Pool (devedor paga com seu capital investido).
+    """
+    agora = datetime.datetime.utcnow()
+    limite_tolerancia = agora - datetime.timedelta(days=5)
+    
+    # 1. Buscar empréstimos aprovados com vencimento vencido há mais de 5 dias
+    atrasados = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO,
+        SolicitacaoEmprestimo.proximo_vencimento < limite_tolerancia
+    ).all()
+    
+    logs = []
+    for s in atrasados:
+        divida_total = calcular_divida_total(s)
+        usuario = s.usuario
+        
+        # Só podemos liquidar se o usuário tiver saldo no Pool (saldo_caixa)
+        if usuario.saldo_caixa > 0:
+            # Tenta liquidar o máximo possível (ou o total da dívida, ou o total do saldo no pool)
+            valor_liquidacao = min(usuario.saldo_caixa, divida_total)
+            
+            sucesso = liquidar_emprestimo_via_pool(usuario, s, valor_liquidacao, db)
+            if sucesso:
+                logs.append(f"✅ Execução Cláusula 3.3: Usuário {usuario.id} liquidou R$ {valor_liquidacao:.2f} via Pool (Atraso > 5 dias)")
+            else:
+                logs.append(f"❌ Falha na liquidação do Usuário {usuario.id}")
+        else:
+            logs.append(f"⚠️ Usuário {usuario.id} inadimplente, mas sem saldo no Pool para execução da Cláusula 3.3")
+            
+    return logs

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-import { Wallet, Eye, EyeOff } from 'lucide-react';
+import { Wallet, Eye, EyeOff, User, Lock, AlertCircle, LogIn } from 'lucide-react';
 import Logo from '../componentes/Logo';
 
 const Login = ({ onLogin }) => {
@@ -39,20 +39,22 @@ const Login = ({ onLogin }) => {
                     <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)', boxShadow: '0 0 40px rgba(255, 204, 0, 0.15)' }}>
                         <Logo size={56} showText={false} />
 </div>
-<h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Bem-vindo ao PSY PAY</h1>
-<p style={{ fontSize: '1.1rem', opacity: 0.8 }}>Comunidade de Fomento e Participação</p>
-</div>
+                    <h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.25rem' }}>Acesse o PSY PAY</h1>
+                    <p style={{ fontSize: '0.95rem', opacity: 0.8 }}>Plataforma Digital de Crédito P2P (Fase Beta)</p>
+                </div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="input-group">
-                            <label htmlFor="cpf">CPF</label>
+                            <label htmlFor="cpf" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <User size={14} /> CPF
+                            </label>
                             <input 
                                 id="cpf"
                                 name="cpf"
                                 type="text" 
                                 autoComplete="username"
-                                placeholder="Seu CPF (000.000.000-00)" 
+                                placeholder="000.000.000-00" 
                                 value={cpf} 
                                 onChange={(e) => setCpf(maskCPF(e.target.value))} 
                                 className="input-field" 
@@ -61,7 +63,9 @@ const Login = ({ onLogin }) => {
                         </div>
 
                         <div className="input-group">
-                            <label htmlFor="senha">Senha</label>
+                            <label htmlFor="senha" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Lock size={14} /> Senha
+                            </label>
                             <div style={{ position: 'relative' }}>
                                 <input 
                                     id="senha"
@@ -98,7 +102,9 @@ const Login = ({ onLogin }) => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn btn-primary mt-1">Entrar</button>
+                        <button type="submit" className="btn btn-primary mt-1" style={{ width: '100%', padding: '1.1rem' }}>
+                            <LogIn size={20} /> Entrar na Conta
+                        </button>
 
                         <div className="text-center mt-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <a 
@@ -118,11 +124,24 @@ const Login = ({ onLogin }) => {
                             </a>
                         </div>
 
-                        {mensagem && (
-                             <div className="alert alert-danger mt-1">
-                                 {mensagem}
+                          {mensagem && (
+                               <div className="alert alert-danger animate-shake mt-1">
+                                   <div className="alert-icon">
+                                       <AlertCircle size={20} />
+                                   </div>
+                                   {mensagem}
+                               </div>
+                          )}
+
+                         <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 10px var(--success)' }}></span>
+                                 Ambiente Seguro & Criptografado (AES-256)
                              </div>
-                        )}
+                             <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3' }}>
+                                Suas transações e acessos são protegidos por logs de auditoria sistêmica conforme os termos de uso vigentes.
+                             </p>
+                         </div>
                     </form>
                 </div>
 

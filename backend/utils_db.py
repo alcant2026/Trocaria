@@ -133,3 +133,47 @@ def sincronizar_esquema(Base, engine):
 
         logger.debug("Sincronização concluída.")
 
+def executar_limpeza_banco(engine):
+    """
+    Remove registros obsoletos para economizar espaço no banco de dados.
+    Mantém a integridade financeira deletando apenas intenções falhas ou expiradas.
+    """
+    logger.info("🧹 DATABASE: Iniciando rotina de Reciclagem de Dados...")
+    is_postgres = "postgresql" in str(engine.url)
+    
+    # Comandos de limpeza (SQL nativo para performance)
+    queries = []
+    
+    if is_postgres:
+        # PostgreSQL / Neon
+        queries = [
+            # 1. Finanças: Deleta depósitos PIX expirados/cancelados há mais de 15 dias
+            "DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo = 'deposito' AND data_criacao < NOW() - INTERVAL '15 days'",
+            
+            # 2. Marketplace: Deleta links inativos há mais de 30 dias
+            "DELETE FROM links_afiliados WHERE is_active = FALSE AND data_criacao < NOW() - INTERVAL '30 days'",
+            
+            # 3. Auditoria: Deleta logs básicos de ações manuais com mais de 90 dias
+            "DELETE FROM acoes_admin WHERE data_acao < NOW() - INTERVAL '90 days'"
+        ]
+    else:
+        # SQLite (Desenvolvimento Local)
+        queries = [
+            "DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo = 'deposito' AND data_criacao < datetime('now', '-15 days')",
+            "DELETE FROM links_afiliados WHERE is_active = 0 AND data_criacao < datetime('now', '-30 days')",
+            "DELETE FROM acoes_admin WHERE data_acao < datetime('now', '-90 days')"
+        ]
+
+    with engine.connect() as conn:
+        for sql in queries:
+            try:
+                result = conn.execute(text(sql))
+                conn.commit()
+                if result.rowcount > 0:
+                    logger.info(f"✨ Limpeza: {result.rowcount} registros removidos via: {sql[:40]}...")
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao executar limpeza SQL: {e}")
+                conn.rollback()
+
+    logger.info("✅ DATABASE: Reciclagem de Dados concluída.")
+

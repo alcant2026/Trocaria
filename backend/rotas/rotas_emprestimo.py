@@ -10,6 +10,9 @@ from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_fintech import calcular_limite_credito, verificar_isencao_taxa, aprovar_emprestimo_instantaneo
 from utils_score import atualizar_score
+from fastapi.responses import StreamingResponse
+import io
+from fpdf import FPDF
 from rotas.rotas_snapshot import cache_snapshot_data
 
 router = APIRouter(prefix="/emprestimos", tags=["Empréstimos Fintech"])
@@ -67,13 +70,15 @@ async def solicitar_emprestimo(
             prazo=dados.parcelas,
             taxa=taxa_juros_padrao,
             db=db,
-            taxa_adesao=taxa_solicitacao # A taxa agora é financiada
+            taxa_adesao=taxa_solicitacao, # A taxa agora é financiada
+            ip_cliente=request.client.host # CAPTURA DO IP PARA CLAUSULA 3.4
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
 
     return {
         "message": "Empréstimo Aprovado e Creditado na sua conta!",
@@ -216,7 +221,8 @@ async def pagar_parcela(id: int, db: Session = Depends(get_db), usuario_logado: 
     ))
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": "Pagamento realizado com sucesso!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/pagamento-avulso/{id}")
@@ -307,7 +313,8 @@ async def pagamento_avulso(id: int, dados: PagamentoRequest, db: Session = Depen
     ))
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": "Pagamento avulso processado!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/quitar-total/{id}")
@@ -396,6 +403,136 @@ async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: U
     ))
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": "Crédito liquidado integralmente!", "novo_saldo": float(usuario.saldo)}
 
+
+class ContratoPDF(FPDF):
+    def header(self):
+        # Logo Oficial
+        try:
+            logo_path = "/home/josias/Área de trabalho/projetos/psy pay/frontend/public/logo.png"
+            self.image(logo_path, x=85, y=10, w=40)
+            self.ln(30)
+        except:
+            # Cabeçalho com branding Psy Pay (Fallback)
+            self.set_font('Helvetica', 'B', 22)
+            self.set_text_color(255, 204, 0)
+            self.cell(0, 15, 'PSY PAY', 0, 1, 'C')
+        
+        self.set_font('Helvetica', 'I', 10)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 5, 'Fintech de Crédito Digital & Fomento', 0, 1, 'C')
+        self.ln(5)
+        # Linha decorativa
+        self.set_draw_color(255, 204, 0)
+        self.line(10, 35, 200, 35)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Helvetica', 'I', 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f'Página {self.page_no()} | Motor de Crédito Digital e Fomento (Fase Beta) | Autenticado Digitalmente', 0, 0, 'C')
+
+@router.get("/contrato/pdf/{id}")
+async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Gera um PDF profissional do contrato de empréstimo."""
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.usuario_id == usuario.id
+    ).first()
+
+    if not solicitacao:
+        raise HTTPException(status_code=404, detail="Contrato não encontrado.")
+
+    # Cálculos para o PDF
+    taxa_mensal = solicitacao.taxa_juros / 100
+    total_com_juros = solicitacao.valor * (Decimal("1") + (taxa_mensal * solicitacao.prazo_meses))
+    total_final = total_com_juros + (solicitacao.taxas_adicionais or Decimal("0.00"))
+    valor_parcela = total_final / solicitacao.prazo_meses
+
+    # Geração do PDF
+    pdf = ContratoPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # 1. Título do Documento
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, f'CÉDULA DE CRÉDITO BANCÁRIO (DIGITAL) - #{solicitacao.id}', 0, 1, 'L')
+    pdf.ln(5)
+
+    # 2. Dados das Partes
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 10, '1. IDENTIFICAÇÃO DAS PARTES', 0, 1, 'L')
+    pdf.set_font('Helvetica', '', 10)
+    pdf.multi_cell(0, 6, f"CREDOR: PSY PAY PLATAFORMA DE CRÉDITO (Fundo de Liquidez Cooperativo)\n"
+                         f"DEVEDOR(A): {usuario.nome}\n"
+                         f"CPF: {usuario.cpf}\n"
+                         f"CHAVE PIX REGISTRADA: {usuario.chave_pix}")
+    pdf.ln(5)
+
+    # 3. Dados do Empréstimo (Quadro Resumo)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 10, '2. QUADRO RESUMO DO CRÉDITO', 0, 1, 'L')
+    
+    # Tabela Simples
+    pdf.set_fill_color(245, 245, 245)
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.cell(95, 8, 'DESCRIÇÃO', 1, 0, 'L', True)
+    pdf.cell(95, 8, 'VALOR / INFO', 1, 1, 'L', True)
+    
+    pdf.set_font('Helvetica', '', 10)
+    pdf.cell(95, 8, 'Valor Principal Liberado', 1, 0, 'L')
+    pdf.cell(95, 8, f'R$ {solicitacao.valor:,.2f}', 1, 1, 'L')
+    
+    pdf.cell(95, 8, 'Taxa de Juros Mensal', 1, 0, 'L')
+    pdf.cell(95, 8, f'{solicitacao.taxa_juros}% a.m.', 1, 1, 'L')
+    
+    pdf.cell(95, 8, 'Prazo de Pagamento', 1, 0, 'L')
+    pdf.cell(95, 8, f'{solicitacao.prazo_meses} Parcelas', 1, 1, 'L')
+    
+    pdf.cell(95, 8, 'Valor da Parcela Mensal', 1, 0, 'L')
+    pdf.cell(95, 8, f'R$ {valor_parcela:,.2f}', 1, 1, 'L')
+    
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.cell(95, 8, 'TOTAL DEVEDOR FINAL', 1, 0, 'L')
+    pdf.cell(95, 8, f'R$ {total_final:,.2f}', 1, 1, 'L')
+    pdf.ln(10)
+
+    # 4. Cláusulas e Termos
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 10, '3. CLÁUSULAS CONTRATUAIS', 0, 1, 'L')
+    pdf.set_font('Helvetica', '', 9)
+    termos = (
+        "3.1. O devedor declara ter recebido o valor principal em sua conta digital Psy Pay no ato da aprovação deste contrato.\n\n"
+        "3.2. O pagamento das parcelas será realizado via débito em conta ou boleto/pix conforme disponibilidade no sistema. "
+        "Atrasos superiores a 24h acarretam em multa de 2% e juros de mora de 0.1% ao dia.\n\n"
+        "3.3. O devedor autoriza a plataforma a utilizar o saldo de sua 'Carteira de Liquidez' (Pool) para quitação automática "
+        "das parcelas em caso de inadimplência superior a 5 dias, conforme os Termos de Uso aceitos no cadastro.\n\n"
+        "3.4. Este contrato possui validade digital mediante o aceite eletrônico realizado pelo usuário sob o IP registrado no sistema."
+    )
+    pdf.multi_cell(0, 5, termos)
+    pdf.ln(10)
+
+    # 5. Assinatura e Autenticação
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.cell(0, 10, '4. AUTENTICAÇÃO DO SISTEMA', 0, 1, 'L')
+    pdf.set_font('Helvetica', 'I', 9)
+    pdf.set_text_color(50, 50, 50)
+    pdf.multi_cell(0, 5, f"Documento gerado e autenticado eletronicamente em {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}.\n"
+                         f"O devedor concordou com estes termos via aplicativo móvel/web.\n"
+                         f"Hash de Identificação: {abs(hash(str(solicitacao.id) + usuario.cpf))}")
+
+    # Retornar o PDF como stream
+    output = io.BytesIO()
+    pdf_out = pdf.output(dest='S')
+    output.write(pdf_out)
+    output.seek(0)
+
+    return StreamingResponse(
+        output, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename=Contrato_PsyPay_{solicitacao.id}.pdf"}
+    )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import api from '../api';
+import api, { BASE_URL } from '../api';
 import './AdminDashboard.css';
 import {
     LayoutDashboard,
@@ -31,7 +31,13 @@ import {
     Sparkles,
     Star,
     Eye,
-    Trash2
+    Trash2,
+    CheckCircle2,
+    Timer,
+    History,
+    AlertCircle,
+    X,
+    ShieldAlert
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 
@@ -54,6 +60,12 @@ const TIPOS_LABEL = {
     bonus_pagador_caixa: 'Bônus de Fidelidade',
     retorno_pool: 'Retorno Fundo Coletivo',
     taxa_adm_emprestimo: 'Comissão Gestão 10%'
+};
+
+const TAXAS_PRAZOS = {
+    0: 1,   // D+0 (Fast)
+    14: 2,  // D+14 (Standard)
+    35: 3   // D+35 (Premium)
 };
 
 const formatarDataBR = (iso) => {
@@ -98,18 +110,33 @@ const AdminDashboard = () => {
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
 
     // Ações de Caixa
-    const [showAcaoModal, setShowAcaoModal] = useState(false);
+    const [showAcaoModal, setShowAcaoModal] = useState(false); 
     const [acaoTipo, setAcaoTipo] = useState(''); // 'saque' ou 'aporte'
     const [acaoData, setAcaoData] = useState({ valor: '', chave_pix: '', motivo: '' });
     const [loadingAcao, setLoadingAcao] = useState(false);
-
-    const [kycPendentes, setKycPendentes] = useState([]);
     
-    // Estado para Exclusão de Parceiro
+    // Gestão de Parceiros
+    const [showNovoParceiroModal, setShowNovoParceiroModal] = useState(false);
+    const [novoParceiroData, setNovoParceiroData] = useState({ 
+        nome: '', 
+        endereco: '', 
+        usuario_id: '', 
+        prazo_liquidacao: 0, 
+        taxa_comissao: 3.00 
+    });
+    const [loadingNovoParceiro, setLoadingNovoParceiro] = useState(false);
     const [showExcluirParceiroModal, setShowExcluirParceiroModal] = useState(false);
     const [parceiroParaExcluir, setParceiroParaExcluir] = useState(null);
     const [loadingExclusao, setLoadingExclusao] = useState(false);
+
+    const [kycPendentes, setKycPendentes] = useState([]);
     const [pixData, setPixData] = useState(null); // { qr_code, qr_code_base64, payment_id }
+    
+    // Filtros Fiscais (Admin)
+    const [dataInicio, setDataInicio] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
+    const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
+    const [loadingFiscalPDF, setLoadingFiscalPDF] = useState(false);
+    const [loadingCobranca, setLoadingCobranca] = useState(false);
 
     // Limits
     const [showLimiteModal, setShowLimiteModal] = useState(false);
@@ -117,6 +144,13 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         carregarSnapshot();
+        
+        // Auto-Refresh a cada 30 segundos (Real-time monitoring)
+        const autoRefresh = setInterval(() => {
+            carregarSnapshot(true); // Chamada silenciosa
+        }, 30000);
+
+        return () => clearInterval(autoRefresh);
     }, []);
 
     useEffect(() => {
@@ -142,19 +176,20 @@ const AdminDashboard = () => {
         }
     };
 
-    const carregarSnapshot = async () => {
-        setLoading(true);
+    const carregarSnapshot = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const res = await api.get('/snapshot');
+            console.log("📊 Admin Snapshot Data:", res);
             setSnapshot(res);
             try {
                 const kycRes = await api.get('/financeiro/admin/kyc-pendentes');
                 setKycPendentes(kycRes || []);
             } catch(e) { console.error("Erro kyc", e); }
         } catch (err) {
-            setMensagem('Erro ao carregar dados: ' + (err.response?.data?.detail || err.message));
+            if (!silent) setMensagem('Erro ao carregar dados: ' + (err.response?.data?.detail || err.message));
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -166,16 +201,6 @@ const AdminDashboard = () => {
     const parceiros = adminData.gestao_parceiros || [];
 
     // --- LOGICA DE AÇÕES ---
-    const handleAbrirDocumento = async (usuario_id, tipo) => {
-        try {
-            const blob = await api.getBlob(`/financeiro/admin/view-doc/${usuario_id}/${tipo}`);
-            const url = window.URL.createObjectURL(blob);
-            window.open(url, '_blank');
-        } catch (err) {
-            setMensagem('Erro ao baixar documento: ' + err.message);
-        }
-    };
-
     const handleExcluirParceiro = async () => {
         if (!parceiroParaExcluir) return;
         setLoadingExclusao(true);
@@ -209,6 +234,54 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleDownloadFiscalPDF = async () => {
+        try {
+            setLoadingFiscalPDF(true);
+            const res = await api.getBlob(`/admin/fiscal/pdf?inicio=${dataInicio}&fim=${dataFim}`);
+            
+            const blob = res.data || res;
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `DEMONSTRATIVO_FISCAL_PSY_PAY_${dataInicio}_A_${dataFim}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (err) {
+            setMensagem('Erro ao baixar relatório fiscal: ' + err.message);
+        } finally {
+            setLoadingFiscalPDF(false);
+        }
+    };
+
+    const handleExecutarCobranca = async () => {
+        if (!confirm("⚠️ ATENÇÃO: Deseja executar a Cláusula 3.3 agora? O sistema irá varrer inadimplentes com mais de 5 dias e liquidar a dívida usando o saldo do Pool do devedor.")) {
+            return;
+        }
+
+        setLoadingCobranca(true);
+        try {
+            const token = localStorage.getItem('token_psypay');
+            const response = await api.post(`/api/admin/fiscal/executar-cobranca`, {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.data.status === "sucesso") {
+                toast.success(response.data.mensagem);
+                if (response.data.detalhes && response.data.detalhes.length > 0) {
+                    console.log("LOGS DE COBRANÇA:", response.data.detalhes);
+                }
+                fetchSnapshot();
+            }
+        } catch (error) {
+            console.error("Erro ao executar cobrança:", error);
+            const errorMsg = error.response?.data?.detail || "Falha ao processar cobrança automática.";
+            toast.error(errorMsg);
+        } finally {
+            setLoadingCobranca(false);
+        }
+    };
+
     const handleAprovar = async (id, tipo) => {
         try {
             const res = await api.post(`/financeiro/admin/confirmar/${id}`, { tipo });
@@ -217,6 +290,25 @@ const AdminDashboard = () => {
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
         }
+    };
+
+    const handleAbrirDocumento = (url) => {
+        if (!url) {
+            setMensagem('Erro: Link do documento não encontrado.');
+            return;
+        }
+
+        // Se a BASE_URL termina em /api e a url começa com /api, removemos a duplicidade
+        let fullUrl = url;
+        if (url.startsWith('/api')) {
+            const apiRoot = BASE_URL.endsWith('/api') ? BASE_URL.replace('/api', '') : BASE_URL;
+            fullUrl = `${apiRoot}${url}`;
+        } else if (!url.startsWith('http')) {
+            fullUrl = `${BASE_URL}${url}`;
+        }
+
+        console.log("📂 Abrindo documento:", fullUrl);
+        window.open(fullUrl, '_blank', 'noopener,noreferrer');
     };
 
     const handleRejeitar = (id) => {
@@ -270,6 +362,47 @@ const AdminDashboard = () => {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
         } finally {
             setLoadingAcao(false);
+        }
+    };
+
+    const handleCriarParceiro = async () => {
+        if (!novoParceiroData.nome || !novoParceiroData.endereco) {
+            setMensagem('Erro: Preencha todos os campos do parceiro.');
+            return;
+        }
+        setLoadingNovoParceiro(true);
+        try {
+            await api.post('/financeiro/admin/fiscal/parceiros', novoParceiroData);
+            setMensagem('Sucesso: Parceiro cadastrado!');
+            setShowNovoParceiroModal(false);
+            setNovoParceiroData({ 
+                nome: '', 
+                endereco: '', 
+                usuario_id: '', 
+                prazo_liquidacao: 0, 
+                taxa_comissao: 3.00 
+            });
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro ao cadastrar: ' + err.message);
+        } finally {
+            setLoadingNovoParceiro(false);
+        }
+    };
+
+    const handleConfirmarExclusaoParceiro = async () => {
+        if (!parceiroParaExcluir) return;
+        setLoadingExclusao(true);
+        try {
+            await api.delete(`/financeiro/admin/fiscal/parceiros/${parceiroParaExcluir.id}`);
+            setMensagem('Sucesso: Parceiro removido.');
+            setShowExcluirParceiroModal(false);
+            setParceiroParaExcluir(null);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro ao remover: ' + err.message);
+        } finally {
+            setLoadingExclusao(false);
         }
     };
 
@@ -337,7 +470,10 @@ const AdminDashboard = () => {
             <main className="admin-main">
                 <header className="admin-header">
                     <div className="header-title">
-                        <h1>{activeTab === 'dashboard' ? 'Fiscal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
+                        <div className="flex-start gap-1">
+                            <h1>{activeTab === 'dashboard' ? 'Fiscal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
+                            <div className="live-indicator-dot" title="Monitoramento em Tempo Real Ativo"></div>
+                        </div>
                         <p className="text-muted">Gestão estratégica e financeira da economia Psy Pay.</p>
                     </div>
                     
@@ -349,9 +485,12 @@ const AdminDashboard = () => {
                 </header>
 
                 {mensagem && (
-                    <div className={`alert ${mensagem.toLowerCase().includes('erro') ? 'alert-danger' : 'alert-success'} mb-2`}>
+                    <div className={`alert ${mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('falha') ? 'alert-danger animate-shake' : 'alert-success'} mb-1`}>
+                        <div className="alert-icon">
+                            {mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('falha') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+                        </div>
                         <span>{mensagem}</span>
-                        <XCircle size={18} onClick={() => setMensagem('')} />
+                        <button onClick={() => setMensagem('')} className="alert-close"><X size={16} /></button>
                     </div>
                 )}
 
@@ -410,6 +549,74 @@ const AdminDashboard = () => {
                             />
                         </div>
 
+                        {/* --- NOVA SEÇÃO: GESTÃO FISCAL --- */}
+                        <div className="glass-panel mb-3 animate-fade-in" style={{ borderLeft: '4px solid var(--primary)', marginBottom: '20px' }}>
+                            <div className="section-header">
+                                <div className="flex-start gap-1">
+                                    <ShieldCheck size={20} color="var(--primary)" />
+                                    <div>
+                                        <h3 style={{ margin: 0 }}>Gestão Fiscal e Auditoria (CPF)</h3>
+                                        <p className="text-xs text-muted">Gere documentos para comprovação de custódia e preenchimento de Carnê-Leão.</p>
+                                    </div>
+                                </div>
+                                <div className="flex-start gap-1">
+                                    <div className="flex-start gap-1" style={{ background: 'var(--bg-accent)', padding: '5px 10px', borderRadius: '8px' }}>
+                                        <div className="text-xs font-bold text-muted">DE:</div>
+                                        <input 
+                                            type="date" 
+                                            value={dataInicio} 
+                                            onChange={(e) => setDataInicio(e.target.value)}
+                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '12px', outline: 'none' }}
+                                        />
+                                        <div className="text-xs font-bold text-muted">ATÉ:</div>
+                                        <input 
+                                            type="date" 
+                                            value={dataFim} 
+                                            onChange={(e) => setDataFim(e.target.value)}
+                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '12px', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={handleDownloadFiscalPDF}
+                                        disabled={loadingFiscalPDF}
+                                        style={{ height: '36px', padding: '0 15px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                    >
+                                        {loadingFiscalPDF ? (
+                                            <><RefreshCw size={14} className="spin" /> GERANDO...</>
+                                        ) : (
+                                            <><BarChart3 size={14} /> GERAR PDF FISCAL</>
+                                        )}
+                                    </button>
+
+                                    <button 
+                                        className="btn" 
+                                        onClick={handleExecutarCobranca}
+                                        disabled={loadingCobranca}
+                                        style={{ 
+                                            height: '36px', 
+                                            padding: '0 15px', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '8px', 
+                                            background: '#ff4d4d', 
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        {loadingCobranca ? (
+                                            <><RefreshCw size={14} className="spin" /> PROCESSANDO...</>
+                                        ) : (
+                                            <><ShieldAlert size={14} /> EXECUTAR CLÁUSULA 3.3</>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="fiscal-grid">
                             <section className="glass-panel">
                                 <div className="section-header">
@@ -440,23 +647,29 @@ const AdminDashboard = () => {
                             <section className="glass-panel">
                                 <h3>Saúde do Sistema</h3>
                                 <div className="mt-1">
-                                    <div className="stat-label">Uso do Pool (Alocação)</div>
+                                    <div className="flex-between">
+                                        <div className="stat-label">Processamento (CPU)</div>
+                                        <span className="text-xs font-bold" style={{ color: (fiscal.cpu_uso > 80) ? 'var(--danger)' : 'var(--primary)' }}>{fiscal.cpu_uso?.toFixed(1) || '0.0'}%</span>
+                                    </div>
                                     <div className="progress-bar-bg mb-1">
                                         <div 
                                             className="progress-bar-fill" 
                                             style={{ 
-                                                width: `${Math.min(100, (fiscal.total_credito_ativo / (fiscal.saldo_pool_caixa || 1)) * 100)}%`, 
-                                                background: 'var(--primary)' 
+                                                width: `${fiscal.cpu_uso || 0}%`, 
+                                                background: (fiscal.cpu_uso > 80) ? 'var(--danger)' : 'var(--primary)' 
                                             }}
                                         ></div>
                                     </div>
-                                    <div className="stat-label">Eficiência de Operação</div>
+                                    <div className="flex-between" style={{ marginTop: '0.5rem' }}>
+                                        <div className="stat-label">Memória RAM</div>
+                                        <span className="text-xs font-bold" style={{ color: (fiscal.ram_uso > 90) ? 'var(--danger)' : 'var(--success)' }}>{fiscal.ram_uso?.toFixed(1) || '0.0'}%</span>
+                                    </div>
                                     <div className="progress-bar-bg">
                                         <div 
                                             className="progress-bar-fill" 
                                             style={{ 
-                                                width: `${Math.min(100, (fiscal.lucro_plataforma_historico / (fiscal.saldo_pool_caixa || 1)) * 20)}%`, 
-                                                background: 'var(--success)' 
+                                                width: `${fiscal.ram_uso || 0}%`, 
+                                                background: (fiscal.ram_uso > 90) ? 'var(--danger)' : 'var(--success)' 
                                             }}
                                         ></div>
                                     </div>
@@ -472,7 +685,7 @@ const AdminDashboard = () => {
                         <div className="section-header">
                             <h3>Fila de Auditoria Financeira</h3>
                             <div className="flex-start gap-1">
-                                <Filter size={16} /> <span className="text-xs">FILTRAR</span>
+                                <Filter size={16} /> <span className="text-xs">FILTRAR (PENDENTES)</span>
                             </div>
                         </div>
 
@@ -498,13 +711,18 @@ const AdminDashboard = () => {
                                                             <p className="font-bold">{p.usuario_nome}</p>
                                                             {p.tipo === 'desbloqueio_dados' && (
                                                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                                                    {p.tem_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'rg')}><Eye size={12} /> RG</button>}
-                                                                    {p.tem_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'renda')}><Eye size={12} /> Renda</button>}
-                                                                    {p.tem_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.usuario_id, 'residencia')}><Eye size={12} /> Res.</button>}
+                                                                    {p.url_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_rg)}><Eye size={12} /> RG</button>}
+                                                                    {p.url_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_renda)}><Eye size={12} /> Renda</button>}
+                                                                    {p.url_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_residencia)}><Eye size={12} /> Res.</button>}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <p className="text-xs text-muted">CPF: {p.usuario_cpf}</p>
+                                                        {p.detalhes && (
+                                                            <p className="text-xs text-primary" style={{ marginTop: '4px', maxWidth: '300px', wordBreak: 'break-all' }}>
+                                                                <strong>Nota:</strong> {p.detalhes}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -524,6 +742,51 @@ const AdminDashboard = () => {
                                                         <CheckCircle size={18} />
                                                     </button>
                                                 </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* SEÇÃO: SAQUES RECENTES CONCLUÍDOS (NOVO) */}
+                        <div className="section-header mt-3" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <History size={20} color="var(--success)" />
+                                <h3>Saques Recentes (Auditoria de Recebimento)</h3>
+                            </div>
+                        </div>
+                        <div className="table-responsive">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Membro</th>
+                                        <th>Valor Líquido</th>
+                                        <th>Status do Log</th>
+                                        <th>Confirmação Cliente</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(adminData.concluidos_recentes || []).map(c => (
+                                        <tr key={c.transacao_id} className="row-hover">
+                                            <td className="text-xs">
+                                                <p className="font-bold">{c.usuario_nome}</p>
+                                                <p className="text-muted">{formatarDataBR(c.data)}</p>
+                                            </td>
+                                            <td className="font-bold">R$ {c.valor.toLocaleString('pt-BR')}</td>
+                                            <td className="text-xs text-muted" style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {c.detalhes || 'Sem logs.'}
+                                            </td>
+                                            <td>
+                                                {c.confirmado_cliente ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                        <CheckCircle2 size={16} /> Recebido em {new Date(c.data_confirmacao_cliente).toLocaleDateString('pt-BR')}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--warning)', fontSize: '0.75rem' }}>
+                                                        <Timer size={16} /> Aguardando Confirmação
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -581,10 +844,10 @@ const AdminDashboard = () => {
                                 <h3>Ações de Caixa</h3>
                                 <div className="flex-column gap-1 mt-1">
                                     <button className="btn btn-primary w-full gap-1" onClick={() => handleOpenAcao('saque')}>
-                                        <ArrowUpRight size={18} /> Resgatar Lucro
+                                        <ArrowUpRight size={18} /> Resgatar Lucro Líquido
                                     </button>
                                     <button className="btn btn-outline w-full gap-1" onClick={() => handleOpenAcao('aporte')}>
-                                        <PlusCircle size={18} /> Injetar Capital
+                                        <PlusCircle size={18} /> Injetar Capital (Aporte)
                                     </button>
                                 </div>
                             </section>
@@ -634,7 +897,7 @@ const AdminDashboard = () => {
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
                             <h3>Parceiros de Caixa (Lojistas)</h3>
-                            <button className="btn btn-primary text-xs gap-1">
+                            <button className="btn btn-primary text-xs gap-1" onClick={() => setShowNovoParceiroModal(true)}>
                                 <PlusCircle size={16} /> Novo Parceiro
                             </button>
                         </div>
@@ -650,8 +913,9 @@ const AdminDashboard = () => {
                                     <thead>
                                         <tr>
                                             <th>Nome do Ponto</th>
+                                            <th>ID Dono</th>
                                             <th>Status Caixa</th>
-                                            <th>Endereço</th>
+                                            <th>Prazo / Taxa</th>
                                             <th>Saldo Atual</th>
                                             <th>Comissões</th>
                                             <th>Ações</th>
@@ -663,15 +927,30 @@ const AdminDashboard = () => {
                                                 <td>
                                                     <div className="flex-start gap-1">
                                                         <div className="user-avatar" style={{ background: 'var(--secondary)' }}><Store size={14} /></div>
-                                                        <p className="font-bold">{p.nome}</p>
+                                                        <div>
+                                                            <p className="font-bold">{p.nome}</p>
+                                                            <p className="text-xs text-muted">{p.endereco}</p>
+                                                        </div>
                                                     </div>
+                                                </td>
+                                                <td>
+                                                    <span className="text-xs font-mono">{p.usuario_id || 'Sem Vínculo'}</span>
                                                 </td>
                                                 <td>
                                                     <span className={`status-pill ${p.caixa_aberto ? 'status-success' : 'status-danger'}`}>
                                                         {p.caixa_aberto ? 'ABERTO' : 'FECHADO'}
                                                     </span>
                                                 </td>
-                                                <td className="text-xs text-muted">{p.endereco}</td>
+                                                <td>
+                                                    <div className="flex-column" style={{ gap: '2px' }}>
+                                                        <span className="text-xs font-bold text-primary" style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>
+                                                            D+{p.prazo_liquidacao || 0}
+                                                        </span>
+                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                                            {p.taxa_comissao}% comissão
+                                                        </span>
+                                                    </div>
+                                                </td>
                                                 <td className="text-primary font-bold">R$ {p.saldo_atual.toLocaleString('pt-BR')}</td>
                                                 <td className="text-success">R$ {p.comissao.toLocaleString('pt-BR')}</td>
                                                 <td>
@@ -880,15 +1159,88 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             </ModalPremium>
-            {/* Modal de Exclusão de Parceiro */}
+            {/* Modal Novo Parceiro */}
+            <ModalPremium
+                isOpen={showNovoParceiroModal}
+                onClose={() => setShowNovoParceiroModal(false)}
+                title="Cadastrar Novo Parceiro (Lojista)"
+                message="Parceiros autorizados realizam depósitos e saques em espécie para os membros da PSY PAY."
+                type="info"
+                onConfirm={handleCriarParceiro}
+                confirmText="Salvar Parceiro"
+                loading={loadingNovoParceiro}
+            >
+                <div style={{ textAlign: 'left', marginTop: '1rem' }}>
+                    <div className="input-group mb-1">
+                        <label>Nome do Estabelecimento</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Ex: Mercadinho do Josias"
+                            value={novoParceiroData.nome}
+                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, nome: e.target.value })}
+                        />
+                    </div>
+                    <div className="input-group mb-1">
+                        <label>ID do Usuário Vínculo (5 chars)</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Ex: A1B2C"
+                            maxLength={5}
+                            value={novoParceiroData.usuario_id}
+                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, usuario_id: e.target.value.toUpperCase() })}
+                        />
+                    </div>
+                    <div className="input-group mb-1">
+                        <label>Endereço Completo</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Ex: Av. Paulista, 1000 - São Paulo"
+                            value={novoParceiroData.endereco}
+                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, endereco: e.target.value })}
+                        />
+                    </div>
+                    <div className="grid-2 gap-1">
+                        <div className="input-group">
+                            <label>Prazo de Liquidação</label>
+                            <select 
+                                className="input-field"
+                                value={novoParceiroData.prazo_liquidacao}
+                                onChange={(e) => {
+                                    const prazo = parseInt(e.target.value);
+                                    setNovoParceiroData({ 
+                                        ...novoParceiroData, 
+                                        prazo_liquidacao: prazo,
+                                        taxa_comissao: TAXAS_PRAZOS[prazo]
+                                    });
+                                }}
+                            >
+                                <option value={0}>Imediato (D+0) → {TAXAS_PRAZOS[0]}%</option>
+                                <option value={14}>14 dias (D+14) → {TAXAS_PRAZOS[14]}%</option>
+                                <option value={35}>35 dias (D+35) → {TAXAS_PRAZOS[35]}%</option>
+                            </select>
+                        </div>
+                        <div className="input-group">
+                            <label>Taxa de Serviço</label>
+                            <div className="text-primary font-bold mt-1" style={{ fontSize: '1.2rem' }}>
+                                {TAXAS_PRAZOS[novoParceiroData.prazo_liquidacao]}% (Fixo)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </ModalPremium>
+
+            {/* Modal Excluir Parceiro */}
             <ModalPremium
                 isOpen={showExcluirParceiroModal}
                 onClose={() => setShowExcluirParceiroModal(false)}
-                title="Excluir Parceiro?"
-                message={`Deseja realmente desativar o parceiro "${parceiroParaExcluir?.nome}"? Isso encerrará automaticamente o caixa do ponto de forma irreversível.`}
+                title="Remover Parceiro?"
+                message={`Deseja desativar o parceiro "${parceiroParaExcluir?.nome}"? Ele não aparecerá mais como ponto de atendimento.`}
                 type="error"
-                onConfirm={handleExcluirParceiro}
-                confirmText="Sim, Desativar"
+                onConfirm={handleConfirmarExclusaoParceiro}
+                confirmText="Sim, Remover"
                 loading={loadingExclusao}
             />
         </div>

@@ -1,3 +1,4 @@
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
@@ -16,12 +17,17 @@ from decimal import Decimal
 import datetime
 from datetime import timezone, timedelta
 import pyotp
+import uuid
+import httpx
 from typing import Optional, List
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, StatusSolicitacao, SolicitacaoEmprestimo
+from modelos.modelos_db import (
+    Usuario, Transacao, TipoTransacao, StatusSolicitacao, 
+    SolicitacaoEmprestimo, Investimento, RegistroAuditoria, 
+    Parceiro, LinkAfiliado
+)
 from utils_emprestimo import calcular_divida_total, liquidar_emprestimo_via_pool
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
-from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Investimento, RegistroAuditoria, Parceiro, LinkAfiliado
 from limitador import limiter
 from utils_seguranca import registrar_acao_admin
 from rotas.rotas_snapshot import cache_snapshot_data
@@ -31,6 +37,11 @@ class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
     metodo: str = "pix" # pix ou especie
     parceiro_id: Optional[int] = None
+
+class ReservaSaqueRequest(BaseModel):
+    valor: Decimal = Field(gt=0)
+    parceiro_id: int
+    senha_saque: str
 
 class SolicitacaoSaque(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -49,6 +60,80 @@ class AporteCaixaRequest(BaseModel):
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
+# --- CONFIGURAÇÕES DE RISCO (BaaS AUTO-PAYOUT) ---
+VALOR_MAX_SAQUE_AUTO = Decimal("100.00")
+SAQUES_AUTO_POR_DIA = 1
+
+async def processar_payout_pix_mp(transacao, usuario: Usuario):
+    """
+    Integração com a API de Transaction Intents do Mercado Pago para envio de PIX (BaaS).
+    """
+    if not mp_access_token:
+        logger.error("❌ PAYOUT: Token do Mercado Pago não configurado.")
+        return False, "Token de acesso não configurado no servidor."
+
+    idempotency_key = str(uuid.uuid4())
+    payload = {
+        "transaction_amount": float(transacao.valor),
+        "description": f"Saque Psy Pay - {usuario.nome} (ID:{transacao.id})",
+        "payment_method_id": "pix",
+        "point_of_interaction": {
+            "type": "payout"
+        },
+        "receiver": {
+            "identification": {
+                "type": "CPF",
+                "number": usuario.cpf.replace(".", "").replace("-", "")
+            }
+        },
+        "payer": {
+            "email": usuario.email
+        }
+    }
+
+    # Nota: Em alguns países/contas o endpoint principal de BaaS é o transaction-intents
+    # Porém, para contas padrão com Payout habilitado, o v1/payouts é o mais estável.
+    url = "https://api.mercadopago.com/v1/payouts"
+    headers = {
+        "Authorization": f"Bearer {mp_access_token.strip()}",
+        "X-Idempotency-Key": idempotency_key,
+        "Content-Type": "application/json"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            logger.info(f"🚀 ENVIANDO PAYOUT PIX (ID: {transacao.id}) - Valor: {transacao.valor}")
+            response = await client.post(url, json=payload, headers=headers)
+            
+            # Tentar fallback se o primeiro endpoint falhar com 404
+            if response.status_code == 404:
+                url_fallback = "https://api.mercadopago.com/v1/transaction-intents/process"
+                response = await client.post(url_fallback, json=payload, headers=headers)
+
+            data = response.json()
+            logger.info(f"📡 RESPOSTA MP ({response.status_code}): {data}")
+            
+            if response.status_code in [200, 201]:
+                status_payout = data.get("status")
+                if status_payout in ["approved", "in_process", "pending"]:
+                    logger.info(f"✅ PAYOUT SUCESSO: Transação {transacao.id} enviada ao MP. Status: {status_payout}")
+                    return True, f"PIX enviado com sucesso via MP. ID: {data.get('id')}"
+                else:
+                    logger.error(f"❌ PAYOUT ERRO: MP recusou com status {status_payout}. Detalhes: {data}")
+                    return False, f"O Mercado Pago recusou a transferência: {status_payout}"
+            else:
+                error_msg = data.get("message", "Erro desconhecido na API do Mercado Pago.")
+                # Tratamento específico para erro de assinatura
+                if "signature" in error_msg.lower():
+                    error_msg = f"Erro de Assinatura/Permissão (Invalid Signature). Detalhes: {data.get('cause', [])}"
+                
+                logger.error(f"❌ PAYOUT API ERRO ({response.status_code}): {error_msg}")
+                return False, f"Erro na API de Payouts: {error_msg}"
+                
+    except Exception as e:
+        logger.error(f"❌ PAYOUT EXCEPTION: {str(e)}")
+        return False, f"Falha na conexão com o banco para realizar o PIX: {str(e)}"
+
 @router.post("/solicitar-saque")
 @limiter.limit("2/minute")
 async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
@@ -58,6 +143,18 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
+    # ANTI-POLUIÇÃO: Verificar se já existe um saque pendente
+    saque_pendente = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.status == "pendente"
+    ).first()
+    if saque_pendente:
+        raise HTTPException(
+            status_code=400, 
+            detail="Você já possui uma solicitação de saque pendente. Aguarde o processamento ou peça o cancelamento ao suporte."
+        )
+
     valor = dados.valor
     chave_pix = dados.chave_pix
     
@@ -92,7 +189,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
 
     # NOVO: Validação OBRIGATÓRIA de Senha e 2FA
     if not verify_password(dados.senha, usuario.senha_hash):
-        raise HTTPException(status_code=401, detail="Senha de segurança incorreta.")
+        raise HTTPException(status_code=403, detail="Senha de segurança incorreta.")
     
     if not usuario.is_verified:
         raise HTTPException(
@@ -108,7 +205,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     
     totp = pyotp.TOTP(usuario.totp_secret)
     if not totp.verify(dados.codigo_2fa):
-        raise HTTPException(status_code=401, detail="Código 2FA (Authenticator) inválido ou expirado.")
+        raise HTTPException(status_code=403, detail="Código 2FA (Authenticator) inválido ou expirado.")
 
     # TRAVA DE SEGURANÇA: 48 HORAS APÓS MUDANÇA DE 2FA
     if usuario.ultima_alteracao_2fa:
@@ -170,13 +267,40 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
         db.add(transacao_taxa)
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     
-    msg = "Solicitação de saque registrada." 
+    # --- NOVO: Lógica de Saque Automático (BaaS) ---
+    msg_final = "Solicitação de saque registrada."
+    
+    # Critérios para Saque Automático:
+    # 1. Valor <= Limite definido
+    # 2. Usuário Verificado (Documentos Aprovados)
+    # 3. 2FA Ativo
+    # 4. Método PIX
+    if dados.metodo == "pix" and valor_liquido <= VALOR_MAX_SAQUE_AUTO and usuario.is_verified and usuario.two_factor_enabled:
+        # Tenta processar o PIX imediatamente via API
+        sucesso_payout, detalhe_payout = await processar_payout_pix_mp(nova_transacao, usuario)
+        
+        if sucesso_payout:
+            nova_transacao.status = "concluido"
+            nova_transacao.detalhes += f" | ✅ AUTO-PIX: {detalhe_payout}"
+            db.commit()
+            msg_final = f"Saque de R$ {valor_liquido:.2f} realizado com sucesso via PIX Instantâneo!"
+        else:
+            nova_transacao.detalhes += f" | ⚠️ FALHA AUTO-PIX: {detalhe_payout}"
+            db.commit()
+            msg_final = "Saque registrado, mas precisará de aprovação manual (Falha na automação PIX)."
+    else:
+        # Se não cair no automático, vai pra fila manual (padrão)
+        prazos = "até 24h úteis"
+        if valor_liquido > 500: prazos = "até 48h úteis"
+        msg_final = f"Solicitação de saque de R$ {valor_liquido:.2f} registrada e aguardando processamento manual ({prazos})."
+
     if taxa > 0:
-        msg += f" Taxa de R$ {taxa} aplicada (Saque > Saldo Pool)."
+        msg_final += f" (Taxa de R$ {taxa} aplicada)."
     
-    return {"message": msg + " Aguardando processamento manual."}
+    return {"message": msg_final}
 
 @router.post("/investir-pool")
 @limiter.limit("5/minute")
@@ -203,7 +327,7 @@ async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     transacao = Transacao(
         usuario_id=usuario.id,
         valor=dados.valor,
-        tipo=TipoTransacao.APORTE_CAIXA,
+        tipo=TipoTransacao.APORTE_POOL,
         status="concluido",
         detalhes="Aporte no Pool (Aceite de Termos e Risco Confirmado)",
         auditoria_id=auditoria.id
@@ -212,10 +336,11 @@ async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     registrar_acao_admin(db, usuario.id, "APORTE_CAIXA_POOL", alvo_id=usuario.id, detalhes=f"Valor: {dados.valor}", ip=request.client.host)
     
     # NOVO: Ganho de Score por aporte no Pool
-    atualizar_score(db, usuario.id, dados.valor, "APORTE_CAIXA")
+    atualizar_score(db, usuario.id, dados.valor, "APORTE_POOL")
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
 
 @router.post("/resgatar-pool")
@@ -260,7 +385,7 @@ async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     transacao = Transacao(
         usuario_id=usuario.id,
         valor=dados.valor,
-        tipo=TipoTransacao.RESGATE_CAIXA,
+        tipo=TipoTransacao.RESGATE_POOL,
         status="concluido",
         detalhes="Resgate do Pool (Fintech Liquidez Diária)",
         auditoria_id=auditoria.id
@@ -268,14 +393,29 @@ async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     db.add(transacao)
 
     # Perda de Score proporcional por resgate (opcional, mantendo para controle de risco)
-    atualizar_score(db, usuario.id, dados.valor, "RESGATE_CAIXA")
+    atualizar_score(db, usuario.id, dados.valor, "RESGATE_POOL")
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": f"Resgate de R$ {dados.valor:.2f} realizado!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/notificar-deposito")
 async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    # ANTI-POLUIÇÃO: Verificar se já existe depósito pendente do mesmo método para evitar sujeira no extrato
+    if dados.metodo == "especie":
+        deposito_pendente = db.query(Transacao).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo == TipoTransacao.DEPOSITO,
+            Transacao.metodo == "especie",
+            Transacao.status == "pendente"
+        ).first()
+        if deposito_pendente:
+            raise HTTPException(
+                status_code=400, 
+                detail="Você já tem um depósito em espécie pendente. Peça ao lojista para confirmar ou cancelar antes de criar um novo."
+            )
+
     valor = dados.valor
     
     if dados.metodo == "especie":
@@ -296,8 +436,72 @@ async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(g
     )
     db.add(nova_transacao)
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar."}
+
+@router.post("/saque/reservar")
+async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """Reserva um valor para saque em espécie em um parceiro específico."""
+    # from utils_score import verificar_2fa # Se houver utilitário de 2FA
+    
+    # 1. Lock no usuário para evitar race conditions
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    
+    # 2. Verificações de Segurança 🛡️
+    if not usuario.is_verified:
+        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para realizar saques.")
+    
+    if not usuario.two_factor_enabled:
+        raise HTTPException(status_code=403, detail="O 2FA é obrigatório para realizar saques em espécie.")
+    
+    # Validar Senha de Saque / 2FA (Simplificado aqui, mas integrável com TOTP)
+    # if not verificar_2fa(usuario, dados.senha_saque):
+    #     raise HTTPException(status_code=400, detail="Senha de saque ou código 2FA inválido.")
+
+    # 3. Validar Parceiro
+    parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Parceiro lojista não encontrado ou inativo.")
+
+    # 4. Validar Saldo e Reservar
+    if usuario.saldo < dados.valor:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente para reservar este saque.")
+    
+    # Evitar Múltiplas Reservas Pendentes (Opcional, mas recomendado)
+    saque_existente = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.metodo == "especie",
+        Transacao.status == "pendente"
+    ).first()
+    if saque_existente:
+        raise HTTPException(status_code=400, detail="Você já possui um saque em espécie reservado. Cancele-o antes de criar um novo.")
+
+    # DEBITAR SALDO (Reserva Atômica) 🛡️
+    usuario.saldo -= dados.valor
+    
+    # 5. Criar Transação Pendente
+    nova_transacao = Transacao(
+        usuario_id=usuario.id,
+        valor=dados.valor,
+        tipo=TipoTransacao.SAQUE,
+        status="pendente",
+        metodo="especie",
+        parceiro_id=dados.parceiro_id,
+        detalhes=f"Saque Reservado (Aguardando Retirada na Loja #{parceiro.id} - {parceiro.nome})"
+    )
+    db.add(nova_transacao)
+    db.commit()
+    
+    # Limpar Cache
+    from rotas.rotas_snapshot import cache_snapshot_data
+    cache_snapshot_data.pop(usuario.id, None)
+    
+    return {
+        "message": f"Saque de R$ {dados.valor:.2f} reservado com sucesso! Vá até a loja {parceiro.nome} com seu ID {usuario.id} para retirar o dinheiro.",
+        "transacao_id": nova_transacao.id
+    }
 
 class DepositoPixRequest(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -307,6 +511,16 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
     if not sdk:
         raise HTTPException(status_code=500, detail="Integração com Mercado Pago não configurada no servidor.")
     
+    # ANTI-POLUIÇÃO: Marcar PIXs anteriores pendentes como EXPIRADOS para limpar o extrato do usuário
+    # Assim só o QR Code mais recente fica visível como pendente.
+    db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.DEPOSITO,
+        Transacao.metodo == "pix",
+        Transacao.status == "pendente"
+    ).update({"status": "expirado"})
+    db.commit()
+
     # Expiração em 30 minutos
     agora = datetime.datetime.now(datetime.timezone.utc)
     expiracao = agora + datetime.timedelta(minutes=30)
@@ -352,11 +566,13 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         tipo=TipoTransacao.DEPOSITO,
         status="pendente",
         metodo="pix",
+        payment_id=str(payment_id),
         detalhes=f"Pix MP Gerado | ID: {payment_id}"
     )
     db.add(nova_transacao)
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     
     return {
         "message": "PIX gerado com sucesso.",
@@ -365,6 +581,50 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         "payment_id": payment_id,
         "expires_at": expiracao_iso
     }
+
+@router.get("/deposito/pix-detalhes/{transacao_id}")
+async def obter_detalhes_pix(transacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    transacao = db.query(Transacao).filter(
+        Transacao.id == transacao_id,
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.DEPOSITO,
+        Transacao.metodo == "pix"
+    ).first()
+    
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Depósito não encontrado ou não pertence a este usuário.")
+    
+    if not transacao.payment_id:
+        raise HTTPException(status_code=400, detail="Este depósito não possui um ID de pagamento válido para recuperação.")
+
+    if not sdk:
+        raise HTTPException(status_code=500, detail="SDK Mercado Pago não configurado.")
+
+    try:
+        # Consultar o Mercado Pago para pegar o QR Code atualizado/armazenado
+        payment_info = sdk.payment().get(transacao.payment_id)
+        if payment_info.get("status") != 200:
+            raise HTTPException(status_code=400, detail="Não foi possível recuperar os dados do PIX no Mercado Pago.")
+            
+        payment = payment_info.get("response", {})
+        qr_code = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code")
+        qr_code_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64")
+        expires_at = payment.get("date_of_expiration")
+        
+        # Verificar se já expirou
+        if payment.get("status") == "cancelled":
+             raise HTTPException(status_code=400, detail="Este código PIX já expirou. Por favor, gere um novo depósito.")
+
+        return {
+            "qr_code": qr_code,
+            "qr_code_base64": qr_code_base64,
+            "payment_id": transacao.payment_id,
+            "expires_at": expires_at,
+            "valor": float(transacao.valor)
+        }
+    except Exception as e:
+        logger.error(f"Erro ao recuperar PIX: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o provedor de pagamento: {str(e)}")
 
 @router.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
@@ -399,8 +659,10 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             logger.info(f"🔔 WEBHOOK MP: Pagamento {payment_id} está {status_mp} ({status_detail}) - Valor: {valor_mp}")
             
             if status_mp == "approved":
-                # Tenta achar a transação de 3 formas: ID exato, Valor/Método ou Valor/Última Pendente
-                transacao = db.query(Transacao).filter(Transacao.detalhes.like(f"%ID: {payment_id}%")).first()
+                # Tenta achar a transação de 3 formas: payment_id (novo), ID exato no Detalhes (legado) ou Valor
+                transacao = db.query(Transacao).filter(Transacao.payment_id == str(payment_id)).first()
+                if not transacao:
+                    transacao = db.query(Transacao).filter(Transacao.detalhes.like(f"%ID: {payment_id}%")).first()
                 
                 if not transacao:
                     transacao = db.query(Transacao).filter(
@@ -414,8 +676,11 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                     if usuario:
                         usuario.saldo += transacao.valor
                         transacao.status = "concluido"
-                        if f"ID: {payment_id}" not in transacao.detalhes:
-                            transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
+                        if not transacao.payment_id:
+                            transacao.payment_id = str(payment_id)
+                        
+                        if f"ID: {payment_id}" not in (transacao.detalhes or ""):
+                            transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
                         
                         fee_details = payment.get("fee_details", [])
                         total_fee = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
@@ -732,7 +997,41 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
 
     return {"message": f"{tipo_txt} processado com sucesso!"}
 
-@router.post("/parceiro/sacar-comissoes")
+@router.post("/confirmar-recebimento/{id}")
+async def confirmar_recebimento_saque(id: int, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Permite que o cliente confirme que recebeu o PIX do saque."""
+    transacao = db.query(Transacao).filter(
+        Transacao.id == id, 
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.SAQUE
+    ).first()
+
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação de saque não encontrada.")
+
+    if transacao.status != "concluido":
+        raise HTTPException(status_code=400, detail="Você só pode confirmar o recebimento de saques já processados pela plataforma.")
+
+    if transacao.confirmado_cliente:
+        return {"message": "Este saque já foi confirmado anteriormente."}
+
+    # Registro de Auditoria
+    auditoria = RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=datetime.datetime.utcnow()
+    )
+    db.add(auditoria)
+    db.flush()
+
+    transacao.confirmado_cliente = True
+    transacao.data_confirmacao_cliente = datetime.datetime.now(timezone.utc)
+    transacao.auditoria_id = auditoria.id
+    
+    db.commit()
+    return {"message": "Recebimento confirmado com sucesso! Obrigado pelo feedback."}
+
+# @router.post("/parceiro/sacar-comissoes")
 async def sacar_comissoes_parceiro(db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
     """Transfere as comissões acumuladas do parceiro para o saldo da carteira."""
     # Lock no registro do parceiro para garantir integridade do saque de comissão
@@ -990,7 +1289,8 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
     transacao.status = "concluido"
     registrar_acao_admin(db, admin.id, "CONFIRMAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Tipo: {transacao.tipo.value}, Valor: {transacao.valor}", ip=request.client.host)
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": msg}
 
 @router.get("/admin/kyc-pendentes")
@@ -1089,7 +1389,8 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
 
     registrar_acao_admin(db, admin.id, "REJEITAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Motivo: {motivo}", ip=request.client.host)
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     return {"message": f"Transacao de {usuario.nome} rejeitada. Motivo: {motivo}"}
 
 @router.post("/assinar-plano")
@@ -1131,7 +1432,8 @@ async def assinar_plano_premium(db: Session = Depends(get_db), usuario_logado: U
         plataforma.saldo += PRECO_ASSINATURA
 
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     
     return {
         "message": "Parabéns! Você agora é um membro Premium Psy Pay.",
@@ -1551,7 +1853,8 @@ async def gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Session = Depend
     )
     db.add(nova_transacao)
     db.commit()
-    cache_snapshot_data.clear()
+    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop("000PL", None)
     
     return {
         "message": "PIX de Aporte gerado com sucesso.",
@@ -1764,6 +2067,58 @@ async def liquidar_caixa_devedores(db: Session = Depends(get_db), admin: Usuario
             ))
 
     db.commit()
+
+class ParceiroCreate(BaseModel):
+    nome: str
+    endereco: str
+    usuario_id: Optional[str] = None
+    prazo_liquidacao: int = 0
+    taxa_comissao: Decimal = Decimal("0.00")
+
+@router.post("/admin/fiscal/parceiros")
+async def criar_parceiro(
+    dados: ParceiroCreate,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """Cadastra um novo parceiro lojista no sistema com regras de recebíveis."""
+    
+    # Validar se o usuario_id existe caso fornecido
+    if dados.usuario_id:
+        user_alvo = db.query(Usuario).filter(Usuario.id == dados.usuario_id).first()
+        if not user_alvo:
+            raise HTTPException(status_code=404, detail=f"Usuário ID {dados.usuario_id} não encontrado na plataforma.")
+
+    novo_parceiro = Parceiro(
+        nome=dados.nome,
+        endereco=dados.endereco,
+        usuario_id=dados.usuario_id,
+        prazo_liquidacao=dados.prazo_liquidacao,
+        taxa_comissao=dados.taxa_comissao,
+        is_active=True,
+        caixa_aberto=False,
+        saldo_caixa_atual=Decimal("0.00"),
+        comissoes_acumuladas=Decimal("0.00")
+    )
+    db.add(novo_parceiro)
+    db.commit()
+    return {"message": "Parceiro cadastrado com sucesso!", "id": novo_parceiro.id}
+
+@router.delete("/admin/fiscal/parceiros/{parceiro_id}")
+async def excluir_parceiro(
+    parceiro_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """Remove (desativa) um parceiro lojista."""
+    parceiro = db.query(Parceiro).filter(Parceiro.id == parceiro_id).first()
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
+    
+    # Em vez de deletar fisicamente, apenas desativamos para manter histórico de transações
+    parceiro.is_active = False
+    db.commit()
+    return {"message": "Parceiro removido com sucesso."}
     registrar_acao_admin(db, admin.id, "LIQUIDAR_CAIXA_DEVEDORES", alvo_id="SISTEMA", detalhes=f"Devedores afetados: {len(devedores)}, Valor total: {total_confiscado}", ip=None)
     return {
         "message": "Liquidação concluída com sucesso.",

@@ -7,6 +7,7 @@ from sqlalchemy import func, case, and_, or_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
 from utils_emprestimo import calcular_divida_total
+import psutil
 
 router = APIRouter(tags=["Snapshot"])
 
@@ -32,11 +33,14 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     # Lazy-Cleaning: Expurgar solicitações expiradas (4h/5d) antes de ler o BD
     try:
         from utils_emprestimo import processar_expiracoes_interna
-        removidos = processar_expiracoes_interna(db)
-        if removidos > 0:
-            print(f"[LAZY-CLEANING] Snapshot limpou {removidos} solicitações expiradas.")
-            # Invalida cache preventivamente se alterou banco
-            cache_snapshot_data.clear() 
+        usuarios_afetados = processar_expiracoes_interna(db)
+        if usuarios_afetados:
+            print(f"[LAZY-CLEANING] Snapshot limpou solicitações expiradas para {len(usuarios_afetados)} usuários.")
+            # Invalida cache apenas dos afetados
+            for uid in usuarios_afetados:
+                cache_snapshot_data.pop(uid, None)
+            # Admin sempre vê tudo, então invalidamos ele também por segurança se houver mudanças globais
+            cache_snapshot_data.pop("000PL", None)
     except Exception as e:
         print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
     
@@ -74,22 +78,43 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
         saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
 
-        # 0.1 Calcular Rentabilidade do Pool
-        total_aportado_bruto = db.query(func.sum(Transacao.valor)).filter(
+        # 0.1 Calcular Rentabilidade do Pool (Lógica de Ciclo Atual)
+        # Buscamos o histórico de depósitos e resgates para identificar o "custo" do capital no pool
+        # Aceitamos tanto as novas etiquetas (APORTE_POOL) quanto as legadas (APORTE_CAIXA)
+        # Mas filtramos as legadas para excluir operações de gaveta/loja
+        transacoes_pool = db.query(Transacao).filter(
             Transacao.usuario_id == usuario.id,
-            Transacao.tipo == TipoTransacao.APORTE_CAIXA,
+            Transacao.tipo.in_([
+                TipoTransacao.APORTE_CAIXA, TipoTransacao.RESGATE_CAIXA,
+                TipoTransacao.APORTE_POOL, TipoTransacao.RESGATE_POOL
+            ]),
             Transacao.status == "concluido"
-        ).scalar() or Decimal("0.00")
+        ).order_by(Transacao.data_criacao.asc()).all()
         
-        total_saque_caixa = db.query(func.sum(Transacao.valor)).filter(
-            Transacao.usuario_id == usuario.id,
-            Transacao.tipo == TipoTransacao.RESGATE_CAIXA,
-            Transacao.status == "concluido"
-        ).scalar() or Decimal("0.00")
+        capital_no_ciclo = Decimal("0.00")
+        for t in transacoes_pool:
+            detalhes = (t.detalhes or "").upper()
+            
+            # Filtro Inteligente: Se for transação de gaveta (caixa físico), ignoramos no rendimento do Pool
+            is_gaveta = "GAVETA" in detalhes or "ABERTURA DE CAIXA" in detalhes or "ENCERRADO" in detalhes
+            if is_gaveta and t.tipo in [TipoTransacao.APORTE_CAIXA, TipoTransacao.RESGATE_CAIXA]:
+                continue
+                
+            if t.tipo in [TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]:
+                capital_no_ciclo += t.valor
+            else:
+                # Se o resgate esvaziar o capital investido, resetamos o ciclo para o que sobrar ou zero
+                capital_no_ciclo = max(Decimal("0.00"), capital_no_ciclo - t.valor)
         
-        capital_liquido = total_aportado_bruto - total_saque_caixa
-        rendimento_abs = max(Decimal("0.00"), saldo_caixa_total - capital_liquido)
-        rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
+        # O rendimento é o que o saldo atual excede o capital que ainda está "em risco" (aportado e não resgatado)
+        if saldo_caixa_total <= 0:
+            rendimento_abs = Decimal("0.00")
+            rendimento_pct = 0.0
+            capital_liquido = Decimal("0.00")
+        else:
+            capital_liquido = capital_no_ciclo
+            rendimento_abs = max(Decimal("0.00"), saldo_caixa_total - capital_liquido)
+            rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
 
         snapshot = {
             "perfil": {
@@ -114,7 +139,11 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "is_parceiro": is_parceiro,
                 "parceiro_id": parceiro.id if parceiro else None,
                 "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
+                "prazo": parceiro.prazo_liquidacao if parceiro else 0,
+                "taxa_loja": float(parceiro.taxa_comissao or 0) if parceiro else 0.0,
                 "comissoes_acumuladas": float(parceiro.comissoes_acumuladas or 0) if parceiro else 0.0,
+                "comissoes_pendentes": float(parceiro.comissoes_pendentes or 0) if parceiro else 0.0,
+                "saldo_caixa_inicial": float(parceiro.saldo_caixa_inicial or 0) if parceiro else 0.0,
                 "saldo_caixa_atual": float(parceiro.saldo_caixa_atual or 0) if parceiro else 0.0,
                 "is_subscriber": usuario.is_subscriber,
                 "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
@@ -139,7 +168,10 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "valor": float(t.valor),
                 "tipo": t.tipo.value,
                 "status": t.status,
+                "metodo": t.metodo,
                 "detalhes": t.detalhes,
+                "confirmado_cliente": t.confirmado_cliente,
+                "data_confirmacao_cliente": t.data_confirmacao_cliente.replace(tzinfo=timezone.utc).isoformat() if t.data_confirmacao_cliente else None,
                 "data": data_t.astimezone(TZ_BRASILIA).isoformat()
             })
 
@@ -239,20 +271,35 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "usuario_chave_pix": p.usuario.chave_pix,
                     "valor": float(p.valor),
                     "tipo": p.tipo.value,
+                    "status": p.status,
                     "detalhes": p.detalhes,
+                    "confirmado_cliente": p.confirmado_cliente,
+                    "data_confirmacao_cliente": p.data_confirmacao_cliente.isoformat() if p.data_confirmacao_cliente else None,
                     "data": data_p.astimezone(TZ_BRASILIA).isoformat(),
                     "tem_rg": False,
                     "tem_renda": False,
-                    "tem_residencia": False
+                    "tem_residencia": False,
+                    "url_rg": None,
+                    "url_renda": None,
+                    "url_residencia": None
                 }
 
-                # Se for KYC, buscar se tem arquivos vinculados
+                # Se for KYC, buscar se tem arquivos vinculados (pegando sempre o envio mais recente)
                 if p.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
-                    docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == p.usuario.id, DocumentoVerificacao.status == "pendente").first()
+                    docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == p.usuario.id).order_by(DocumentoVerificacao.id.desc()).first()
                     if docs:
+                        def parse_url(path):
+                            if not path: return None
+                            # Se o path no BD vier como 'uploads/arquivo.png', removemos o prefixo para usar /api/uploads/arquivo.png
+                            clean_path = path.replace("uploads/", "").replace("uploads\\", "")
+                            return f"/api/uploads/{clean_path}"
+
                         info_p["tem_rg"] = bool(docs.caminho_rg)
                         info_p["tem_renda"] = bool(docs.caminho_renda)
                         info_p["tem_residencia"] = bool(docs.caminho_residencia)
+                        info_p["url_rg"] = parse_url(docs.caminho_rg)
+                        info_p["url_renda"] = parse_url(docs.caminho_renda)
+                        info_p["url_residencia"] = parse_url(docs.caminho_residencia)
 
                 pendentes_list.append(info_p)
 
@@ -433,10 +480,41 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido",
                 Transacao.data_criacao >= data_30_dias_atras
             ).scalar() or Decimal("0.00")
+            # --- MÉTRICAS DE HARDWARE (REAL-TIME) ---
+            try:
+                cpu_uso = psutil.cpu_percent(interval=0.1) # Pequeno delay para leitura real
+                ram = psutil.virtual_memory()
+                ram_uso = ram.percent
+                print(f"📊 HARDWARE: CPU {cpu_uso}% | RAM {ram_uso}%")
+            except Exception as e:
+                print(f"Erro ao coletar métricas de hardware: {e}")
+                cpu_uso = 0
+                ram_uso = 0
+
+            # 8. Saques Concluídos Recentemente (Para Auditoria de Recebimento)
+            concluidos_raw = db.query(Transacao).join(Usuario).filter(
+                Transacao.status == "concluido",
+                Transacao.tipo == TipoTransacao.SAQUE
+            ).order_by(Transacao.data_criacao.desc()).limit(20).all()
+
+            concluidos_list = []
+            for c in concluidos_raw:
+                data_c = c.data_criacao
+                if data_c.tzinfo is None: data_c = data_c.replace(tzinfo=timezone.utc)
+                concluidos_list.append({
+                    "transacao_id": c.id,
+                    "usuario_nome": c.usuario.nome,
+                    "valor": float(c.valor),
+                    "data": data_c.astimezone(TZ_BRASILIA).isoformat(),
+                    "confirmado_cliente": c.confirmado_cliente,
+                    "data_confirmacao_cliente": c.data_confirmacao_cliente.replace(tzinfo=timezone.utc).isoformat() if c.data_confirmacao_cliente else None,
+                    "detalhes": c.detalhes
+                })
 
             snapshot["admin"] = {
                 "pendentes": pendentes_list,
-                    "fiscal": {
+                "concluidos_recentes": concluidos_list,
+                "fiscal": {
                         "custodia_total": float(custodia_total_estimada),
                         "saldo_usuarios_gerenciado": float(saldo_usuarios),
                         "lucro_plataforma_total": float(lucro_mensal_plataforma),
@@ -449,6 +527,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                         "lucro_acumulado_pool": float(juros_acumulados_pool),
                         "total_credito_ativo": float(total_credito_ativo),
+                        "cpu_uso": cpu_uso,
+                        "ram_uso": ram_uso,
                     "detalhamento_lucro": {
                         "taxa_postagem": float(detalhamento_total.get('taxa_postagem', 0)),
                         "desbloqueio_dados": float(detalhamento_total.get('desbloqueio_dados', 0)),
@@ -528,6 +608,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "id": p.id,
                     "nome": p.nome,
                     "endereco": p.endereco,
+                    "usuario_id": p.usuario_id,
+                    "prazo_liquidacao": p.prazo_liquidacao,
+                    "taxa_comissao": float(p.taxa_comissao),
                     "is_active": p.is_active,
                     "caixa_aberto": p.caixa_aberto,
                     "saldo_atual": float(p.saldo_caixa_atual),
@@ -553,10 +636,12 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.usuario_id == usuario.id).all()
         meus_emp_list = []
         for s in solicitacoes_tomador:
-            # Replicando lógica de juros e parcelas de rotas_emprestimo
+            # Replicando lógica de juros e parcelas de rotas_emprestimo (Incluindo taxas financiadas)
             taxa_mensal = s.taxa_juros / 100
             total_com_juros = s.valor * (Decimal("1") + (taxa_mensal * s.prazo_meses))
-            valor_parcela = total_com_juros / s.prazo_meses
+            taxas_adicionais = s.taxas_adicionais or Decimal("0.00")
+            
+            valor_parcela = (total_com_juros + taxas_adicionais) / s.prazo_meses
             
             # Tratamento de nulos para campos novos ou legados
             taxas_adicionais = s.taxas_adicionais or Decimal("0.00")

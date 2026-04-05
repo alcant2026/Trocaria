@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { 
   ArrowDownUp, 
   TrendingUp, 
@@ -32,7 +34,7 @@ const App = () => {
 
     const atualizarPerfil = useCallback(async () => {
         try {
-            const data = await api.get('/usuarios/perfil');
+            const data = await api.get('/auth/perfil');
             setUser(data);
         } catch (err) {
             console.error('Erro ao atualizar perfil:', err);
@@ -68,7 +70,7 @@ const App = () => {
             const token = localStorage.getItem('token');
             if (token) {
                 try {
-                    const data = await api.get('/usuarios/perfil');
+                    const data = await api.get('/auth/perfil');
                     if (data && data.nome) {
                         setUser(data);
                         setIsAuthenticated(true);
@@ -78,6 +80,14 @@ const App = () => {
                 } catch (err) {
                     localStorage.removeItem('token');
                 }
+            }
+            const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+            if (isCapacitor) {
+                try {
+                    await StatusBar.setBackgroundColor({ color: '#000000' });
+                    await StatusBar.setStyle({ style: Style.Dark });
+                    await SplashScreen.hide();
+                } catch (e) { console.warn('Plugins nativos não disponíveis.'); }
             }
             clearTimeout(timeout);
             setLoading(false);
@@ -91,26 +101,14 @@ const App = () => {
 
     if (loading) return <LoadingScreen message="Inicializando Psy Pay..." />;
 
-    const botaoWhatsapp = (
-        <a 
-            href="https://wa.me/5511999999999" 
-            className="whatsapp-float" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            aria-label="Contato WhatsApp"
-        >
-            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
-        </a>
-    );
 
     if (!isAuthenticated) {
-        if (page === 'registro') return <><Registro />{botaoWhatsapp}</>;
+        if (page === 'registro') return <Registro />;
         if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
         if (page === 'recuperar-senha') return <RecuperarSenha />;
         return (
             <>
                 <Login onLogin={onLogin} />
-                {botaoWhatsapp}
                 <BannerCookies usuario={null} />
             </>
         );
@@ -209,7 +207,7 @@ const App = () => {
                             <button className="btn btn-danger" onClick={async () => {
                                 setModalExcluir(false);
                                 try {
-                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://peer-5gq5.onrender.com/api'}/usuarios/excluir-conta`, {
+                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://peer-5gq5.onrender.com/api'}/auth/excluir-conta`, {
                                         method: 'DELETE',
                                         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                                     });
@@ -222,7 +220,9 @@ const App = () => {
                     </div>
                 </div>
             )}
-            {botaoWhatsapp}
+            <footer className="api-footer">
+                <p>PSY PAY - Plataforma experimental de tecnologia para crédito digital. Atuamos como facilitador de crédito cooperativo em fase beta. O uso do serviço implica no aceite total dos Termos de Uso e Política de Privacidade. © 2024-2026 PSY PAY.</p>
+            </footer>
             <TemporizadorInatividade aoDeslogar={logout} />
             <BannerCookies usuario={user} onUpdate={atualizarPerfil} />
         </div>

@@ -20,7 +20,7 @@ CACHE_TTL_SEG = 15 # 15 segundos de "paz" para o banco de dados
 
 # Versão do cache — incrementar aqui força invalidação de todos os snapshots cacheados
 # quando o servidor reinicia com novos campos no perfil
-CACHE_VERSION = "v4_hardware_metrics"
+CACHE_VERSION = "v5_render_free_tier"
 
 @router.get("/snapshot")
 @router.get("/snapshot/")
@@ -482,13 +482,28 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             ).scalar() or Decimal("0.00")
             # --- MÉTRICAS DE HARDWARE (REAL-TIME) ---
             try:
+                # Detecção de Limites de Plano (Render Free Tier)
+                is_render = os.getenv("RENDER") == "true"
+                
                 cpu_uso = psutil.cpu_percent(interval=0.1)
-                cpu_threads = psutil.cpu_count(logical=True) or 1
-                ram = psutil.virtual_memory()
-                ram_total_gb = round(ram.total / (1024**3), 1)
-                if ram_total_gb < 0.1: ram_total_gb = 0.5 # Mínimo para planos free
-                ram_uso = ram.percent
-                print(f"📊 HARDWARE: CPU {cpu_uso}% ({cpu_threads} threads) | RAM {ram_uso}% ({ram_total_gb}GB)")
+                cpu_threads_host = psutil.cpu_count(logical=True) or 1
+                ram_host = psutil.virtual_memory()
+                ram_total_gb_host = round(ram_host.total / (1024**3), 1)
+
+                if is_render:
+                    # Limites do Plano Render Free: 512MB RAM e ~1 CPU compartilhado
+                    cpu_threads = 1
+                    ram_total_gb = 0.5
+                    # Ajustamos o uso proporcionalmente ao limite do plano se psutil reportar o host
+                    ram_uso = min(100.0, (float(ram_host.used) / (0.5 * 1024**3)) * 100) if ram_host.used else 0.0
+                else:
+                    cpu_threads = cpu_threads_host
+                    ram_total_gb = ram_total_gb_host
+                    ram_uso = ram_host.percent
+
+                if ram_total_gb < 0.1: ram_total_gb = 0.5 # Fallback de emergência
+                
+                print(f"📊 HARDWARE ({'RENDER' if is_render else 'LOCAL'}): CPU {cpu_uso}% ({cpu_threads} threads) | RAM {ram_uso}% ({ram_total_gb}GB)")
             except Exception as e:
                 print(f"Erro ao coletar métricas de hardware: {e}")
                 cpu_uso = 0

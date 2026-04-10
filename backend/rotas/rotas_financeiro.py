@@ -314,6 +314,9 @@ async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     # Lock para evitar bit-flipping de saldo
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
+    if not usuario.is_verified:
+        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para realizar investimentos no Pool.")
+    
     if usuario.saldo < dados.valor:
         raise HTTPException(status_code=400, detail="Saldo insuficiente para investimento no Pool.")
     

@@ -47,6 +47,9 @@ async def solicitar_emprestimo(
     # LOCK no usuário
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
+    if not usuario.is_verified:
+        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para solicitar crédito.")
+    
     limite = calcular_limite_credito(usuario, db)
     if dados.valor > limite:
         raise HTTPException(status_code=400, detail=f"Valor solicitado (R$ {dados.valor}) excede seu limite disponível (R$ {limite}).")
@@ -151,54 +154,32 @@ async def pagar_parcela(id: int, db: Session = Depends(get_db), usuario_logado: 
     # 1. Deduzir saldo
     usuario.saldo -= total_a_pagar
     
-    # 2. Distribuição Financeira (Cooperativa)
-    # Regra: 100% do juro vai para o Pool. O Principal volta para o capital da Cooperativa.
-    # A plataforma fica com a Taxa de Operação e a Mora.
+    # 2. Distribuição Financeira (Cooperativa 2.0)
+    # Regra: 100% do juro e taxas entram no cofre da plataforma (000PL).
+    # O rateio para o Pool deixa de ser instantâneo e passa a ser periódico via Rota de Dividendos.
     
     juro_da_parcela = (solicitacao.valor * taxa_mensal)
     principal_da_parcela = solicitacao.valor / solicitacao.prazo_meses
     
-    # NOVAS REGRAS DE COMISSÃO:
-    comissao_adm = juro_da_parcela * Decimal("0.10") # 10% de taxa adm sobre juros
-    lucro_pool_liquido = juro_da_parcela * Decimal("0.90") # 90% para investidores
-    
     # Taxa diluída é o que foi financiado no início
     taxa_diluida = (solicitacao.taxas_adicionais or Decimal("0.00")) / solicitacao.prazo_meses
-    receita_operacional = taxa_diluida + mora + comissao_adm
+    receita_total_plataforma = juro_da_parcela + taxa_diluida + mora
 
-    # A) Retorno de Principal para a plataforma (para novos empréstimos)
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if plataforma:
+        # Retorno de Principal volta para o capital giro (saldo_caixa)
         plataforma.saldo_caixa += principal_da_parcela
-        plataforma.saldo += receita_operacional
+        # Juros e Taxas entram no lucro bruto (saldo) para acumulo de dividendos
+        plataforma.saldo += receita_total_plataforma
         
-        # LOG DE AUDITORIA DA COMISSÃO (10%)
+        # Auditoria da Receita
         db.add(Transacao(
             usuario_id="000PL",
-            valor=comissao_adm,
+            valor=receita_total_plataforma,
             tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
             status="concluido",
-            detalhes=f"Taxa Gestão (10%) s/ Juros - Parc. Empréstimo #{solicitacao.id}"
+            detalhes=f"Receita Bruta (Cooperativa 2.0) - Parc. Empréstimo #{solicitacao.id}"
         ))
-
-    # B) Rateio do Lucro Líquido (Juros - Taxa Adm) para todos os investidores do Pool
-    # NOVO: Cálculo de Peso Ponderado (Saldo * Multiplicador de Fidelidade)
-    from utils_emprestimo import obter_multiplicador_fidelidade
-    
-    participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-    dados_participantes = []
-    total_pool_ponderado = Decimal("0.00")
-
-    for p in participantes:
-        peso = obter_multiplicador_fidelidade(p.id, db)
-        saldo_ponderado = p.saldo_caixa * peso
-        total_pool_ponderado += saldo_ponderado
-        dados_participantes.append((p, saldo_ponderado))
-
-    if total_pool_ponderado > 0:
-        for p, saldo_ponderado in dados_participantes:
-            fatia = (saldo_ponderado / total_pool_ponderado) * lucro_pool_liquido
-            p.saldo_caixa += fatia
 
     # 3. Atualizar Empréstimo
     solicitacao.parcelas_pagas += 1
@@ -245,54 +226,32 @@ async def pagamento_avulso(id: int, dados: PagamentoRequest, db: Session = Depen
     # Deduzir saldo
     usuario.saldo -= valor_pagamento
     
-    # 2. Distribuição Proporcional (Amortização)
-    # Calculamos quanto do pagamento é juro e quanto é principal baseado na parcela base
+    # 2. Distribuição Financeira (Cooperativa 2.0)
+    # 100% dos juros da amortização entram no cofre central.
+    # Recalculamos as proporções baseado na parcela base
     taxa_mensal = solicitacao.taxa_juros / 100
     juro_mensal = solicitacao.valor * taxa_mensal
     principal_mensal = solicitacao.valor / solicitacao.prazo_meses
     total_base = juro_mensal + principal_mensal
     
     prop_juros = juro_mensal / total_base
-    
     valor_juros = valor_pagamento * prop_juros
     valor_principal = valor_pagamento - valor_juros
-    
-    # Comissão ADM (10% sobre a parte de juros do pagamento avulso)
-    comissao_adm = valor_juros * Decimal("0.10")
-    lucro_pool_liquido = valor_juros * Decimal("0.90")
 
-    # A) Retorno ao Fundo e Receita
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if plataforma:
+        # Principal volta para capital giro (saldo_caixa)
         plataforma.saldo_caixa += valor_principal
-        plataforma.saldo += comissao_adm
+        # Juros da amortização entram no lucro bruto (saldo)
+        plataforma.saldo += valor_juros
         
-        # LOG DE AUDITORIA DA COMISSÃO (10% Avulso)
         db.add(Transacao(
             usuario_id="000PL",
-            valor=comissao_adm,
+            valor=valor_juros,
             tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
             status="concluido",
-            detalhes=f"Taxa Gestão (10%) s/ Amortização Juros - Empréstimo #{solicitacao.id}"
+            detalhes=f"Receita Bruta Amortização (Cooperativa 2.0) - Empréstimo #{solicitacao.id}"
         ))
-
-    # B) Rateio do Lucro Líquido Ponderado
-    from utils_emprestimo import obter_multiplicador_fidelidade
-    
-    participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-    dados_participantes = []
-    total_pool_ponderado = Decimal("0.00")
-
-    for p in participantes:
-        peso = obter_multiplicador_fidelidade(p.id, db)
-        saldo_ponderado = p.saldo_caixa * peso
-        total_pool_ponderado += saldo_ponderado
-        dados_participantes.append((p, saldo_ponderado))
-
-    if total_pool_ponderado > 0:
-        for p, saldo_ponderado in dados_participantes:
-            fatia = (saldo_ponderado / total_pool_ponderado) * lucro_pool_liquido
-            p.saldo_caixa += fatia
 
     # Registrar amortização
     solicitacao.valor_amortizado += valor_pagamento
@@ -340,55 +299,30 @@ async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: U
     # 1. Pagar
     usuario.saldo -= total_quitar
     
-    # 2. Quitação e Distribuição
-    from utils_emprestimo import calcular_divida_total
-    total_quitar = calcular_divida_total(solicitacao)
-    
-    # Cálculo do que é lucro bruto da quitação
+    # 2. Quitação e Distribuição (Cooperativa 2.0)
+    # Todo o excedente de juros e taxas vai para o cofre central
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     taxa_mensal = solicitacao.taxa_juros / 100
     
-    # Lucro é o juro das parcelas restantes + taxas pendentes + mora
+    # Lucro é o juro das parcelas restantes + taxas pendentes
     juros_restantes = (solicitacao.valor * taxa_mensal) * parcelas_restantes
     taxas_pendentes = solicitacao.taxas_adicionais or Decimal("0.00") 
     principal_restante = (solicitacao.valor / solicitacao.prazo_meses) * parcelas_restantes
     
-    # Comissão ADM (10% sobre juros antecipados na quitação)
-    comissao_adm = juros_restantes * Decimal("0.10")
-    lucro_pool_liquido = juros_restantes * Decimal("0.90")
-
-    # A) Retorno do Principal ao Fundo e Taxas
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if plataforma:
+        # Principal volta para capital giro
         plataforma.saldo_caixa += principal_restante
-        plataforma.saldo += taxas_pendentes + comissao_adm
+        # Juros restantes e taxas pendentes entram no lucro bruto
+        plataforma.saldo += (juros_restantes + taxas_pendentes)
         
-        # LOG DE AUDITORIA DA COMISSÃO (10% Quitação)
         db.add(Transacao(
             usuario_id="000PL",
-            valor=comissao_adm,
+            valor=(juros_restantes + taxas_pendentes),
             tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
             status="concluido",
-            detalhes=f"Taxa Gestão (10%) s/ Quitação Total - Empréstimo #{solicitacao.id}"
+            detalhes=f"Receita Bruta Quitação (Cooperativa 2.0) - Empréstimo #{solicitacao.id}"
         ))
-
-    # B) Distribuição do lucro líquido aos sócios (Rateio Ponderado)
-    from utils_emprestimo import obter_multiplicador_fidelidade
-    
-    participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0).all()
-    dados_participantes = []
-    total_pool_ponderado = Decimal("0.00")
-
-    for p in participantes:
-        peso = obter_multiplicador_fidelidade(p.id, db)
-        saldo_ponderado = p.saldo_caixa * peso
-        total_pool_ponderado += saldo_ponderado
-        dados_participantes.append((p, saldo_ponderado))
-
-    if total_pool_ponderado > 0:
-        for p, saldo_ponderado in dados_participantes:
-            fatia = (saldo_ponderado / total_pool_ponderado) * lucro_pool_liquido
-            p.saldo_caixa += fatia
 
     # 3. Encerrar contrato
     solicitacao.status = StatusSolicitacao.CONCLUIDO

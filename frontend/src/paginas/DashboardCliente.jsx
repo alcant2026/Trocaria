@@ -1180,19 +1180,27 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     {/* PASSO 1: SIMULAÇÃO */}
                     {passoSolicitar === 1 && (
                         <div className="animate-fade-in">
-                            <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 5px 0' }}>Seu limite disponível agora:</p>
-                                <p style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {limiteInfo.limite_disponivel.toLocaleString('pt-BR')}</p>
-                            </div>
-                            
-                            {!usuario.is_verified && (
-                                <div className="info-block mb-1" style={{ background: 'rgba(255, 145, 0, 0.08)', border: '1px solid rgba(255, 145, 0, 0.2)', padding: '10px', borderRadius: '12px' }}>
-                                    <p style={{ color: 'var(--warning)', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                                        <ShieldAlert size={14} /> Conta Não Verificada
+                            {!usuario.is_verified ? (
+                                <div className="info-block mb-1" style={{ background: 'rgba(255, 61, 0, 0.08)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '15px', borderRadius: '16px', textAlign: 'center' }}>
+                                    <ShieldAlert size={32} color="var(--danger)" style={{ marginBottom: '10px' }} />
+                                    <h4 style={{ color: 'var(--danger)', fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px' }}>
+                                        Acesso Restrito: KYC Obrigatório
+                                    </h4>
+                                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '15px' }}>
+                                        Para sua segurança e da cooperativa, a solicitação de crédito exige que sua conta esteja <strong>totalmente verificada</strong>.
                                     </p>
-                                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', marginTop: '4px', lineHeight: '1.3' }}>
-                                        Seu limite está restrito ao seu saldo em garantia. Para liberar o crédito base de R$ 20,00 e bônus de Score, faça o envio de documentos no menu <strong>Upgrade</strong>.
-                                    </p>
+                                    <button 
+                                        className="btn btn-primary btn-block" 
+                                        onClick={() => setSecaoAtiva('perfil')}
+                                        style={{ background: 'var(--danger)', boxShadow: '0 0 15px rgba(255,61,0,0.3)' }}
+                                    >
+                                        ENVIAR DOCUMENTOS AGORA
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 5px 0' }}>Seu limite disponível agora:</p>
+                                    <p style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {limiteInfo.limite_disponivel.toLocaleString('pt-BR')}</p>
                                 </div>
                             )}
                             
@@ -1389,13 +1397,34 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     </span>
                                 </div>
                             </div>
-                            <div style={{ marginTop: '10px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ marginTop: '10px' }}>
                                 <div style={{ 
-                                    width: `${Math.min(100, (usuario.total_dividendos_ganhos > 0 ? 100 : 30))}%`, 
-                                    height: '100%', 
-                                    background: 'var(--primary)',
-                                    boxShadow: '0 0 10px var(--primary)'
-                                }}></div>
+                                    height: '6px', 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    borderRadius: '10px', 
+                                    overflow: 'hidden',
+                                    position: 'relative'
+                                }}>
+                                    <div 
+                                        className="animate-pulse"
+                                        style={{ 
+                                            width: `${Math.min(100, (
+                                                ((usuario.saldo_caixa || 0) * 0.5) + 
+                                                ((usuario.score || 0) * 0.3) + 
+                                                ((usuario.gasto_total_taxas || 0) * 0.2)
+                                            ) / 100 * 100)}%`, 
+                                            height: '100%', 
+                                            background: 'linear-gradient(90deg, var(--primary) 0%, var(--success) 100%)',
+                                            boxShadow: '0 0 15px var(--primary)',
+                                            borderRadius: '10px',
+                                            transition: 'width 1s ease-in-out'
+                                        }}
+                                    ></div>
+                                </div>
+                                <div className="flex-between mt-0-5">
+                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Status de Sócio</span>
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--primary)' }}>NÍVEL {Math.floor((((usuario.saldo_caixa || 0) * 0.5) + ((usuario.score || 0) * 0.3) + ((usuario.gasto_total_taxas || 0) * 0.2)) / 100) + 1}</span>
+                                </div>
                             </div>
                         </div>
 
@@ -1417,10 +1446,38 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </div>
                     </div>
 
+                    {!usuario.is_verified && (
+                        <div style={{ 
+                            background: 'rgba(255, 193, 7, 0.05)', 
+                            border: '1px solid rgba(255, 193, 7, 0.2)', 
+                            borderRadius: '12px', 
+                            padding: '12px', 
+                            marginTop: '1.5rem',
+                            display: 'flex',
+                            gap: '12px',
+                            alignItems: 'center'
+                        }}>
+                            <ShieldAlert size={20} color="#ffc107" />
+                            <div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, display: 'block', color: '#ffc107', textTransform: 'uppercase' }}>Conta não Verificada</span>
+                                <span style={{ fontSize: '0.7rem', color: 'rgba(255,193,7,0.8)', lineHeight: '1.2', display: 'block' }}>
+                                    Envie seus documentos para liberar aportes e aumentar seu lucro.
+                                </span>
+                            </div>
+                            <button 
+                                className="btn btn-sm" 
+                                style={{ background: '#ffc107', color: '#000', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 900 }}
+                                onClick={() => setSecaoAtiva('perfil')}
+                            >
+                                VERIFICAR
+                            </button>
+                        </div>
+                    )}
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '1.5rem' }}>
                         <button 
                             className="btn btn-primary" 
-                            disabled={!valorPool || parseFloat(valorPool) <= 0 || parseFloat(valorPool) > usuario.saldo}
+                            disabled={!usuario.is_verified || !valorPool || parseFloat(valorPool) <= 0 || parseFloat(valorPool) > usuario.saldo}
                             onClick={handleAportePool}
                         >
                             <PlusCircle size={18} style={{ marginRight: '8px' }} />

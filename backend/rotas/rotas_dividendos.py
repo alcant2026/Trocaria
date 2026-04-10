@@ -1,120 +1,131 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from decimal import Decimal
-import datetime
 from database import get_db
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, RegistroAuditoria
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
+from decimal import Decimal
 from pydantic import BaseModel, Field
+import datetime
+from rotas.rotas_snapshot import cache_snapshot_data
 
-router = APIRouter(prefix="/dividendos", tags=["Financeiro - Dividendos"])
+router = APIRouter(prefix="/dividendos", tags=["Dividendos & Cooperativa"])
 
 class ProcessarDividendosRequest(BaseModel):
-    custos_administrativos: Decimal = Field(gt=0, description="Soma de Impostos + Infra + Retirada Admin")
-    confirmar: bool = False
+    valor_distribuir: Decimal = Field(gt=0, description="Valor líquido a ser rateado entre os cooperados")
+    descricao: str = Field(default="Distribuição de Lucros Periódica", description="Motivo da distribuição")
+
+@router.get("/status")
+async def obter_status_dividendos(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Retorna o saldo acumulado na plataforma disponível para distribuição."""
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    
+    # Busca total de taxas/juros acumulados (Saldo do 000PL)
+    saldo_bruto = plataforma.saldo if plataforma else Decimal("0.00")
+    
+    # Estatísticas do Pool
+    total_participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0).count()
+    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+    
+    return {
+        "saldo_bruto_plataforma": float(saldo_bruto),
+        "total_participantes_pool": total_participantes,
+        "capital_total_pool": float(total_pool),
+        "mensagem": "Este saldo reflete juros e taxas acumulados que ainda não foram distribuídos."
+    }
 
 @router.post("/processar")
-async def processar_dividendos_comunitarios(
+async def processar_dividendos(
     dados: ProcessarDividendosRequest, 
     db: Session = Depends(get_db), 
     admin: Usuario = Depends(exigir_admin)
 ):
     """
-    Motor de Distribuição Proporcional (Regra de Negócio Cooperativa).
-    Transforma o lucro da plataforma em dividendos para os usuários engajados.
+    Algoritmo Cooperativo 2.0: Distribui lucro excedente baseado em Saldo + Score + Engajamento.
     """
-    
-    # 1. Identificar o Usuário de Sistema (000PL) onde está o Lucro Bruto
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if not plataforma:
-        raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema 000PL não encontrada.")
     
-    lucro_bruto = plataforma.saldo
-    if lucro_bruto < dados.custos_administrativos:
+    if plataforma.saldo < dados.valor_distribuir:
         raise HTTPException(
             status_code=400, 
-            detail=f"Saldo de lucro insuficiente (R$ {lucro_bruto}) para cobrir os custos informados (R$ {dados.custos_administrativos})."
+            detail=f"Saldo insuficiente na plataforma. Disponível: R$ {plataforma.saldo}"
         )
+
+    # 1. Identificar Participantes do Pool
+    participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0, Usuario.id != "000PL").all()
+    if not participantes:
+        raise HTTPException(status_code=400, detail="Não há participantes no Pool para receber dividendos.")
+
+    # 2. Calcular Pesos Ponderados
+    # Pesos Sugeridos: 60% Saldo Pool | 30% Psy Score | 10% Gasto em Taxas (Engajamento)
+    dados_rateio = []
+    soma_pesos_total = Decimal("0.00")
+
+    from sqlalchemy import func
     
-    pote_dividendos = lucro_bruto - dados.custos_administrativos
-    if pote_dividendos <= 0:
-        return {"message": "Sem lucro líquido para distribuição após dedução de custos.", "pote": 0}
+    for p in participantes:
+        # Calcular quanto esse usuário já pagou em taxas (Engajamento)
+        total_taxas_pagas = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.usuario_id == p.id,
+            Transacao.tipo.in_([TipoTransacao.TAXA_ADM_EMPRESTIMO, TipoTransacao.TAXA_ESPECIE]),
+            Transacao.status == "concluido"
+        ).scalar() or Decimal("0.00")
 
-    # 2. Buscar usuários elegíveis (ativos e com algum engajamento)
-    usuarios = db.query(Usuario).filter(
-        Usuario.is_active == True,
-        Usuario.id != "000PL" # O sistema não ganha dividendo dele mesmo
-    ).all()
-
-    # 3. Calcular Índices de Participação (IP) individuais e totais
-    ips = []
-    ip_total = Decimal("0.00")
-
-    for u in usuarios:
-        saldo_pool = u.saldo_caixa or Decimal("0.00")
-        score = u.score or Decimal("0.00")
-        gastos = u.gasto_total_taxas or Decimal("0.00")
+        # Fórmulas de Peso
+        peso_saldo = p.saldo_caixa * Decimal("0.60")
+        peso_score = (p.score * Decimal("10")) * Decimal("0.30") # Multiplica score por 10 para escala 1000
+        peso_taxas = total_taxas_pagas * Decimal("0.10")
         
-        # Fórmula de Peso: 50% Pool, 30% Score, 20% Gastos
-        ip_u = (saldo_pool * Decimal("0.5")) + (score * Decimal("0.3")) + (gastos * Decimal("0.2"))
+        peso_final = peso_saldo + peso_score + peso_taxas
+        soma_pesos_total += peso_final
+        dados_rateio.append({
+            "usuario": p,
+            "peso": peso_final
+        })
+
+    if soma_pesos_total <= 0:
+         raise HTTPException(status_code=400, detail="Peso total calculado é zero. Verifique os saldos do Pool.")
+
+    # 3. Executar o Rateio
+    for item in dados_rateio:
+        user = item["usuario"]
+        fatia = (item["peso"] / soma_pesos_total) * dados.valor_distribuir
         
-        if ip_u > 0:
-            ips.append({"usuario": u, "ip": ip_u})
-            ip_total += ip_u
-
-    if ip_total <= 0:
-        raise HTTPException(status_code=400, detail="Nenhum usuário elegível encontrado para distribuição.")
-
-    if not dados.confirmar:
-        return {
-            "simulacao": True,
-            "lucro_bruto": float(lucro_bruto),
-            "custos": float(dados.custos_administrativos),
-            "pote_liquido": float(pote_dividendos),
-            "total_participantes": len(ips),
-            "ip_global": float(ip_total)
-        }
-
-    # 4. Executar Distribuição Real
-    distribuido_real = Decimal("0.00")
-    for item in ips:
-        u = item["usuario"]
-        ip_u = item["ip"]
+        # Credita no saldo do Pool (Reinvestimento automático ou saldo disponível?)
+        # A regra cooperativa do Psy Pay reinveste no saldo_caixa para aumentar o limite.
+        user.saldo_caixa += fatia
+        user.total_dividendos_ganhos = (user.total_dividendos_ganhos or Decimal("0.00")) + fatia
         
-        fatia = (ip_u / ip_total) * pote_dividendos
-        fatia = fatia.quantize(Decimal("0.01")) 
+        # Registrar Transação para o Usuário
+        db.add(Transacao(
+            usuario_id=user.id,
+            valor=fatia,
+            tipo=TipoTransacao.DIVIDENDOS,
+            status="concluido",
+            detalhes=f"Recebimento de Dividendos Coletivos - {dados.descricao}"
+        ))
         
-        if fatia > 0:
-            u.saldo += fatia
-            if u.total_dividendos_ganhos is None: u.total_dividendos_ganhos = Decimal("0.00")
-            u.total_dividendos_ganhos += fatia
-            
-            db.add(Transacao(
-                usuario_id=u.id,
-                valor=fatia,
-                tipo=TipoTransacao.RETORNO_POOL,
-                status="concluido",
-                detalhes=f"Recebimento de Dividendos Participativos (Ciclo: {datetime.datetime.now().strftime('%m/%Y')})"
-            ))
-            distribuido_real += fatia
+        # Invalida cache do snapshot do usuário
+        cache_snapshot_data.pop(user.id, None)
 
-    # 5. Debitar do caixa da plataforma
-    plataforma.saldo -= (dados.custos_administrativos + distribuido_real)
+    # 4. Debitar da Plataforma
+    plataforma.saldo -= dados.valor_distribuir
     
+    # Registrar Saída da Plataforma
     db.add(Transacao(
-        usuario_id=plataforma.id,
-        valor=dados.custos_administrativos,
-        tipo=TipoTransacao.SAQUE,
+        usuario_id="000PL",
+        valor=dados.valor_distribuir,
+        tipo=TipoTransacao.RESGATE_POOL,
         status="concluido",
-        detalhes=f"Dedução de Custos Operacionais (Admin: {admin.id})"
-    ))
+        detalhes=f"Distribuição de Dividendos: {dados.descricao} (Total: R$ {dados.valor_distribuir})"
+    ) )
 
     db.commit()
+    cache_snapshot_data.pop("000PL", None)
 
     return {
-        "status": "sucesso",
-        "pote_distribuido": float(distribuido_real),
-        "participantes": len(ips),
-        "custos_liquidados": float(dados.custos_administrativos)
+        "status": "success",
+        "mensagem": f"R$ {dados.valor_distribuir} distribuídos com sucesso entre {len(participantes)} sócios.",
+        "media_por_socio": float(dados.valor_distribuir / len(participantes))
     }
+
+from sqlalchemy import func

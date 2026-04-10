@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, and_
+from sqlalchemy import func, case, and_, text, or_
 import logging
 
 logger = logging.getLogger(__name__)
@@ -238,6 +238,11 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     # Deduzir o valor bruto do saldo do usuário
     usuario.saldo -= valor
     
+    # NOVO: Acumular no gasto total de taxas para dividendos
+    if taxa > 0:
+        if usuario.gasto_total_taxas is None: usuario.gasto_total_taxas = Decimal("0.00")
+        usuario.gasto_total_taxas += taxa
+
     # Criar transação de saque pendente (com o valor LÍQUIDO que o admin deve pagar)
     nova_transacao = Transacao(
         usuario_id=usuario.id,
@@ -1853,7 +1858,7 @@ async def gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Session = Depend
     )
     db.add(nova_transacao)
     db.commit()
-    cache_snapshot_data.pop(usuario.id, None)
+    cache_snapshot_data.pop(admin.id, None)
     cache_snapshot_data.pop("000PL", None)
     
     return {
@@ -2119,9 +2124,3 @@ async def excluir_parceiro(
     parceiro.is_active = False
     db.commit()
     return {"message": "Parceiro removido com sucesso."}
-    registrar_acao_admin(db, admin.id, "LIQUIDAR_CAIXA_DEVEDORES", alvo_id="SISTEMA", detalhes=f"Devedores afetados: {len(devedores)}, Valor total: {total_confiscado}", ip=None)
-    return {
-        "message": "Liquidação concluída com sucesso.",
-        "devedores_afetados": len(devedores),
-        "total_confiscado_e_rateado": float(total_confiscado)
-    }

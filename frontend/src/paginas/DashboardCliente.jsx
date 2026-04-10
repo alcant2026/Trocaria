@@ -125,6 +125,20 @@ const TIPOS_LABEL = {
     assinatura: 'Assinatura Premium',
 };
 
+const NOMES_SECOES = {
+    home: 'Início',
+    pool: 'Fundo Coletivo',
+    solicitar: 'Solicitar Crédito',
+    depositar: 'Adicionar Saldo',
+    saque: 'Realizar Saque',
+    historico: 'Minhas Atividades',
+    contratos: 'Meus Contratos',
+    score: 'Upgrade de Perfil',
+    marketplace: 'Marketplace',
+    caixa_parceiro: 'Painel do Lojista',
+    notificacoes: 'Notificações',
+};
+
 // Tipos que são saídas do tipo "taxa/pagamento"
 const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa', 'aporte_pool', 'abertura_gaveta', 'assinatura']);
 // Tipos que são entradas (positivos)
@@ -390,6 +404,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             novosDados.vendas_texto = salesMatch[1].trim();
         }
         
+        // 3. Extrair Link ou WhatsApp
+        const linkMatch = texto.match(/https?:\/\/[^\s]+/i);
+        if (linkMatch) {
+            novosDados.url_afiliado = linkMatch[0];
+        } else {
+            // Se não achar link, procura por um padrão de telefone
+            const phoneMatch = texto.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}[-\s]?\d{4}/);
+            if (phoneMatch) {
+                novosDados.url_afiliado = phoneMatch[0].replace(/\D/g, '');
+            }
+        }
+
         // 4. Extrair Nome (primeiras linhas que não sejam preço/links)
         const lines = texto.split('\n').map(l => l.trim()).filter(l => l.length > 5);
         if (lines.length > 0 && !lines[0].toLowerCase().includes('http')) {
@@ -927,27 +953,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             <header className="mb-1">
                 <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     Olá, {usuario.nome.split(' ')[0]}
-                    <div
-                        onClick={handleCopiarId}
-                        style={{
-                            fontSize: '0.65rem',
-                            background: 'rgba(255,255,255,0.05)',
-                            padding: '4px 12px',
-                            borderRadius: '20px',
-                            border: '1px solid var(--border-color)',
-                            color: copiadoId ? 'var(--success)' : 'var(--text-muted)',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            marginLeft: '4px'
-                        }}
-                    >
-                        {copiadoId ? <Check size={12} /> : <Copy size={12} />}
-                        {usuario.id}
-                    </div>
                     {isOffline && (
                         <div className="badge bg-warning text-dark animate-pulse" style={{ fontSize: '0.65rem', padding: '4px 10px', borderRadius: '20px', fontWeight: 800, marginLeft: '10px' }}>
                              Offline
@@ -1062,8 +1067,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         >
                             <ArrowLeft size={20} />
                         </button>
-                        <h2 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'capitalize' }}>
-                            {activeView === 'caixa_parceiro' ? 'Meu Caixa' : activeView === 'score' ? 'Upgrade' : activeView}
+                        <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800, color: 'var(--text-main)' }}>
+                            {NOMES_SECOES[activeView] || (activeView?.replace(/_/g, ' ').toUpperCase())}
                         </h2>
                     </div>
                 </div>
@@ -1164,8 +1169,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {/* View Switcher Content */}
             {activeView === 'solicitar' && (
                 <div className="card">
-                    <div className="flex-between mb-1">
-                        <h2 style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>Solicitar Crédito Instantâneo</h2>
+                    <div className="flex-end mb-1">
                         <div style={{ display: 'flex', gap: '4px' }}>
                             {[1, 2].map(i => (
                                 <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoSolicitar ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
@@ -1246,13 +1250,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
                                 <button 
                                     className="btn btn-primary" 
-                                    style={{ flex: 2 }} 
+                                    style={{ width: '100%', padding: '0.8rem' }} 
                                     disabled={!valor || parseFloat(valor) <= 0 || parseFloat(valor) > limiteInfo.limite_disponivel}
                                     onClick={() => setPassoSolicitar(2)}
                                 >
-                                    Continuar
+                                    Continuar para Confirmação
                                 </button>
-                                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSolicitar(1); }}>Voltar</button>
                             </div>
                         </div>
                     )}
@@ -1363,7 +1366,40 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </p>
                     </div>
 
-                    <div className="input-group">
+                    {/* NOVO: SEÇÃO DE DIVIDENDOS PARTICIPATIVOS MOVIDA PARA O CONTEXTO DO POOL */}
+                        <div className="mt-2" style={{ 
+                            background: 'linear-gradient(90deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(255,255,255,0.02) 100%)', 
+                            padding: '15px', 
+                            borderRadius: '16px',
+                            border: '1px solid rgba(var(--primary-rgb), 0.1)'
+                        }}>
+                            <div className="flex-between" style={{ marginBottom: '6px' }}>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Participação nos Lucros</span>
+                                <span className="badge badge-success" style={{ fontSize: '0.6rem' }}>SISTEMA ATIVO</span>
+                            </div>
+                            <div className="flex-between">
+                                <div>
+                                    <span style={{ fontSize: '0.7rem', display: 'block', color: 'rgba(255,255,255,0.5)' }}>Total Recebido</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--success)' }}>R$ {(usuario.total_dividendos_ganhos || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <span style={{ fontSize: '0.7rem', display: 'block', color: 'rgba(255,255,255,0.5)' }}>Índice de Engajamento</span>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>
+                                        {(( (usuario.saldo_caixa || 0) * 0.5 ) + ( (usuario.score || 0) * 0.3 ) + ( (usuario.gasto_total_taxas || 0) * 0.2 )).toFixed(1)} pts
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ marginTop: '10px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                    width: `${Math.min(100, (usuario.total_dividendos_ganhos > 0 ? 100 : 30))}%`, 
+                                    height: '100%', 
+                                    background: 'var(--primary)',
+                                    boxShadow: '0 0 10px var(--primary)'
+                                }}></div>
+                            </div>
+                        </div>
+
+                        <div className="input-group">
                         <label>Valor da Operação</label>
                         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <input
@@ -1429,8 +1465,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {
                 activeView === 'depositar' && (
                     <div className="card">
-                        <div className="flex-between mb-1">
-                            <h2 style={{ fontSize: '1.2rem' }}>Adicionar Saldo</h2>
+                        <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '4px' }}>
                                 {[1, 2, 3].map(i => (
                                     <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoDeposito ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
@@ -1576,16 +1611,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             {loadingAction ? 'Verificando...' : 'Já realizei o pagamento'}
                                         </button>
                                         
-                                        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>
+                                        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}>
                                             Assim que você pagar, o saldo atualizará automaticamente em até 10 segundos aqui na sua tela.
                                         </p>
-                                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => {
-                                            setPassoDeposito(1);
-                                            setActiveView('home');
-                                            carregarSnapshot();
-                                        }}>
-                                            Voltar ao Início
-                                        </button>
                                     </div>
                                 ) : (
                                     <>
@@ -1665,8 +1693,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {
                 activeView === 'saque' && (
                     <div className="card">
-                        <div className="flex-between mb-1">
-                            <h2 style={{ fontSize: '1.2rem' }}>Solicitar Saque</h2>
+                        <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '4px' }}>
                                 {[1, 2, 3].map(i => (
                                     <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoSaque ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
@@ -1679,30 +1706,24 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <ShieldAlert size={48} color="var(--danger)" style={{ margin: '0 auto 1rem' }} />
                                 <p className="mb-1" style={{ fontWeight: 600 }}>Conta Não Verificada</p>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Para realizar saques, sua identidade precisa estar verificada. Envie seus documentos (RG, Renda e Residência) e aguarde a aprovação.</p>
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
                                     <button 
                                         className="btn btn-primary" 
-                                        style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} 
+                                        style={{ width: '100%', padding: '0.8rem' }} 
                                         onClick={() => {
                                             setTipoUpgrade('verificacao');
                                             setPassoUpgrade(2);
                                             setActiveView('score');
                                         }}
                                     >
-                                        Enviar Documentos
+                                        Enviar Documentos para Aprovação
                                     </button>
-                                    <button className="btn btn-secondary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => setActiveView('home')}>Voltar</button>
-                                </div>
                             </div>
                         ) : !usuario.two_factor_enabled ? (
                             <div className="text-center" style={{ padding: '1rem' }}>
                                 <ShieldAlert size={48} color="var(--warning)" style={{ margin: '0 auto 1rem' }} />
                                 <p className="mb-1" style={{ fontWeight: 600 }}>2FA Desativado</p>
                                 <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>Por segurança, o 2FA é obrigatório para todos os saques.</p>
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                                    <button className="btn btn-primary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
-                                    <button className="btn btn-secondary" style={{ width: 'auto', padding: '0.6rem 1rem', fontSize: '0.85rem' }} onClick={() => setActiveView('home')}>Voltar</button>
-                                </div>
+                                    <button className="btn btn-primary" style={{ width: '100%', padding: '0.8rem' }} onClick={() => window.location.hash = 'seguranca'}>Configurar 2FA Agora</button>
                             </div>
                         ) : (
                             <>
@@ -1773,10 +1794,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     </div>
                                                 )}
 
-                                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                                <div style={{ marginTop: '1.5rem' }}>
                                                     <button 
                                                         className="btn btn-primary" 
-                                                        style={{ flex: 2, background: 'var(--warning)', color: '#000' }} 
+                                                        style={{ width: '100%', padding: '0.8rem', background: 'var(--warning)', color: '#000' }} 
                                                         disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo || !parceiroIdSaque || loadingAction}
                                                         onClick={async () => {
                                                             setLoadingAction(true);
@@ -1798,7 +1819,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     >
                                                         {loadingAction ? 'Reservando...' : 'Reservar Saque Agora'}
                                                     </button>
-                                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setActiveView('home')}>Cancelar</button>
                                                 </div>
                                             </div>
 
@@ -1823,16 +1843,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     )}
                                                 </div>
 
-                                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                                <div style={{ marginTop: '1.5rem' }}>
                                                     <button 
                                                         className="btn btn-primary" 
-                                                        style={{ flex: 2 }} 
+                                                        style={{ width: '100%', padding: '0.8rem' }} 
                                                         disabled={!valorSaque || parseFloat(valorSaque) <= 0 || parseFloat(valorSaque) > usuario.saldo}
                                                         onClick={() => setPassoSaque(2)}
                                                     >
-                                                        Próximo
+                                                        Continuar para Revisão
                                                     </button>
-                                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setActiveView('home'); setPassoSaque(1); }}>Voltar</button>
                                                 </div>
                                             </div>
                                         )}
@@ -1976,8 +1995,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {
                 activeView === 'score' && (
                     <div className="card">
-                        <div className="flex-between mb-1">
-                            <h2 style={{ fontSize: '1.2rem' }}>Upgrade de Perfil</h2>
+                        <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '4px' }}>
                                 {[1, 2, 3].map(i => (
                                     <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoUpgrade ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
@@ -2119,9 +2137,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <p style={{ margin: 0 }}>O Score máximo é 1000. Recompensamos quem ajuda o ecossistema a crescer!</p>
                                         </div>
 
-                                        <div className="mt-1" style={{ display: 'flex', gap: '10px' }}>
-                                            <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setActiveView('home')}>Entendido</button>
-                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
+                                        <div className="mt-1">
+                                            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setPassoUpgrade(1)}>Voltar para Opções</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -2255,15 +2272,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {
                 activeView === 'historico' && (
                     <div className="card animate-fade-in">
-                        <div className="flex-between mb-1">
-                            <div>
-                                <h2 style={{ fontSize: '1.1rem', color: 'var(--primary)', margin: 0 }}>Histórico Detalhado</h2>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Consulte todas as suas movimentações financeiras.</p>
-                            </div>
+                        <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button 
                                     className="btn btn-outline btn-sm" 
-                                    style={{ gap: '6px', fontSize: '0.75rem', padding: '8px 12px' }}
+                                    style={{ gap: '6px', fontSize: '0.75rem', padding: '8px 12px', border: 'none', background: 'rgba(255,255,255,0.05)' }}
                                     onClick={() => setShowModalRelatorio(true)}
                                 >
                                     <FileDown size={14} /> Informe IRPF
@@ -2927,7 +2940,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                     <div className="input-group mb-1">
                         <label>Seu Link Afiliado/WhatsApp</label>
-                        <input className="input-field" value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
+                        <input 
+                            className="input-field" 
+                            placeholder="Link do produto ou número do WhatsApp"
+                            value={dadosNovoLink.url_afiliado} 
+                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} 
+                        />
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            💡 Se inserir apenas o número do WhatsApp, criaremos o link automaticamente para você!
+                        </p>
                     </div>
 
                     <div className="input-group mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.15)' }}>

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema, executar_limpeza_banco
@@ -111,8 +111,8 @@ async def startup_db_setup():
                 )
                 db.add(novo_sistema)
                 db.commit()
-    except Exception as e:
-        print(f"ERRO NO BOOT DE DB: {e}")
+    except Exception:
+        pass
 
     # Criar pasta de uploads se não existir
     if not os.path.exists("uploads"):
@@ -122,7 +122,7 @@ async def startup_db_setup():
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
-for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal]:
+for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos]:
     app.include_router(router_module.router, prefix="/api")
     app.include_router(router_module.router)
 
@@ -138,8 +138,8 @@ async def root():
 async def api_root():
     return {"status": "online", "message": "Psy Pay API Gateway"}
 
-# Montar a pasta de uploads como estática para visualização do Admin
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Segurança: Pasta de uploads protegida via rota /api/admin/view-doc
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

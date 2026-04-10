@@ -208,7 +208,8 @@ async def obter_usuario_logado(token: str = Depends(oauth2_scheme), db: Session 
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
         return usuario
     except Exception as e:
-        print(f"Erro JWT: {e}")
+        # Silenciar erros de boot repetitivos em logs de produção
+        pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Erro ao validar credenciais. Por favor, faça login novamente."
@@ -254,8 +255,6 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
     # Normalizar CPF (remover pontos e traços)
     cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
     
-    print(f"DEBUG LOGIN: Tentativa de login para CPF: {cpf_limpo}")
-    
     usuario = db.query(Usuario).filter(
         Usuario.cpf == cpf_limpo,
         Usuario.is_active == True
@@ -268,8 +267,15 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
             detail="CPF ou senha incorretos."
         )
 
+    # SEGURANÇA: Bloquear login do ID de sistema
+    if usuario.id == "000PL":
+        print(f"ALERTA SEGURANÇA: Tentativa de login negada para ID de sistema 000PL.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="CPF ou senha incorretos."
+        )
+
     senha_valida = verify_password(dados.senha, usuario.senha_hash)
-    print(f"DEBUG LOGIN: Usuário {usuario.id} encontrado. Senha válida: {senha_valida}")
 
     if not senha_valida:
         raise HTTPException(

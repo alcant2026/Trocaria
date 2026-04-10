@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db, engine
@@ -78,41 +79,33 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
         saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
 
-        # 0.1 Calcular Rentabilidade do Pool (Lógica de Ciclo Atual)
-        # Buscamos o histórico de depósitos e resgates para identificar o "custo" do capital no pool
-        # Aceitamos tanto as novas etiquetas (APORTE_POOL) quanto as legadas (APORTE_CAIXA)
-        # Mas filtramos as legadas para excluir operações de gaveta/loja
-        transacoes_pool = db.query(Transacao).filter(
-            Transacao.usuario_id == usuario.id,
-            Transacao.tipo.in_([
-                TipoTransacao.APORTE_CAIXA, TipoTransacao.RESGATE_CAIXA,
-                TipoTransacao.APORTE_POOL, TipoTransacao.RESGATE_POOL
-            ]),
-            Transacao.status == "concluido"
-        ).order_by(Transacao.data_criacao.asc()).all()
-        
-        capital_no_ciclo = Decimal("0.00")
-        for t in transacoes_pool:
-            detalhes = (t.detalhes or "").upper()
-            
-            # Filtro Inteligente: Se for transação de gaveta (caixa físico), ignoramos no rendimento do Pool
-            is_gaveta = "GAVETA" in detalhes or "ABERTURA DE CAIXA" in detalhes or "ENCERRADO" in detalhes
-            if is_gaveta and t.tipo in [TipoTransacao.APORTE_CAIXA, TipoTransacao.RESGATE_CAIXA]:
-                continue
-                
-            if t.tipo in [TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]:
-                capital_no_ciclo += t.valor
-            else:
-                # Se o resgate esvaziar o capital investido, resetamos o ciclo para o que sobrar ou zero
-                capital_no_ciclo = max(Decimal("0.00"), capital_no_ciclo - t.valor)
-        
+        # 0.1 Calcular Rentabilidade do Pool (Otimizado via SQL Aggregation)
         # O rendimento é o que o saldo atual excede o capital que ainda está "em risco" (aportado e não resgatado)
+        capital_aportado = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo.in_([TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]),
+            Transacao.status == "concluido",
+            ~Transacao.detalhes.ilike("%GAVETA%"),
+            ~Transacao.detalhes.ilike("%ABERTURA DE CAIXA%"),
+            ~Transacao.detalhes.ilike("%ENCERRADO%")
+        ).scalar() or Decimal("0.00")
+
+        capital_resgatado = db.query(func.sum(Transacao.valor)).filter(
+            Transacao.usuario_id == usuario.id,
+            Transacao.tipo.in_([TipoTransacao.RESGATE_CAIXA, TipoTransacao.RESGATE_POOL]),
+            Transacao.status == "concluido",
+            ~Transacao.detalhes.ilike("%GAVETA%"),
+            ~Transacao.detalhes.ilike("%ABERTURA DE CAIXA%"),
+            ~Transacao.detalhes.ilike("%ENCERRADO%")
+        ).scalar() or Decimal("0.00")
+
+        capital_liquido = max(Decimal("0.00"), capital_aportado - capital_resgatado)
+        
         if saldo_caixa_total <= 0:
             rendimento_abs = Decimal("0.00")
             rendimento_pct = 0.0
             capital_liquido = Decimal("0.00")
         else:
-            capital_liquido = capital_no_ciclo
             rendimento_abs = max(Decimal("0.00"), saldo_caixa_total - capital_liquido)
             rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
 
@@ -148,6 +141,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "is_subscriber": usuario.is_subscriber,
                 "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
                 "pontos_marketplace": usuario.pontos_marketplace,
+                # Dividendos
+                "gasto_total_taxas": float(usuario.gasto_total_taxas or 0),
+                "total_dividendos_ganhos": float(usuario.total_dividendos_ganhos or 0),
             },
             "historico": []
         }

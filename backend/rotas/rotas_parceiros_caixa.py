@@ -119,7 +119,7 @@ async def fechar_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends
     resultado = {
         "message": "Caixa encerrado com sucesso. Todo o valor da gaveta + comissões foram devolvidos ao seu saldo digital.",
         "comissao_recebida": float(comissao_para_pagar),
-        "valor_resgatado": float(saldo_para_resgate),
+        "valor_resgatado": float(valor_resgate_total),
         "total_creditado": float(valor_resgate_total)
     }
 
@@ -195,13 +195,18 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
             plataforma.saldo += lucro_plataforma
 
         # Registro de Taxa paga pelo cliente
+        taxa_paga = dados.valor * TAXA_OPERACAO_ESPECIE
         db.add(Transacao(
             usuario_id=cliente.id,
-            valor=dados.valor * TAXA_OPERACAO_ESPECIE,
+            valor=taxa_paga,
             tipo=TipoTransacao.TAXA_ESPECIE,
             status="concluido",
             detalhes=f"Taxa de Serviço: Depósito em Espécie (Loja #{parceiro.id})"
         ))
+
+        # NOVO: Acumular no gasto total de taxas para dividendos
+        if cliente.gasto_total_taxas is None: cliente.gasto_total_taxas = Decimal("0.00")
+        cliente.gasto_total_taxas += taxa_paga
         
         # Transação de Envio pelo Parceiro
         db.add(Transacao(
@@ -287,13 +292,18 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
             plataforma.saldo += lucro_plataforma
 
         # Registro de Taxa paga pelo cliente
+        taxa_paga = dados.valor * TAXA_OPERACAO_ESPECIE
         db.add(Transacao(
             usuario_id=cliente.id,
-            valor=dados.valor * TAXA_OPERACAO_ESPECIE,
+            valor=taxa_paga,
             tipo=TipoTransacao.TAXA_ESPECIE,
             status="concluido",
             detalhes=f"Taxa de Serviço: Saque em Espécie (Loja #{parceiro.id})"
         ))
+
+        # NOVO: Acumular no gasto total de taxas para dividendos
+        if cliente.gasto_total_taxas is None: cliente.gasto_total_taxas = Decimal("0.00")
+        cliente.gasto_total_taxas += taxa_paga
         
         # Transação Saque Cliente (Registro do Fluxo)
         db.add(Transacao(

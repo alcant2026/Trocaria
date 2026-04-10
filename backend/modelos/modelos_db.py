@@ -90,6 +90,10 @@ class Usuario(Base):
     assinatura_expira_em = Column(DateTime, nullable=True)
     pontos_marketplace = Column(Integer, default=0)
 
+    # NOVO: Regra de Dividendos Participativos
+    gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)
+    total_dividendos_ganhos = Column(Numeric(precision=20, scale=2), default=0)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
 
@@ -128,6 +132,11 @@ class SolicitacaoEmprestimo(Base):
     auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="solicitacoes")
     investimentos = relationship("Investimento", back_populates="solicitacao")
+
+    from sqlalchemy import Index
+    __table_args__ = (
+        Index('idx_solicitacao_status_user', 'usuario_id', 'status'),
+    )
 
 class Investimento(Base):
     __tablename__ = "investimentos"
@@ -168,6 +177,13 @@ class Transacao(Base):
     auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="transacoes")
     parceiro = relationship("Parceiro")
+
+    from sqlalchemy import Index
+    __table_args__ = (
+        Index('idx_transacao_user_status', 'usuario_id', 'status'),
+        Index('idx_transacao_parceiro_status', 'parceiro_id', 'status'),
+        Index('idx_transacao_tipo_status', 'tipo', 'status'),
+    )
 
 class Parceiro(Base):
     __tablename__ = "parceiros"

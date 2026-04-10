@@ -45,6 +45,18 @@ async def postar_link_comunidade(dados: LinkCreate, db: Session = Depends(get_db
     Postagem gratuita por 24 horas (Carência inicial).
     Exige 2FA (Google Authenticator) para prevenir spam.
     """
+    url_final = dados.url_afiliado.strip()
+    
+    # Lógica de WhatsApp Inteligente
+    if not url_final.lower().startswith(('http://', 'https://')):
+        # Remove caracteres de formatação (espaços, parênteses, traços)
+        so_numeros = "".join(filter(str.isdigit, url_final))
+        if 8 <= len(so_numeros) <= 13:
+            # Se não tiver DDI 55 e for um número brasileiro plausível (DDD + número)
+            if not so_numeros.startswith('55') and len(so_numeros) <= 11:
+                so_numeros = '55' + so_numeros
+            url_final = f"https://wa.me/{so_numeros}"
+
     # ANTI-SPAM: Exigir 2FA ativo
     if not usuario.two_factor_enabled or not usuario.totp_secret:
         raise HTTPException(
@@ -66,7 +78,7 @@ async def postar_link_comunidade(dados: LinkCreate, db: Session = Depends(get_db
 
     novo_link = LinkAfiliado(
         nome_produto=dados.nome_produto,
-        url_afiliado=dados.url_afiliado,
+        url_afiliado=url_final,
         url_imagem=dados.url_imagem,
         valor=dados.valor,
         nota=dados.nota,
@@ -130,6 +142,10 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
         detalhes=f"IMPULSIONAMENTO ADS: {views} views para o link #{link.id}"
     )
     db.add(transacao)
+
+    # NOVO: Acumular no gasto total de taxas para dividendos
+    if usuario.gasto_total_taxas is None: usuario.gasto_total_taxas = Decimal("0.00")
+    usuario.gasto_total_taxas += custo
     
     db.commit()
     

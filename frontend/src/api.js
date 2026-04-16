@@ -4,9 +4,10 @@ const androidDevUrl = import.meta.env.VITE_API_URL_ANDROID || 'http://10.0.2.2:8
 
 const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 
-export const BASE_URL = import.meta.env.DEV 
+// Prioriza URL de variável de ambiente se definida (mesmo em dev se quisermos forçar o apontamento remoto)
+export const BASE_URL = viteUrl || (import.meta.env.DEV 
     ? (isCapacitor ? androidDevUrl : '/api') 
-    : (viteUrl || productionUrl);
+    : productionUrl);
 
 const api = {
     getToken: () => localStorage.getItem('token'),

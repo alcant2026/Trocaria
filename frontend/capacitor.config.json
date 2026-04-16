@@ -4,6 +4,7 @@
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
+    "url": "https://cred30.site",
     "cleartext": true
   },
   "plugins": {

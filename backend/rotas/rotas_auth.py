@@ -402,10 +402,19 @@ async def desativar_2fa(request: Request, senha: str, codigo: str, usuario: Usua
     db.commit()
     return {"message": "2FA desativado."}
 
+class SolicitacaoExclusao(BaseModel):
+    senha: str
+
 @router.delete("/excluir-conta")
-async def excluir_conta(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+async def excluir_conta(dados: SolicitacaoExclusao, request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    # 0. Segurança: Validar Senha ANTES de qualquer processamento
+    if not verify_password(dados.senha, usuario.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Senha incorreta. A exclusão da conta exige confirmação de segurança."
+        )
+
     # 1. Validar se tem empréstimos ativos (PENDENTE ou APROVADO)
-    # Importação local para evitar circular dependency se necessário, mas está no mesmo repositório
     from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao
     
     tem_pendencias = db.query(SolicitacaoEmprestimo).filter(
@@ -421,12 +430,21 @@ async def excluir_conta(usuario: Usuario = Depends(obter_usuario_logado), db: Se
     
     # 2. Anonimizar dados sensíveis (LGPD)
     usuario.nome = "Usuário Excluído"
-    usuario.email = f"excluido_{usuario.id}@psy pay.com.br"
+    usuario.email = f"excluido_{usuario.id}@psypay.com.br"
     usuario.cpf = f"000.000.000-{usuario.id}"
     usuario.chave_pix = "removida"
     usuario.senha_hash = "DELETADO"
     usuario.is_active = False
     
+    # Registrar auditoria da exclusão
+    from modelos.modelos_db import AcaoAdmin
+    db.add(RegistroAuditoria(
+        ip=request.client.host,
+        user_agent=request.headers.get("user-agent"),
+        data_registro=datetime.utcnow(),
+        municipio="Exclusão de Conta (Self-Service)"
+    ))
+
     db.commit()
     return {"message": "Conta excluída com sucesso. Seus dados foram anonimizados conforme a LGPD."}
 

@@ -12,6 +12,7 @@ import mercadopago
 # Inicializa SDK Mercado Pago
 mp_access_token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
 sdk = mercadopago.SDK(mp_access_token) if mp_access_token else None
+from limitador import limiter
 from fastapi.responses import FileResponse
 from decimal import Decimal
 import datetime
@@ -409,7 +410,8 @@ async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     return {"message": f"Resgate de R$ {dados.valor:.2f} realizado!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/notificar-deposito")
-async def notificar_deposito(dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+@limiter.limit("2/minute")
+async def notificar_deposito(request: Request, dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     # ANTI-POLUIÇÃO: Verificar se já existe depósito pendente do mesmo método para evitar sujeira no extrato
     if dados.metodo == "especie":
         deposito_pendente = db.query(Transacao).filter(

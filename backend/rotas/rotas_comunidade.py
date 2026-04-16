@@ -9,6 +9,7 @@ from decimal import Decimal
 import datetime
 import pyotp
 import random
+from limitador import limiter
 
 router = APIRouter(prefix="/comunidade", tags=["Comunidade"])
 
@@ -40,7 +41,8 @@ PRECO_VIEWS = {
 }
 
 @router.post("/postar-link")
-async def postar_link_comunidade(dados: LinkCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+@limiter.limit("2/minute")
+async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """
     Postagem gratuita por 24 horas (Carência inicial).
     Exige 2FA (Google Authenticator) para prevenir spam.

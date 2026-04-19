@@ -1173,8 +1173,12 @@ async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depen
 
 @router.get("/parceiros")
 async def listar_parceiros_publico(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """Endpoint público para usuários verem os pontos de saque/depósito em espécie."""
+    # Buscamos parceiros ativos
     parceiros = db.query(Parceiro).filter(Parceiro.is_active == True).order_by(Parceiro.nome).all()
+    
+    # Log para debug (aparecerá no terminal do backend)
+    print(f"🔍 MARKETPLACE: Encontrados {len(parceiros)} parceiros ativos.")
+    
     return [{
         "id": p.id, 
         "nome": p.nome, 
@@ -1197,8 +1201,17 @@ class ParceiroUpdate(BaseModel):
 @router.post("/admin/parceiros")
 async def criar_parceiro(request: Request, dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco, usuario_id=dados.usuario_id)
+    
+    # Sincroniza tokens do MP se o usuário já tiver vinculado antes de virar parceiro
+    usuario_alvo = db.query(Usuario).filter(Usuario.id == dados.usuario_id).first()
+    if usuario_alvo and usuario_alvo.mp_access_token:
+        parceiro.mp_access_token = usuario_alvo.mp_access_token
+        parceiro.mp_refresh_token = usuario_alvo.mp_refresh_token
+        parceiro.mp_user_id = usuario_alvo.mp_user_id
+        parceiro.mp_token_expires_at = usuario_alvo.mp_token_expires_at
+    
     db.add(parceiro)
-    db.flush()
+    db.commit()
     registrar_acao_admin(db, admin.id, "CRIAR_PARCEIRO", alvo_id=str(parceiro.id), detalhes=f"Parceiro: {parceiro.nome}", ip=request.client.host)
     db.commit()
     return {"message": "Parceiro cadastrado com sucesso!"}

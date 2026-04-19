@@ -22,6 +22,7 @@ import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
+import LoadingScreen from './componentes/LoadingScreen';
 import MarketplaceCallback from './paginas/MarketplaceCallback';
 
 const App = () => {

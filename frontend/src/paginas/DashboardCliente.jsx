@@ -699,6 +699,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     };
 
 
+    // Carregar parceiros sempre que entrar na tela de depósito
+    useEffect(() => {
+        if (activeView === 'depositar') {
+            api.get('/financeiro/parceiros')
+                .then(res => {
+                    console.log("📊 Parceiros carregados:", res);
+                    setParceiros(res || []);
+                })
+                .catch(err => console.error("Erro ao carregar parceiros:", err));
+        }
+    }, [activeView]);
+
     const handleGerarPix = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {

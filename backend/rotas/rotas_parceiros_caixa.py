@@ -6,6 +6,11 @@ from modelos.modelos_db import Usuario, Parceiro, Transacao, TipoTransacao
 from decimal import Decimal
 import datetime
 
+import mercadopago
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/parceiros", tags=["Caixa Parceiro"])
 
 # ================= CONFIGURAÇÕES GERAIS =================
@@ -92,28 +97,39 @@ async def fechar_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends
     comissao_para_pagar = parceiro.comissoes_acumuladas
     valor_resgate_total = parceiro.saldo_caixa_inicial + comissao_para_pagar
 
-    db.refresh(usuario) # Pega o saldo digital exato do lojista
+    # TAXA DE FECHAMENTO DE TURNO (Manutenção da Plataforma)
+    TAXA_FECHAMENTO = Decimal("2.00")
     
-    # Devolve fundo inicial + ganhos do dia (D+0) para o saldo digital
-    usuario.saldo += valor_resgate_total
+    # Devolve fundo inicial + ganhos do dia (D+0) para o saldo digital, subtraindo a taxa de fechamento
+    valor_liquido_resgate = valor_resgate_total - TAXA_FECHAMENTO
     
-    # Registro do fechamento (Resgate do fundo semente do digital para digital)
+    if valor_liquido_resgate < 0: valor_liquido_resgate = Decimal("0.00")
+
+    db.refresh(usuario)
+    usuario.saldo += valor_liquido_resgate
+    
+    # Registro do lucro da plataforma
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if plataforma:
+        plataforma.saldo += TAXA_FECHAMENTO
+
+    # Registro do fechamento
     db.add(Transacao(
         usuario_id=usuario.id,
         valor=parceiro.saldo_caixa_inicial,
         tipo=TipoTransacao.FECHAMENTO_GAVETA,
         status="concluido",
-        detalhes=f"Encerrado: Resgate do Fundo de Reserva Inicial (Loja #{parceiro.id})"
+        detalhes=f"Encerrado: Resgate do Fundo Inicial (Loja #{parceiro.id}) | Taxa Fechamento: R$ {TAXA_FECHAMENTO}"
     ))
 
-    if comissao_para_pagar > 0:
-        db.add(Transacao(
-            usuario_id=usuario.id,
-            valor=comissao_para_pagar,
-            tipo=TipoTransacao.COMISSAO_PARCEIRO,
-            status="concluido",
-            detalhes=f"Encerrado: Comissões D+0 creditadas (Loja #{parceiro.id})"
-        ))
+    # Registro da Taxa de Fechamento
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=TAXA_FECHAMENTO,
+        tipo=TipoTransacao.TAXA_ESPECIE,
+        status="concluido",
+        detalhes=f"Taxa de Manutenção de Turno (Psy Pay)"
+    ))
 
     # Reseta os contadores para o próximo turno
     resultado = {
@@ -410,38 +426,32 @@ async def confirmar_entrega_especie(dados: ConfirmarEntregaRequest, db: Session 
     if not transacao:
         raise HTTPException(status_code=404, detail="Transação não encontrada ou expirada.")
 
-    # 1. Regras de Negócio e Taxas
-    taxa_loja_percentual = parceiro.taxa_comissao / 100
-    taxa_servico_total = transacao.valor * Decimal("0.05")
-    valor_entregue_maos = transacao.valor - taxa_servico_total
-    
-    comissao_loja = transacao.valor * taxa_loja_percentual
-    lucro_plataforma = taxa_servico_total - comissao_loja
+    # 1. Regras de Negócio e Taxas (Sincronizadas com a Reserva)
+    # O cliente já pagou 2% na reserva. 1% já foi para a plataforma.
+    # Agora calculamos o 1% que pertence ao lojista.
+    valor_entregue_maos = transacao.valor
+    comissao_loja = transacao.valor * Decimal("0.01")
 
     # 2. Validar se o parceiro tem dinheiro físico em gaveta para entregar
     if parceiro.saldo_caixa_atual < valor_entregue_maos:
-        raise HTTPException(status_code=400, detail="Você não tem dinheiro físico suficiente em gaveta para confirmar este saque.")
+        raise HTTPException(status_code=400, detail=f"Você não tem dinheiro físico suficiente em gaveta (R$ {valor_entregue_maos:.2f}) para confirmar este saque.")
 
     # 3. Operação Financeira
     # Lojista recebe o REEMBOLSO digitalmente (Exatamente o que deu em mãos)
     usuario.saldo += valor_entregue_maos
     
-    # Lojista remove o LÍQUIDO da gaveta física
+    # Lojista remove o valor da gaveta física
     parceiro.saldo_caixa_atual -= valor_entregue_maos
     
     # 4. Lógica de Comissões (D+0, D+14, D+35)
+    # O lojista ganha o seu 1% aqui
     if parceiro.prazo_liquidacao > 0:
         parceiro.comissoes_pendentes += comissao_loja
         transacao.data_liquidacao = datetime.datetime.utcnow() + datetime.timedelta(days=parceiro.prazo_liquidacao)
     else:
         parceiro.comissoes_acumuladas += comissao_loja
     
-    # 5. Lucro da Plataforma (000PL)
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo += lucro_plataforma
-
-    # 6. Finalizar Transação e Auditoria
+    # 5. Finalizar Transação e Auditoria
     transacao.status = "concluido"
     transacao.detalhes = f"Saque Entregue em Mãos (Loja #{parceiro.id}). Cliente ID {transacao.usuario_id}"
     
@@ -459,4 +469,73 @@ async def confirmar_entrega_especie(dados: ConfirmarEntregaRequest, db: Session 
         "message": f"Sucesso! R$ {transacao.valor:.2f} creditados em sua conta e dinheiro entregue ao cliente.",
         "saldo_digital": float(usuario.saldo),
         "saldo_gaveta": float(parceiro.saldo_caixa_atual)
+    }
+
+@router.post("/gerar-pix-caixa")
+async def gerar_pix_caixa(
+    dados: IntermediacaoRequest, 
+    db: Session = Depends(get_db), 
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """Gera um PIX para o cliente pagar no balcão, enviando o dinheiro para o MP do lojista."""
+    if dados.valor <= 0:
+        raise HTTPException(status_code=400, detail="Valor inválido.")
+
+    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
+    if not parceiro or not parceiro.mp_access_token:
+        raise HTTPException(status_code=400, detail="Você precisa conectar seu Mercado Pago em 'CONFIG' para usar esta função.")
+    
+    if not parceiro.caixa_aberto:
+        raise HTTPException(status_code=400, detail="Seu caixa precisa estar aberto para realizar operações.")
+
+    cliente = db.query(Usuario).filter(Usuario.id == dados.codigo_cliente).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado.")
+
+    # TAXA ZERO NO DEPÓSITO VIA TERMINAL
+    taxa_plataforma = 0 
+
+    sdk = mercadopago.SDK(parceiro.mp_access_token)
+    
+    payment_data = {
+        "transaction_amount": float(dados.valor),
+        "description": f"Pagamento no Balcão: {parceiro.nome} | Cliente: {cliente.nome}",
+        "payment_method_id": "pix",
+        "application_fee": taxa_plataforma,
+        "external_reference": f"TERMINAL_{parceiro.id}_{cliente.id}", # Crucial para o Webhook identificar
+        "payer": {
+            "email": cliente.email,
+            "identification": {
+                "type": "CPF",
+                "number": cliente.cpf.replace(".", "").replace("-", "")
+            }
+        },
+        "notification_url": "https://peer-5gq5.onrender.com/api/financeiro/webhook/mercadopago"
+    }
+
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
+
+    if result.get("status") not in [200, 201]:
+        logger.error(f"Erro PIX Terminal: {payment}")
+        raise HTTPException(status_code=400, detail="Não foi possível gerar o PIX. Verifique seu Mercado Pago.")
+
+    # Registra a intenção de pagamento (Valor integral)
+    db.add(Transacao(
+        usuario_id=cliente.id,
+        parceiro_id=parceiro.id,
+        valor=Decimal(str(dados.valor)),
+        tipo=TipoTransacao.DEPOSITO,
+        status="pendente",
+        metodo="pix",
+        payment_id=str(payment.get("id")),
+        detalhes=f"PIX Terminal Grátis (Loja: {parceiro.nome})"
+    ))
+    db.commit()
+
+    return {
+        "payment_id": payment.get("id"),
+        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code"),
+        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64"),
+        "valor": float(dados.valor)
     }

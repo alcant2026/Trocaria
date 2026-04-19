@@ -223,23 +223,31 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
                 detail=f"Saque Bloqueado: Por medida de segurança, após alterar o 2FA, os saques ficam suspensos por 48 horas. Tente novamente em aproximadamente {int(horas_restantes)} horas."
             )
 
-    # Regra: Isento se o valor do saque for menor ou igual ao saldo no Pool (saldo_caixa)
-    # Senão: R$ 5,00 de taxa (descontada do valor solicitado)
-    taxa = Decimal("0.00")
-    saldo_caixa_v = usuario.saldo_caixa or Decimal("0.00")
-    if valor > saldo_caixa_v:
-        taxa = Decimal("5.00")
-        if valor <= taxa:
-            raise HTTPException(status_code=400, detail=f"O valor solicitado deve ser maior que a taxa de R$ {taxa}.")
+    # REGRAS DE TAXA DE SAQUE (PIX)
+    # 1. Se valor <= Pool (saldo da plataforma 000PL): Taxa R$ 0,01
+    # 2. Se valor > Pool: Taxa 2%
     
-    if usuario.saldo < valor:
-        raise HTTPException(status_code=400, detail="Saldo principal insuficiente para realizar este saque.")
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    pool_liquidez = plataforma.saldo if plataforma else Decimal("0.00")
+    
+    if valor <= pool_liquidez:
+        taxa = Decimal("0.01")
+    else:
+        taxa = valor * Decimal("0.02")
 
-    # Valor que será efetivamente sacado (líquido)
-    valor_liquido = valor - taxa
+    total_debito = valor + taxa
+    if usuario.saldo < total_debito:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobrir o saque e a taxa de R$ {taxa:.2f}.")
+
+    # Deduzir saldo + taxa
+    usuario.saldo -= total_debito
     
-    # Deduzir o valor bruto do saldo do usuário
-    usuario.saldo -= valor
+    # Creditar taxa para a plataforma
+    if plataforma:
+        plataforma.saldo += taxa
+    
+    # Valor que será efetivamente sacado (líquido)
+    valor_liquido = valor
     
     # NOVO: Acumular no gasto total de taxas para dividendos
     if taxa > 0:
@@ -505,20 +513,42 @@ async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, d
     if saque_existente:
         raise HTTPException(status_code=400, detail="Você já possui um saque em espécie reservado. Cancele-o antes de criar um novo.")
 
-    # DEBITAR SALDO (Reserva Atômica) 🛡️
-    usuario.saldo -= dados.valor
+    # 4. Cálculo de Taxas (2% total: 1% Plataforma, 1% Parceiro)
+    taxa_total = dados.valor * Decimal("0.02")
+    comissao_parceiro = dados.valor * Decimal("0.01")
+    lucro_plataforma = dados.valor * Decimal("0.01")
     
-    # 5. Criar Transação Pendente
+    if usuario.saldo < (dados.valor + taxa_total):
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobrir o saque e a taxa de R$ {taxa_total:.2f}.")
+
+    # DEBITAR SALDO (Valor + Taxa) 🛡️
+    usuario.saldo -= (dados.valor + taxa_total)
+    
+    # Credita lucro imediato da plataforma (1%)
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if plataforma:
+        plataforma.saldo += lucro_plataforma
+
+    # 5. Criar Transações
     nova_transacao = Transacao(
         usuario_id=usuario.id,
-        valor=dados.valor,
+        valor=dados.valor, # Valor que o cliente recebe em mãos
         tipo=TipoTransacao.SAQUE,
         status="pendente",
         metodo="especie",
-        parceiro_id=dados.parceiro_id,
-        detalhes=f"Saque Reservado (Aguardando Retirada na Loja #{parceiro.id} - {parceiro.nome})"
+        parceiro_id=parceiro.id,
+        detalhes=f"Saque Reservado (Aguardando Retirada: {parceiro.nome}) | Taxa Total: R$ {taxa_total}"
     )
     db.add(nova_transacao)
+    
+    # Registro de Taxa
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=taxa_total,
+        tipo=TipoTransacao.TAXA_ESPECIE,
+        status="concluido",
+        detalhes=f"Taxa de Saque em Espécie (1% Plataforma, 1% Parceiro)"
+    ))
     db.commit()
     
     # Limpar Cache
@@ -564,11 +594,11 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
         if parceiro and parceiro.mp_access_token:
             current_sdk = mercadopago.SDK(parceiro.mp_access_token)
-            # Definir taxa da plataforma (ex: 2% de intermediação)
-            application_fee = float(round(dados.valor * Decimal("0.02"), 2))
-            logger.info(f"🏦 DEPÓSITO DESCENTRALIZADO: Usando conta do Parceiro {parceiro.nome} (Taxa App: {application_fee})")
+            # TAXA ZERO NO DEPÓSITO: O cliente recebe 100% do que pagou
+            application_fee = None
+            logger.info(f"🏦 DEPÓSITO DESCENTRALIZADO (GRÁTIS): Usando conta do Parceiro {parceiro.nome}")
         else:
-            logger.warning(f"⚠️ Parceiro {dados.parceiro_id} não possui MP conectado. Usando conta principal (Custódia Direta).")
+            logger.warning(f"⚠️ Parceiro {dados.parceiro_id} não possui MP conectado. Usando conta principal.")
 
     payment_data = {
         "transaction_amount": float(dados.valor),

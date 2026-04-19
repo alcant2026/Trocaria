@@ -2905,7 +2905,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src="https://http2.mlstatic.com/frontend-assets/marketplace-web/mkt-web/images/logo-mp-64.png" alt="Mercado Pago" style={{ width: '32px', height: '32px' }} />
+                                        <img src="https://www.mercadopago.com.br/instore/merchant/static/images/logo-mp.png" alt="Mercado Pago" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
                                         <span style={{ fontWeight: 600 }}>Mercado Pago (Split)</span>
                                     </div>
                                     <div className={`badge ${mpStatus.conectado ? 'badge--success' : 'badge--warning'}`}>

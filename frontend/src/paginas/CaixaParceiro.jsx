@@ -155,6 +155,43 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
         }
     };
 
+    // Sincronizar status do MP ao entrar na aba config
+    useEffect(() => {
+        if (activeTab === 'config') {
+            api.get('/marketplace/status')
+                .then(res => {
+                    if (res.conectado) {
+                        // Força a atualização do objeto usuário local se detectado conexão
+                        if (usuario) usuario.mp_access_token = true;
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+    }, [activeTab, usuario]);
+
+    const handleGerarPixCaixa = async () => {
+        if (!codigoCliente || !valor) {
+            setErro("Informe o ID do cliente e o valor.");
+            return;
+        }
+        setLoading(true);
+        limparMensagens();
+        try {
+            const res = await api.post('/parceiros/gerar-pix-caixa', {
+                codigo_cliente: codigoCliente,
+                valor: parseFloat(valor),
+                tipo_operacao: 'deposito'
+            });
+            // Reutiliza a lógica de exibir QR Code se já existir, ou criamos uma específica
+            setQrCodeData(res);
+            setSucesso("PIX gerado com sucesso! Peça ao cliente para escanear.");
+        } catch (err) {
+            setErro(err.message || "Erro ao gerar PIX no terminal.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleConectarMP = async () => {
         setLoading(true);
         try {
@@ -369,6 +406,28 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                             {loading ? <RefreshCw className="animate-spin" size={20} /> : <Search size={20} />}
                             {loading ? 'BUSCANDO...' : 'BUSCAR PEDIDOS'}
                         </button>
+
+                        {tipoOp === 'deposito' && usuario?.mp_access_token && (
+                            <button 
+                                className="btn btn-full mt-1" 
+                                onClick={handleGerarPixCaixa}
+                                disabled={loading || !codigoCliente || !valor}
+                                style={{ 
+                                    height: '50px', 
+                                    fontSize: '1rem', 
+                                    background: '#009aff', 
+                                    color: 'white',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px'
+                                }}
+                            >
+                                <Zap size={20} fill="white" />
+                                RECEBER VIA PIX
+                            </button>
+                        )}
                         
                         <div className="alert mt-1" style={{ padding: '10px', background: 'rgba(255,145,0,0.05)', border: '1px dashed var(--warning)' }}>
                             <AlertTriangle size={14} className="text-warning" />
@@ -379,6 +438,36 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                     <button className="btn btn-outline btn-full" onClick={handleFecharCaixa} disabled={loading} style={{ opacity: 0.7 }}>
                         Encerrar Turno e Liquidar Comissões
                     </button>
+
+                    {/* Modal/Seção de QR Code no Terminal */}
+                    {qrCodeData && (
+                        <div className="card mt-2 animate-slide-up" style={{ textAlign: 'center', border: '2px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
+                            <div className="flex-between mb-2">
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Pagar via PIX</h3>
+                                <button onClick={() => setQrCodeData(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontWeight: 'bold', cursor: 'pointer' }}>FECHAR</button>
+                            </div>
+                            
+                            <div style={{ background: 'white', padding: '15px', borderRadius: '15px', display: 'inline-block', marginBottom: '15px' }}>
+                                <img src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px' }} />
+                            </div>
+
+                            <div className="input-group">
+                                <label>Copia e Cola</label>
+                                <input 
+                                    type="text" 
+                                    readOnly 
+                                    value={qrCodeData.qr_code} 
+                                    className="input-field" 
+                                    onClick={(e) => e.target.select()}
+                                    style={{ fontSize: '0.7rem', textAlign: 'center' }}
+                                />
+                            </div>
+                            
+                            <p className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                                O saldo será creditado automaticamente após o pagamento.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 

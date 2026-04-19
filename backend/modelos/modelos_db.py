@@ -224,6 +224,8 @@ class LinkAfiliado(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nome_produto = Column(String(150), nullable=False)
+    descricao = Column(Text, nullable=True)
+    categoria = Column(String(50), default="Geral", index=True)
     url_afiliado = Column(String(500), nullable=False)
     url_imagem = Column(String(500), nullable=True)
     valor = Column(Numeric(10, 2), default=0.00)

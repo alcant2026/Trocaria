@@ -15,6 +15,8 @@ router = APIRouter(prefix="/comunidade", tags=["Comunidade"])
 
 class LinkCreate(BaseModel):
     nome_produto: str
+    descricao: Optional[str] = ""
+    categoria: Optional[str] = "Geral"
     url_afiliado: str
     url_imagem: str
     valor: float = 0.00
@@ -80,6 +82,8 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
 
     novo_link = LinkAfiliado(
         nome_produto=dados.nome_produto,
+        descricao=dados.descricao,
+        categoria=dados.categoria,
         url_afiliado=url_final,
         url_imagem=dados.url_imagem,
         valor=dados.valor,
@@ -167,6 +171,8 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
         "links": [{
             "id": l.id,
             "nome_produto": l.nome_produto,
+            "descricao": l.descricao or "",
+            "categoria": l.categoria or "Geral",
             "valor": float(l.valor) if l.valor else 0.00,
             "url_imagem": l.url_imagem,
             "url_afiliado": l.url_afiliado,
@@ -185,16 +191,21 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
     }
 
 @router.get("/explorar")
-async def explorar_comunidade(page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
+async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
     """
     Retorna links ativos da comunidade com paginação. 
     Boosted links aparecem primeiro, misturados com os grátis (24h).
+    Filtra por categoria se fornecido.
     """
     offset = (page - 1) * limit
     query = db.query(LinkAfiliado).filter(
         LinkAfiliado.is_active == True,
         LinkAfiliado.visualizacoes_restantes > 0
     )
+    
+    if categoria and categoria != "Geral":
+        query = query.filter(LinkAfiliado.categoria == categoria)
+        
     total = query.count()
     links = query.order_by(LinkAfiliado.is_boosted.desc(), LinkAfiliado.data_criacao.desc()).offset(offset).limit(limit).all()
     
@@ -204,6 +215,8 @@ async def explorar_comunidade(page: int = 1, limit: int = 12, db: Session = Depe
         resultado.append({
             "id": l.id,
             "nome_produto": l.nome_produto,
+            "descricao": l.descricao or "",
+            "categoria": l.categoria or "Geral",
             "valor": float(l.valor) if l.valor else 0.00,
             "url_afiliado": l.url_afiliado,
             "url_imagem": l.url_imagem,

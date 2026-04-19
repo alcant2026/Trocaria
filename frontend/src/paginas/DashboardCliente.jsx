@@ -271,12 +271,19 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [loadingPostagem, setLoadingPostagem] = useState(false);
     const [dadosNovoLink, setDadosNovoLink] = useState({ 
         nome_produto: '', 
+        descricao: '',
+        categoria: 'Geral',
         url_afiliado: '', 
         url_imagem: '', 
-        valor: '',
-        vendas_texto: '',
-        codigo_2fa: ''
+        valor: '', 
+        vendas_texto: '', 
+        codigo_2fa: '' 
     });
+
+    const CATEGORIAS_MARKETPLACE = [
+        "Geral", "Celulares", "Informática", "Eletrônicos", "Veículos", 
+        "Imóveis", "Serviços", "Empréstimos P2P", "Cursos", "Games"
+    ];
     const [showBoostModal, setShowBoostModal] = useState(false);
     const [boostTarget, setBoostTarget] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
@@ -290,6 +297,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [loadingMarket, setLoadingMarket] = useState(false);
     const [mpStatus, setMpStatus] = useState({ conectado: false, mp_user_id: null, expira_em: null });
     const [loadingMP, setLoadingMP] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState('Geral');
+    const [selectedAdDetails, setSelectedAdDetails] = useState(null);
 
     const isFirstLoad = !usuario.nome && !isOffline;
 
@@ -563,7 +572,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         const page = reset ? 1 : pageExplorar;
         setLoadingMarket(true);
         try {
-            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12`);
+            const catParam = selectedCategory && selectedCategory !== 'Geral' ? `&categoria=${selectedCategory}` : '';
+            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12${catParam}`);
             const novosLinks = resp.links || [];
             if (reset) {
                 setMarketplaceLinks(novosLinks);
@@ -579,6 +589,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             setLoadingMarket(false);
         }
     };
+
+    // Recarregar ao mudar categoria
+    useEffect(() => {
+        if (activeView === 'marketplace' && marketplaceTab === 'explorar') {
+            carregarExplorar(true);
+        }
+    }, [selectedCategory, activeView]);
 
     // Smart Polling (30s) + Visibility Update
     useEffect(() => {
@@ -2828,13 +2845,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {/* --- VIEW: MARKETPLACE (COMUNIDADE) --- */}
             {activeView === 'marketplace' && (
                 <div className="marketplace-container animate-fade-in">
-                    <div className="marketplace-header mb-1">
-                        <div className="marketplace-tabs">
+                    <div className="marketplace-header mb-1" style={{ flexWrap: 'wrap', gap: '10px' }}>
+                        <div className="marketplace-tabs" style={{ flex: 1 }}>
                             <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
                             <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anúncios</button>
                             <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configurações</button>
                         </div>
-                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px' }}>
+                        
+                        {marketplaceTab === 'explorar' && (
+                            <select 
+                                className="input-field" 
+                                style={{ width: 'auto', minWidth: '150px', height: '38px', borderRadius: '10px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)' }}
+                                value={selectedCategory}
+                                onChange={(e) => {
+                                    setSelectedCategory(e.target.value);
+                                    setPageExplorar(1);
+                                    // carregarExplorarMarketplace(1, e.target.value); // Função será atualizada
+                                }}
+                            >
+                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                        )}
+
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', height: '38px' }}>
                             <Plus size={16} /> Novo Anúncio
                         </button>
                     </div>
@@ -2980,14 +3013,35 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 </button>
                                                 {l.valor > 0 && <div className="market-price-tag">R$ {l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>}
                                             </div>
-                                            <div className="market-info">
-                                                <h3 className="market-title">{l.nome_produto}</h3>
-                                                <div className="market-meta">
-                                                    <span className="market-author">por {l.anunciante}</span>
-                                                    <span className="market-views"><Eye size={11} /> {l.views_totais || 0}</span>
-                                                </div>
-                                                <div className="market-rating-row">
-                                                    <div className="market-stars">
+                                                <div className="market-info">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                                        <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-muted)' }}>
+                                                            {l.categoria || 'Geral'}
+                                                        </span>
+                                                        <span className="market-views"><Eye size={11} /> {l.views_totais || 0}</span>
+                                                    </div>
+                                                    <h3 className="market-title" style={{ marginBottom: '8px' }}>{l.nome_produto}</h3>
+                                                    
+                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                                                        <button 
+                                                            className="btn btn-primary" 
+                                                            style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: '0 10px' }}
+                                                            onClick={() => window.open(l.url_afiliado, '_blank')}
+                                                        >
+                                                            COMPRAR
+                                                        </button>
+                                                        <button 
+                                                            className="btn btn-secondary" 
+                                                            style={{ height: '32px', fontSize: '0.75rem', padding: '0 10px', background: 'rgba(255,255,255,0.05)' }}
+                                                            onClick={() => setSelectedAdDetails(l)}
+                                                        >
+                                                            DETALHES
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="market-meta" style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                                                        <span className="market-author">por {l.anunciante}</span>
+                                                        <div className="market-stars">
                                                         {[1, 2, 3, 4, 5].map((s) => {
                                                             const isDono = l.usuario_id === usuario?.id;
                                                             return (
@@ -3156,6 +3210,30 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
 
                     <div className="input-group mb-1">
+                        <label>Categoria</label>
+                        <select 
+                            className="input-field" 
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px' }}
+                            value={dadosNovoLink.categoria} 
+                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, categoria: e.target.value})}
+                        >
+                            {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="input-group mb-1">
+                        <label>Descrição Detalhada (OLX Style)</label>
+                        <textarea 
+                            className="input-field" 
+                            rows="4"
+                            placeholder="Descreva o estado do produto, garantias, o que acompanha, etc."
+                            style={{ width: '100%', resize: 'none' }}
+                            value={dadosNovoLink.descricao} 
+                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, descricao: e.target.value})}
+                        />
+                    </div>
+
+                    <div className="input-group mb-1">
                         <label>Seu Link Afiliado/WhatsApp</label>
                         <input 
                             className="input-field" 
@@ -3188,7 +3266,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         try {
                             await api.post('/comunidade/postar-link', dadosNovoLink);
                             setShowPostarLink(false);
-                            setDadosNovoLink({ nome_produto: '', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' });
+                            setDadosNovoLink({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' });
                             carregarMeusLinksMarketplace();
                             showModal({ title: 'Sucesso!', message: 'Anúncio publicado com sucesso!', type: 'success' });
                         } catch (err) { 
@@ -3236,7 +3314,45 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 loading={loadingAction}
             />
 
-            {/* Modal de Assinatura Premium */}
+            {/* Modal de Detalhes do Anúncio (OLX Style) */}
+            <ModalPremium
+                isOpen={!!selectedAdDetails}
+                onClose={() => setSelectedAdDetails(null)}
+                title={selectedAdDetails?.nome_produto || "Detalhes do Anúncio"}
+                type="info"
+            >
+                {selectedAdDetails && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <img 
+                            src={selectedAdDetails.url_imagem} 
+                            style={{ width: '100%', borderRadius: '12px', maxHeight: '250px', objectFit: 'cover' }} 
+                            alt="Produto"
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="badge badge--primary">{selectedAdDetails.categoria}</span>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)' }}>
+                                R$ {selectedAdDetails.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</h4>
+                            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                                {selectedAdDetails.descricao || "Nenhuma descrição fornecida para este anúncio."}
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            <User size={14} /> Anunciante: <strong>{selectedAdDetails.anunciante || "Privado"}</strong>
+                        </div>
+                        <button 
+                            className="btn btn-primary w-full" 
+                            style={{ height: '50px', fontSize: '1.1rem' }}
+                            onClick={() => window.open(selectedAdDetails.url_afiliado, '_blank')}
+                        >
+                            Comprar / Chamar no WhatsApp
+                        </button>
+                    </div>
+                )}
+            </ModalPremium>
             <ModalPremium
                 isOpen={showAssinarModal}
                 onClose={() => setShowAssinarModal(false)}

@@ -288,6 +288,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [pageMeusLinks, setPageMeusLinks] = useState(1);
     const [hasMoreMeusLinks, setHasMoreMeusLinks] = useState(false);
     const [loadingMarket, setLoadingMarket] = useState(false);
+    const [mpStatus, setMpStatus] = useState({ conectado: false, mp_user_id: null, expira_em: null });
+    const [loadingMP, setLoadingMP] = useState(false);
 
     const isFirstLoad = !usuario.nome && !isOffline;
 
@@ -312,8 +314,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     if (res.status === 'success') {
                         clearInterval(interval);
                         showModal({ 
-                            title: 'Pagamento Confirmado! <PartyPopper size={20} style={{ display: "inline", verticalAlign: "middle" }} />', 
-                            message: 'Seu depósito foi processado e o saldo já está disponível na sua conta.', 
+                            title: <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                                <PartyPopper size={28} color="var(--primary)" />
+                                <span>Pagamento Confirmado!</span>
+                            </div>, 
+                            message: 'Excelente! Seu depósito foi processado e o saldo já está disponível em sua conta digital Psy Pay.', 
                             type: 'success' 
                         });
                         setActiveView('home');
@@ -597,6 +602,19 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (activeView === 'marketplace') {
             carregarMeusLinksMarketplace(true);
             carregarExplorar(true);
+            verificarStatusMP();
+        }
+
+        // Detectar retorno do OAuth Mercado Pago
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        if (params.get('status') === 'success') {
+            showModal({ title: 'Marketplace', message: 'Conta Mercado Pago conectada com sucesso!', type: 'success' });
+            // Limpar a URL para não repetir o aviso
+            window.location.hash = window.location.hash.split('?')[0];
+            verificarStatusMP();
+        } else if (params.get('status') === 'error') {
+            showModal({ title: 'Erro Marketplace', message: params.get('msg') || 'Não foi possível conectar sua conta.', type: 'danger' });
+            window.location.hash = window.location.hash.split('?')[0];
         }
     }, [activeView]);
 
@@ -689,7 +707,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
         setLoadingAction(true);
         try {
-            const res = await api.post('/financeiro/pix/gerar', { valor: v });
+            const res = await api.post('/financeiro/pix/gerar', { 
+                valor: v,
+                parceiro_id: parceiroIdDeposito 
+            });
             setQrCodeData(res);
             setPassoDeposito(2); // Avança pra tela do QR Code pix
         } catch (err) {
@@ -797,6 +818,41 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             setMensagem('Erro: ' + err.message);
         } finally {
             setLoadingAction(false);
+        }
+    };
+
+    const verificarStatusMP = async () => {
+        try {
+            const res = await api.get('/marketplace/status');
+            setMpStatus(res);
+        } catch (err) {
+            console.error('Erro ao verificar status MP:', err);
+        }
+    };
+
+    const handleConectarMP = async () => {
+        setLoadingMP(true);
+        try {
+            const res = await api.get('/marketplace/auth-url');
+            window.location.href = res.url;
+        } catch (err) {
+            showModal({ title: 'Erro Marketplace', message: err.response?.data?.detail || 'Erro ao gerar URL de autorização.', type: 'danger' });
+        } finally {
+            setLoadingMP(false);
+        }
+    };
+
+    const handleDesconectarMP = async () => {
+        if (!confirm('Deseja realmente desconectar sua conta do Mercado Pago? Você não poderá receber pagamentos split até conectar novamente.')) return;
+        setLoadingMP(true);
+        try {
+            await api.post('/marketplace/desconectar');
+            setMpStatus({ conectado: false, mp_user_id: null, expira_em: null });
+            showModal({ title: 'Marketplace', message: 'Conta desconectada com sucesso.', type: 'info' });
+        } catch (err) {
+            showModal({ title: 'Erro', message: 'Erro ao desconectar conta.', type: 'danger' });
+        } finally {
+            setLoadingMP(false);
         }
     };
 
@@ -1539,12 +1595,32 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                                         <ShieldCheck size={18} color="var(--primary)" style={{ marginTop: '2px' }} />
                                         <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
-                                            <strong>Transparência Fase Beta (MVP)</strong><br />
-                                            Como plataforma experimental de crédito digital, os recebimentos são processados diretamente pelo Gestor Fundador. Seus créditos e rendimentos são registrados pelo sistema sob os termos de uso.
+                                            <strong>Custódia Descentralizada</strong><br />
+                                            O Psy Pay utiliza uma rede de lojistas parceiros. Ao escolher um lojista abaixo para gerar seu PIX, seu saldo será garantido diretamente pela custódia do parceiro escolhido.
                                         </div>
                                     </div>
                                 </div>
                                 
+                                <div className="input-group mb-1">
+                                    <label>Escolha o Lojista (Recebedor)</label>
+                                    <select
+                                        className="input-field"
+                                        value={parceiroIdDeposito}
+                                        onChange={(e) => setParceiroIdDeposito(e.target.value)}
+                                        style={{ marginBottom: '1rem' }}
+                                    >
+                                        <option value="">Plataforma (Custódia Direta)</option>
+                                        {parceiros.filter(p => p.mp_conectado).map(p => (
+                                            <option key={p.id} value={p.id}>{p.nome}</option>
+                                        ))}
+                                    </select>
+                                    {parceiros.filter(p => p.mp_conectado).length === 0 && (
+                                        <p style={{ fontSize: '0.6rem', color: 'var(--warning)', marginTop: '-10px', marginBottom: '10px' }}>
+                                            ⚠️ Nenhum lojista parceiro disponível para PIX no momento. Usando conta administrativa.
+                                        </p>
+                                    )}
+                                </div>
+
                                 <div className="input-group mb-1">
                                     <label>Escolha o Método</label>
                                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -1581,6 +1657,17 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             }}
                                         />
                                     </div>
+                                    {valorNotificacao && parseFloat(valorNotificacao) > 0 && (
+                                        <div className="animate-fade-in" style={{ marginTop: '8px', padding: '10px', borderRadius: '8px', background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)', textAlign: 'center' }}>
+                                            <div className="font-bold text-sm">
+                                                <span>Saldo a receber: </span>
+                                                <span className="text-success">R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                * Depósito integral sem taxas para o cliente.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ marginTop: '1.5rem' }}>
@@ -1691,7 +1778,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 style={{ marginBottom: '1rem' }}
                                             >
                                                 <option value="">Buscar loja próxima...</option>
-                                                {parceiros.map(p => (
+                                                {parceiros.filter(p => p.caixa_aberto).map(p => (
                                                     <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
                                                 ))}
                                             </select>
@@ -2732,6 +2819,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <div className="marketplace-tabs">
                             <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
                             <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anúncios</button>
+                            <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configurações</button>
                         </div>
                         <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px' }}>
                             <Plus size={16} /> Novo Anúncio
@@ -2780,6 +2868,65 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe 1 ponto por link aberto e converta em saldo real automaticamente!</p>
                             </div>
                             <button className="btn btn-primary btn-sm" style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px' }} onClick={() => setShowAssinarModal(true)}>ASSINAR R$ 19,99</button>
+                        </div>
+                    )}
+
+                    {marketplaceTab === 'config' && (
+                        <div className="animate-fade-in" style={{ 
+                            background: 'rgba(255,255,255,0.03)', 
+                            padding: '20px', 
+                            borderRadius: '16px', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            marginBottom: '2rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                                <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
+                                    <CreditCard size={24} color="var(--primary)" />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Recebimentos Automáticos</h3>
+                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure como você deseja receber o dinheiro das suas vendas.</p>
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <img src="https://http2.mlstatic.com/frontend-assets/marketplace-web/mkt-web/images/logo-mp-64.png" alt="Mercado Pago" style={{ width: '32px', height: '32px' }} />
+                                        <span style={{ fontWeight: 600 }}>Mercado Pago (Split)</span>
+                                    </div>
+                                    <div className={`badge ${mpStatus.conectado ? 'badge--success' : 'badge--warning'}`}>
+                                        {mpStatus.conectado ? 'CONECTADO' : 'NÃO CONECTADO'}
+                                    </div>
+                                </div>
+                                
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                                    Ao conectar sua conta, o valor das suas vendas cairá diretamente no seu Mercado Pago, já descontando a taxa da plataforma. Isso evita bitributação e agiliza seu recebimento.
+                                </p>
+
+                                {mpStatus.conectado ? (
+                                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Conta Vinculada: <strong>{mpStatus.mp_user_id}</strong></div>
+                                        <button 
+                                            className="btn btn-sm" 
+                                            style={{ background: 'rgba(255,61,0,0.1)', color: 'var(--danger)', width: '100%', marginTop: '10px' }}
+                                            onClick={handleDesconectarMP}
+                                            disabled={loadingMP}
+                                        >
+                                            {loadingMP ? 'Processando...' : 'Desconectar Conta'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ width: '100%', marginTop: '10px', fontWeight: 700 }}
+                                        onClick={handleConectarMP}
+                                        disabled={loadingMP}
+                                    >
+                                        {loadingMP ? 'Carregando...' : 'CONECTAR AGORA'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
 

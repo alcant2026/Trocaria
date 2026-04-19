@@ -65,7 +65,7 @@ TZ_BRASILIA = timezone(timedelta(hours=-3))
 VALOR_MAX_SAQUE_AUTO = Decimal("100.00")
 SAQUES_AUTO_POR_DIA = 1
 
-async def processar_payout_pix_mp(transacao, usuario: Usuario):
+async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Optional[str] = None):
     """
     Integração com a API de Transaction Intents do Mercado Pago para envio de PIX (BaaS).
     """
@@ -95,8 +95,10 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario):
     # Nota: Em alguns países/contas o endpoint principal de BaaS é o transaction-intents
     # Porém, para contas padrão com Payout habilitado, o v1/payouts é o mais estável.
     url = "https://api.mercadopago.com/v1/payouts"
+    token_final = (token_custom or mp_access_token).strip()
+    
     headers = {
-        "Authorization": f"Bearer {mp_access_token.strip()}",
+        "Authorization": f"Bearer {token_final}",
         "X-Idempotency-Key": idempotency_key,
         "Content-Type": "application/json"
     }
@@ -285,12 +287,27 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     # 3. 2FA Ativo
     # 4. Método PIX
     if dados.metodo == "pix" and valor_liquido <= VALOR_MAX_SAQUE_AUTO and usuario.is_verified and usuario.two_factor_enabled:
+        # DESCENTRALIZAÇÃO: Buscar um parceiro que tenha MP conectado e saldo suficiente para honrar o saque
+        parceiro_pagador = db.query(Parceiro).filter(
+            Parceiro.mp_access_token != None,
+            Parceiro.is_active == True,
+            Parceiro.saldo_caixa_atual >= valor_liquido
+        ).first()
+
+        token_para_payout = None
+        if parceiro_pagador:
+            token_para_payout = parceiro_pagador.mp_access_token
+            logger.info(f"🏦 SAQUE DESCENTRALIZADO: Usando saldo do Parceiro {parceiro_pagador.nome}")
+        
         # Tenta processar o PIX imediatamente via API
-        sucesso_payout, detalhe_payout = await processar_payout_pix_mp(nova_transacao, usuario)
+        sucesso_payout, detalhe_payout = await processar_payout_pix_mp(nova_transacao, usuario, token_custom=token_para_payout)
         
         if sucesso_payout:
             nova_transacao.status = "concluido"
             nova_transacao.detalhes += f" | ✅ AUTO-PIX: {detalhe_payout}"
+            if parceiro_pagador:
+                nova_transacao.parceiro_id = parceiro_pagador.id
+                parceiro_pagador.saldo_caixa_atual -= valor_liquido
             db.commit()
             msg_final = f"Saque de R$ {valor_liquido:.2f} realizado com sucesso via PIX Instantâneo!"
         else:
@@ -515,6 +532,7 @@ async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, d
 
 class DepositoPixRequest(BaseModel):
     valor: Decimal = Field(gt=0)
+    parceiro_id: Optional[int] = None
 
 @router.post("/pix/gerar")
 async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -537,6 +555,21 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
     # Formato MP: 2023-08-22T12:00:00.000-04:00
     expiracao_iso = expiracao.isoformat(timespec='milliseconds')
     
+    # DESCENTRALIZAÇÃO: Escolher o SDK (Global ou do Parceiro)
+    current_sdk = sdk
+    application_fee = None
+    parceiro = None
+
+    if dados.parceiro_id:
+        parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
+        if parceiro and parceiro.mp_access_token:
+            current_sdk = mercadopago.SDK(parceiro.mp_access_token)
+            # Definir taxa da plataforma (ex: 2% de intermediação)
+            application_fee = float(round(dados.valor * Decimal("0.02"), 2))
+            logger.info(f"🏦 DEPÓSITO DESCENTRALIZADO: Usando conta do Parceiro {parceiro.nome} (Taxa App: {application_fee})")
+        else:
+            logger.warning(f"⚠️ Parceiro {dados.parceiro_id} não possui MP conectado. Usando conta principal (Custódia Direta).")
+
     payment_data = {
         "transaction_amount": float(dados.valor),
         "description": f"Depósito Psy Pay - {usuario.nome}",
@@ -553,12 +586,15 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         }
     }
     
-    result = sdk.payment().create(payment_data)
+    if application_fee:
+        payment_data["application_fee"] = application_fee
+
+    result = current_sdk.payment().create(payment_data)
     payment = result.get("response", {})
     
     if result.get("status") not in [200, 201]:
         logger.error(f"Erro Mercado Pago: {payment}")
-        error_msg = "Não foi possível gerar o código PIX. Verifique suas credenciais no .env"
+        error_msg = "Não foi possível gerar o código PIX. Verifique a conexão do parceiro ou as credenciais."
         if payment.get("message") == "Unauthorized use of live credentials":
             error_msg = "Erro: Você está usando chaves de PRODUÇÃO em localhost. Use chaves de TESTE (Sandbox)."
         elif result.get("status") == 401:
@@ -577,7 +613,8 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
         status="pendente",
         metodo="pix",
         payment_id=str(payment_id),
-        detalhes=f"Pix MP Gerado | ID: {payment_id}"
+        parceiro_id=parceiro.id if parceiro else None,
+        detalhes=f"Pix MP Gerado | ID: {payment_id}" + (f" | Custódia: {parceiro.nome}" if parceiro else " | Custódia Direta")
     )
     db.add(nova_transacao)
     db.commit()
@@ -684,7 +721,12 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                 if transacao and transacao.status == "pendente":
                     usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
                     if usuario:
-                        usuario.saldo += transacao.valor
+                        # ABSORÇÃO DE TAXAS: O usuário recebe o valor bruto total (Realidade comercial)
+                        # A plataforma absorve o custo do Mercado Pago subtraindo do seu saldo de lucro.
+                        fee_details = payment.get("fee_details", [])
+                        total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
+                        
+                        usuario.saldo += valor_mp
                         transacao.status = "concluido"
                         if not transacao.payment_id:
                             transacao.payment_id = str(payment_id)
@@ -692,13 +734,22 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         if f"ID: {payment_id}" not in (transacao.detalhes or ""):
                             transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
                         
-                        fee_details = payment.get("fee_details", [])
-                        total_fee = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
-                        if total_fee > 0:
-                            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-                            if plataforma:
-                                plataforma.saldo -= total_fee
-                                transacao.detalhes += f" | [Taxa Intermediação: R$ {total_fee}]"
+                        transacao.detalhes += f" | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
+
+                        # ATUALIZAÇÃO DESCENTRALIZADA: Crédito de Custódia para o Parceiro (Bruto)
+                        # O parceiro assume a custódia do valor total que o cliente vê no app.
+                        if transacao.parceiro_id:
+                            parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
+                            if parceiro:
+                                parceiro.saldo_caixa_atual += valor_mp
+                                logger.info(f"🏦 CUSTÓDIA: Parceiro {parceiro.nome} assumiu custódia de R$ {valor_mp} (Bruto).")
+                                transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
+                        
+                        # Deduz as taxas do Mercado Pago do lucro da plataforma (Absorção)
+                        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+                        if plataforma:
+                            plataforma.saldo -= total_fee_mp
+                            logger.info(f"💸 TAXA ABSORVIDA: R$ {total_fee_mp} descontados do lucro da plataforma.")
                         
                         if usuario.id != "000PL":
                             atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
@@ -762,14 +813,30 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
     # Credita o saldo ao usuário
     usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
     if usuario:
-        usuario.saldo += transacao.valor
+        # ABSORÇÃO DE TAXAS: O usuário recebe o bruto
+        fee_details = payment.get("fee_details", [])
+        total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
+
+        usuario.saldo += valor_mp
         transacao.status = "concluido"
-        if f"ID: {payment_id}" not in transacao.detalhes:
-            transacao.detalhes += f" | Vinculado ao ID MP: {payment_id}"
-        transacao.detalhes += " | Sincronizado Manualmente pelo Admin"
+        if f"ID: {payment_id}" not in (transacao.detalhes or ""):
+            transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
+        transacao.detalhes += f" | Sincronizado Manualmente | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
+
+        # DESCENTRALIZAÇÃO: Atualizar custódia do parceiro (Bruto)
+        if transacao.parceiro_id:
+            parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
+            if parceiro:
+                parceiro.saldo_caixa_atual += valor_mp
+                transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
         
+        # Subtrai taxas do admin
+        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+        if plataforma:
+            plataforma.saldo -= total_fee_mp
+
         if usuario.id != "000PL":
-            atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+            atualizar_score(db, usuario.id, valor_mp, "DEPOSITO")
         
         db.commit()
         
@@ -804,11 +871,29 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
 
         if transacao:
             usuario_db = db.query(Usuario).filter(Usuario.id == usuario.id).with_for_update().first()
-            usuario_db.saldo += transacao.valor
-            transacao.status = "concluido"
-            transacao.detalhes += " | Sincronizado via Polling Automático"
             
-            atualizar_score(db, usuario_db.id, transacao.valor, "DEPOSITO")
+            # ABSORÇÃO DE TAXAS: O usuário recebe o bruto
+            fee_details = payment.get("fee_details", [])
+            total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
+            valor_mp = Decimal(str(payment.get("transaction_amount")))
+
+            usuario_db.saldo += valor_mp
+            transacao.status = "concluido"
+            transacao.detalhes += f" | Polling Automático | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
+
+            # DESCENTRALIZAÇÃO: Atualizar custódia do parceiro (Bruto)
+            if transacao.parceiro_id:
+                parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
+                if parceiro:
+                    parceiro.saldo_caixa_atual += valor_mp
+                    transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
+            
+            # Subtrai taxas do admin
+            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+            if plataforma:
+                plataforma.saldo -= total_fee_mp
+
+            atualizar_score(db, usuario_db.id, valor_mp, "DEPOSITO")
             db.commit()
             
             from rotas.rotas_snapshot import cache_snapshot_data
@@ -1089,8 +1174,14 @@ async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depen
 @router.get("/parceiros")
 async def listar_parceiros_publico(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """Endpoint público para usuários verem os pontos de saque/depósito em espécie."""
-    parceiros = db.query(Parceiro).filter(Parceiro.is_active == True, Parceiro.caixa_aberto == True).order_by(Parceiro.nome).all()
-    return [{"id": p.id, "nome": p.nome, "endereco": p.endereco} for p in parceiros]
+    parceiros = db.query(Parceiro).filter(Parceiro.is_active == True).order_by(Parceiro.nome).all()
+    return [{
+        "id": p.id, 
+        "nome": p.nome, 
+        "endereco": p.endereco,
+        "caixa_aberto": p.caixa_aberto,
+        "mp_conectado": bool(p.mp_access_token)
+    } for p in parceiros]
 
 class ParceiroCreate(BaseModel):
     nome: str

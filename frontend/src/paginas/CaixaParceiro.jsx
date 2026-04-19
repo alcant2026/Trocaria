@@ -155,6 +155,34 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
         }
     };
 
+    const handleConectarMP = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/marketplace/auth-url');
+            if (res.url) {
+                window.location.href = res.url;
+            }
+        } catch (err) {
+            setErro("Erro ao iniciar conexão com Mercado Pago.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDesconectarMP = async () => {
+        if (!window.confirm("Deseja realmente desconectar sua conta do Mercado Pago? Você deixará de receber PIX descentralizado.")) return;
+        setLoading(true);
+        try {
+            await api.post('/marketplace/desconectar');
+            setSucesso("Conta desconectada com sucesso.");
+            if (onUpdate) onUpdate();
+        } catch (err) {
+            setErro("Erro ao desconectar conta.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Auto-Busca quando o ID está completo (5 caracteres) 🔍
     useEffect(() => {
         if (codigoCliente.length === 5) {
@@ -366,9 +394,7 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                                 { prazo: 14, taxa: 2, label: 'Standard (14 dias)', color: 'var(--warning)', desc: 'Equilíbrio entre comissão e espera.' },
                                 { prazo: 35, taxa: 3, label: 'Premium (35 dias)', color: '#a855f7', desc: 'Melhor lucro para quem pode esperar.' }
                             ].map(plano => {
-                                // Forçamos a comparação numérica para garantir o destaque correto
                                 const isActive = Number(usuario?.prazo) === Number(plano.prazo);
-                                
                                 return (
                                     <div 
                                         key={plano.prazo}
@@ -395,6 +421,54 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
                                 );
                             })}
                         </div>
+                    </div>
+
+                    {/* SEÇÃO MERCADO PAGO */}
+                    <div className="card mt-2" style={{ border: '1px solid rgba(var(--primary-rgb), 0.2)', background: 'rgba(var(--primary-rgb), 0.02)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+                            <div style={{ padding: '10px', background: 'rgba(0,154,255,0.1)', borderRadius: '12px' }}>
+                                <Store size={24} color="#009aff" />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0 }}>Integração Financeira</h3>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>Receba pagamentos PIX direto na sua conta</p>
+                            </div>
+                        </div>
+
+                        {usuario?.mp_access_token ? (
+                            <div className="animate-fade-in" style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px', border: '1px solid var(--success)' }}>
+                                <div className="flex-between mb-1">
+                                    <div className="flex" style={{ gap: '8px' }}>
+                                        <CheckCircle size={16} color="var(--success)" />
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--success)' }}>MERCADO PAGO CONECTADO</span>
+                                    </div>
+                                    <button 
+                                        onClick={handleDesconectarMP}
+                                        style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                    >
+                                        Desconectar
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0 }}>
+                                    Sua loja já está habilitada para receber depósitos PIX de forma descentralizada.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="animate-fade-in">
+                                <p style={{ fontSize: '0.8rem', marginBottom: '15px', lineHeight: '1.4' }}>
+                                    Para que os clientes possam pagar para você via PIX, é necessário vincular sua conta do Mercado Pago.
+                                </p>
+                                <button 
+                                    className="btn btn-primary btn-full" 
+                                    onClick={handleConectarMP} 
+                                    disabled={loading}
+                                    style={{ background: '#009aff', color: 'white', border: 'none' }}
+                                >
+                                    {loading ? <RefreshCw className="animate-spin" size={20} /> : <Store size={20} />}
+                                    CONECTAR MERCADO PAGO
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

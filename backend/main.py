@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos, rotas_marketplace
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema, executar_limpeza_banco
@@ -77,7 +77,9 @@ def get_db():
 
 @app.on_event("startup")
 async def startup_db_setup():
-    print("🚀 SISTEMA: Iniciando processo de boot...")
+    from database import SQLALCHEMY_DATABASE_URL
+    db_type = "SQLite Local" if "sqlite" in SQLALCHEMY_DATABASE_URL else "Postgres Nuvem (Neon)"
+    print(f"🚀 SISTEMA: Iniciando processo de boot... [DB: {db_type}]")
     os.makedirs("uploads", exist_ok=True)
     
     try:
@@ -122,7 +124,7 @@ async def startup_db_setup():
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
-for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos]:
+for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos, rotas_marketplace]:
     app.include_router(router_module.router, prefix="/api")
     app.include_router(router_module.router)
 

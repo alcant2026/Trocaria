@@ -70,27 +70,36 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     
     # 0. Verificar Liquidez Global do Pool (Regra de 30% de Reserva)
-    total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+    from modelos.modelos_db import Parceiro
+    total_pool = db.query(func.sum(Parceiro.saldo_caixa_atual)).scalar() or Decimal("0.00")
+    
     # Apenas 70% da liquidez total pode ser emprestada (30% reservado para saques)
     reservado = total_pool * Decimal("0.30")
     disponivel_emprestimo = total_pool - reservado
     
     if valor > disponivel_emprestimo:
         raise ValueError(
-            f"Liquidez insuficiente no Pool. Para segurança do sistema, mantemos uma reserva de 30% para resgates. "
+            f"Liquidez insuficiente no Pool Descentralizado. Para segurança do sistema, mantemos uma reserva de 30% para resgates. "
             f"Disponível para novos empréstimos: R$ {disponivel_emprestimo:,.2f}"
         )
 
-    if plataforma.saldo < valor:
-         # Se a plataforma não tem saldo direto, tenta usar o saldo_caixa da plataforma (Pool)
-         if plataforma.saldo_caixa >= valor:
-             plataforma.saldo_caixa -= valor
-             plataforma.saldo += valor # Move para o saldo para processar a transferência
-         else:
-             # Se mesmo assim não for no saldo da 000PL, mas houver no pool global, 
-             # o saldo da 000PL pode ficar temporariamente negativo (lastreado pelos outros usuários)
-             # pois a cooperativa garante a operação.
-             plataforma.saldo += valor 
+    # 0.1 DESCENTRALIZAÇÃO: Alocar o empréstimo a parceiros com saldo
+    valor_a_alocar = valor
+    parceiros_com_saldo = db.query(Parceiro).filter(Parceiro.saldo_caixa_atual > 0, Parceiro.is_active == True).order_by(Parceiro.saldo_caixa_atual.desc()).all()
+    
+    alocacoes = []
+    for p in parceiros_com_saldo:
+        if valor_a_alocar <= 0: break
+        
+        valor_do_p = min(p.saldo_caixa_atual, valor_a_alocar)
+        p.saldo_caixa_atual -= valor_do_p
+        valor_a_alocar -= valor_do_p
+        alocacoes.append(f"Parceiro {p.nome} (R$ {valor_do_p})")
+
+    if valor_a_alocar > 0:
+        # Se ainda sobrou valor e não há mais parceiros, usa o saldo da plataforma como fallback
+        plataforma.saldo_caixa -= valor_a_alocar
+        alocacoes.append(f"Reserva Plataforma (R$ {valor_a_alocar})")
 
     # 1. Criar a Solicitação já APROVADA
     agora = datetime.datetime.utcnow()
@@ -120,8 +129,7 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
     )
     db.add(investimento_sistema)
 
-    # 3. Transferir dinheiro para o tomador
-    plataforma.saldo -= valor
+    # 3. Transferir "lastro" para o tomador (Saldo App)
     usuario.saldo += valor
 
     # 4. Registrar Transações
@@ -130,7 +138,7 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
         valor=valor,
         tipo=TipoTransacao.RECEBIMENTO,
         status="concluido",
-        detalhes=f"Empréstimo Fintech Aprovado Instantaneamente - Pedido #{nova_solicitacao.id}"
+        detalhes=f"Empréstimo Aprovado (Lastro: {', '.join(alocacoes)}) - Pedido #{nova_solicitacao.id}"
     ))
     
     db.add(Transacao(
@@ -138,7 +146,7 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
         valor=valor,
         tipo=TipoTransacao.INVESTIMENTO,
         status="concluido",
-        detalhes=f"Aporte Cooperativa para Usuário {usuario.id} - Pedido #{nova_solicitacao.id}"
+        detalhes=f"Gestão de Crédito Descentralizado: {', '.join(alocacoes)}"
     ))
 
     db.commit()

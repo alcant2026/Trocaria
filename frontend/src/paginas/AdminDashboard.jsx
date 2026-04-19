@@ -499,9 +499,9 @@ const AdminDashboard = () => {
                     <div className="animate-fade-in">
                         <div className="stats-grid">
                             <StatCard 
-                                label="Custódia Total" 
+                                label="Custódia Descentralizada" 
                                 value={`R$ ${fiscal.saldo_usuarios_gerenciado?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={Users}
+                                icon={ShieldCheck}
                                 color="var(--primary)"
                                 trend={null}
                             />
@@ -937,9 +937,15 @@ const AdminDashboard = () => {
                                                     <span className="text-xs font-mono">{p.usuario_id || 'Sem Vínculo'}</span>
                                                 </td>
                                                 <td>
-                                                    <span className={`status-pill ${p.caixa_aberto ? 'status-success' : 'status-danger'}`}>
-                                                        {p.caixa_aberto ? 'ABERTO' : 'FECHADO'}
-                                                    </span>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <span className={`status-pill ${p.caixa_aberto ? 'status-success' : 'status-danger'}`}>
+                                                            {p.caixa_aberto ? 'ABERTO' : 'FECHADO'}
+                                                        </span>
+                                                        <span className={`text-xs font-bold ${p.mp_conectado ? 'text-success' : 'text-warning'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            {p.mp_conectado ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                                            {p.mp_conectado ? 'MP CONECTADO' : 'SEM MP'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div className="flex-column" style={{ gap: '2px' }}>

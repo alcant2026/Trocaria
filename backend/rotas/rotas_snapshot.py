@@ -632,7 +632,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "is_active": p.is_active,
                     "caixa_aberto": p.caixa_aberto,
                     "saldo_atual": float(p.saldo_caixa_atual),
-                    "comissao": float(p.comissoes_acumuladas)
+                    "comissao": float(p.comissoes_acumuladas),
+                    "mp_conectado": bool(p.mp_access_token)
                 })
 
             # 8. Empréstimos que bateram a meta mas não liberaram (Falta garantidor)

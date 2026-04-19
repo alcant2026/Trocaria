@@ -94,6 +94,12 @@ class Usuario(Base):
     gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)
     total_dividendos_ganhos = Column(Numeric(precision=20, scale=2), default=0)
 
+    # Mercado Pago Marketplace (OAuth)
+    mp_access_token = Column(String(255), nullable=True)
+    mp_refresh_token = Column(String(255), nullable=True)
+    mp_user_id = Column(String(100), nullable=True)
+    mp_token_expires_at = Column(DateTime, nullable=True)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
     transacoes = relationship("Transacao", back_populates="usuario")
 
@@ -205,6 +211,12 @@ class Parceiro(Base):
     prazo_liquidacao = Column(Integer, default=0) # 0, 14, 35 dias
     taxa_comissao = Column(Numeric(precision=5, scale=2), default=0.00) # Porcentagem
     
+    # Mercado Pago Marketplace (Custódia Descentralizada)
+    mp_access_token = Column(String(255), nullable=True)
+    mp_refresh_token = Column(String(255), nullable=True)
+    mp_user_id = Column(String(100), nullable=True)
+    mp_token_expires_at = Column(DateTime, nullable=True)
+
     usuario = relationship("Usuario")
 
 class LinkAfiliado(Base):

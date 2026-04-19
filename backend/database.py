@@ -7,10 +7,26 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 load_dotenv()
 
-# Caminho absoluto para evitar criação de múltiplos arquivos .db
+# Caminho absoluto para o banco SQLite local
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB_URL = f"sqlite:///{os.path.join(BASE_DIR, 'cred_plus.db')}"
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+
+# DETECÇÃO AUTOMÁTICA DE AMBIENTE
+# No Render, a variável de ambiente 'RENDER' é sempre 'true'.
+IS_PRODUCTION = os.getenv("RENDER") == "true" or os.getenv("ENVIRONMENT") == "production"
+
+if IS_PRODUCTION:
+    # Em produção, exigimos a DATABASE_URL do Neon/Postgres
+    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+    if not SQLALCHEMY_DATABASE_URL:
+        # Fallback de segurança caso a variável não esteja setada na nuvem
+        SQLALCHEMY_DATABASE_URL = DEFAULT_DB_URL
+    print(f"🌐 AMBIENTE: Produção (Nuvem) - Usando: {SQLALCHEMY_DATABASE_URL.split('@')[-1] if '@' in SQLALCHEMY_DATABASE_URL else 'DB Cloud'}")
+else:
+    # Localmente, priorizamos o SQLite para não afetar os dados reais
+    # Mas permitimos sobrescrever via DATABASE_URL_LOCAL se preferir Postgres local
+    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL_LOCAL", DEFAULT_DB_URL)
+    print(f"🏠 AMBIENTE: Local (Desenvolvimento) - Usando: {SQLALCHEMY_DATABASE_URL}")
 
 def normalizar_database_url(url: str) -> str:
     # Ajuste de compatibilidade Heroku/Render.

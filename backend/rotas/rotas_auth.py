@@ -298,7 +298,8 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
             "two_factor_enabled": usuario.two_factor_enabled,
             "is_subscriber": usuario.is_subscriber,
             "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
-            "pontos_marketplace": usuario.pontos_marketplace
+            "pontos_marketplace": usuario.pontos_marketplace,
+            "mp_access_token": bool(usuario.mp_access_token)
         }
     }
 
@@ -320,7 +321,8 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "aceite_cookies": usuario.aceite_cookies,
         "is_subscriber": usuario.is_subscriber,
         "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
-        "pontos_marketplace": usuario.pontos_marketplace
+        "pontos_marketplace": usuario.pontos_marketplace,
+        "mp_access_token": bool(usuario.mp_access_token)
     }
 
 @router.post("/aceitar-cookies")

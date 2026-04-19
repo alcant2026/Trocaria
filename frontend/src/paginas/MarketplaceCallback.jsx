@@ -22,8 +22,12 @@ const MarketplaceCallback = () => {
                 await api.get(`/marketplace/callback?code=${code}&state=${state}`);
                 setStatus('sucesso');
                 setMensagem('Sua conta Mercado Pago foi conectada com sucesso! Redirecionando...');
+                
+                // Limpa a URL para não processar de novo no refresh
+                window.history.replaceState({}, document.title, "/");
+                
                 setTimeout(() => {
-                    window.location.href = '/#marketplace';
+                    window.location.hash = 'marketplace';
                 }, 3000);
             } catch (err) {
                 setStatus('erro');

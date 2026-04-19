@@ -18,7 +18,8 @@ IS_PROD = os.environ.get("RENDER") == "true"
 CLIENT_ID = os.environ.get("MERCADOPAGO_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("MERCADOPAGO_CLIENT_SECRET", "")
 FRONTEND_URL = os.environ.get("FRONTEND_URL" if IS_PROD else "FRONTEND_URL_LOCAL", "http://localhost:3000")
-REDIRECT_URI = os.environ.get("MP_REDIRECT_URI" if IS_PROD else "MP_REDIRECT_URI_LOCAL", f"{FRONTEND_URL}/api/marketplace/callback")
+# Agora o redirecionamento vai para a RAIZ (o App.jsx vai detectar os parâmetros)
+REDIRECT_URI = f"{FRONTEND_URL}/"
 
 import urllib.parse
 
@@ -71,7 +72,7 @@ async def marketplace_callback(code: str, state: str, db: Session = Depends(get_
         
         if response.status_code != 200:
             logger.error(f"Erro OAuth MP: {response.text}")
-            return RedirectResponse(url=f"{frontend_url_redirect}/#marketplace?status=error&msg=Falha+na+autenticacao")
+            raise HTTPException(status_code=400, detail="Falha ao obter token do Mercado Pago.")
         
         token_data = response.json()
         
@@ -95,7 +96,7 @@ async def marketplace_callback(code: str, state: str, db: Session = Depends(get_
             logger.info(f"✅ MP vinculado ao Parceiro ID: {parceiro.id}")
 
         db.commit()
-        return RedirectResponse(url=f"{frontend_url_redirect}/#marketplace?status=success")
+        return {"status": "success", "message": "Conta Mercado Pago vinculada com sucesso!"}
 
 @router.get("/status")
 async def get_mp_status(usuario: Usuario = Depends(obter_usuario_logado)):

@@ -22,7 +22,7 @@ import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
-import LoadingScreen from './componentes/LoadingScreen';
+import MarketplaceCallback from './paginas/MarketplaceCallback';
 
 const App = () => {
     const [loading, setLoading] = useState(true);
@@ -67,6 +67,16 @@ const App = () => {
     useEffect(() => {
         const init = async () => {
             const timeout = setTimeout(() => setLoading(false), 3000);
+            
+            // NOVO: Detectar retorno do Mercado Pago antes de validar login
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('code') && params.get('state')) {
+                setPage('vincular-mp');
+                setLoading(false);
+                clearTimeout(timeout);
+                return;
+            }
+
             const token = localStorage.getItem('token');
             if (token) {
                 try {
@@ -188,6 +198,7 @@ const App = () => {
                 {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
                 {page === 'pool' && <DashboardCliente initialView="pool" />}
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
+                {page === 'vincular-mp' && <MarketplaceCallback />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'seguranca' && <Seguranca />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}

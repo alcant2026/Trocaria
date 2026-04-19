@@ -479,10 +479,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const handleAssinarPlano = async () => {
+    const handleAssinarPlano = async (tipoPlano = 'mensal') => {
         setLoadingAssinatura(true);
         try {
-            const res = await api.post('/financeiro/assinar-plano');
+            const res = await api.post('/financeiro/assinar-plano', { plano: tipoPlano });
             carregarSnapshot();
             setShowAssinarModal(false);
             showModal({ 
@@ -491,7 +491,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 type: 'success' 
             });
         } catch (err) { 
-            showModal({ title: 'Assinatura', message: err.message, type: 'danger' }); 
+            showModal({ title: 'Assinatura', message: err.response?.data?.detail || err.message, type: 'danger' }); 
         } finally { 
             setLoadingAssinatura(false); 
         }
@@ -2913,7 +2913,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#FFD600' }}>Seja um Membro Premium Marketplace</h4>
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe 1 ponto por link aberto e converta em saldo real automaticamente!</p>
                             </div>
-                            <button className="btn btn-primary btn-sm" style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px' }} onClick={() => setShowAssinarModal(true)}>ASSINAR R$ 19,99</button>
+                            <button className="btn btn-primary btn-sm" style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px' }} onClick={() => setShowAssinarModal(true)}>ASSINAR R$ 199,99</button>
                         </div>
                     )}
 
@@ -3262,6 +3262,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         />
                     </div>
 
+                    <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
+                            ⚠️ <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Psy Pay atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
+                        </p>
+                    </div>
+
                     <button className="btn btn-primary w-full mt-1" disabled={!dadosNovoLink.codigo_2fa || dadosNovoLink.codigo_2fa.length < 6} onClick={async () => {
                         try {
                             await api.post('/comunidade/postar-link', dadosNovoLink);
@@ -3335,14 +3341,42 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </span>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</h4>
-                            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
-                                {selectedAdDetails.descricao || "Nenhuma descrição fornecida para este anúncio."}
-                            </p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                <div style={{ width: '40px', height: '40px', background: 'rgba(var(--primary-rgb), 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <User size={20} color="var(--primary)" />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        {selectedAdDetails.anunciante}
+                                        {selectedAdDetails.anunciante_verificado && <ShieldCheck size={14} color="#00CFFF" title="Vendedor Verificado" />}
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        Membro desde {selectedAdDetails.anunciante_desde}
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--success)' }}>
+                                        {selectedAdDetails.anunciante_vendas} VENDAS
+                                    </div>
+                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Histórico Concluído</div>
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            <User size={14} /> Anunciante: <strong>{selectedAdDetails.anunciante || "Privado"}</strong>
+
+                        {/* Dica de Segurança (OLX Style) */}
+                        <div style={{ background: 'rgba(255,214,0,0.05)', padding: '12px', borderRadius: '10px', border: '1px dotted rgba(255,214,0,0.3)' }}>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <AlertTriangle size={18} color="#FFD600" style={{ flexShrink: 0 }} />
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                                    <strong>DICA DE SEGURANÇA:</strong> Nunca realize pagamentos fora do Psy Pay. Prefira negociar a entrega em locais públicos e confira o produto antes de confirmar.
+                                </p>
+                            </div>
                         </div>
+
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</h4>
+                        <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                            {selectedAdDetails.descricao || "Nenhuma descrição fornecida para este anúncio."}
+                        </p>
                         <button 
                             className="btn btn-primary w-full" 
                             style={{ height: '50px', fontSize: '1.1rem' }}
@@ -3353,24 +3387,90 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
                 )}
             </ModalPremium>
+            {/* Modal de Assinatura Premium */}
             <ModalPremium
                 isOpen={showAssinarModal}
                 onClose={() => setShowAssinarModal(false)}
                 title="🔥 Upgrade Premium Marketplace"
-                message="Deseja ativar sua assinatura Premium por R$ 19,99 (30 dias)? Você ganhará pontos por cliques que viram saldo real!"
                 type="info"
-                onConfirm={handleAssinarPlano}
-                confirmText="Ativar Agora (R$ 19,99)"
-                loading={loadingAssinatura}
             >
-                <div style={{ textAlign: 'left', marginTop: '1rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '10px', color: 'var(--primary)' }}>Vantagens da Assinatura:</p>
-                    <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '15px' }}>
-                        <li>Ganhe 1 ponto para cada clique em "Ver Produto".</li>
-                        <li>A cada 1.000 pontos, receba R$ 0,10 direto no saldo.</li>
-                        <li>Badge exclusivo de Membro Premium no Marketplace.</li>
-                        <li>Ajuda a plataforma a crescer e aumentar o Fundo Coletivo.</li>
-                    </ul>
+                <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                        Escolha o plano que melhor se adapta a você e ganhe pontos, isenção de taxas e selo VIP!
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* PLANO MENSAL */}
+                        <div 
+                            className="card-minimal clickable" 
+                            style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                padding: '20px', 
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                background: 'rgba(255,255,255,0.02)'
+                            }}
+                            onClick={() => handleAssinarPlano('mensal')}
+                        >
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 800, fontSize: '1rem' }}>MENSAL</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cobrado a cada 30 dias</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--primary)' }}>R$ 19,99</div>
+                            </div>
+                        </div>
+
+                        {/* PLANO ANUAL */}
+                        <div 
+                            className="card-minimal clickable" 
+                            style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                padding: '20px', 
+                                border: '2px solid var(--warning)',
+                                background: 'rgba(255,214,0,0.05)',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}
+                            onClick={() => handleAssinarPlano('anual')}
+                        >
+                            <div style={{ 
+                                position: 'absolute', 
+                                top: '0', 
+                                right: '0', 
+                                background: 'var(--warning)', 
+                                color: '#000', 
+                                fontSize: '0.55rem', 
+                                fontWeight: 900, 
+                                padding: '2px 10px', 
+                                borderBottomLeftRadius: '8px' 
+                            }}>
+                                ECONOMIZE 16%
+                            </div>
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--warning)' }}>ANUAL (VIP)</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Acesso por 1 ano inteiro</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--warning)' }}>R$ 199,99</div>
+                                <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>~R$ 16,66/mês</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ textAlign: 'left', marginTop: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.8' }}>
+                            <li>💰 <strong>Cashback em Pontos:</strong> Ganhe pontos por cada link aberto.</li>
+                            <li>📉 <strong>Taxa Zero em Vendas:</strong> Venda no Marketplace sem comissão.</li>
+                            <li>🚀 <strong>Prioridade de Saque:</strong> Seus saques são processados primeiro.</li>
+                            <li>💎 <strong>Selo VIP:</strong> Destaque exclusivo no seu perfil e anúncios.</li>
+                        </ul>
+                    </div>
+
+                    {loadingAssinatura && <div className="mt-1" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Processando assinatura...</div>}
                 </div>
             </ModalPremium>
             <BannerCookies usuario={usuario} onUpdate={carregarSnapshot} />

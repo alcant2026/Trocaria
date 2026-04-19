@@ -227,6 +227,9 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
             "views_totais": l.visualizacoes_totais,
             "ponto_max": int(l.ponto_max or 1),
             "anunciante": anunciante.nome.split(' ')[0] if anunciante else "Anônimo",
+            "anunciante_vendas": anunciante.vendas_completadas if anunciante else 0,
+            "anunciante_desde": anunciante.data_aceite.strftime("%m/%Y") if anunciante and anunciante.data_aceite else "N/D",
+            "anunciante_verificado": anunciante.is_verified if anunciante else False,
             "usuario_id": l.usuario_id,
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None
         })

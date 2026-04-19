@@ -167,6 +167,33 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     if usuario.saldo < valor:
         raise HTTPException(status_code=400, detail="Saldo insuficiente para este saque.")
 
+    # AML (Anti-Lavagem de Dinheiro): Limites Escalonados (Tiers)
+    if usuario.is_verified and usuario.is_subscriber:
+        LIMITE_DIARIO_SAQUE = Decimal("15000.00") # Nível 3 (VIP Total)
+    elif usuario.is_verified or usuario.is_subscriber:
+        LIMITE_DIARIO_SAQUE = Decimal("5000.00")  # Nível 2 (Verificado ou Premium)
+    else:
+        LIMITE_DIARIO_SAQUE = Decimal("1500.00")  # Nível 1 (Básico - Risco Maior)
+    hoje = datetime.datetime.utcnow().date()
+    inicio_dia = datetime.datetime.combine(hoje, datetime.time.min)
+    fim_dia = datetime.datetime.combine(hoje, datetime.time.max)
+    
+    saques_hoje = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.SAQUE,
+        Transacao.data_transacao >= inicio_dia,
+        Transacao.data_transacao <= fim_dia,
+        Transacao.status.in_(["pendente", "concluido"]) # Ignora cancelados
+    ).all()
+    
+    total_sacado_hoje = sum([s.valor for s in saques_hoje])
+    
+    if total_sacado_hoje + valor > LIMITE_DIARIO_SAQUE:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Limite diário de saque excedido. (Máx: R$ {LIMITE_DIARIO_SAQUE}/dia). Você já movimentou R$ {total_sacado_hoje:.2f} hoje."
+        )
+
     # SEGURANÇA: Validação de PIX (Zero Trust Policy)
     # A regra do usuário é que o saque tem que ser na mesma chave PIX do nome
     # Em um cenário real, consultaríamos uma API do Bacen/PSP para validar a titularidade.
@@ -767,6 +794,14 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
                         
                         transacao.detalhes += f" | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
+
+                        # NOVO: Gamificação de Reputação (Se for venda do Marketplace)
+                        if transacao.tipo == TipoTransacao.RECEBIMENTO:
+                            usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
+                            usuario.score += Decimal("5.0")
+                            if usuario.score > Decimal("1000.0"):
+                                usuario.score = Decimal("1000.0")
+                            logger.info(f"🏆 REPUTAÇÃO: {usuario.nome} completou uma venda! +1 Venda, +5 Score.")
 
                         # ATUALIZAÇÃO DESCENTRALIZADA: Crédito de Custódia para o Parceiro (Bruto)
                         # O parceiro assume a custódia do valor total que o cliente vê no app.
@@ -1539,45 +1574,60 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
     cache_snapshot_data.pop("000PL", None)
     return {"message": f"Transacao de {usuario.nome} rejeitada. Motivo: {motivo}"}
 
+class AssinarPlanoRequest(BaseModel):
+    plano: str # 'mensal' ou 'anual'
+
 @router.post("/assinar-plano")
-async def assinar_plano_premium(db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Ativa o plano de assinatura de R$ 19,99/mês."""
-    PRECO_ASSINATURA = Decimal("19.99")
+async def assinar_plano_premium(dados: AssinarPlanoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """Ativa o plano de assinatura Mensal ou Anual."""
+    if dados.plano == 'anual':
+        preco = Decimal("199.99")
+        dias = 365
+        nome_plano = "ANUAL"
+    else:
+        preco = Decimal("19.99")
+        dias = 30
+        nome_plano = "MENSAL"
     
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
-    if usuario.saldo < PRECO_ASSINATURA:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. O plano Premium custa R$ {PRECO_ASSINATURA}.")
+    if usuario.saldo < preco:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. O plano {nome_plano} custa R$ {preco}.")
 
     # Deduzir saldo
-    usuario.saldo -= PRECO_ASSINATURA
+    usuario.saldo -= preco
     
-    # Benefício do Plano: 30 dias de Premium
+    # Benefício do Plano: Dias de Premium
     agora = datetime.datetime.utcnow()
     if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
-        # Se já for assinante, adiciona 30 dias à expiração atual
-        usuario.assinatura_expira_em += datetime.timedelta(days=30)
+        usuario.assinatura_expira_em += datetime.timedelta(days=dias)
     else:
-        # Se não for ou venceu, começa de agora
         usuario.is_subscriber = True
-        usuario.assinatura_expira_em = agora + datetime.timedelta(days=30)
+        usuario.assinatura_expira_em = agora + datetime.timedelta(days=dias)
+
+    # NOVO: Bônus de Score Imediato pela Fidelidade
+    bonus_score = Decimal("100.0") if dados.plano == 'anual' else Decimal("20.0")
+    usuario.score += bonus_score
+    if usuario.score > Decimal("1000.0"):
+        usuario.score = Decimal("1000.0")
 
     # Registrar Transação
     transacao = Transacao(
         usuario_id=usuario.id,
-        valor=PRECO_ASSINATURA,
+        valor=preco,
         tipo=TipoTransacao.ASSINATURA,
         status="concluido",
-        detalhes="Ativação de Plano Premium Marketplace (30 dias)"
+        detalhes=f"Assinatura Premium Marketplace ({nome_plano} - {dias} dias)"
     )
     db.add(transacao)
     
     # O valor vai para o lucro da plataforma
     plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
     if plataforma:
-        plataforma.saldo += PRECO_ASSINATURA
+        plataforma.saldo += preco
 
     db.commit()
+    return {"message": f"Parabéns! Seu plano {nome_plano} foi ativado com sucesso.", "expira_em": usuario.assinatura_expira_em}
     cache_snapshot_data.pop(usuario.id, None)
     cache_snapshot_data.pop("000PL", None)
     

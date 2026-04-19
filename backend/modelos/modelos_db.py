@@ -93,6 +93,7 @@ class Usuario(Base):
     # NOVO: Regra de Dividendos Participativos
     gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)
     total_dividendos_ganhos = Column(Numeric(precision=20, scale=2), default=0)
+    vendas_completadas = Column(Integer, default=0)
 
     # Mercado Pago Marketplace (OAuth)
     mp_access_token = Column(String(255), nullable=True)

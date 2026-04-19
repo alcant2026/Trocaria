@@ -475,7 +475,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             }));
             // Feedback silencioso ou pequeno toast seria bom, mas opcional
         } catch (err) {
-            alert(err.response?.data?.detail || 'Erro ao avaliar');
+            showModal({ title: 'Erro na Avaliação', message: err.response?.data?.detail || 'Erro ao avaliar', type: 'danger' });
         }
     };
 
@@ -3300,7 +3300,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 setShowBoostModal(false);
                                 carregarSnapshot();
                                 showModal({ title: 'Ativado!', message: pkg.v + ' views adicionadas.', type: 'success' });
-                            } catch (err) { alert('Erro ao turbinar'); }
+                            } catch (err) { showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao turbinar anúncio', type: 'danger' }); }
                         }}>
                             <div><p className="font-bold">{pkg.v} Views</p></div>
                             <span className="text-primary font-bold">R$ {pkg.p}</span>

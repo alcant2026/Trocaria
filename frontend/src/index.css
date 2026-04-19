@@ -1330,4 +1330,44 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     .api-footer p {
         font-size: 0.75rem;
     }
+    }
+}
+
+/* ========================================
+   MOBILE & RESPONSIVENESS FIXES
+   ======================================== */
+
+@media (max-width: 480px) {
+    /* 1. Modal Padding Reduzido */
+    .modal-card {
+        padding: 1.5rem 1rem !important;
+    }
+    
+    /* 4. Abas do Marketplace compactadas */
+    .m-tab {
+        padding: 6px 10px !important;
+        font-size: 0.7rem !important;
+    }
+    .marketplace-tabs {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 400px) {
+    /* 2. Cards de Assinatura (Mensal vs Anual) Empilhados */
+    .card-minimal {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+    .card-minimal > div {
+        text-align: left !important;
+        width: 100%;
+    }
+    
+    /* 3. Vitrine do Marketplace (1 Coluna para não espremer botões) */
+    .marketplace-grid {
+        grid-template-columns: 1fr !important;
+    }
 }

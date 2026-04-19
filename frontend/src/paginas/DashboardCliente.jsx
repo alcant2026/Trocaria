@@ -54,7 +54,9 @@ import {
     PartyPopper,
     Info,
     QrCode,
-    FileDown
+    FileDown,
+    Flame,
+    TrendingDown
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
@@ -1645,9 +1647,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         ))}
                                     </select>
                                     {parceiros.filter(p => p.mp_conectado).length === 0 && (
-                                        <p style={{ fontSize: '0.6rem', color: 'var(--warning)', marginTop: '-10px', marginBottom: '10px' }}>
-                                            ⚠️ Nenhum lojista parceiro disponível para PIX no momento. Usando conta administrativa.
-                                        </p>
+                                        <div className="alert alert-warning mb-3" style={{ fontSize: '0.6rem' }}>
+                                            <AlertTriangle size={16} className="text-warning mr-2 inline-block" /> Nenhum lojista parceiro disponível para PIX no momento. Usando conta administrativa.
+                                        </div>
                                     )}
                                 </div>
 
@@ -2345,7 +2347,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 {/* CAMPO 1: RG */}
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRG ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRG ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        1. Foto do RG ou CNH (Frente e Verso) {fotoRG && '✅'}
+                                                        1. Foto do RG ou CNH (Frente e Verso) {fotoRG && <CheckCircle size={16} className="text-success inline-block ml-2" />}
                                                     </label>
                                                     <input 
                                                         type="file" 
@@ -2358,7 +2360,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 {/* CAMPO 2: RESIDENCIA */}
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoResidencia ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        2. Comprovante de Residência {fotoResidencia && '✅'}
+                                                        2. Comprovante de Residência {fotoResidencia && <CheckCircle size={16} className="text-success inline-block ml-2" />}
                                                     </label>
                                                     <input 
                                                         type="file" 
@@ -2371,7 +2373,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 {/* CAMPO 3: RENDA */}
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRenda ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRenda ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        3. Comprovante de Renda {fotoRenda && '✅'}
+                                                        3. Comprovante de Renda {fotoRenda && <CheckCircle size={16} className="text-success inline-block ml-2" />}
                                                     </label>
                                                     <input 
                                                         type="file" 
@@ -2646,7 +2648,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                                                                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
                                                                                 <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Configuração de Garantia</p>
-                                                                                {emp.tipo_garantia === 'hibrida' && <p style={{ fontSize: '0.65rem', color: 'var(--success)', fontWeight: 700, marginBottom: '4px' }}>✨ MODO JATO ATIVO (Pool Acelerado)</p>}
+                                                                                {emp.tipo_garantia === 'hibrida' && <p style={{ fontSize: '0.65rem', color: 'var(--success)', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><Sparkles size={12} className="text-primary" /> MODO JATO ATIVO (Pool Acelerado)</p>}
                                                                                 
                                                                                 {emp.garantidores && emp.garantidores.length > 0 ? (
                                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2705,7 +2707,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                                 <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '8px' }}>
                                                                                     <span>{g.nome}</span>
                                                                                     <span style={{ color: g.aceito ? 'var(--success)' : 'var(--warning)', fontWeight: 700 }}>
-                                                                                        {g.aceito ? 'Confirmou ✓' : 'Pendente...'}
+                                                                                        {g.aceito ? <span style={{display: 'inline-flex', alignItems: 'center', gap: '4px'}}>Confirmou <CheckCircle size={12} /></span> : 'Pendente...'}
                                                                                     </span>
                                                                                 </div>
                                                                             ))}
@@ -3169,7 +3171,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Anuncie grátis por 24h com 50 views. Preencha os dados ou use a colagem inteligente.</p>
                     
                     <div className="input-group mb-1">
-                        <label style={{ color: 'var(--primary)', fontWeight: 600 }}>✨ Colagem Inteligente (Smart Paste)</label>
+                        <label style={{ color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={16} /> Colagem Inteligente (Smart Paste)</label>
                         <textarea 
                             className="smart-paste-area" 
                             placeholder="Cole aqui a descrição completa do produto para auto-preenchimento..."
@@ -3242,7 +3244,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} 
                         />
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            💡 Se inserir apenas o número do WhatsApp, criaremos o link automaticamente para você!
+                            <Info size={14} className="text-warning inline-block mr-1" /> Se inserir apenas o número do WhatsApp, criaremos o link automaticamente para você!
                         </p>
                     </div>
 
@@ -3264,7 +3266,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                     <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                            ⚠️ <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Psy Pay atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
+                            <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Psy Pay atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
                         </p>
                     </div>
 
@@ -3391,7 +3393,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             <ModalPremium
                 isOpen={showAssinarModal}
                 onClose={() => setShowAssinarModal(false)}
-                title="🔥 Upgrade Premium Marketplace"
+                title={<span style={{display: 'flex', alignItems: 'center', gap: '8px'}}><Flame size={20} className="text-danger" /> Upgrade Premium Marketplace</span>}
                 type="info"
             >
                 <div style={{ textAlign: 'center' }}>
@@ -3463,10 +3465,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                     <div style={{ textAlign: 'left', marginTop: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.8' }}>
-                            <li>💰 <strong>Cashback em Pontos:</strong> Ganhe pontos por cada link aberto.</li>
-                            <li>📉 <strong>Taxa Zero em Vendas:</strong> Venda no Marketplace sem comissão.</li>
-                            <li>🚀 <strong>Prioridade de Saque:</strong> Seus saques são processados primeiro.</li>
-                            <li>💎 <strong>Selo VIP:</strong> Destaque exclusivo no seu perfil e anúncios.</li>
+                            <li><Coins size={16} className="text-success inline-block mr-2" /> <strong>Cashback em Pontos:</strong> Ganhe pontos por cada link aberto.</li>
+                            <li><TrendingDown size={16} className="text-success inline-block mr-2" /> <strong>Taxa Zero em Vendas:</strong> Venda no Marketplace sem comissão.</li>
+                            <li><Rocket size={16} className="text-primary inline-block mr-2" /> <strong>Prioridade de Saque:</strong> Seus saques são processados primeiro.</li>
+                            <li><Gem size={16} className="text-primary inline-block mr-2" /> <strong>Selo VIP:</strong> Destaque exclusivo no seu perfil e anúncios.</li>
                         </ul>
                     </div>
 

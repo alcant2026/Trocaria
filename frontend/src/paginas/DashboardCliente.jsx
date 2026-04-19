@@ -719,10 +719,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
         setLoadingAction(true);
         try {
-            const res = await api.post('/financeiro/pix/gerar', { 
+            const payload = {
                 valor: v,
-                parceiro_id: parceiroIdDeposito 
-            });
+                parceiro_id: parceiroIdDeposito ? parseInt(parceiroIdDeposito) : null
+            };
+            const res = await api.post('/financeiro/pix/gerar', payload);
             setQrCodeData(res);
             setPassoDeposito(2); // Avança pra tela do QR Code pix
         } catch (err) {

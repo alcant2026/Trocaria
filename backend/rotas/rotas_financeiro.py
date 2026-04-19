@@ -593,15 +593,17 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
     payment = result.get("response", {})
     
     if result.get("status") not in [200, 201]:
-        logger.error(f"Erro Mercado Pago: {payment}")
-        error_msg = "Não foi possível gerar o código PIX. Verifique a conexão do parceiro ou as credenciais."
+        logger.error(f"❌ ERRO MERCADO PAGO ({result.get("status")}): {payment}")
+        error_msg = "Não foi possível gerar o PIX. "
         if payment.get("message") == "Unauthorized use of live credentials":
-            error_msg = "Erro: Você está usando chaves de PRODUÇÃO em localhost. Use chaves de TESTE (Sandbox)."
+            error_msg += "Não é permitido usar chaves de PRODUÇÃO em localhost."
+        elif "application_fee" in str(payment):
+            error_msg += "O lojista precisa autorizar a taxa de intermediação."
         elif result.get("status") == 401:
-            error_msg = "Erro: Token do Mercado Pago inválido ou expirado."
-            
+            error_msg += "O token do lojista expirou ou é inválido."
+        else:
+            error_msg += "Verifique a conexão do parceiro."
         raise HTTPException(status_code=400, detail=error_msg)
-        
     payment_id = payment.get("id")
     qr_code = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code")
     qr_code_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64")

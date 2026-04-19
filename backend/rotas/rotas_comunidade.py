@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink, HistoricoClique
@@ -198,7 +198,7 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
     Filtra por categoria se fornecido.
     """
     offset = (page - 1) * limit
-    query = db.query(LinkAfiliado).filter(
+    query = db.query(LinkAfiliado).options(joinedload(LinkAfiliado.usuario)).filter(
         LinkAfiliado.is_active == True,
         LinkAfiliado.visualizacoes_restantes > 0
     )
@@ -211,7 +211,7 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
     
     resultado = []
     for l in links:
-        anunciante = db.query(Usuario).filter(Usuario.id == l.usuario_id).first()
+        anunciante = l.usuario
         resultado.append({
             "id": l.id,
             "nome_produto": l.nome_produto,

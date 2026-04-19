@@ -28,14 +28,14 @@ class InformePDF(FPDF):
         
         self.set_font('Arial', 'B', 14)
         self.set_text_color(80, 80, 80)
-        self.cell(0, 10, 'INFORME DE RENDIMENTOS FINANCEIROS', 0, 1, 'C')
+        self.cell(0, 10, 'EXTRATO DE FIDELIDADE E CASHBACK', 0, 1, 'C')
         self.ln(10)
 
     def footer(self):
         self.set_y(-25)
         self.set_font('Arial', 'I', 8)
         self.set_text_color(128, 128, 128)
-        self.cell(0, 10, 'Este documento é um extrato auxiliar para auxílio na declaração do IRPF.', 0, 1, 'C')
+        self.cell(0, 10, 'Este documento é um extrato demonstrativo de recompensas e uso da plataforma.', 0, 1, 'C')
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
 @router.get("/pdf")
@@ -91,7 +91,7 @@ async def gerar_relatorio_pdf(
         
         # Identificação
         pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f'Contribuinte: {user.nome.upper()}', 0, 1)
+        pdf.cell(0, 10, f'Usuário: {user.nome.upper()}', 0, 1)
         pdf.set_font('Arial', '', 10)
         pdf.cell(0, 8, f'CPF: {user.cpf}', 0, 1)
         pdf.cell(0, 8, f'Ano-Calendário de Referência: {ano}', 0, 1)
@@ -100,7 +100,7 @@ async def gerar_relatorio_pdf(
         # Seção 1: Saldo em CC (Conta Digital)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, ' 1. SALDO EM CONTA DIGITAL (CONTA CORRENTE)', 0, 1, 'L', True)
+        pdf.cell(0, 10, ' 1. SALDO DISPONÍVEL NA CARTEIRA', 0, 1, 'L', True)
         pdf.ln(2)
         pdf.set_font('Arial', '', 10)
         pdf.cell(100, 8, f'Saldo em 31/12/{ano}:', 0, 0)
@@ -111,12 +111,12 @@ async def gerar_relatorio_pdf(
         # Seção 2: Saldo e Rendimentos do Pool (LIQUIDEZ)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, ' 2. INVESTIMENTOS EM POOL DE LIQUIDEZ (POUPANÇA/POOL)', 0, 1, 'L', True)
+        pdf.cell(0, 10, ' 2. SALDO DE CASHBACK (FUNDO COMUNITÁRIO)', 0, 1, 'L', True)
         pdf.ln(4)
         
         # O que tem no Pool
         pdf.set_font('Arial', '', 10)
-        pdf.cell(100, 10, f'Valor Total em Custódia no Pool (31/12/{ano}):', 0, 0)
+        pdf.cell(100, 10, f'Fidelidade Acumulada no Fundo (31/12/{ano}):', 0, 0)
         pdf.set_font('Arial', 'B', 12)
         pdf.set_text_color(41, 121, 255) # Azul destaque
         pdf.cell(0, 10, f'R$ {user.saldo_caixa:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'), 0, 1, 'R')
@@ -124,7 +124,7 @@ async def gerar_relatorio_pdf(
         # Quanto Ganhou (Lucro Real)
         pdf.set_text_color(0, 0, 0) # Volta ao preto
         pdf.set_font('Arial', '', 10)
-        pdf.cell(100, 10, f'Rendimento Líquido Acumulado no Ano ({ano}):', 0, 0)
+        pdf.cell(100, 10, f'Recompensas / Cashback Recebidos ({ano}):', 0, 0)
         pdf.set_font('Arial', 'B', 12)
         pdf.set_text_color(0, 150, 0) # Verde lucro
         pdf.cell(0, 10, f'R$ {rendimento_pool:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'), 0, 1, 'R')
@@ -134,7 +134,7 @@ async def gerar_relatorio_pdf(
         
         # Mensagem Final
         pdf.set_font('Arial', 'I', 9)
-        pdf.multi_cell(0, 5, 'Nota: Os valores acima refletem a posição consolidada do investidor na plataforma PSY PAY para fins de ajuste anual perante a Receita Federal ou controle financeiro pessoal.', 0, 'C')
+        pdf.multi_cell(0, 5, 'Nota: Os valores acima representam o acúmulo de bônus, cashback e movimentação na plataforma PSY PAY, gerado exclusivamente para controle pessoal do usuário.', 0, 'C')
 
         # Stream the PDF response
         pdf_output = pdf.output(dest='S')
@@ -142,7 +142,7 @@ async def gerar_relatorio_pdf(
             io.BytesIO(pdf_output),
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=INFORME_PSY_PAY_{user.nome.replace(' ', '_')}_{ano}.pdf"
+                "Content-Disposition": f"attachment; filename=EXTRATO_PSY_PAY_{user.nome.replace(' ', '_')}_{ano}.pdf"
             }
         )
     except Exception as e:

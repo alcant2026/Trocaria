@@ -18,8 +18,9 @@ IS_PROD = os.environ.get("RENDER") == "true"
 CLIENT_ID = os.environ.get("MERCADOPAGO_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("MERCADOPAGO_CLIENT_SECRET", "")
 FRONTEND_URL = os.environ.get("FRONTEND_URL" if IS_PROD else "FRONTEND_URL_LOCAL", "http://localhost:3000")
-# Voltando para o link que já está cadastrado no seu painel MP
-REDIRECT_URI = f"{FRONTEND_URL}/api/marketplace/callback"
+# O link deve apontar para o BACKEND (servidor) no Render
+BACKEND_URL_PROD = "https://peer-5gq5.onrender.com"
+REDIRECT_URI = f"{BACKEND_URL_PROD if IS_PROD else FRONTEND_URL}/api/marketplace/callback"
 
 import urllib.parse
 

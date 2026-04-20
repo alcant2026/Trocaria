@@ -1293,9 +1293,19 @@ async def editar_parceiro(id: int, request: Request, dados: ParceiroUpdate, db: 
     parceiro.endereco = dados.endereco
     parceiro.usuario_id = dados.usuario_id
     parceiro.is_active = dados.ativo
+    
+    # NOVO: Sincroniza tokens do MP na edição
+    if dados.usuario_id:
+        usuario_alvo = db.query(Usuario).filter(Usuario.id == dados.usuario_id).first()
+        if usuario_alvo and usuario_alvo.mp_access_token:
+            parceiro.mp_access_token = usuario_alvo.mp_access_token
+            parceiro.mp_refresh_token = usuario_alvo.mp_refresh_token
+            parceiro.mp_user_id = usuario_alvo.mp_user_id
+            parceiro.mp_token_expires_at = usuario_alvo.mp_token_expires_at
+
     registrar_acao_admin(db, admin.id, "EDITAR_PARCEIRO", alvo_id=str(parceiro.id), detalhes=f"Novo nome: {parceiro.nome}, Ativo: {parceiro.is_active}", ip=request.client.host)
     db.commit()
-    return {"message": "Parceiro atualizado!"}
+    return {"message": "Parceiro atualizado e token sincronizado!"}
 
 @router.delete("/admin/parceiros/{id}")
 async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):

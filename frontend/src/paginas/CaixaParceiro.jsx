@@ -14,6 +14,7 @@ const CaixaParceiro = ({ onUpdate, usuario }) => {
     const [tipoOp, setTipoOp] = useState('deposito');
     const [simulacao, setSimulacao] = useState(null);
     const [fundoReserva, setFundoReserva] = useState('');
+    const [qrCodeData, setQrCodeData] = useState(null);
 
     const limparMensagens = () => {
         setErro('');

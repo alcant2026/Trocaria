@@ -1307,6 +1307,36 @@ async def editar_parceiro(id: int, request: Request, dados: ParceiroUpdate, db: 
     db.commit()
     return {"message": "Parceiro atualizado e token sincronizado!"}
 
+@router.post("/admin/parceiros/sincronizar-tokens")
+async def sincronizar_tokens_parceiros(request: Request, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """
+    Percorre todos os lojistas e copia o token do Mercado Pago
+    do usuário dono para o registro da loja. Útil quando o lojista
+    foi criado antes de o usuário vincular a conta do MP.
+    """
+    parceiros = db.query(Parceiro).filter(Parceiro.usuario_id != None).all()
+    atualizados = []
+    nao_atualizados = []
+
+    for p in parceiros:
+        usuario_alvo = db.query(Usuario).filter(Usuario.id == p.usuario_id).first()
+        if usuario_alvo and usuario_alvo.mp_access_token:
+            p.mp_access_token = usuario_alvo.mp_access_token
+            p.mp_refresh_token = usuario_alvo.mp_refresh_token
+            p.mp_user_id = usuario_alvo.mp_user_id
+            p.mp_token_expires_at = usuario_alvo.mp_token_expires_at
+            atualizados.append(p.nome)
+        else:
+            nao_atualizados.append(p.nome)
+
+    db.commit()
+    registrar_acao_admin(db, admin.id, "SINCRONIZAR_TOKENS_MP", alvo_id="todos", detalhes=f"Atualizados: {atualizados}", ip=request.client.host)
+    return {
+        "message": f"{len(atualizados)} lojista(s) sincronizado(s) com sucesso!",
+        "atualizados": atualizados,
+        "sem_mp_vinculado": nao_atualizados
+    }
+
 @router.delete("/admin/parceiros/{id}")
 async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = db.query(Parceiro).filter(Parceiro.id == id).first()

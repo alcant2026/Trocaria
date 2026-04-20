@@ -365,6 +365,16 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleSincronizarTokens = async () => {
+        try {
+            const res = await api.post('/financeiro/admin/parceiros/sincronizar-tokens');
+            setMensagem(res.message || res.data?.message || 'Tokens sincronizados com sucesso!');
+            carregarParceiros();
+        } catch (err) {
+            setMensagem('Erro ao sincronizar: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
     const handleCriarParceiro = async () => {
         if (!novoParceiroData.nome || !novoParceiroData.endereco) {
             setMensagem('Erro: Preencha todos os campos do parceiro.');
@@ -897,9 +907,19 @@ const AdminDashboard = () => {
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
                             <h3>Parceiros de Caixa (Lojistas)</h3>
-                            <button className="btn btn-primary text-xs gap-1" onClick={() => setShowNovoParceiroModal(true)}>
-                                <PlusCircle size={16} /> Novo Parceiro
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button 
+                                    className="btn btn-outline text-xs gap-1" 
+                                    onClick={handleSincronizarTokens}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', borderColor: 'var(--success)', color: 'var(--success)' }}
+                                    title="Sincroniza o token do Mercado Pago do usuário dono para a loja parceira"
+                                >
+                                    <RefreshCw size={14} /> Sincronizar Tokens MP
+                                </button>
+                                <button className="btn btn-primary text-xs gap-1" onClick={() => setShowNovoParceiroModal(true)}>
+                                    <PlusCircle size={16} /> Novo Parceiro
+                                </button>
+                            </div>
                         </div>
                         
                         {parceiros.length === 0 ? (

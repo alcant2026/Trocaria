@@ -2915,7 +2915,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#FFD600' }}>Seja um Membro Premium Marketplace</h4>
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe 1 ponto por link aberto e converta em saldo real automaticamente!</p>
                             </div>
-                            <button className="btn btn-primary btn-sm" style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px' }} onClick={() => setShowAssinarModal(true)}>ASSINAR R$ 199,99</button>
+                            <button 
+                                className="btn btn-primary btn-sm" 
+                                style={{ background: '#FFD600', color: '#000', border: 'none', fontWeight: 800, width: 'auto', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }} 
+                                onClick={() => setShowAssinarModal(true)}
+                            >
+                                <Gem size={14} /> ASSINAR PREMIUM
+                            </button>
                         </div>
                     )}
 
@@ -3389,7 +3395,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
                 )}
             </ModalPremium>
-            {/* Modal de Assinatura Premium */}
             <ModalPremium
                 isOpen={showAssinarModal}
                 onClose={() => setShowAssinarModal(false)}
@@ -3397,10 +3402,23 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 type="info"
             >
                 <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
-                        Escolha o plano que melhor se adapta a você e ganhe pontos, isenção de taxas e selo VIP!
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        Desbloqueie vantagens exclusivas e turbine seus resultados na plataforma!
                     </p>
 
+                    {/* BENEFÍCIOS PRIMEIRO */}
+                    <div style={{ textAlign: 'left', marginBottom: '20px', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>O que você ganha:</p>
+                        <ul style={{ margin: 0, paddingLeft: '0', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '2', listStyle: 'none' }}>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Coins size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Cashback em Pontos</strong> — 1 ponto por link aberto, convertível em saldo real.</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><TrendingDown size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Taxa Zero em Vendas</strong> — Anuncie e venda sem pagar comissão à plataforma.</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Rocket size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Prioridade de Saque</strong> — Seus saques são processados antes dos demais.</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Gem size={16} style={{ color: '#FFD600', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Selo VIP</strong> — Badge dourado exclusivo no seu perfil e anúncios em destaque.</span></li>
+                        </ul>
+                    </div>
+
+                    {/* ESCOLHA DE PLANO */}
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Escolha seu plano:</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {/* PLANO MENSAL */}
                         <div 
@@ -3409,18 +3427,22 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 display: 'flex', 
                                 justifyContent: 'space-between', 
                                 alignItems: 'center', 
-                                padding: '20px', 
-                                border: '1px solid rgba(255,255,255,0.05)',
-                                background: 'rgba(255,255,255,0.02)'
+                                padding: '16px 20px', 
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                transition: 'border-color 0.2s'
                             }}
                             onClick={() => handleAssinarPlano('mensal')}
                         >
                             <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontWeight: 800, fontSize: '1rem' }}>MENSAL</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cobrado a cada 30 dias</div>
+                                <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Plano Mensal</div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Cobrado uma vez, válido por 30 dias</div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--primary)' }}>R$ 19,99</div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <div style={{ fontWeight: 900, fontSize: '1.3rem', color: 'var(--primary)' }}>R$ 19,99</div>
+                                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>por mês</div>
                             </div>
                         </div>
 
@@ -3431,46 +3453,38 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 display: 'flex', 
                                 justifyContent: 'space-between', 
                                 alignItems: 'center', 
-                                padding: '20px', 
+                                padding: '16px 20px', 
                                 border: '2px solid var(--warning)',
                                 background: 'rgba(255,214,0,0.05)',
+                                borderRadius: '12px',
                                 position: 'relative',
-                                overflow: 'hidden'
+                                overflow: 'hidden',
+                                cursor: 'pointer'
                             }}
                             onClick={() => handleAssinarPlano('anual')}
                         >
                             <div style={{ 
-                                position: 'absolute', 
-                                top: '0', 
-                                right: '0', 
-                                background: 'var(--warning)', 
-                                color: '#000', 
-                                fontSize: '0.55rem', 
-                                fontWeight: 900, 
-                                padding: '2px 10px', 
-                                borderBottomLeftRadius: '8px' 
+                                position: 'absolute', top: 0, right: 0,
+                                background: 'var(--warning)', color: '#000',
+                                fontSize: '0.55rem', fontWeight: 900,
+                                padding: '3px 12px', borderBottomLeftRadius: '8px'
                             }}>
                                 ECONOMIZE 16%
                             </div>
                             <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--warning)' }}>ANUAL (VIP)</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Acesso por 1 ano inteiro</div>
+                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--warning)' }}>Plano Anual <Gem size={14} style={{ display: 'inline', verticalAlign: 'middle' }} /></div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Acesso completo por 1 ano inteiro + bônus de Score</div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--warning)' }}>R$ 199,99</div>
-                                <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>~R$ 16,66/mês</div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <div style={{ fontWeight: 900, fontSize: '1.3rem', color: 'var(--warning)' }}>R$ 199,99</div>
+                                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>~R$ 16,66/mês</div>
                             </div>
                         </div>
                     </div>
 
-                    <div style={{ textAlign: 'left', marginTop: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.8' }}>
-                            <li><Coins size={16} className="text-success inline-block mr-2" /> <strong>Cashback em Pontos:</strong> Ganhe pontos por cada link aberto.</li>
-                            <li><TrendingDown size={16} className="text-success inline-block mr-2" /> <strong>Taxa Zero em Vendas:</strong> Venda no Marketplace sem comissão.</li>
-                            <li><Rocket size={16} className="text-primary inline-block mr-2" /> <strong>Prioridade de Saque:</strong> Seus saques são processados primeiro.</li>
-                            <li><Gem size={16} className="text-primary inline-block mr-2" /> <strong>Selo VIP:</strong> Destaque exclusivo no seu perfil e anúncios.</li>
-                        </ul>
-                    </div>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '14px', opacity: 0.7 }}>
+                        O valor é descontado do saldo da sua carteira Psy Pay. Certifique-se de ter saldo disponível antes de assinar.
+                    </p>
 
                     {loadingAssinatura && <div className="mt-1" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Processando assinatura...</div>}
                 </div>

@@ -1371,3 +1371,14 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
         grid-template-columns: 1fr !important;
     }
 }
+
+/* 5. Correção dos Seletores (Dropdown Menu) no Tema Escuro */
+select option {
+    background-color: #13141f !important; /* Fundo escuro azulado padrão do sistema */
+    color: #ffffff !important;
+    padding: 10px;
+}
+select.input-field option {
+    background-color: #13141f !important;
+    color: #ffffff !important;
+}

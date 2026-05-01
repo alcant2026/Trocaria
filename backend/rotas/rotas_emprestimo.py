@@ -5,11 +5,13 @@ from sqlalchemy import func
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
+import hashlib
 from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, RegistroAuditoria
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from utils_fintech import calcular_limite_credito, verificar_isencao_taxa, aprovar_emprestimo_instantaneo
 from utils_score import atualizar_score
+from utils_emprestimo import calcular_mora, creditar_plataforma, limpar_cache, calcular_divida_total
 from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
@@ -139,47 +141,21 @@ async def pagar_parcela(id: int, db: Session = Depends(get_db), usuario_logado: 
     total_final = total_com_juros + (solicitacao.taxas_adicionais or Decimal("0.00"))
     valor_parcela = total_final / solicitacao.prazo_meses
     
-    # Adicionar mora se estiver atrasado
-    agora = datetime.datetime.utcnow()
-    mora = Decimal("0.00")
-    if solicitacao.proximo_vencimento and agora > solicitacao.proximo_vencimento:
-        atraso = (agora - solicitacao.proximo_vencimento).days
-        mora = valor_parcela * Decimal("0.02") + (valor_parcela * Decimal("0.001") * atraso)
-
+    mora = calcular_mora(solicitacao, valor_parcela)
     total_a_pagar = valor_parcela + mora
 
     if usuario.saldo < total_a_pagar:
         raise HTTPException(status_code=400, detail=f"Saldo insuficiente. Necessário: R$ {total_a_pagar:,.2f}")
 
-    # 1. Deduzir saldo
     usuario.saldo -= total_a_pagar
-    
-    # 2. Distribuição Financeira (Cooperativa 2.0)
-    # Regra: 100% do juro e taxas entram no cofre da plataforma (000PL).
-    # O rateio para o Pool deixa de ser instantâneo e passa a ser periódico via Rota de Dividendos.
-    
+
     juro_da_parcela = (solicitacao.valor * taxa_mensal)
     principal_da_parcela = solicitacao.valor / solicitacao.prazo_meses
-    
-    # Taxa diluída é o que foi financiado no início
+
     taxa_diluida = (solicitacao.taxas_adicionais or Decimal("0.00")) / solicitacao.prazo_meses
     receita_total_plataforma = juro_da_parcela + taxa_diluida + mora
 
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        # Retorno de Principal volta para o capital giro (saldo_caixa)
-        plataforma.saldo_caixa += principal_da_parcela
-        # Juros e Taxas entram no lucro bruto (saldo) para acumulo de dividendos
-        plataforma.saldo += receita_total_plataforma
-        
-        # Auditoria da Receita
-        db.add(Transacao(
-            usuario_id="000PL",
-            valor=receita_total_plataforma,
-            tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
-            status="concluido",
-            detalhes=f"Receita Bruta (Cooperativa 2.0) - Parc. Empréstimo #{solicitacao.id}"
-        ))
+    creditar_plataforma(db, principal_da_parcela, receita_total_plataforma, solicitacao.id, "Receita Bruta (Cooperativa 2.0) - Parc")
 
     # 3. Atualizar Empréstimo
     solicitacao.parcelas_pagas += 1
@@ -202,8 +178,7 @@ async def pagar_parcela(id: int, db: Session = Depends(get_db), usuario_logado: 
     ))
 
     db.commit()
-    cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
+    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
     return {"message": "Pagamento realizado com sucesso!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/pagamento-avulso/{id}")
@@ -223,40 +198,22 @@ async def pagamento_avulso(id: int, dados: PagamentoRequest, db: Session = Depen
     if usuario.saldo < valor_pagamento:
         raise HTTPException(status_code=400, detail="Saldo insuficiente.")
 
-    # Deduzir saldo
     usuario.saldo -= valor_pagamento
-    
-    # 2. Distribuição Financeira (Cooperativa 2.0)
-    # 100% dos juros da amortização entram no cofre central.
-    # Recalculamos as proporções baseado na parcela base
+
     taxa_mensal = solicitacao.taxa_juros / 100
     juro_mensal = solicitacao.valor * taxa_mensal
     principal_mensal = solicitacao.valor / solicitacao.prazo_meses
     total_base = juro_mensal + principal_mensal
-    
+
     prop_juros = juro_mensal / total_base
     valor_juros = valor_pagamento * prop_juros
     valor_principal = valor_pagamento - valor_juros
 
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        # Principal volta para capital giro (saldo_caixa)
-        plataforma.saldo_caixa += valor_principal
-        # Juros da amortização entram no lucro bruto (saldo)
-        plataforma.saldo += valor_juros
-        
-        db.add(Transacao(
-            usuario_id="000PL",
-            valor=valor_juros,
-            tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
-            status="concluido",
-            detalhes=f"Receita Bruta Amortização (Cooperativa 2.0) - Empréstimo #{solicitacao.id}"
-        ))
+    creditar_plataforma(db, valor_principal, valor_juros, solicitacao.id, "Receita Bruta Amortização (Cooperativa 2.0)")
 
     # Registrar amortização
     solicitacao.valor_amortizado += valor_pagamento
     
-    from utils_emprestimo import calcular_divida_total
     divida_restante = calcular_divida_total(solicitacao)
     
     if divida_restante <= 0:
@@ -272,15 +229,12 @@ async def pagamento_avulso(id: int, dados: PagamentoRequest, db: Session = Depen
     ))
 
     db.commit()
-    cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
+    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
     return {"message": "Pagamento avulso processado!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/quitar-total/{id}")
 async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Liquida o empréstimo integralmente."""
-    from utils_emprestimo import calcular_divida_total
-    
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == id,
@@ -296,33 +250,16 @@ async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: U
     if usuario.saldo < total_quitar:
         raise HTTPException(status_code=400, detail=f"Saldo insuficiente para quitação. Necessário R$ {total_quitar:,.2f}")
 
-    # 1. Pagar
     usuario.saldo -= total_quitar
-    
-    # 2. Quitação e Distribuição (Cooperativa 2.0)
-    # Todo o excedente de juros e taxas vai para o cofre central
+
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     taxa_mensal = solicitacao.taxa_juros / 100
-    
-    # Lucro é o juro das parcelas restantes + taxas pendentes
+
     juros_restantes = (solicitacao.valor * taxa_mensal) * parcelas_restantes
-    taxas_pendentes = solicitacao.taxas_adicionais or Decimal("0.00") 
+    taxas_pendentes = solicitacao.taxas_adicionais or Decimal("0.00")
     principal_restante = (solicitacao.valor / solicitacao.prazo_meses) * parcelas_restantes
-    
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        # Principal volta para capital giro
-        plataforma.saldo_caixa += principal_restante
-        # Juros restantes e taxas pendentes entram no lucro bruto
-        plataforma.saldo += (juros_restantes + taxas_pendentes)
-        
-        db.add(Transacao(
-            usuario_id="000PL",
-            valor=(juros_restantes + taxas_pendentes),
-            tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
-            status="concluido",
-            detalhes=f"Receita Bruta Quitação (Cooperativa 2.0) - Empréstimo #{solicitacao.id}"
-        ))
+
+    creditar_plataforma(db, principal_restante, juros_restantes + taxas_pendentes, solicitacao.id, "Receita Bruta Quitação (Cooperativa 2.0)")
 
     # 3. Encerrar contrato
     solicitacao.status = StatusSolicitacao.CONCLUIDO
@@ -337,8 +274,7 @@ async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: U
     ))
 
     db.commit()
-    cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
+    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
     return {"message": "Crédito liquidado integralmente!", "novo_saldo": float(usuario.saldo)}
 
 
@@ -401,10 +337,12 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, '1. IDENTIFICAÇÃO DAS PARTES', 0, 1, 'L')
     pdf.set_font('Helvetica', '', 10)
+    cpf_mascarado = f"***.{usuario.cpf[-4:]}" if len(usuario.cpf) >= 4 else "***"
+    pix_mascarado = f"{usuario.chave_pix[:3]}***{usuario.chave_pix[-3:]}" if len(usuario.chave_pix) >= 6 else "***"
     pdf.multi_cell(0, 6, f"CREDOR: PSY PAY PLATAFORMA DE CRÉDITO (Fundo de Liquidez Cooperativo)\n"
                          f"DEVEDOR(A): {usuario.nome}\n"
-                         f"CPF: {usuario.cpf}\n"
-                         f"CHAVE PIX REGISTRADA: {usuario.chave_pix}")
+                         f"CPF: {cpf_mascarado}\n"
+                         f"CHAVE PIX REGISTRADA: {pix_mascarado}")
     pdf.ln(5)
 
     # 3. Dados do Empréstimo (Quadro Resumo)
@@ -455,9 +393,12 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     pdf.cell(0, 10, '4. AUTENTICAÇÃO DO SISTEMA', 0, 1, 'L')
     pdf.set_font('Helvetica', 'I', 9)
     pdf.set_text_color(50, 50, 50)
+    hash_id = hashlib.sha256(f"{solicitacao.id}{usuario.cpf}{solicitacao.data_criacao.isoformat()}".encode()).hexdigest()[:16]
+    cpf_mascarado = f"***.{usuario.cpf[-4:]}" if len(usuario.cpf) >= 4 else "***"
+    pix_mascarado = f"{usuario.chave_pix[:3]}***{usuario.chave_pix[-3:]}" if len(usuario.chave_pix) >= 6 else "***"
     pdf.multi_cell(0, 5, f"Documento gerado e autenticado eletronicamente em {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}.\n"
                          f"O devedor concordou com estes termos via aplicativo móvel/web.\n"
-                         f"Hash de Identificação: {abs(hash(str(solicitacao.id) + usuario.cpf))}")
+                         f"Hash de Identificação: {hash_id}")
 
     # Retornar o PDF como stream
     output = io.BytesIO()

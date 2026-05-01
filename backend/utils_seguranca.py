@@ -12,7 +12,7 @@ def registrar_acao_admin(db: Session, admin_id: str, acao: str, alvo_id: str = N
         alvo_id=alvo_id,
         detalhes=detalhes,
         ip=ip,
-        data_acao=datetime.datetime.utcnow()
+        data_acao=datetime.datetime.now(datetime.timezone.utc)
     )
     db.add(nova_acao)
     db.commit()

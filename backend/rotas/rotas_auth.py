@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import pyotp
 from modelos.modelos_db import Usuario, RegistroAuditoria
@@ -140,7 +140,7 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         )
 
     # Criar registro de auditoria para o aceite de termos
-    agora = datetime.utcnow()
+    agora = datetime.now(timezone.utc)
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         municipio=f"{dados.cidade}/{dados.estado}" if dados.cidade else "Localização não informada",
@@ -244,7 +244,7 @@ def verify_password(plain_password, hashed_password):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -329,7 +329,7 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
 async def aceitar_cookies(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
     """Registra o consentimento de cookies para o usuário logado."""
     usuario.aceite_cookies = True
-    usuario.data_aceite_cookies = datetime.utcnow()
+    usuario.data_aceite_cookies = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Preferências de cookies salvas."}
 
@@ -381,7 +381,7 @@ async def ativar_2fa(request: Request, codigo: str, usuario: Usuario = Depends(o
         # Só marca a alteração se for RE-ativação (campo já existia = o usuário desativou antes)
         # No primeiro cadastro do 2FA, ultima_alteracao_2fa fica NULL → sem trava de 48h
         if usuario.ultima_alteracao_2fa is not None:
-            usuario.ultima_alteracao_2fa = datetime.utcnow()
+            usuario.ultima_alteracao_2fa = datetime.now(timezone.utc)
         db.commit()
         return {"message": "2FA ativado com sucesso!"}
     else:
@@ -400,7 +400,7 @@ async def desativar_2fa(request: Request, senha: str, codigo: str, usuario: Usua
     
     usuario.two_factor_enabled = False
     usuario.totp_secret = None
-    usuario.ultima_alteracao_2fa = datetime.utcnow()
+    usuario.ultima_alteracao_2fa = datetime.now(timezone.utc)
     db.commit()
     return {"message": "2FA desativado."}
 
@@ -443,7 +443,7 @@ async def excluir_conta(dados: SolicitacaoExclusao, request: Request, usuario: U
     db.add(RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.utcnow(),
+        data_registro=datetime.now(timezone.utc),
         municipio="Exclusão de Conta (Self-Service)"
     ))
 
@@ -482,7 +482,7 @@ async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, b
     
     # Salvar Hash do código (Segurança Bancária: nunca salvar limpo)
     usuario.codigo_recuperacao_hash = hashlib.sha256(codigo.encode()).hexdigest()
-    usuario.expiracao_recuperacao = datetime.utcnow() + timedelta(minutes=15)
+    usuario.expiracao_recuperacao = datetime.now(timezone.utc) + timedelta(minutes=15)
     
     db.commit()
 
@@ -506,7 +506,7 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
         raise HTTPException(status_code=400, detail="Solicitação de recuperação não encontrada ou expirada.")
 
     # Verificar expiração
-    if datetime.utcnow() > usuario.expiracao_recuperacao:
+    if datetime.now(timezone.utc) > usuario.expiracao_recuperacao:
         usuario.codigo_recuperacao_hash = None # Limpa por segurança
         db.commit()
         raise HTTPException(status_code=400, detail="O código de recuperação expirou (limite de 15 min).")
@@ -526,7 +526,7 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
     usuario.expiracao_recuperacao = None
     
     # Registrar auditoria
-    agora = datetime.utcnow()
+    agora = datetime.now(timezone.utc)
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),

@@ -2,11 +2,38 @@ from sqlalchemy.orm import Session
 from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Usuario
 from decimal import Decimal
 import datetime
+from typing import Optional
+
+
+def calcular_mora(solicitacao: SolicitacaoEmprestimo, valor_parcela: Decimal) -> Decimal:
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    if not solicitacao.proximo_vencimento or agora <= solicitacao.proximo_vencimento:
+        return Decimal("0.00")
+    atraso = (agora - solicitacao.proximo_vencimento).days
+    return valor_parcela * Decimal("0.02") + (valor_parcela * Decimal("0.001") * atraso)
+
+
+def creditar_plataforma(db: Session, valor_principal: Decimal, valor_receita: Decimal, solicitacao_id: int, descricao: str) -> Optional[Usuario]:
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+    if plataforma:
+        plataforma.saldo_caixa += valor_principal
+        plataforma.saldo += valor_receita
+        db.add(Transacao(
+            usuario_id="000PL",
+            valor=valor_receita,
+            tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
+            status="concluido",
+            detalhes=f"{descricao} - Empréstimo #{solicitacao_id}"
+        ))
+    return plataforma
+
+
+def limpar_cache(cache: dict, *user_ids: str):
+    for uid in user_ids:
+        cache.pop(uid, None)
+
 
 def calcular_divida_total(solicitacao: SolicitacaoEmprestimo):
-    """
-    Calcula o valor total devedor de um empréstimo, incluindo principal, juros e mora.
-    """
     taxa_mensal = solicitacao.taxa_juros / 100
     total_com_juros = solicitacao.valor * (1 + (taxa_mensal * solicitacao.prazo_meses))
     valor_parcela_base = total_com_juros / solicitacao.prazo_meses
@@ -14,17 +41,9 @@ def calcular_divida_total(solicitacao: SolicitacaoEmprestimo):
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     valor_quittance_base = valor_parcela_base * parcelas_restantes
     
-    # Adicionar taxas adicionais pendentes
     valor_quittance_base += (solicitacao.taxas_adicionais or Decimal("0.00"))
 
-    # Lógica de Mora (Multa 2% + 0.1% a.d.)
-    agora = datetime.datetime.utcnow()
-    mora_atraso = Decimal("0.00")
-    if solicitacao.proximo_vencimento and agora > solicitacao.proximo_vencimento:
-        delta = agora - solicitacao.proximo_vencimento
-        if delta.days > 0:
-            mora_atraso = valor_parcela_base * Decimal("0.02") + (valor_parcela_base * Decimal("0.001") * delta.days)
-
+    mora_atraso = calcular_mora(solicitacao, valor_parcela_base)
     return valor_quittance_base + mora_atraso
 
 def liquidar_emprestimo_via_pool(usuario, solicitacao, valor_liquidacao, db: Session):
@@ -76,7 +95,7 @@ def processar_expiracoes_interna(db: Session):
     """
     Identifica e cancela solicitações que expiraram o prazo de 4h ou 5d.
     """
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     
     # 1. Solicitações que expiraram a janela de conferência física (4h)
     expiradas_4h = db.query(SolicitacaoEmprestimo).filter(
@@ -109,7 +128,7 @@ def obter_multiplicador_fidelidade(usuario_id: str, db: Session) -> Decimal:
     - 1.5x (Bônus 50%) se tiver empréstimo ativo/pago e estiver rigorosamente em dia.
     - 1.0x caso contrário.
     """
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     
     # Verifica todos os empréstimos do usuário
     vincuo_credito = db.query(SolicitacaoEmprestimo).filter(
@@ -133,7 +152,7 @@ def processar_inadimplencia_coletiva_automatica(db: Session):
     Varredura automática para execução da Cláusula 3.3 do Contrato.
     Regra: Atraso > 5 dias -> Liquidação Automática via Pool (devedor paga com seu capital investido).
     """
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     limite_tolerancia = agora - datetime.timedelta(days=5)
     
     # 1. Buscar empréstimos aprovados com vencimento vencido há mais de 5 dias

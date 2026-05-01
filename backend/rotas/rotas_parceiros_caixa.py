@@ -5,6 +5,7 @@ from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import Usuario, Parceiro, Transacao, TipoTransacao
 from decimal import Decimal
 import datetime
+from utils_parceiros import parceiro_esta_apto
 
 import mercadopago
 import logging
@@ -15,6 +16,13 @@ router = APIRouter(prefix="/parceiros", tags=["Caixa Parceiro"])
 
 # ================= CONFIGURAÇÕES GERAIS =================
 TAXA_OPERACAO_ESPECIE = Decimal("0.05") # Taxa fixa de 5% cobrada do cliente final
+
+def exigir_parceiro_apto_operacional(parceiro: Parceiro):
+    if not parceiro:
+        raise HTTPException(status_code=403, detail="Você não tem permissão de parceiro lojista.")
+    if not parceiro_esta_apto(parceiro):
+        raise HTTPException(status_code=403, detail="Parceiro precisa estar ativo e com CNPJ em situação ATIVA para operar o caixa.")
+    return parceiro
 
 @router.get("/meu-caixa")
 async def obter_meu_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -28,6 +36,9 @@ async def obter_meu_caixa(db: Session = Depends(get_db), usuario: Usuario = Depe
         "is_parceiro": True,
         "parceiro_id": parceiro.id,
         "nome_loja": parceiro.nome,
+        "razao_social": parceiro.razao_social,
+        "cnpj": parceiro.cnpj,
+        "cnpj_status": parceiro.cnpj_status,
         "caixa_aberto": parceiro.caixa_aberto,
         "saldo_inicial": float(parceiro.saldo_caixa_inicial),
         "saldo_gaveta": float(parceiro.saldo_caixa_atual),
@@ -46,8 +57,7 @@ async def abrir_caixa(valor_gaveta: Decimal = Body(..., embed=True), db: Session
     if valor_gaveta < 10:
         raise HTTPException(status_code=400, detail="O fundo de reserva mínimo para abrir o caixa é de R$ 10,00.")
 
-    if not parceiro:
-        raise HTTPException(status_code=403, detail="Você não tem permissão de parceiro lojista.")
+    exigir_parceiro_apto_operacional(parceiro)
     
     # Proteção Atômica: Marca como aberto ANTES de qualquer transação
     parceiro.caixa_aberto = True
@@ -81,8 +91,7 @@ async def abrir_caixa(valor_gaveta: Decimal = Body(..., embed=True), db: Session
 @router.post("/fechar-caixa")
 async def fechar_caixa(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
-    if not parceiro:
-        raise HTTPException(status_code=403, detail="Você não tem permissão de parceiro lojista.")
+    exigir_parceiro_apto_operacional(parceiro)
     
     if not parceiro.caixa_aberto:
         raise HTTPException(status_code=400, detail="Caixa não está aberto.")
@@ -161,6 +170,8 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
          raise HTTPException(status_code=400, detail="Valor da operação deve ser maior que zero.")
          
     parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
+    if parceiro:
+        exigir_parceiro_apto_operacional(parceiro)
     if not parceiro or not parceiro.caixa_aberto:
         print(f"❌ ERRO 403: Caixa fechado p/ usuario {usuario.id}")
         raise HTTPException(status_code=403, detail="Seu caixa está fechado ou você não tem acesso.")
@@ -200,7 +211,7 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
         # Lógica de Prazo de Liquidação da Comissão
         data_liberacao = None
         if parceiro.prazo_liquidacao > 0:
-            data_liberacao = datetime.datetime.utcnow() + datetime.timedelta(days=parceiro.prazo_liquidacao)
+            data_liberacao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=parceiro.prazo_liquidacao)
             parceiro.comissoes_pendentes += comissao_parceiro
         else:
             parceiro.comissoes_acumuladas += comissao_parceiro
@@ -287,7 +298,7 @@ async def intermediar_operacao(dados: IntermediacaoRequest, db: Session = Depend
         # Lógica de Prazo de Liquidação da Comissão
         data_liberacao = None
         if parceiro.prazo_liquidacao > 0:
-            data_liberacao = datetime.datetime.utcnow() + datetime.timedelta(days=parceiro.prazo_liquidacao)
+            data_liberacao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=parceiro.prazo_liquidacao)
             parceiro.comissoes_pendentes += comissao_parceiro
         else:
             parceiro.comissoes_acumuladas += comissao_parceiro
@@ -447,7 +458,7 @@ async def confirmar_entrega_especie(dados: ConfirmarEntregaRequest, db: Session 
     # O lojista ganha o seu 1% aqui
     if parceiro.prazo_liquidacao > 0:
         parceiro.comissoes_pendentes += comissao_loja
-        transacao.data_liquidacao = datetime.datetime.utcnow() + datetime.timedelta(days=parceiro.prazo_liquidacao)
+        transacao.data_liquidacao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=parceiro.prazo_liquidacao)
     else:
         parceiro.comissoes_acumuladas += comissao_loja
     

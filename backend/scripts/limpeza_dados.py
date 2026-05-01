@@ -11,7 +11,7 @@ from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao, Transac
 def realizar_limpeza():
     db = SessionLocal()
     try:
-        agora = datetime.datetime.utcnow()
+        agora = datetime.datetime.now(datetime.timezone.utc)
         
         # 1. Limpar Solicitações PENDENTES expiradas há mais de 30 dias
         limite_solicitacoes = agora - datetime.timedelta(days=30)

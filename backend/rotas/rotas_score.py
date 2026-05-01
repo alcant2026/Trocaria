@@ -88,7 +88,7 @@ async def solicitar_verificacao_com_docs(
         docs_existentes.caminho_renda = path_renda
         docs_existentes.caminho_residencia = path_residencia
         docs_existentes.status = "pendente"
-        docs_existentes.data_envio = datetime.datetime.utcnow()
+        docs_existentes.data_envio = datetime.datetime.now(datetime.timezone.utc)
         docs_existentes.data_analise = None
         docs_existentes.motivo_rejeicao = None
     else:

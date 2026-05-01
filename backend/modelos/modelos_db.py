@@ -44,7 +44,7 @@ class RegistroAuditoria(Base):
     ip = Column(String(45), nullable=False)
     municipio = Column(String(255), nullable=True)
     user_agent = Column(Text, nullable=True)
-    data_registro = Column(DateTime, default=datetime.datetime.utcnow)
+    data_registro = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -61,7 +61,7 @@ class Usuario(Base):
     score_anterior = Column(Numeric(precision=6, scale=1), default=0)
     ultima_solicitacao = Column(DateTime, nullable=True)
     solicitacoes_hoje = Column(Integer, default=0)
-    ultima_atualizacao_score = Column(DateTime, default=datetime.datetime.utcnow)
+    ultima_atualizacao_score = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     is_admin = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
@@ -113,7 +113,7 @@ class SolicitacaoEmprestimo(Base):
     taxa_juros = Column(Numeric(precision=5, scale=2), nullable=False)
     prazo_meses = Column(Integer, nullable=False)
     status = Column(Enum(StatusSolicitacao, name="status_solicitacao", values_callable=lambda x: [e.value for e in x]), default=StatusSolicitacao.PENDENTE, index=True)
-    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     proximo_vencimento = Column(DateTime, nullable=True)
     parcelas_pagas = Column(Integer, default=0)
     taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0)
@@ -132,7 +132,7 @@ class SolicitacaoEmprestimo(Base):
     aceite_termos = Column(Boolean, default=False)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String(14), nullable=True)
-    data_aceite = Column(DateTime, default=datetime.datetime.utcnow)
+    data_aceite = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     ip_aceite = Column(String(45), nullable=True)
     municipio_aceite = Column(String(255), nullable=True)
 
@@ -153,7 +153,7 @@ class Investimento(Base):
     solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"), index=True)
     valor_investido = Column(Numeric(precision=20, scale=2), nullable=False)
     pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0)
-    data_investimento = Column(DateTime, default=datetime.datetime.utcnow)
+    data_investimento = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     is_pool = Column(Boolean, default=True)
 
     solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
@@ -168,7 +168,7 @@ class Transacao(Base):
     valor = Column(Numeric(precision=20, scale=2), nullable=False)
     tipo = Column(Enum(TipoTransacao, name="tipo_transacao", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     status = Column(String(50), default="pendente", index=True)
-    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     detalhes = Column(Text, nullable=True)
     metodo = Column(String, default="pix", index=True)
@@ -197,9 +197,13 @@ class Parceiro(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
+    razao_social = Column(String(255), nullable=True)
+    cnpj = Column(String(18), unique=True, index=True, nullable=True)
+    cnpj_status = Column(String(30), default="pendente", index=True)
+    cnpj_validado_em = Column(DateTime, nullable=True)
     endereco = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, index=True)
-    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
     caixa_aberto = Column(Boolean, default=False)
@@ -231,14 +235,14 @@ class LinkAfiliado(Base):
     url_imagem = Column(String(500), nullable=True)
     valor = Column(Numeric(10, 2), default=0.00)
     is_active = Column(Boolean, default=True)
-    data_criacao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     # Novos campos para Marketplace
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
     is_boosted = Column(Boolean, default=False)
     visualizacoes_restantes = Column(Integer, default=50) # Bônus inicial de 50 views
     visualizacoes_totais = Column(Integer, default=0)
-    data_expiracao = Column(DateTime, default=lambda: datetime.datetime.utcnow() + datetime.timedelta(hours=24))
+    data_expiracao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24))
     nota = Column(Numeric(2, 1), default=0.0)  # Rating 0.0 a 5.0 (média)
     total_avaliacoes = Column(Integer, default=0)
     vendas_texto = Column(String(50), nullable=True)  # Ex: "8mil+ vendas"
@@ -259,7 +263,7 @@ class AcaoAdmin(Base):
     acao = Column(String(100), nullable=False)
     detalhes = Column(Text, nullable=True)
     ip = Column(String(45), nullable=True)
-    data_acao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_acao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     admin = relationship("Usuario")
 
@@ -270,7 +274,7 @@ class DenunciaLink(Base):
     link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
     motivo = Column(String(200), nullable=True)
-    data_denuncia = Column(DateTime, default=datetime.datetime.utcnow)
+    data_denuncia = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     link = relationship("LinkAfiliado")
     usuario = relationship("Usuario")
@@ -282,7 +286,7 @@ class AvaliacaoLink(Base):
     link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False)
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False)
     nota = Column(Integer, nullable=False) # 1 a 5
-    data_avaliacao = Column(DateTime, default=datetime.datetime.utcnow)
+    data_avaliacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     link = relationship("LinkAfiliado")
     usuario = relationship("Usuario")
@@ -297,7 +301,7 @@ class DocumentoVerificacao(Base):
     caminho_residencia = Column(String(500), nullable=True)
     status = Column(String(50), default="pendente") # pendente, aprovado, rejeitado
     motivo_rejeicao = Column(String(200), nullable=True)
-    data_envio = Column(DateTime, default=datetime.datetime.utcnow)
+    data_envio = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     data_analise = Column(DateTime, nullable=True)
     
     usuario = relationship("Usuario")
@@ -309,7 +313,7 @@ class HistoricoClique(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
     link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True)
-    data_clique = Column(DateTime, default=datetime.datetime.utcnow)
+    data_clique = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     usuario = relationship("Usuario")
     link = relationship("LinkAfiliado")

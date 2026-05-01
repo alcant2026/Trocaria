@@ -84,7 +84,7 @@ async def marketplace_callback(code: str, state: str, db: Session = Depends(get_
         
         expires_in = token_data.get("expires_in", 0)
         if expires_in:
-            usuario.mp_token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=expires_in)
+            usuario.mp_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in)
         
         # NOVO: Se o usuário for um Parceiro, salvar também na tabela de Parceiros
         from modelos.modelos_db import Parceiro

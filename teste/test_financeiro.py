@@ -52,3 +52,24 @@ def test_admin_confirmar_deposito(client, db):
     # 4. Verificar saldo do usuário
     usuario = db.query(Usuario).filter(Usuario.email == "deposito@example.com").first()
     assert usuario.saldo == Decimal("300.00")
+
+
+def test_admin_criar_parceiro_exige_cnpj_ativo(client, db):
+    token_admin = registrar_e_logar(client, "admin-parceiro@example.com", "123.123.123-12")
+    admin = db.query(Usuario).filter(Usuario.email == "admin-parceiro@example.com").first()
+    admin.is_admin = True
+    db.commit()
+
+    response = client.post(
+        "/financeiro/admin/parceiros",
+        json={
+            "nome": "Loja Centro",
+            "razao_social": "Loja Centro LTDA",
+            "cnpj": "11.222.333/0001-81",
+            "cnpj_status": "baixada",
+            "endereco": "Rua A, 10"
+        },
+        headers={"Authorization": f"Bearer {token_admin}"}
+    )
+    assert response.status_code == 400
+    assert "CNPJ em situação ATIVA" in response.json()["detail"]

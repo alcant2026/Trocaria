@@ -18,16 +18,15 @@ def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
     saldo_pool = usuario.saldo_caixa or Decimal("0.00")
     score = usuario.score or Decimal("0.00")
     
-    # Regra: Microcrédito Progressivo (Zero Pool)
-    if usuario.is_verified and score >= Decimal("700.00"):
-        if score >= Decimal("900.00"):
-            return Decimal("500.00")
-        elif score >= Decimal("800.00"):
-            return Decimal("200.00")
-        else:
-            return Decimal("50.00")
-
     if saldo_pool <= Decimal("1.00"):
+        # Microcrédito Progressivo (Zero Pool): crédito base para verified de alto score
+        if usuario.is_verified and score >= Decimal("700.00"):
+            if score >= Decimal("900.00"):
+                return Decimal("500.00")
+            elif score >= Decimal("800.00"):
+                return Decimal("200.00")
+            else:
+                return Decimal("50.00")
         return Decimal("0.00")
 
     # NOVO: Trava de Segurança KYC
@@ -102,7 +101,7 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
         alocacoes.append(f"Reserva Plataforma (R$ {valor_a_alocar})")
 
     # 1. Criar a Solicitação já APROVADA
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     nova_solicitacao = SolicitacaoEmprestimo(
         usuario_id=usuario.id,
         valor=valor,

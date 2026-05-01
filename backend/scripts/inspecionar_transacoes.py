@@ -22,7 +22,7 @@ def inspecionar_transacoes():
             print(f"ID: {t.id}, Valor: {t.valor}, Data: {t.data_criacao}, Status: {t.status}")
 
         # Todas as transações concluídas hoje e no mês
-        agora = datetime.utcnow()
+        agora = datetime.now(timezone.utc)
         primeiro_dia_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         receitas_mes = db.query(Transacao).filter(

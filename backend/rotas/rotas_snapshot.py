@@ -29,7 +29,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     """
     Endpoint de Snapshot Autocontido com Cache de 15s.
     """
-    agora_ts = datetime.utcnow().timestamp()
+    agora_ts = datetime.now(timezone.utc).timestamp()
     
     # Lazy-Cleaning: Expurgar solicitações expiradas (4h/5d) antes de ler o BD
     try:
@@ -131,6 +131,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "divida_total_pool": float(divida_total_pendente),
                 "is_parceiro": is_parceiro,
                 "parceiro_id": parceiro.id if parceiro else None,
+                "parceiro_cnpj": parceiro.cnpj if parceiro else None,
+                "parceiro_razao_social": parceiro.razao_social if parceiro else None,
+                "parceiro_cnpj_status": parceiro.cnpj_status if parceiro else None,
                 "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
                 "prazo": parceiro.prazo_liquidacao if parceiro else 0,
                 "taxa_loja": float(parceiro.taxa_comissao or 0) if parceiro else 0.0,
@@ -174,7 +177,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         # --- NOVO: MARKETPLACE DA COMUNIDADE (CPM ADS) ---
         print(f"[DEBUG SNAPSHOT] Buscando anúncios da comunidade")
         from modelos.modelos_db import LinkAfiliado
-        agora = datetime.utcnow()
+        agora = datetime.now(timezone.utc)
         
         # 1. LIMPEZA INTELIGENTE DO MARKETPLACE
         # GRÁTIS: expirou (24h) OU views acabaram → DELETA do BD (libera espaço)
@@ -580,7 +583,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             ).all()
 
             # Mapeamento de fidelidade por usuário
-            agora_utc = datetime.utcnow()
+            agora_utc = datetime.now(timezone.utc)
             fidelidade_map = {uid: False for uid in user_ids}
             
             for uid in user_ids:

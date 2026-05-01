@@ -11,7 +11,7 @@ import {
   Shield,
   ShoppingBag
 } from 'lucide-react';
-import api from './api';
+import api, { BASE_URL } from './api';
 import DashboardCliente from './paginas/DashboardCliente';
 import AdminDashboard from './paginas/AdminDashboard';
 import Login from './paginas/Login';
@@ -67,15 +67,24 @@ const App = () => {
 
     useEffect(() => {
         const init = async () => {
-            const timeout = setTimeout(() => setLoading(false), 3000);
-            
-            // NOVO: Detectar retorno do Mercado Pago antes de validar login
             const params = new URLSearchParams(window.location.search);
             if (params.get('code') && params.get('state')) {
                 setPage('vincular-mp');
                 setLoading(false);
-                clearTimeout(timeout);
                 return;
+            }
+
+            const maxRetries = 3;
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    if (attempt > 0) setLoading(true);
+                    const resp = await fetch(`${BASE_URL}/__warmup`, { signal: AbortSignal.timeout(15000) });
+                    if (resp.ok) break;
+                } catch {
+                    if (attempt < maxRetries - 1) {
+                        await new Promise(r => setTimeout(r, (attempt + 1) * 3000));
+                    }
+                }
             }
 
             const token = localStorage.getItem('token');
@@ -100,7 +109,6 @@ const App = () => {
                     await SplashScreen.hide();
                 } catch (e) { console.warn('Plugins nativos não disponíveis.'); }
             }
-            clearTimeout(timeout);
             setLoading(false);
         };
         init();

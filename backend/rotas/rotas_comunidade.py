@@ -92,7 +92,7 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
         usuario_id=usuario.id,
         visualizacoes_restantes=50,
         is_boosted=False,
-        data_expiracao=datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        data_expiracao=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
     )
     
     db.add(novo_link)
@@ -137,7 +137,7 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
     link.ponto_min = pacote["ponto_min"]
     link.ponto_max = pacote["ponto_max"]
     # Estender expiração para longa duração (ex: +30 dias de vida no banco)
-    link.data_expiracao = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    link.data_expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
     
     # 4. Registrar Transação de Saída
     transacao = Transacao(
@@ -276,7 +276,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
         
         if usuario and usuario.is_subscriber and not is_proprio_link:
             # SEGURANÇA: Verificar se já clicou neste link nas últimas 24 horas
-            vinte_quatro_horas_atras = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+            vinte_quatro_horas_atras = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=24)
             ja_clicou = db.query(HistoricoClique).filter(
                 HistoricoClique.usuario_id == usuario.id,
                 HistoricoClique.link_id == link.id,

@@ -31,6 +31,7 @@ from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 from limitador import limiter
 from utils_seguranca import registrar_acao_admin
+from utils_parceiros import validar_cnpj, normalizar_cnpj, normalizar_status_cadastral, parceiro_esta_apto
 from rotas.rotas_snapshot import cache_snapshot_data
 from utils_score import atualizar_score
 
@@ -43,6 +44,7 @@ class ReservaSaqueRequest(BaseModel):
     valor: Decimal = Field(gt=0)
     parceiro_id: int
     senha_saque: str
+    codigo_2fa: str = ""
 
 class SolicitacaoSaque(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -60,6 +62,18 @@ class AporteCaixaRequest(BaseModel):
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
+
+
+def exigir_parceiro_apto(parceiro: Parceiro):
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
+    if not parceiro.is_active:
+        raise HTTPException(status_code=403, detail="Parceiro inativo.")
+    if not validar_cnpj(parceiro.cnpj):
+        raise HTTPException(status_code=403, detail="Parceiro sem CNPJ valido.")
+    if normalizar_status_cadastral(parceiro.cnpj_status) != "ativa":
+        raise HTTPException(status_code=403, detail="Parceiro precisa estar com CNPJ em situacao ATIVA para operar.")
+    return parceiro
 
 # --- CONFIGURAÇÕES DE RISCO (BaaS AUTO-PAYOUT) ---
 VALOR_MAX_SAQUE_AUTO = Decimal("100.00")
@@ -174,7 +188,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
         LIMITE_DIARIO_SAQUE = Decimal("5000.00")  # Nível 2 (Verificado ou Premium)
     else:
         LIMITE_DIARIO_SAQUE = Decimal("1500.00")  # Nível 1 (Básico - Risco Maior)
-    hoje = datetime.datetime.utcnow().date()
+    hoje = datetime.datetime.now(datetime.timezone.utc).date()
     inicio_dia = datetime.datetime.combine(hoje, datetime.time.min)
     fim_dia = datetime.datetime.combine(hoje, datetime.time.max)
     
@@ -214,8 +228,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
         if not dados.parceiro_id:
             raise HTTPException(status_code=400, detail="Parceiro obrigatório para saque em espécie.")
         parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
-        if not parceiro:
-            raise HTTPException(status_code=404, detail="Parceiro não encontrado ou inativo.")
+        exigir_parceiro_apto(parceiro)
 
     # NOVO: Validação OBRIGATÓRIA de Senha e 2FA
     if not verify_password(dados.senha, usuario.senha_hash):
@@ -240,7 +253,7 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     # TRAVA DE SEGURANÇA: 48 HORAS APÓS MUDANÇA DE 2FA
     if usuario.ultima_alteracao_2fa:
         # Garantir que estamos comparando offset-naive UTC times
-        agora_utc = datetime.datetime.utcnow()
+        agora_utc = datetime.datetime.now(datetime.timezone.utc)
         tempo_decorrido = agora_utc - usuario.ultima_alteracao_2fa
         
         if tempo_decorrido < timedelta(hours=48):
@@ -326,6 +339,8 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
         parceiro_pagador = db.query(Parceiro).filter(
             Parceiro.mp_access_token != None,
             Parceiro.is_active == True,
+            Parceiro.cnpj != None,
+            Parceiro.cnpj_status == "ativa",
             Parceiro.saldo_caixa_atual >= valor_liquido
         ).first()
 
@@ -377,7 +392,7 @@ async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.utcnow()
+        data_registro=datetime.datetime.now(datetime.timezone.utc)
     )
     db.add(auditoria)
     db.flush()
@@ -435,7 +450,7 @@ async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.utcnow()
+        data_registro=datetime.datetime.now(datetime.timezone.utc)
     )
     db.add(auditoria)
     db.flush()
@@ -484,8 +499,7 @@ async def notificar_deposito(request: Request, dados: NotificacaoDeposito, db: S
         if not dados.parceiro_id:
             raise HTTPException(status_code=400, detail="Parceiro obrigatório para depósito em espécie.")
         parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
-        if not parceiro:
-            raise HTTPException(status_code=404, detail="Parceiro não encontrado ou inativo.")
+        exigir_parceiro_apto(parceiro)
 
     nova_transacao = Transacao(
         usuario_id=usuario.id,
@@ -517,14 +531,15 @@ async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, d
     if not usuario.two_factor_enabled:
         raise HTTPException(status_code=403, detail="O 2FA é obrigatório para realizar saques em espécie.")
     
-    # Validar Senha de Saque / 2FA (Simplificado aqui, mas integrável com TOTP)
-    # if not verificar_2fa(usuario, dados.senha_saque):
-    #     raise HTTPException(status_code=400, detail="Senha de saque ou código 2FA inválido.")
+    if not verify_password(dados.senha_saque, usuario.senha_hash):
+        raise HTTPException(status_code=403, detail="Senha de segurança incorreta.")
+
+    if not dados.codigo_2fa or not pyotp.TOTP(usuario.totp_secret).verify(dados.codigo_2fa):
+        raise HTTPException(status_code=403, detail="Código 2FA inválido ou expirado.")
 
     # 3. Validar Parceiro
     parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
-    if not parceiro:
-        raise HTTPException(status_code=404, detail="Parceiro lojista não encontrado ou inativo.")
+    exigir_parceiro_apto(parceiro)
 
     # 4. Validar Saldo e Reservar
     if usuario.saldo < dados.valor:
@@ -619,7 +634,7 @@ async def gerar_pix_deposito(dados: DepositoPixRequest, db: Session = Depends(ge
 
     if dados.parceiro_id:
         parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
-        if parceiro and parceiro.mp_access_token:
+        if parceiro and parceiro_esta_apto(parceiro) and parceiro.mp_access_token:
             current_sdk = mercadopago.SDK(parceiro.mp_access_token)
             # TAXA ZERO NO DEPÓSITO: O cliente recebe 100% do que pagou
             application_fee = None
@@ -1048,6 +1063,7 @@ async def verificar_transacao_parceiro(dados: ParceiroVerificarRequest, db: Sess
     parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
     if not parceiro:
         raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+    exigir_parceiro_apto(parceiro)
 
     valor_decimal = Decimal(str(dados.valor))
     
@@ -1082,6 +1098,7 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
     parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).first()
     if not parceiro:
         raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
+    exigir_parceiro_apto(parceiro)
 
     transacao = db.query(Transacao).filter(
         Transacao.id == dados.transacao_id,
@@ -1141,7 +1158,7 @@ async def confirmar_transacao_parceiro(dados: ParceiroConfirmarRequest, request:
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.utcnow(),
+        data_registro=datetime.datetime.now(datetime.timezone.utc),
     )
     db.add(auditoria)
     db.flush()  # gera o ID do auditoria antes do commit
@@ -1181,7 +1198,7 @@ async def confirmar_recebimento_saque(id: int, request: Request, db: Session = D
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.utcnow()
+        data_registro=datetime.datetime.now(datetime.timezone.utc)
     )
     db.add(auditoria)
     db.flush()
@@ -1249,25 +1266,51 @@ async def listar_parceiros_publico(db: Session = Depends(get_db), usuario: Usuar
     return [{
         "id": p.id, 
         "nome": p.nome, 
+        "razao_social": p.razao_social,
+        "cnpj": p.cnpj,
         "endereco": p.endereco,
         "caixa_aberto": p.caixa_aberto,
         "mp_conectado": bool(p.mp_access_token)
-    } for p in parceiros]
+    } for p in parceiros if parceiro_esta_apto(p)]
 
 class ParceiroCreate(BaseModel):
     nome: str
+    razao_social: str
+    cnpj: str
+    cnpj_status: str = "ativa"
     endereco: str
     usuario_id: str | None = None
 
 class ParceiroUpdate(BaseModel):
     nome: str
+    razao_social: str
+    cnpj: str
+    cnpj_status: str = "ativa"
     endereco: str
     usuario_id: str | None = None
     ativo: bool = True
 
 @router.post("/admin/parceiros")
 async def criar_parceiro(request: Request, dados: ParceiroCreate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    parceiro = Parceiro(nome=dados.nome, endereco=dados.endereco, usuario_id=dados.usuario_id)
+    cnpj = normalizar_cnpj(dados.cnpj)
+    if not validar_cnpj(cnpj):
+        raise HTTPException(status_code=400, detail="CNPJ inválido. Parceiros devem ser cadastrados somente como pessoa jurídica.")
+    status_cnpj = normalizar_status_cadastral(dados.cnpj_status)
+    if status_cnpj != "ativa":
+        raise HTTPException(status_code=400, detail="Só aceitamos parceiros com CNPJ em situação ATIVA.")
+    parceiro_existente = db.query(Parceiro).filter(Parceiro.cnpj == cnpj).first()
+    if parceiro_existente:
+        raise HTTPException(status_code=400, detail="Já existe parceiro cadastrado com este CNPJ.")
+
+    parceiro = Parceiro(
+        nome=dados.nome,
+        razao_social=dados.razao_social,
+        cnpj=cnpj,
+        cnpj_status=status_cnpj,
+        cnpj_validado_em=datetime.datetime.now(datetime.timezone.utc),
+        endereco=dados.endereco,
+        usuario_id=dados.usuario_id
+    )
     
     # Sincroniza tokens do MP se o usuário já tiver vinculado antes de virar parceiro
     usuario_alvo = db.query(Usuario).filter(Usuario.id == dados.usuario_id).first()
@@ -1281,15 +1324,29 @@ async def criar_parceiro(request: Request, dados: ParceiroCreate, db: Session = 
     db.commit()
     registrar_acao_admin(db, admin.id, "CRIAR_PARCEIRO", alvo_id=str(parceiro.id), detalhes=f"Parceiro: {parceiro.nome}", ip=request.client.host)
     db.commit()
-    return {"message": "Parceiro cadastrado com sucesso!"}
+    return {"message": "Parceiro PJ cadastrado com sucesso!"}
 
 @router.put("/admin/parceiros/{id}")
 async def editar_parceiro(id: int, request: Request, dados: ParceiroUpdate, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     parceiro = db.query(Parceiro).filter(Parceiro.id == id).first()
     if not parceiro:
         raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
+
+    cnpj = normalizar_cnpj(dados.cnpj)
+    if not validar_cnpj(cnpj):
+        raise HTTPException(status_code=400, detail="CNPJ inválido. Parceiros devem ser cadastrados somente como pessoa jurídica.")
+    status_cnpj = normalizar_status_cadastral(dados.cnpj_status)
+    if status_cnpj != "ativa":
+        raise HTTPException(status_code=400, detail="Só aceitamos parceiros com CNPJ em situação ATIVA.")
+    parceiro_existente = db.query(Parceiro).filter(Parceiro.cnpj == cnpj, Parceiro.id != parceiro.id).first()
+    if parceiro_existente:
+        raise HTTPException(status_code=400, detail="Já existe outro parceiro cadastrado com este CNPJ.")
     
     parceiro.nome = dados.nome
+    parceiro.razao_social = dados.razao_social
+    parceiro.cnpj = cnpj
+    parceiro.cnpj_status = status_cnpj
+    parceiro.cnpj_validado_em = datetime.datetime.now(datetime.timezone.utc)
     parceiro.endereco = dados.endereco
     parceiro.usuario_id = dados.usuario_id
     parceiro.is_active = dados.ativo
@@ -1577,7 +1634,7 @@ async def confirmar_verificacao(transacao_id: int, request: Request, db: Session
     doc = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario.id, DocumentoVerificacao.status == "pendente").first()
     if doc:
         doc.status = "aprovado"
-        doc.data_analise = datetime.datetime.utcnow()
+        doc.data_analise = datetime.datetime.now(datetime.timezone.utc)
 
     registrar_acao_admin(db, admin.id, "CONFIRMAR_VERIFICACAO", alvo_id=usuario.id, detalhes=f"Transacao: {transacao.id}", ip=request.client.host)
     db.commit()
@@ -1606,7 +1663,7 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
         if doc:
             doc.status = "rejeitado"
             doc.motivo_rejeicao = motivo
-            doc.data_analise = datetime.datetime.utcnow()
+            doc.data_analise = datetime.datetime.now(datetime.timezone.utc)
 
     registrar_acao_admin(db, admin.id, "REJEITAR_TRANSACAO", alvo_id=str(transacao.id), detalhes=f"Motivo: {motivo}", ip=request.client.host)
     db.commit()
@@ -1638,7 +1695,7 @@ async def assinar_plano_premium(dados: AssinarPlanoRequest, db: Session = Depend
     usuario.saldo -= preco
     
     # Benefício do Plano: Dias de Premium
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
         usuario.assinatura_expira_em += datetime.timedelta(days=dias)
     else:
@@ -2142,7 +2199,7 @@ async def investir_lucro_plataforma(
     solicitacao.valor_arrecadado += valor
 
     # Criar registro de auditoria
-    agora = datetime.datetime.utcnow()
+    agora = datetime.datetime.now(datetime.timezone.utc)
     auditoria = RegistroAuditoria(
         ip=request.client.host,
         municipio=f"{admin.cidade}/{admin.estado}" if admin.cidade else "Localização Admin",
@@ -2306,6 +2363,9 @@ async def liquidar_caixa_devedores(db: Session = Depends(get_db), admin: Usuario
 
 class ParceiroCreate(BaseModel):
     nome: str
+    razao_social: str
+    cnpj: str
+    cnpj_status: str = "ativa"
     endereco: str
     usuario_id: Optional[str] = None
     prazo_liquidacao: int = 0
@@ -2325,8 +2385,22 @@ async def criar_parceiro(
         if not user_alvo:
             raise HTTPException(status_code=404, detail=f"Usuário ID {dados.usuario_id} não encontrado na plataforma.")
 
+    cnpj = normalizar_cnpj(dados.cnpj)
+    if not validar_cnpj(cnpj):
+        raise HTTPException(status_code=400, detail="CNPJ inválido. Parceiros devem ser cadastrados somente como pessoa jurídica.")
+    status_cnpj = normalizar_status_cadastral(dados.cnpj_status)
+    if status_cnpj != "ativa":
+        raise HTTPException(status_code=400, detail="Só aceitamos parceiros com CNPJ em situação ATIVA.")
+    parceiro_existente = db.query(Parceiro).filter(Parceiro.cnpj == cnpj).first()
+    if parceiro_existente:
+        raise HTTPException(status_code=400, detail="Já existe parceiro cadastrado com este CNPJ.")
+
     novo_parceiro = Parceiro(
         nome=dados.nome,
+        razao_social=dados.razao_social,
+        cnpj=cnpj,
+        cnpj_status=status_cnpj,
+        cnpj_validado_em=datetime.datetime.now(datetime.timezone.utc),
         endereco=dados.endereco,
         usuario_id=dados.usuario_id,
         prazo_liquidacao=dados.prazo_liquidacao,

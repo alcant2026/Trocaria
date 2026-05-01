@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database import SessionLocal
 from modelos.modelos_db import Usuario, DocumentoVerificacao
-from datetime import datetime
+from datetime import datetime, timezone
 
 def fix_kyc():
     db = SessionLocal()
@@ -27,7 +27,7 @@ def fix_kyc():
         for d in docs:
             if d.status == "pendente":
                 d.status = "aprovado"
-                d.data_analise = datetime.utcnow()
+                d.data_analise = datetime.now(timezone.utc)
         
         db.commit()
         print("[OK] Perfil verificado e documentos aprovados com sucesso!")

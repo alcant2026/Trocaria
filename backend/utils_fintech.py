@@ -1,117 +1,120 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, Investimento
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao
 from decimal import Decimal
 import datetime
 
+
 def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
-    """
-    Calcula o limite de crédito progressivo do usuário.
-    Regras:
-    - Se limite_credito_personalizado estiver definido, usa ele (Override).
-    - Se Score >= 700 e is_verified, ganha crédito progressivo mesmo sem saldo no pool.
-    - Mínimo R$ 100 no Pool para ter crédito base se as condições acima não atendidas.
-    """
     if usuario.limite_credito_personalizado is not None:
         return usuario.limite_credito_personalizado
 
-    saldo_pool = usuario.saldo_caixa or Decimal("0.00")
-    score = usuario.score or Decimal("0.00")
-    
-    if saldo_pool <= Decimal("1.00"):
-        # Microcrédito Progressivo (Zero Pool): crédito base para verified de alto score
-        if usuario.is_verified and score >= Decimal("700.00"):
-            if score >= Decimal("900.00"):
-                return Decimal("500.00")
-            elif score >= Decimal("800.00"):
-                return Decimal("200.00")
-            else:
-                return Decimal("50.00")
+    if not usuario.is_verified:
         return Decimal("0.00")
 
-    # NOVO: Trava de Segurança KYC
-    # Se não for verificado, o limite é estritamente o que ele tem no Pool (Garantia 1:1)
-    if not usuario.is_verified:
-        return saldo_pool
+    score = usuario.score or Decimal("0.00")
 
-    # Regra: Limite Base de R$ 20,00 se tiver saldo no Pool (Apenas para VERIFICADOS)
-    limite_base = Decimal("20.00")
+    if score >= Decimal("900.00"):
+        return Decimal("500.00")
+    elif score >= Decimal("800.00"):
+        return Decimal("200.00")
+    elif score >= Decimal("700.00"):
+        bonus = ((score - Decimal("700.00")) / Decimal("100.00")) * Decimal("50.00")
+        return min(Decimal("200.00"), Decimal("50.00") + bonus)
+    elif score >= Decimal("500.00"):
+        bonus = ((score - Decimal("500.00")) / Decimal("100.00")) * Decimal("10.00")
+        return Decimal("20.00") + bonus
 
-    # Se o score for excelente (Ex: VIP), libera o multiplicador de 1.2x o capital
-    if score >= Decimal("800.00"):
-        return max(limite_base, saldo_pool * Decimal("1.2"))
-    
-    # Lógica de progressão adicional: +10 reais para cada 100 pontos de score acima de 500
-    if score > Decimal("500.00"):
-        bonus_score = ((score - Decimal("500.00")) / Decimal("100.00")) * Decimal("10.00")
-        limite_base += bonus_score
+    return Decimal("0.00")
 
-    return limite_base
 
 def verificar_isencao_taxa(usuario: Usuario) -> bool:
-    """
-    Verifica se o usuário é isento da taxa de postagem/solicitação.
-    Regra: Score >= 500 e Saldo Pool > 100.
-    """
-    saldo_pool = usuario.saldo_caixa or Decimal("0.00")
     score = usuario.score or Decimal("0.00")
-    
-    if score >= Decimal("500.0") and saldo_pool > Decimal("100.00"):
-        return True
-    return False
+    return score >= Decimal("500.0")
 
-def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, taxa_adesao: Decimal = Decimal("0.00"), ip_cliente: str = None) -> SolicitacaoEmprestimo:
-    """
-    Cria e aprova instantaneamente um empréstimo usando o dinheiro da plataforma (Pool).
-    A taxa_adesao (se houver) é somada como custos financeiros (taxas_adicionais).
-    """
+
+def saldo_disponivel_pool(db: Session) -> Decimal:
+    total = db.query(func.sum(Usuario.credito_virtual)).filter(
+        Usuario.credito_virtual > 0
+    ).scalar() or Decimal("0.00")
+    return total
+
+
+def adicionar_credito_virtual(usuario_id: str, valor: Decimal, db: Session) -> dict:
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise ValueError("Usuário não encontrado.")
+
+    taxa = valor * Decimal("0.02")
+    credito = valor
+
+    usuario.credito_virtual = (usuario.credito_virtual or Decimal("0.00")) + credito
+
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=credito,
+        tipo=TipoTransacao.DEPOSITO,
+        status="concluido",
+        detalhes=f"Depósito virtual de R$ {credito} (taxa de {taxa} já paga via PIX)"
+    ))
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=taxa,
+        tipo=TipoTransacao.TAXA_DEPOSITO_VIRTUAL,
+        status="concluido",
+        detalhes=f"Taxa de 2% sobre depósito virtual de R$ {valor}"
+    ))
+    db.commit()
+
+    return {
+        "credito_virtual": float(usuario.credito_virtual),
+        "taxa_paga": float(taxa)
+    }
+
+
+def resgatar_credito_virtual(usuario_id: str, valor: Decimal, db: Session) -> dict:
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).with_for_update().first()
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    
-    # 0. Verificar Liquidez Global do Pool (Regra de 30% de Reserva)
-    from modelos.modelos_db import Parceiro
-    total_pool = db.query(func.sum(Parceiro.saldo_caixa_atual)).scalar() or Decimal("0.00")
-    
-    # Apenas 70% da liquidez total pode ser emprestada (30% reservado para saques)
-    reservado = total_pool * Decimal("0.30")
-    disponivel_emprestimo = total_pool - reservado
-    
-    if valor > disponivel_emprestimo:
+    if not usuario:
+        raise ValueError("Usuário não encontrado.")
+
+    saldo_atual = usuario.credito_virtual or Decimal("0.00")
+    if valor > saldo_atual:
+        raise ValueError(f"Saldo virtual insuficiente. Disponível: R$ {saldo_atual}")
+
+    usuario.credito_virtual -= valor
+
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=valor,
+        tipo=TipoTransacao.SAQUE,
+        status="pendente",
+        detalhes=f"Resgate de crédito virtual — enviaremos PIX no valor de R$ {valor}"
+    ))
+    db.commit()
+
+    return {"message": "Resgate solicitado. O valor será enviado via PIX.", "novo_saldo": float(usuario.credito_virtual)}
+
+
+def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, ip_cliente: str = None) -> SolicitacaoEmprestimo:
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    pool_total = saldo_disponivel_pool(db)
+
+    if valor > pool_total:
         raise ValueError(
-            f"Liquidez insuficiente no Pool Descentralizado. Para segurança do sistema, mantemos uma reserva de 30% para resgates. "
-            f"Disponível para novos empréstimos: R$ {disponivel_emprestimo:,.2f}"
+            f"Saldo do fundo coletivo insuficiente. Disponível: R$ {pool_total:.2f}. "
+            f"Aguarde mais investidores aportarem."
         )
 
-    # 0.1 DESCENTRALIZAÇÃO: Alocar o empréstimo a parceiros com saldo
-    valor_a_alocar = valor
-    parceiros_com_saldo = db.query(Parceiro).filter(Parceiro.saldo_caixa_atual > 0, Parceiro.is_active == True).order_by(Parceiro.saldo_caixa_atual.desc()).all()
-    
-    alocacoes = []
-    for p in parceiros_com_saldo:
-        if valor_a_alocar <= 0: break
-        
-        valor_do_p = min(p.saldo_caixa_atual, valor_a_alocar)
-        p.saldo_caixa_atual -= valor_do_p
-        valor_a_alocar -= valor_do_p
-        alocacoes.append(f"Parceiro {p.nome} (R$ {valor_do_p})")
-
-    if valor_a_alocar > 0:
-        # Se ainda sobrou valor e não há mais parceiros, usa o saldo da plataforma como fallback
-        plataforma.saldo_caixa -= valor_a_alocar
-        alocacoes.append(f"Reserva Plataforma (R$ {valor_a_alocar})")
-
-    # 1. Criar a Solicitação já APROVADA
     agora = datetime.datetime.now(datetime.timezone.utc)
     nova_solicitacao = SolicitacaoEmprestimo(
         usuario_id=usuario.id,
         valor=valor,
         taxa_juros=taxa,
         prazo_meses=prazo,
-        status=StatusSolicitacao.APROVADO,
+        status=StatusSolicitacao.PENDENTE,
         data_criacao=agora,
         proximo_vencimento=agora + datetime.timedelta(days=30),
         aceite_termos=True,
-        taxas_adicionais=taxa_adesao,
         data_aceite=agora,
         ip_aceite=ip_cliente,
         cpf_aceite=usuario.cpf
@@ -119,34 +122,56 @@ def aprovar_emprestimo_instantaneo(usuario_id: str, valor: Decimal, prazo: int, 
     db.add(nova_solicitacao)
     db.flush()
 
-    # 2. Registrar o "Investimento" Único do Sistema
-    investimento_sistema = Investimento(
-        investidor_id=plataforma.id,
-        solicitacao_id=nova_solicitacao.id,
-        valor_investido=valor,
-        is_pool=True
-    )
-    db.add(investimento_sistema)
-
-    # 3. Transferir "lastro" para o tomador (Saldo App)
-    usuario.saldo += valor
-
-    # 4. Registrar Transações
-    db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=valor,
-        tipo=TipoTransacao.RECEBIMENTO,
-        status="concluido",
-        detalhes=f"Empréstimo Aprovado (Lastro: {', '.join(alocacoes)}) - Pedido #{nova_solicitacao.id}"
-    ))
-    
-    db.add(Transacao(
-        usuario_id=plataforma.id,
-        valor=valor,
-        tipo=TipoTransacao.INVESTIMENTO,
-        status="concluido",
-        detalhes=f"Gestão de Crédito Descentralizado: {', '.join(alocacoes)}"
-    ))
-
     db.commit()
     return nova_solicitacao
+
+
+def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == solicitacao_id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+    ).first()
+
+    if not solicitacao:
+        raise ValueError("Solicitação não encontrada ou já foi aceita.")
+
+    credor = db.query(Usuario).filter(Usuario.id == credor_id).with_for_update().first()
+    if not credor:
+        raise ValueError("Investidor não encontrado.")
+
+    score_credor = credor.score or Decimal("0.00")
+    if score_credor < Decimal("850.00"):
+        raise ValueError(
+            f"Score mínimo para investir é 850. Seu score atual é {score_credor}. "
+            f"Complete seu cadastro, pague taxas em dia e aumente seu score."
+        )
+
+    credito_atual = credor.credito_virtual or Decimal("0.00")
+    if credito_atual < solicitacao.valor:
+        raise ValueError(
+            f"Saldo virtual insuficiente. Você tem R$ {credito_atual} disponíveis "
+            f"para emprestar."
+        )
+
+    tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
+
+    credor.credito_virtual -= solicitacao.valor
+    credor.valor_emprestado = (credor.valor_emprestado or Decimal("0.00")) + solicitacao.valor
+    credor.emprestimos_ativos = (credor.emprestimos_ativos or 0) + 1
+
+    solicitacao.status = StatusSolicitacao.APROVADO
+    solicitacao.credor_id = credor.id
+    solicitacao.chave_pix_credor = credor.chave_pix_publica or credor.chave_pix
+    solicitacao.proximo_vencimento = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+
+    db.commit()
+
+    return {
+        "message": "Oferta aceita! Envie o valor via PIX para o tomador.",
+        "tomador_nome": tomador.nome,
+        "chave_pix_tomador": tomador.chave_pix_publica or tomador.chave_pix,
+        "valor": float(solicitacao.valor),
+        "parcelas": solicitacao.prazo_meses,
+        "score_tomador": float(tomador.score),
+        "inadimplente": tomador.inadimplente
+    }

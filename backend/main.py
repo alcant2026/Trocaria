@@ -174,15 +174,17 @@ async def startup_db_setup():
 
         from modelos.modelos_db import Usuario
         with SessionLocal() as db:
-            if not db.query(Usuario).filter(Usuario.id == "000PL").first():
-                print("ESTRUTURA DB: Criando usuário de sistema 000PL...")
-                novo_sistema = Usuario(
-                    id="000PL", nome="PSY PAY Plataforma (Sistema)", email="sistema@psypay.com.br",
-                    cpf="00000000000", senha_hash="SISTEMA_VIRTUAL", chave_pix="sistema",
-                    is_admin=True, is_active=True, saldo=0, saldo_caixa=0
+            if not db.query(Usuario).filter(Usuario.is_admin == True).first():
+                import secrets
+                admin_id = "ADM01"
+                admin = Usuario(
+                    id=admin_id, nome="Admin Psy Pay", email="admin@psypay.com.br",
+                    cpf="00000000001", senha_hash=secrets.token_hex(16), chave_pix="admin@psypay.com.br",
+                    is_admin=True, is_active=True
                 )
-                db.add(novo_sistema)
+                db.add(admin)
                 db.commit()
+                print("✅ Conta admin criada (ID: ADM01)")
     except Exception as e:
         print(f"⚠️ ERRO no startup_db_setup: {e}")
 

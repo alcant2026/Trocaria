@@ -26,7 +26,7 @@ from modelos.modelos_db import (
     SolicitacaoEmprestimo, Investimento, RegistroAuditoria, 
     Parceiro, LinkAfiliado
 )
-from utils_emprestimo import calcular_divida_total, liquidar_emprestimo_via_pool
+from utils_emprestimo import calcular_divida_total
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 from limitador import limiter

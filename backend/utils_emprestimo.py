@@ -13,19 +13,17 @@ def calcular_mora(solicitacao: SolicitacaoEmprestimo, valor_parcela: Decimal) ->
     return valor_parcela * Decimal("0.02") + (valor_parcela * Decimal("0.001") * atraso)
 
 
-def creditar_plataforma(db: Session, valor_principal: Decimal, valor_receita: Decimal, solicitacao_id: int, descricao: str) -> Optional[Usuario]:
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo_caixa += valor_principal
-        plataforma.saldo += valor_receita
+def creditar_plataforma(db: Session, valor: Decimal, solicitacao_id: int, descricao: str) -> Optional[Usuario]:
+    admin = db.query(Usuario).filter(Usuario.is_admin == True).first()
+    if admin:
         db.add(Transacao(
-            usuario_id="000PL",
-            valor=valor_receita,
-            tipo=TipoTransacao.TAXA_ADM_EMPRESTIMO,
+            usuario_id=admin.id,
+            valor=valor,
+            tipo=TipoTransacao.TAXA_ORIGEM,
             status="concluido",
-            detalhes=f"{descricao} - Empréstimo #{solicitacao_id}"
+            detalhes=f"{descricao} - Pedido #{solicitacao_id}"
         ))
-    return plataforma
+    return admin
 
 
 def limpar_cache(cache: dict, *user_ids: str):
@@ -37,146 +35,128 @@ def calcular_divida_total(solicitacao: SolicitacaoEmprestimo):
     taxa_mensal = solicitacao.taxa_juros / 100
     total_com_juros = solicitacao.valor * (1 + (taxa_mensal * solicitacao.prazo_meses))
     valor_parcela_base = total_com_juros / solicitacao.prazo_meses
-    
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     valor_quittance_base = valor_parcela_base * parcelas_restantes
-    
     valor_quittance_base += (solicitacao.taxas_adicionais or Decimal("0.00"))
-
     mora_atraso = calcular_mora(solicitacao, valor_parcela_base)
     return valor_quittance_base + mora_atraso
 
-def liquidar_emprestimo_via_pool(usuario, solicitacao, valor_liquidacao, db: Session):
-    """
-    Executa a liquidação automática de um empréstimo usando o saldo do Pool do devedor.
-    O lucro é distribuído para os outros membros da cooperativa.
-    """
-    from sqlalchemy import func
-    
-    if valor_liquidacao <= 0:
-        return False
-        
-    # 1. Deduzir do saldo_caixa do devedor
-    usuario.saldo_caixa -= valor_liquidacao
-    
-    # 2. Rateio entre os outros participantes do Pool (Cooperativa)
-    total_caixa_outros = db.query(func.sum(Usuario.saldo_caixa)).filter(Usuario.id != usuario.id).scalar() or Decimal("0.00")
-    
-    if total_caixa_outros > 0:
-        outros_participantes = db.query(Usuario).filter(Usuario.saldo_caixa > 0, Usuario.id != usuario.id).all()
-        for p_caixa in outros_participantes:
-            fatia = (p_caixa.saldo_caixa / total_caixa_outros) * valor_liquidacao
-            p_caixa.saldo_caixa += fatia
-    else:
-        # Se estiver sozinho no pool, o dinheiro volta para a reserva da plataforma
-        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-        if plataforma:
-            plataforma.saldo_caixa += valor_liquidacao
-        
-    # 3. Atualizar o empréstimo
-    solicitacao.valor_amortizado += valor_liquidacao
-    if valor_liquidacao >= calcular_divida_total(solicitacao):
-        solicitacao.status = StatusSolicitacao.CONCLUIDO
-        solicitacao.parcelas_pagas = solicitacao.prazo_meses
 
-    # 4. Registrar transações
+def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: str, valor_pago: Decimal) -> dict:
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == solicitacao_id,
+        SolicitacaoEmprestimo.usuario_id == pagador_id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
+
+    if not solicitacao:
+        raise ValueError("Empréstimo não encontrado ou não está ativo.")
+
+    parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
+    if parcelas_restantes <= 0:
+        raise ValueError("Empréstimo já está totalmente pago.")
+
+    hoje = datetime.datetime.now(datetime.timezone.utc)
+
     db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=valor_liquidacao,
-        tipo=TipoTransacao.RESGATE_CAIXA,
-        status="concluido",
-        detalhes=f"Liquidação Automática (Anti-calote) - Pedido #{solicitacao.id}"
+        usuario_id=pagador_id,
+        valor=valor_pago,
+        tipo=TipoTransacao.CONFIRMACAO_PAGAMENTO,
+        status="pendente",
+        data_criacao=hoje,
+        detalhes=f"Pagamento confirmado pelo tomador — Pedido #{solicitacao.id}. Aguardando confirmação do credor."
     ))
-    
+
+    solicitacao.confirmacao_pagamento_data = hoje
     db.commit()
-    return True
 
-def processar_expiracoes_interna(db: Session):
-    """
-    Identifica e cancela solicitações que expiraram o prazo de 4h ou 5d.
-    """
-    agora = datetime.datetime.now(datetime.timezone.utc)
-    
-    # 1. Solicitações que expiraram a janela de conferência física (4h)
-    expiradas_4h = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
-        SolicitacaoEmprestimo.data_expiracao_4h != None,
-        SolicitacaoEmprestimo.data_expiracao_4h < agora
-    ).all()
-    
-    # 2. Solicitações que expiraram o prazo total de captação (5d)
-    expiradas_5d = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE,
-        SolicitacaoEmprestimo.data_expiracao_5d != None,
-        SolicitacaoEmprestimo.data_expiracao_5d < agora
-    ).all()
-    
-    usuarios_afetados = set()
-    for s in (expiradas_4h + expiradas_5d):
-        s.status = StatusSolicitacao.CANCELADO
-        usuarios_afetados.add(s.usuario_id)
-        
-    if usuarios_afetados:
-        db.commit()
-        
-    return usuarios_afetados
+    return {
+        "message": "Pagamento registrado! O credor precisa confirmar o recebimento.",
+        "solicitacao_id": solicitacao.id,
+        "credor_id": solicitacao.credor_id
+    }
 
-def obter_multiplicador_fidelidade(usuario_id: str, db: Session) -> Decimal:
-    """
-    Retorna o multiplicador de lucro baseados no histórico de crédito.
-    Regra: 
-    - 1.5x (Bônus 50%) se tiver empréstimo ativo/pago e estiver rigorosamente em dia.
-    - 1.0x caso contrário.
-    """
-    agora = datetime.datetime.now(datetime.timezone.utc)
-    
-    # Verifica todos os empréstimos do usuário
-    vincuo_credito = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.usuario_id == usuario_id,
-        SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO])
-    ).all()
 
-    if not vincuo_credito:
-        return Decimal("1.0")
+def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: str) -> dict:
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == solicitacao_id,
+        SolicitacaoEmprestimo.credor_id == credor_id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
 
-    tem_pagamento = any(s.parcelas_pagas > 0 or s.status == StatusSolicitacao.CONCLUIDO for s in vincuo_credito)
-    tem_atraso = any(s.status == StatusSolicitacao.APROVADO and s.proximo_vencimento < agora for s in vincuo_credito)
+    if not solicitacao:
+        raise ValueError("Empréstimo não encontrado ou não está ativo.")
 
-    if tem_pagamento and not tem_atraso:
-        return Decimal("1.5")
-    
-    return Decimal("1.0")
+    credor = db.query(Usuario).filter(Usuario.id == credor_id).first()
+    tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
 
-def processar_inadimplencia_coletiva_automatica(db: Session):
-    """
-    Varredura automática para execução da Cláusula 3.3 do Contrato.
-    Regra: Atraso > 5 dias -> Liquidação Automática via Pool (devedor paga com seu capital investido).
-    """
-    agora = datetime.datetime.now(datetime.timezone.utc)
-    limite_tolerancia = agora - datetime.timedelta(days=5)
-    
-    # 1. Buscar empréstimos aprovados com vencimento vencido há mais de 5 dias
-    atrasados = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO,
-        SolicitacaoEmprestimo.proximo_vencimento < limite_tolerancia
-    ).all()
-    
-    logs = []
-    for s in atrasados:
-        divida_total = calcular_divida_total(s)
-        usuario = s.usuario
-        
-        # Só podemos liquidar se o usuário tiver saldo no Pool (saldo_caixa)
-        if usuario.saldo_caixa > 0:
-            # Tenta liquidar o máximo possível (ou o total da dívida, ou o total do saldo no pool)
-            valor_liquidacao = min(usuario.saldo_caixa, divida_total)
-            
-            sucesso = liquidar_emprestimo_via_pool(usuario, s, valor_liquidacao, db)
-            if sucesso:
-                logs.append(f"✅ Execução Cláusula 3.3: Usuário {usuario.id} liquidou R$ {valor_liquidacao:.2f} via Pool (Atraso > 5 dias)")
-            else:
-                logs.append(f"❌ Falha na liquidação do Usuário {usuario.id}")
-        else:
-            logs.append(f"⚠️ Usuário {usuario.id} inadimplente, mas sem saldo no Pool para execução da Cláusula 3.3")
-            
-    return logs
+    solicitacao.parcelas_pagas += 1
+
+    if solicitacao.parcelas_pagas == 1:
+        credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + solicitacao.valor
+
+    juros_parcela = solicitacao.valor * (solicitacao.taxa_juros / 100)
+    credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + juros_parcela
+
+    if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
+        solicitacao.status = StatusSolicitacao.CONCLUIDO
+        solicitacao.data_quitacao = datetime.datetime.now(datetime.timezone.utc)
+        tomador.inadimplente = False
+        credor.emprestimos_ativos = max(0, (credor.emprestimos_ativos or 1) - 1)
+        tomador.emprestimos_concluidos = (tomador.emprestimos_concluidos or 0) + 1
+    else:
+        solicitacao.proximo_vencimento += datetime.timedelta(days=30)
+
+    db.add(Transacao(
+        usuario_id=credor_id,
+        valor=Decimal("0.00"),
+        tipo=TipoTransacao.CONFIRMACAO_RECEBIMENTO,
+        status="concluido",
+        detalhes=f"Recebimento confirmado — Parcela {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}"
+    ))
+
+    db.commit()
+    return {
+        "message": "Recebimento confirmado! Parcela registrada.",
+        "parcelas_pagas": solicitacao.parcelas_pagas,
+        "total_parcelas": solicitacao.prazo_meses,
+        "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO
+    }
+
+
+def aplicar_calote(solicitacao_id: int, db: Session) -> dict:
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == solicitacao_id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
+
+    if not solicitacao:
+        raise ValueError("Empréstimo não encontrado ou não está ativo.")
+
+    tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
+    credor = db.query(Usuario).filter(Usuario.id == solicitacao.credor_id).first()
+
+    tomador.inadimplente = True
+    tomador.qtd_calotes = (tomador.qtd_calotes or 0) + 1
+    tomador.score = max(Decimal("0.00"), (tomador.score or Decimal("0.00")) - Decimal("200"))
+
+    juros_perdidos = solicitacao.valor * (solicitacao.taxa_juros / 100) * (solicitacao.prazo_meses - solicitacao.parcelas_pagas)
+    credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + solicitacao.valor + juros_perdidos
+
+    solicitacao.status = StatusSolicitacao.CANCELADO
+
+    db.add(Transacao(
+        usuario_id=tomador.id,
+        valor=solicitacao.valor,
+        tipo=TipoTransacao.CONFIRMACAO_PAGAMENTO,
+        status="cancelado",
+        detalhes=f"CALOTE — Empréstimo #{solicitacao.id} marcado como inadimplente"
+    ))
+
+    db.commit()
+
+    return {
+        "message": f"Calote registrado. {tomador.nome} marcado como inadimplente.",
+        "score_perdido": -200,
+        "credor_reembolsado": float(solicitacao.valor)
+    }

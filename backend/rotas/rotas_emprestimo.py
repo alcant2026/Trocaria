@@ -1,42 +1,87 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
 import hashlib
-from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao, RegistroAuditoria
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao
 from database import get_db
-from rotas.rotas_auth import obter_usuario_logado, exigir_admin
-from utils_fintech import calcular_limite_credito, verificar_isencao_taxa, aprovar_emprestimo_instantaneo
+from rotas.rotas_auth import obter_usuario_logado
+from utils_fintech import calcular_limite_credito, verificar_isencao_taxa, criar_solicitacao_p2p, aceitar_oferta, saldo_disponivel_pool, adicionar_credito_virtual, resgatar_credito_virtual
 from utils_score import atualizar_score
-from utils_emprestimo import calcular_mora, creditar_plataforma, limpar_cache, calcular_divida_total
+from utils_emprestimo import calcular_divida_total, confirmar_pagamento_externo, confirmar_recebimento_externo, creditar_plataforma, aplicar_calote
 from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
 from rotas.rotas_snapshot import cache_snapshot_data
 from limitador import limiter
 
-router = APIRouter(prefix="/emprestimos", tags=["Empréstimos Fintech"])
+router = APIRouter(prefix="/emprestimos", tags=["Empréstimos P2P"])
 
 class SolicitacaoRequest(BaseModel):
     valor: Decimal = Field(gt=0, le=10000)
     parcelas: int = Field(ge=1, le=12)
     aceite_termos: bool
 
+class PagamentoRequest(BaseModel):
+    valor_pagamento: Decimal = Field(gt=0)
+
+@router.get("/oportunidades")
+async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    solicitacoes = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
+
+    pool_total = saldo_disponivel_pool(db)
+    resultado = []
+    for s in solicitacoes:
+        resultado.append({
+            "id": s.id,
+            "tomador_nome": s.usuario.nome,
+            "chave_pix_tomador": s.usuario.chave_pix_publica or s.usuario.chave_pix,
+            "valor": float(s.valor),
+            "parcelas": s.prazo_meses,
+            "taxa_juros": float(s.taxa_juros),
+            "score_tomador": float(s.usuario.score),
+            "inadimplente": s.usuario.inadimplente,
+            "data_criacao": s.data_criacao.isoformat()
+        })
+    return {"oportunidades": resultado, "pool_disponivel": float(pool_total)}
+
+@router.post("/calote/{id}")
+@limiter.limit("5/minute")
+async def registrar_calote(request: Request, id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.usuario_id == usuario_logado.id
+    ).first()
+
+    if not solicitacao:
+        solicitacao = db.query(SolicitacaoEmprestimo).filter(
+            SolicitacaoEmprestimo.id == id,
+            SolicitacaoEmprestimo.credor_id == usuario_logado.id
+        ).first()
+
+    if not solicitacao or solicitacao.status != StatusSolicitacao.APROVADO:
+        raise HTTPException(status_code=404, detail="Empréstimo não encontrado.")
+
+    try:
+        result = aplicar_calote(id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
+
 @router.get("/limite")
 async def consultar_limite(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """Retorna o limite de crédito atual do usuário baseado no Pool e Score."""
     limite = calcular_limite_credito(usuario, db)
     isento = verificar_isencao_taxa(usuario)
-    
     return {
         "limite_disponivel": float(limite),
         "score_atual": float(usuario.score),
-        "saldo_pool": float(usuario.saldo_caixa),
+        "emprestimos_ativos": usuario.emprestimos_ativos or 0,
         "isento_taxa": isento,
-        "mensagem": "Você tem crédito disponível!" if limite > 0 else "Aumente seu saldo no Pool para liberar crédito."
+        "mensagem": "Crédito disponível!" if limite > 0 else "Complete seu cadastro e aumente seu score para liberar crédito."
     }
 
 @router.post("/solicitar")
@@ -47,257 +92,269 @@ async def solicitar_emprestimo(
     db: Session = Depends(get_db),
     usuario_logado: Usuario = Depends(obter_usuario_logado)
 ):
-    """Solicita e aprova instantaneamente um empréstimo se houver limite."""
-    # LOCK no usuário
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).first()
     
     if not usuario.is_verified:
-        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para solicitar crédito.")
+        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA.")
     
     limite = calcular_limite_credito(usuario, db)
     if dados.valor > limite:
-        raise HTTPException(status_code=400, detail=f"Valor solicitado (R$ {dados.valor}) excede seu limite disponível (R$ {limite}).")
+        raise HTTPException(status_code=400, detail=f"Valor excede seu limite disponível (R$ {limite}).")
 
     if not dados.aceite_termos:
-        raise HTTPException(status_code=400, detail="Você deve aceitar os termos de uso.")
+        raise HTTPException(status_code=400, detail="Aceite os termos.")
 
-    # Verificação de Taxa (Regra: Score 500+ e Pool 100+ é ISENTO)
-    isento = verificar_isencao_taxa(usuario)
-    # Taxa reduzida para R$ 2,00 em microcréditos. Agora ela será SOMADA à dívida.
-    taxa_solicitacao = Decimal("0.00") if isento else (Decimal("2.00") if dados.valor <= 50 else Decimal("4.00"))
-
-    # Aprovação instantânea via Cooperativa (Sistema)
-    # Taxa de juros padrão da plataforma (ex: 5%)
     taxa_juros_padrao = Decimal("5.0")
     
     try:
-        nova_solicitacao = aprovar_emprestimo_instantaneo(
+        nova_solicitacao = criar_solicitacao_p2p(
             usuario_id=usuario.id,
             valor=dados.valor,
             prazo=dados.parcelas,
             taxa=taxa_juros_padrao,
             db=db,
-            taxa_adesao=taxa_solicitacao, # A taxa agora é financiada
-            ip_cliente=request.client.host # CAPTURA DO IP PARA CLAUSULA 3.4
+            ip_cliente=request.client.host
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    db.commit()
     cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
 
     return {
-        "message": "Empréstimo Aprovado e Creditado na sua conta!",
+        "message": "Solicitação criada! Aguardando um investidor aceitar.",
         "id": nova_solicitacao.id,
-        "valor_liberado": float(dados.valor)
+        "valor": float(dados.valor),
+        "status": "pendente"
     }
+
+@router.post("/aceitar-oferta/{id}")
+@limiter.limit("5/minute")
+async def aceitar_oferta_endpoint(request: Request, id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    try:
+        result = aceitar_oferta(id, usuario_logado.id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return result
 
 @router.get("/meus")
 async def listar_meus_emprestimos(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """Lista o histórico de empréstimos do usuário."""
-    solicitacoes = db.query(SolicitacaoEmprestimo).filter(
+    como_tomador = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.usuario_id == usuario.id
     ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
-    
+
+    como_credor = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.credor_id == usuario.id
+    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
+
     resultado = []
-    for s in solicitacoes:
-        # Cálculo total da dívida: (Principal + Juros Acumulados) + Taxas Financiadas
+    for s in como_tomador + como_credor:
         taxa_mensal = s.taxa_juros / 100
         total_com_juros = s.valor * (Decimal("1") + (taxa_mensal * s.prazo_meses))
-        total_final = total_com_juros + (s.taxas_adicionais or Decimal("0.00"))
-        valor_parcela = total_final / s.prazo_meses
+        valor_parcela = total_com_juros / s.prazo_meses
         
+        credor_nome = s.credor.nome if s.credor else "Aguardando investidor"
+        chave_pix_pagamento = s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix)
         resultado.append({
             "id": s.id,
+            "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
+            "contraparte": credor_nome if s.usuario_id == usuario.id else s.usuario.nome,
+            "chave_pix_pagamento": chave_pix_pagamento,
+            "score_contraparte": float(s.credor.score if s.credor else 0) if s.usuario_id == usuario.id else float(s.usuario.score or 0),
             "valor_principal": float(s.valor),
             "taxa_juros": float(s.taxa_juros),
             "prazo": s.prazo_meses,
             "valor_parcela": round(float(valor_parcela), 2),
-            "total_devedor": float(total_final),
+            "total_devedor": float(total_com_juros),
             "status": s.status.value,
+            "parcelas_pagas": s.parcelas_pagas,
+            "parcelas_totais": s.prazo_meses,
             "proximo_vencimento": s.proximo_vencimento.isoformat() if s.proximo_vencimento else None,
             "data_criacao": s.data_criacao.isoformat()
         })
     return resultado
 
-class PagamentoRequest(BaseModel):
-    valor_pagamento: Decimal = Field(gt=0)
+@router.post("/confirmar-pagamento/{id}")
+async def confirmar_pagamento(id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    try:
+        result = confirmar_pagamento_externo(db, id, usuario_logado.id, dados.valor_pagamento)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
 
-@router.post("/pagar-parcela/{id}")
-async def pagar_parcela(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Processa o pagamento de uma parcela com distribuição de lucro para o Pool."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
+@router.post("/confirmar-recebimento/{id}")
+async def confirmar_recebimento(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    try:
+        result = confirmar_recebimento_externo(db, id, usuario_logado.id)
+        if result.get("quitado"):
+            atualizar_score(db, usuario_logado.id, Decimal("5.0"), "PAGAMENTO_EM_DIA")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
+
+@router.post("/gerar-taxa/{id}")
+async def gerar_taxa_origem(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.id == id, 
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).with_for_update().first()
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.usuario_id == usuario_logado.id,
+        SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.PENDENTE])
+    ).first()
 
     if not solicitacao:
-        raise HTTPException(status_code=404, detail="Empréstimo ativo não encontrado.")
+        raise HTTPException(status_code=404, detail="Solicitação não encontrada.")
 
-    # Calcular valor da parcela (Principal + Juros + Taxa Financiada)
-    taxa_mensal = solicitacao.taxa_juros / 100
-    total_com_juros = solicitacao.valor * (Decimal("1") + (taxa_mensal * solicitacao.prazo_meses))
-    total_final = total_com_juros + (solicitacao.taxas_adicionais or Decimal("0.00"))
-    valor_parcela = total_final / solicitacao.prazo_meses
+    isento = verificar_isencao_taxa(usuario_logado)
+    valor_taxa = Decimal("0.00") if isento else (Decimal("2.00") if solicitacao.valor <= 50 else Decimal("4.00"))
+
+    if valor_taxa == 0:
+        return {"message": "Isento de taxa.", "valor": 0}
+
+    from rotas.rotas_financeiro import sdk
+    if not sdk:
+        raise HTTPException(status_code=500, detail="Pagamento não configurado.")
+
+    payment_data = {
+        "transaction_amount": float(valor_taxa),
+        "description": f"Taxa Psy Pay - Pedido #{solicitacao.id}",
+        "payment_method_id": "pix",
+        "payer": {"email": usuario_logado.email}
+    }
+
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
     
-    mora = calcular_mora(solicitacao, valor_parcela)
-    total_a_pagar = valor_parcela + mora
+    if result.get("status") not in [200, 201]:
+        raise HTTPException(status_code=400, detail="Erro ao gerar PIX da taxa.")
 
-    if usuario.saldo < total_a_pagar:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. Necessário: R$ {total_a_pagar:,.2f}")
+    qr_code = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code")
+    qr_code_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64")
+    payment_id = payment.get("id")
 
-    usuario.saldo -= total_a_pagar
+    db.add(Transacao(
+        usuario_id=usuario_logado.id,
+        valor=valor_taxa,
+        tipo=TipoTransacao.TAXA_ORIGEM,
+        status="pendente",
+        payment_id=str(payment_id),
+        detalhes=f"Taxa de origem - Pedido #{solicitacao.id}"
+    ))
+    db.commit()
 
-    juro_da_parcela = (solicitacao.valor * taxa_mensal)
-    principal_da_parcela = solicitacao.valor / solicitacao.prazo_meses
+    return {
+        "message": "QR Code gerado! Pague a taxa para concluir.",
+        "valor": float(valor_taxa),
+        "qr_code": qr_code,
+        "qr_code_base64": qr_code_base64,
+        "payment_id": payment_id
+    }
 
-    taxa_diluida = (solicitacao.taxas_adicionais or Decimal("0.00")) / solicitacao.prazo_meses
-    receita_total_plataforma = juro_da_parcela + taxa_diluida + mora
+@router.post("/gerar-taxa-solicitacao")
+@limiter.limit("3/minute")
+async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    valor_taxa = dados.valor * Decimal("0.03")
+    if valor_taxa < Decimal("1.00"):
+        valor_taxa = Decimal("1.00")
 
-    creditar_plataforma(db, principal_da_parcela, receita_total_plataforma, solicitacao.id, "Receita Bruta (Cooperativa 2.0) - Parc")
+    from rotas.rotas_financeiro import sdk
+    if not sdk:
+        return {"message": "Ambiente sem PIX configurado.", "valor": float(valor_taxa), "simulacao": True}
 
-    # 3. Atualizar Empréstimo
-    solicitacao.parcelas_pagas += 1
-    if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
-        solicitacao.status = StatusSolicitacao.CONCLUIDO
+    payment_data = {
+        "transaction_amount": float(valor_taxa),
+        "description": f"Taxa de solicitação - R$ {dados.valor}",
+        "payment_method_id": "pix",
+        "payer": {"email": usuario_logado.email}
+    }
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
+    if result.get("status") not in [200, 201]:
+        raise HTTPException(status_code=400, detail="Erro ao gerar PIX.")
+
+    db.add(Transacao(
+        usuario_id=usuario_logado.id,
+        valor=valor_taxa,
+        tipo=TipoTransacao.TAXA_SOLICITACAO,
+        status="pendente",
+        payment_id=str(payment.get("id")),
+        detalhes=f"Taxa de 3% sobre solicitação de R$ {dados.valor}"
+    ))
+    db.commit()
+
+    return {
+        "message": "Pague a taxa de 3% para solicitar o empréstimo.",
+        "valor": float(valor_taxa),
+        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code"),
+        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64"),
+        "payment_id": payment.get("id")
+    }
+
+@router.post("/depositar-virtual")
+@limiter.limit("3/minute")
+async def depositar_virtual(dados: PagamentoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    if dados.valor_pagamento < Decimal("10.00"):
+        raise HTTPException(status_code=400, detail="Valor mínimo: R$ 10,00")
+
+    taxa = dados.valor_pagamento * Decimal("0.02")
+
+    from rotas.rotas_financeiro import sdk
+    if sdk:
+        payment_data = {
+            "transaction_amount": float(taxa),
+            "description": f"Taxa de 2% sobre depósito virtual de R$ {dados.valor_pagamento}",
+            "payment_method_id": "pix",
+            "payer": {"email": usuario_logado.email}
+        }
+        result = sdk.payment().create(payment_data)
+        payment = result.get("response", {})
+        if result.get("status") not in [200, 201]:
+            raise HTTPException(status_code=400, detail="Erro ao gerar PIX da taxa.")
     else:
-        # Pular para o próximo mês
-        solicitacao.proximo_vencimento += datetime.timedelta(days=30)
+        payment = {"id": "simulado"}
 
-    # 4. Aumentar Score do Bom Pagador
-    if mora == 0:
-        atualizar_score(db, usuario.id, Decimal("5.0"), "PAGAMENTO_EM_DIA")
-    
-    db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=total_a_pagar,
-        tipo=TipoTransacao.PAGAMENTO_PARCELA,
-        status="concluido",
-        detalhes=f"Pagamento parcela #{solicitacao.parcelas_pagas} - Pedido #{id}"
-    ))
+    result = adicionar_credito_virtual(usuario_logado.id, dados.valor_pagamento, db)
 
-    db.commit()
-    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
-    return {"message": "Pagamento realizado com sucesso!", "novo_saldo": float(usuario.saldo)}
+    return {
+        "message": f"Depósito virtual de R$ {dados.valor_pagamento} realizado! Taxa de R$ {taxa}.",
+        "credito_virtual": result["credito_virtual"],
+        "taxa_paga": result["taxa_paga"],
+        "qr_code_taxa": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
+        "payment_id": payment.get("id")
+    }
 
-@router.post("/pagamento-avulso/{id}")
-async def pagamento_avulso(id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Realiza um pagamento parcial para amortizar a dívida."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-    solicitacao = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.id == id,
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).with_for_update().first()
+@router.post("/resgatar-virtual")
+@limiter.limit("3/minute")
+async def resgatar_virtual(dados: PagamentoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    try:
+        result = resgatar_credito_virtual(usuario_logado.id, dados.valor_pagamento, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
 
-    if not solicitacao:
-        raise HTTPException(status_code=404, detail="Empréstimo não encontrado.")
-
-    valor_pagamento = dados.valor_pagamento
-    if usuario.saldo < valor_pagamento:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente.")
-
-    usuario.saldo -= valor_pagamento
-
-    taxa_mensal = solicitacao.taxa_juros / 100
-    juro_mensal = solicitacao.valor * taxa_mensal
-    principal_mensal = solicitacao.valor / solicitacao.prazo_meses
-    total_base = juro_mensal + principal_mensal
-
-    prop_juros = juro_mensal / total_base
-    valor_juros = valor_pagamento * prop_juros
-    valor_principal = valor_pagamento - valor_juros
-
-    creditar_plataforma(db, valor_principal, valor_juros, solicitacao.id, "Receita Bruta Amortização (Cooperativa 2.0)")
-
-    # Registrar amortização
-    solicitacao.valor_amortizado += valor_pagamento
-    
-    divida_restante = calcular_divida_total(solicitacao)
-    
-    if divida_restante <= 0:
-        solicitacao.status = StatusSolicitacao.CONCLUIDO
-        solicitacao.parcelas_pagas = solicitacao.prazo_meses
-
-    db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=valor_pagamento,
-        tipo=TipoTransacao.PAGAMENTO_PARCELA,
-        status="concluido",
-        detalhes=f"Pagamento Avulso - Pedido #{id}"
-    ))
-
-    db.commit()
-    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
-    return {"message": "Pagamento avulso processado!", "novo_saldo": float(usuario.saldo)}
-
-@router.post("/quitar-total/{id}")
-async def quitar_total(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Liquida o empréstimo integralmente."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-    solicitacao = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.id == id,
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).with_for_update().first()
-
-    if not solicitacao:
-        raise HTTPException(status_code=404, detail="Empréstimo não encontrado.")
-
-    total_quitar = calcular_divida_total(solicitacao)
-    
-    if usuario.saldo < total_quitar:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para quitação. Necessário R$ {total_quitar:,.2f}")
-
-    usuario.saldo -= total_quitar
-
-    parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
-    taxa_mensal = solicitacao.taxa_juros / 100
-
-    juros_restantes = (solicitacao.valor * taxa_mensal) * parcelas_restantes
-    taxas_pendentes = solicitacao.taxas_adicionais or Decimal("0.00")
-    principal_restante = (solicitacao.valor / solicitacao.prazo_meses) * parcelas_restantes
-
-    creditar_plataforma(db, principal_restante, juros_restantes + taxas_pendentes, solicitacao.id, "Receita Bruta Quitação (Cooperativa 2.0)")
-
-    # 3. Encerrar contrato
-    solicitacao.status = StatusSolicitacao.CONCLUIDO
-    solicitacao.parcelas_pagas = solicitacao.prazo_meses
-    
-    db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=total_quitar,
-        tipo=TipoTransacao.PAGAMENTO_PARCELA,
-        status="concluido",
-        detalhes=f"Quitação Integral - Pedido #{id}"
-    ))
-
-    db.commit()
-    limpar_cache(cache_snapshot_data, usuario.id, "000PL")
-    return {"message": "Crédito liquidado integralmente!", "novo_saldo": float(usuario.saldo)}
-
+@router.get("/pool-saldo")
+async def pool_saldo(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    total = saldo_disponivel_pool(db)
+    return {
+        "pool_disponivel": float(total),
+        "meu_credito_virtual": float(usuario.credito_virtual or 0),
+        "meu_valor_emprestado": float(usuario.valor_emprestado or 0),
+        "meus_emprestimos_ativos": usuario.emprestimos_ativos or 0
+    }
 
 class ContratoPDF(FPDF):
     def header(self):
-        # Logo Oficial
         try:
             logo_path = "/home/josias/Área de trabalho/projetos/psy pay/frontend/public/logo.png"
             self.image(logo_path, x=85, y=10, w=40)
             self.ln(30)
         except:
-            # Cabeçalho com branding Psy Pay (Fallback)
             self.set_font('Helvetica', 'B', 22)
             self.set_text_color(255, 204, 0)
             self.cell(0, 15, 'PSY PAY', 0, 1, 'C')
         
         self.set_font('Helvetica', 'I', 10)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 5, 'Fintech de Crédito Digital & Fomento', 0, 1, 'C')
+        self.cell(0, 5, 'Plataforma de Crédito Colaborativo', 0, 1, 'C')
         self.ln(5)
-        # Linha decorativa
         self.set_draw_color(255, 204, 0)
         self.line(10, 35, 200, 35)
 
@@ -305,104 +362,89 @@ class ContratoPDF(FPDF):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f'Página {self.page_no()} | Motor de Crédito Digital e Fomento (Fase Beta) | Autenticado Digitalmente', 0, 0, 'C')
+        self.cell(0, 10, f'Página {self.page_no()} | Psy Pay | Autenticado Digitalmente', 0, 0, 'C')
 
 @router.get("/contrato/pdf/{id}")
 async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """Gera um PDF profissional do contrato de empréstimo."""
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == id,
         SolicitacaoEmprestimo.usuario_id == usuario.id
     ).first()
 
     if not solicitacao:
+        solicitacao = db.query(SolicitacaoEmprestimo).filter(
+            SolicitacaoEmprestimo.id == id,
+            SolicitacaoEmprestimo.credor_id == usuario.id
+        ).first()
+
+    if not solicitacao:
         raise HTTPException(status_code=404, detail="Contrato não encontrado.")
 
-    # Cálculos para o PDF
     taxa_mensal = solicitacao.taxa_juros / 100
     total_com_juros = solicitacao.valor * (Decimal("1") + (taxa_mensal * solicitacao.prazo_meses))
     total_final = total_com_juros + (solicitacao.taxas_adicionais or Decimal("0.00"))
     valor_parcela = total_final / solicitacao.prazo_meses
 
-    # Geração do PDF
+    credor = solicitacao.credor
+    tomador = solicitacao.usuario
+
     pdf = ContratoPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # 1. Título do Documento
     pdf.set_font('Helvetica', 'B', 16)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f'CÉDULA DE CRÉDITO BANCÁRIO (DIGITAL) - #{solicitacao.id}', 0, 1, 'L')
+    pdf.cell(0, 10, f'CONTRATO DE CRÉDITO P2P - #{solicitacao.id}', 0, 1, 'L')
     pdf.ln(5)
 
-    # 2. Dados das Partes
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, '1. IDENTIFICAÇÃO DAS PARTES', 0, 1, 'L')
     pdf.set_font('Helvetica', '', 10)
-    cpf_mascarado = f"***.{usuario.cpf[-4:]}" if len(usuario.cpf) >= 4 else "***"
-    pix_mascarado = f"{usuario.chave_pix[:3]}***{usuario.chave_pix[-3:]}" if len(usuario.chave_pix) >= 6 else "***"
-    pdf.multi_cell(0, 6, f"CREDOR: PSY PAY PLATAFORMA DE CRÉDITO (Fundo de Liquidez Cooperativo)\n"
-                         f"DEVEDOR(A): {usuario.nome}\n"
-                         f"CPF: {cpf_mascarado}\n"
-                         f"CHAVE PIX REGISTRADA: {pix_mascarado}")
+    cpf_tomador = f"***.{tomador.cpf[-4:]}" if len(tomador.cpf) >= 4 else "***"
+    cpf_credor = f"***.{credor.cpf[-4:]}" if credor and len(credor.cpf) >= 4 else "***"
+    pdf.multi_cell(0, 6, f"CREDOR: {credor.nome if credor else 'A definir'} (CPF: {cpf_credor})\n"
+                         f"DEVEDOR: {tomador.nome} (CPF: {cpf_tomador})")
     pdf.ln(5)
 
-    # 3. Dados do Empréstimo (Quadro Resumo)
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(0, 10, '2. QUADRO RESUMO DO CRÉDITO', 0, 1, 'L')
-    
-    # Tabela Simples
+    pdf.cell(0, 10, '2. QUADRO RESUMO', 0, 1, 'L')
     pdf.set_fill_color(245, 245, 245)
     pdf.set_font('Helvetica', 'B', 10)
     pdf.cell(95, 8, 'DESCRIÇÃO', 1, 0, 'L', True)
-    pdf.cell(95, 8, 'VALOR / INFO', 1, 1, 'L', True)
-    
+    pdf.cell(95, 8, 'VALOR', 1, 1, 'L', True)
     pdf.set_font('Helvetica', '', 10)
-    pdf.cell(95, 8, 'Valor Principal Liberado', 1, 0, 'L')
+    pdf.cell(95, 8, 'Valor do Empréstimo', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {solicitacao.valor:,.2f}', 1, 1, 'L')
-    
     pdf.cell(95, 8, 'Taxa de Juros Mensal', 1, 0, 'L')
     pdf.cell(95, 8, f'{solicitacao.taxa_juros}% a.m.', 1, 1, 'L')
-    
-    pdf.cell(95, 8, 'Prazo de Pagamento', 1, 0, 'L')
+    pdf.cell(95, 8, 'Prazo', 1, 0, 'L')
     pdf.cell(95, 8, f'{solicitacao.prazo_meses} Parcelas', 1, 1, 'L')
-    
-    pdf.cell(95, 8, 'Valor da Parcela Mensal', 1, 0, 'L')
+    pdf.cell(95, 8, 'Valor da Parcela', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {valor_parcela:,.2f}', 1, 1, 'L')
-    
-    pdf.set_font('Helvetica', 'B', 10)
-    pdf.cell(95, 8, 'TOTAL DEVEDOR FINAL', 1, 0, 'L')
+    pdf.cell(95, 8, 'TOTAL DEVEDOR', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {total_final:,.2f}', 1, 1, 'L')
     pdf.ln(10)
 
-    # 4. Cláusulas e Termos
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(0, 10, '3. CLÁUSULAS CONTRATUAIS', 0, 1, 'L')
+    pdf.cell(0, 10, '3. CONDIÇÕES', 0, 1, 'L')
     pdf.set_font('Helvetica', '', 9)
     termos = (
-        "3.1. O devedor declara ter recebido o valor principal em sua conta digital Psy Pay no ato da aprovação deste contrato.\n\n"
-        "3.2. O pagamento das parcelas será realizado via débito em conta ou boleto/pix conforme disponibilidade no sistema. "
-        "Atrasos superiores a 24h acarretam em multa de 2% e juros de mora de 0.1% ao dia.\n\n"
-        "3.3. O devedor autoriza a plataforma a utilizar o saldo de sua 'Carteira de Liquidez' (Pool) para quitação automática "
-        "das parcelas em caso de inadimplência superior a 5 dias, conforme os Termos de Uso aceitos no cadastro.\n\n"
-        "3.4. Este contrato possui validade digital mediante o aceite eletrônico realizado pelo usuário sob o IP registrado no sistema."
+        "3.1. O valor do empréstimo é transferido diretamente entre as partes via PIX, sem intermediação da plataforma.\n\n"
+        "3.2. O pagamento das parcelas é realizado via PIX diretamente ao credor. A plataforma apenas registra as confirmações.\n\n"
+        "3.3. O atraso no pagamento acarreta multa de 2% e juros de mora de 0.1% ao dia.\n\n"
+        "3.4. Este contrato possui validade digital mediante o aceite eletrônico das partes no sistema."
     )
     pdf.multi_cell(0, 5, termos)
     pdf.ln(10)
 
-    # 5. Assinatura e Autenticação
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(0, 10, '4. AUTENTICAÇÃO DO SISTEMA', 0, 1, 'L')
+    pdf.cell(0, 10, '4. AUTENTICAÇÃO', 0, 1, 'L')
     pdf.set_font('Helvetica', 'I', 9)
     pdf.set_text_color(50, 50, 50)
-    hash_id = hashlib.sha256(f"{solicitacao.id}{usuario.cpf}{solicitacao.data_criacao.isoformat()}".encode()).hexdigest()[:16]
-    cpf_mascarado = f"***.{usuario.cpf[-4:]}" if len(usuario.cpf) >= 4 else "***"
-    pix_mascarado = f"{usuario.chave_pix[:3]}***{usuario.chave_pix[-3:]}" if len(usuario.chave_pix) >= 6 else "***"
-    pdf.multi_cell(0, 5, f"Documento gerado e autenticado eletronicamente em {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}.\n"
-                         f"O devedor concordou com estes termos via aplicativo móvel/web.\n"
-                         f"Hash de Identificação: {hash_id}")
+    hash_id = hashlib.sha256(f"{solicitacao.id}{tomador.cpf}{solicitacao.data_criacao.isoformat()}".encode()).hexdigest()[:16]
+    pdf.multi_cell(0, 5, f"Documento gerado em {datetime.datetime.now(datetime.timezone.utc).strftime('%d/%m/%Y %H:%M:%S')}.\n"
+                         f"Hash: {hash_id}")
 
-    # Retornar o PDF como stream
     output = io.BytesIO()
     pdf_out = pdf.output(dest='S')
     output.write(pdf_out)

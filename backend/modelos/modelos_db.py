@@ -35,6 +35,11 @@ class TipoTransacao(enum.Enum):
     RETORNO_POOL = "retorno_pool"
     COMISSAO_PARCEIRO = "comissao_parceiro"
     TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
+    TAXA_DEPOSITO_VIRTUAL = "taxa_deposito_virtual"
+    TAXA_SOLICITACAO = "taxa_solicitacao"
+    TAXA_ORIGEM = "taxa_origem"
+    CONFIRMACAO_PAGAMENTO = "confirmacao_pagamento"
+    CONFIRMACAO_RECEBIMENTO = "confirmacao_recebimento"
     ASSINATURA = "assinatura"
 
 class RegistroAuditoria(Base):
@@ -55,8 +60,16 @@ class Usuario(Base):
     cpf = Column(String(14), unique=True, index=True, nullable=False)
     senha_hash = Column(Text, nullable=False)
     chave_pix = Column(String(255), nullable=False)
+    chave_pix_publica = Column(String(255), nullable=True)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
-    saldo_caixa = Column(Numeric(precision=20, scale=2), default=0) # Saldo no Pool de Investimentos
+    saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
+    credito_virtual = Column(Numeric(precision=20, scale=2), default=0)
+    valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)
+    total_receber = Column(Numeric(precision=20, scale=2), default=0)
+    inadimplente = Column(Boolean, default=False)
+    qtd_calotes = Column(Integer, default=0)
+    emprestimos_ativos = Column(Integer, default=0)
+    emprestimos_concluidos = Column(Integer, default=0)
     score = Column(Numeric(precision=6, scale=1), default=0)
     score_anterior = Column(Numeric(precision=6, scale=1), default=0)
     ultima_solicitacao = Column(DateTime, nullable=True)
@@ -101,7 +114,7 @@ class Usuario(Base):
     mp_user_id = Column(String(100), nullable=True)
     mp_token_expires_at = Column(DateTime, nullable=True)
 
-    solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario")
+    solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario", foreign_keys="SolicitacaoEmprestimo.usuario_id")
     transacoes = relationship("Transacao", back_populates="usuario")
 
 class SolicitacaoEmprestimo(Base):
@@ -119,9 +132,13 @@ class SolicitacaoEmprestimo(Base):
     taxas_adicionais = Column(Numeric(precision=20, scale=2), default=0)
     valor_amortizado = Column(Numeric(precision=20, scale=2), default=0)
     valor_arrecadado = Column(Numeric(precision=20, scale=2), default=0)
-    tipo_garantia = Column(String(50), default="pool") # pool, avalista, objeto
+    credor_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
+    chave_pix_credor = Column(String(255), nullable=True)
+    confirmacao_pagamento_data = Column(DateTime, nullable=True)
+    confirmacao_recebimento_data = Column(DateTime, nullable=True)
+    data_quitacao = Column(DateTime, nullable=True)
+    tipo_garantia = Column(String(50), default="p2p")
     garantia_descricao = Column(Text, nullable=True)
-    sugestao_pool = Column(Numeric(precision=20, scale=2), default=0)
     
     data_expiracao_4h = Column(DateTime, nullable=True) # Janela para entrega física
     data_expiracao_5d = Column(DateTime, nullable=True) # Prazo total para captação (se houver)
@@ -137,7 +154,8 @@ class SolicitacaoEmprestimo(Base):
     municipio_aceite = Column(String(255), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
-    usuario = relationship("Usuario", back_populates="solicitacoes")
+    usuario = relationship("Usuario", back_populates="solicitacoes", foreign_keys=[usuario_id])
+    credor = relationship("Usuario", foreign_keys=[credor_id], primaryjoin="SolicitacaoEmprestimo.credor_id == Usuario.id")
     investimentos = relationship("Investimento", back_populates="solicitacao")
 
     from sqlalchemy import Index

@@ -131,21 +131,19 @@ class TestCalcularLimiteCredito:
         limite = calcular_limite_credito(usuario, None)
         assert limite == Decimal("0")
 
-    def test_nao_verificado_com_pool(self):
+    def test_nao_verificado_sempre_zero(self):
         from utils_fintech import calcular_limite_credito
         usuario = Mock()
         usuario.limite_credito_personalizado = None
-        usuario.saldo_caixa = Decimal("150")
         usuario.score = Decimal("300")
         usuario.is_verified = False
         limite = calcular_limite_credito(usuario, None)
-        assert limite == Decimal("150")
+        assert limite == Decimal("0")
 
-    def test_verificado_sem_pool_score_baixo(self):
+    def test_verificado_score_baixo(self):
         from utils_fintech import calcular_limite_credito
         usuario = Mock()
         usuario.limite_credito_personalizado = None
-        usuario.saldo_caixa = Decimal("0")
         usuario.score = Decimal("100")
         usuario.is_verified = True
         limite = calcular_limite_credito(usuario, None)
@@ -155,7 +153,6 @@ class TestCalcularLimiteCredito:
         from utils_fintech import calcular_limite_credito
         usuario = Mock()
         usuario.limite_credito_personalizado = None
-        usuario.saldo_caixa = Decimal("50")
         usuario.score = Decimal("600")
         usuario.is_verified = True
         limite = calcular_limite_credito(usuario, None)
@@ -163,15 +160,14 @@ class TestCalcularLimiteCredito:
         esperado = Decimal("20") + bonus
         assert limite == esperado, f"{limite} != {esperado}"
 
-    def test_score_excelente_multiplicador_com_pool(self):
+    def test_nao_verificado_score_alto(self):
         from utils_fintech import calcular_limite_credito
         usuario = Mock()
         usuario.limite_credito_personalizado = None
-        usuario.saldo_caixa = Decimal("100")
         usuario.score = Decimal("850")
         usuario.is_verified = False
         limite = calcular_limite_credito(usuario, None)
-        assert limite == Decimal("100")
+        assert limite == Decimal("0")
 
     def test_verified_sem_pool_score_alto_retorna_fixo(self):
         from utils_fintech import calcular_limite_credito

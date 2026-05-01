@@ -4,7 +4,7 @@ import { ShieldAlert, PlusCircle, ArrowDownCircle } from 'lucide-react';
 const GerenciarPool = ({
     usuario, valorPool, setValorPool,
     handleAportePool, handleResgatePool,
-    setSecaoAtiva, isFirstLoad
+    isFirstLoad
 }) => {
     return (
         <div className="card">
@@ -127,13 +127,9 @@ const GerenciarPool = ({
                             Envie seus documentos para liberar aportes e aumentar seu lucro.
                         </span>
                     </div>
-                    <button
-                        className="btn btn-sm"
-                        style={{ background: '#ffc107', color: '#000', padding: '6px 12px', fontSize: '0.65rem', fontWeight: 900 }}
-                        onClick={() => setSecaoAtiva('perfil')}
-                    >
-                        VERIFICAR
-                    </button>
+                        <span style={{ fontSize: '0.65rem', color: '#ffc107' }}>
+                            Vá em Configurações → Verificação
+                        </span>
                 </div>
             )}
 

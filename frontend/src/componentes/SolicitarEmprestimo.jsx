@@ -6,7 +6,7 @@ const SolicitarEmprestimo = ({
     usuario, aceiteTermos, setAceiteTermos,
     valor, setValor, parcelas, setParcelas,
     limiteInfo, loadingAction, handleSolicitar,
-    setSecaoAtiva
+    setActiveView
 }) => {
     return (
         <div className="card">
@@ -29,13 +29,9 @@ const SolicitarEmprestimo = ({
                             <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '15px' }}>
                                 Para sua segurança e da cooperativa, a solicitação de crédito exige que sua conta esteja <strong>totalmente verificada</strong>.
                             </p>
-                            <button
-                                className="btn btn-primary btn-block"
-                                onClick={() => setSecaoAtiva('perfil')}
-                                style={{ background: 'var(--danger)', boxShadow: '0 0 15px rgba(255,61,0,0.3)' }}
-                            >
-                                ENVIAR DOCUMENTOS AGORA
-                            </button>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--warning)', marginTop: '15px' }}>
+                                        Vá em <strong>Configurações → Verificação</strong> para enviar seus documentos e liberar o crédito.
+                                    </p>
                         </div>
                     ) : (
                         <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>

@@ -1272,7 +1272,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     limiteInfo={limiteInfo}
                     loadingAction={loadingAction}
                     handleSolicitar={handleSolicitar}
-                    setSecaoAtiva={setSecaoAtiva}
                 />
             )}
             {activeView === 'pool' && (
@@ -1282,7 +1281,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setValorPool={setValorPool}
                     handleAportePool={handleAportePool}
                     handleResgatePool={handleResgatePool}
-                    setSecaoAtiva={setSecaoAtiva}
                     isFirstLoad={isFirstLoad}
                 />
             )}

@@ -420,6 +420,7 @@ async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Sessio
     return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
 
 @router.post("/resgatar-pool")
+@limiter.limit("5/minute")
 async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Resgata saldo do Pool validando dívidas ativas como colateral."""
     # Lock preventivo
@@ -517,6 +518,7 @@ async def notificar_deposito(request: Request, dados: NotificacaoDeposito, db: S
     return {"message": "Notificação enviada. O saldo será creditado assim que o admin confirmar."}
 
 @router.post("/saque/reservar")
+@limiter.limit("2/minute")
 async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Reserva um valor para saque em espécie em um parceiro específico."""
     # from utils_score import verificar_2fa # Se houver utilitário de 2FA
@@ -748,6 +750,7 @@ async def obter_detalhes_pix(transacao_id: int, db: Session = Depends(get_db), u
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o provedor de pagamento: {str(e)}")
 
 @router.post("/webhook/mercadopago")
+@limiter.limit("10/minute")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
     try:
         payload = await request.json()

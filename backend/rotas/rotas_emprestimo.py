@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
 from rotas.rotas_snapshot import cache_snapshot_data
+from limitador import limiter
 
 router = APIRouter(prefix="/emprestimos", tags=["Empréstimos Fintech"])
 
@@ -39,9 +40,10 @@ async def consultar_limite(db: Session = Depends(get_db), usuario: Usuario = Dep
     }
 
 @router.post("/solicitar")
+@limiter.limit("3/minute")
 async def solicitar_emprestimo(
-    dados: SolicitacaoRequest, 
     request: Request,
+    dados: SolicitacaoRequest, 
     db: Session = Depends(get_db),
     usuario_logado: Usuario = Depends(obter_usuario_logado)
 ):

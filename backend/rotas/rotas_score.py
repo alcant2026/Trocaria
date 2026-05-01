@@ -51,16 +51,23 @@ async def solicitar_verificacao_com_docs(
     detalhe_pagamento = "Solicitação de Verificação (Grátis)"
         
         
-    # Salvar Arquivos Localmente de forma segura
+    MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+    ALLOWED_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf"}
+
     def salvar_arquivo(arquivo: UploadFile, tipo_doc: str) -> str:
         if not arquivo or not arquivo.filename: return None
+        if arquivo.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail=f"Formato não permitido: {arquivo.content_type}. Use PNG, JPG ou PDF.")
+        conteudo = arquivo.file.read()
+        if len(conteudo) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="Arquivo muito grande. Máximo de 5MB por arquivo.")
         token = secrets.token_hex(8)
         extensao = arquivo.filename.split('.')[-1][:5]
         nome_seguro = f"{usuario.id}_{tipo_doc}_{token}.{extensao}"
         caminho_completo = os.path.join("uploads", nome_seguro)
         try:
             with open(caminho_completo, "wb") as f:
-                f.write(arquivo.file.read())
+                f.write(conteudo)
             return caminho_completo
         except Exception as e:
             print("Erro ao salvar arquivo:", e)

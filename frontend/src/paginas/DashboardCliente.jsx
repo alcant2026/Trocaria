@@ -647,7 +647,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
 
         if (!aceiteTermos) {
-            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso e as políticas da cooperativa para continuar.', type: 'warning' });
+            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso para continuar.', type: 'warning' });
             return;
         }
 
@@ -1882,7 +1882,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         {/* PASSO 1: SELEÇÃO DO UPGRADE */}
                         {passoUpgrade === 1 && (
                             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil de cooperado hoje.</p>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Escolha como deseja melhorar seu perfil hoje.</p>
                                 
                                     {(!usuario.is_verified || usuario.kyc_status === 'pendente') && (
                                         <div 
@@ -2094,7 +2094,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <div className="info-value" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>
                                                 GRÁTIS
                                             </div>
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este serviço não possui custo para cooperados.</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este serviço é gratuito.</p>
                                         </div>
 
                                         <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>

@@ -241,7 +241,7 @@ const App = () => {
                 </div>
             )}
             <footer className="api-footer">
-                <p>PSY PAY - Plataforma experimental de tecnologia para crédito digital. Atuamos como facilitador de crédito cooperativo em fase beta. O uso do serviço implica no aceite total dos Termos de Uso e Política de Privacidade. © 2024-2026 PSY PAY.</p>
+                <p>PSY PAY - Rede de Apoio entre Pares. Conectamos pessoas que querem apoiar umas às outras. O uso do serviço implica no aceite total dos Termos de Uso e Política de Privacidade. © 2024-2026 PSY PAY.</p>
             </footer>
             <TemporizadorInatividade aoDeslogar={logout} />
             <BannerCookies usuario={user} onUpdate={atualizarPerfil} />

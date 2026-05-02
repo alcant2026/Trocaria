@@ -132,6 +132,22 @@ const AdminDashboard = () => {
         setLoadingAddSaldo(false);
     };
 
+    const handleResolverDisputa = async (id, acao) => {
+        if (!confirm('Tem certeza? Isso afetara o score dos usuarios envolvidos.')) return;
+        try {
+            if (acao === 'calote') {
+                await api.post('/emprestimos/calote/' + id);
+                setMensagem('Calote registrado! Credor reembolsado, tomador marcado como inadimplente.');
+            } else {
+                await api.post('/emprestimos/confirmar-recebimento/' + id);
+                setMensagem('Pagamento confirmado manualmente!');
+            }
+            carregarSnapshot();
+        } catch (e) {
+            setMensagem('Erro: ' + (e.message || e));
+        }
+    };
+
     // Ações de Caixa
     const [showAcaoModal, setShowAcaoModal] = useState(false); 
     const [acaoTipo, setAcaoTipo] = useState(''); // 'saque' ou 'aporte'
@@ -941,6 +957,45 @@ const AdminDashboard = () => {
                                 ))
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* --- VIEW: DISPUTAS / PAGAMENTOS PENDENTES --- */}
+                {activeTab === 'emprestimos' && (
+                    <div className="glass-panel animate-fade-in mt-2">
+                        <div className="section-header">
+                            <h3>Pagamentos Pendentes de Confirmação</h3>
+                            <AlertTriangle size={16} color="var(--warning)" />
+                        </div>
+                        <p className="text-xs text-muted mb-2">Empréstimos onde o tomador já pagou mas o credor ainda não confirmou. Se o credor não confirmar, o admin pode resolver.</p>
+                        
+                        {(() => {
+                            const pendentes = (snapshot?.cliente_emprestimos || []).filter(e => e.pagamento_pendente);
+                            if (pendentes.length === 0) return <p className="text-muted">Nenhum pagamento pendente de confirmação.</p>;
+                            return pendentes.map(emp => (
+                                <div key={emp.id} className="info-block mb-1" style={{ border: '1px solid rgba(var(--warning-rgb), 0.3)', padding: '12px', borderRadius: '12px' }}>
+                                    <div className="flex-between">
+                                        <div>
+                                            <p style={{ fontWeight: 700, margin: 0 }}>Apoio #{emp.id}</p>
+                                            <p className="text-xs text-muted" style={{ margin: '2px 0' }}>
+                                                Tomador: {emp.contraparte_nome} | Credor: {emp.tipo === 'credor' ? 'Você' : emp.contraparte_nome}
+                                            </p>
+                                            <p className="text-xs text-muted" style={{ margin: 0 }}>
+                                                Pago em: {emp.confirmacao_pagamento_data || '—'}
+                                            </p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button className="btn btn-sm btn-primary" style={{ padding: '6px 12px', fontSize: '0.7rem' }} onClick={() => handleResolverDisputa(emp.id, 'confirmar')}>
+                                                Confirmar (forçar)
+                                            </button>
+                                            <button className="btn btn-sm" style={{ padding: '6px 12px', fontSize: '0.7rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => handleResolverDisputa(emp.id, 'calote')}>
+                                                Marcar Calote
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ));
+                        })()}
                     </div>
                 )}
 

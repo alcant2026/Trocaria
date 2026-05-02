@@ -37,7 +37,8 @@ import {
     History,
     AlertCircle,
     X,
-    ShieldAlert
+    ShieldAlert,
+    AlertTriangle
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 

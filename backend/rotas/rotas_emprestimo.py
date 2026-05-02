@@ -45,6 +45,7 @@ async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario =
             "parcelas": s.prazo_meses,
             "taxa_compensacao": float(s.taxa_juros),
             "score_tomador": float(s.usuario.score),
+            "verificado": s.usuario.is_verified,
             "inadimplente": s.usuario.inadimplente,
             "data_criacao": s.data_criacao.isoformat()
         })

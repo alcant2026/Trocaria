@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Star, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, User, Star, ShieldCheck, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
 import api from '../api';
 
 const OportunidadesLista = ({ usuario, onUpdate }) => {
@@ -123,6 +123,11 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                     <Star size={12} /> {op.score_tomador}
                                 </span>
+                                {op.verificado && (
+                                    <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <ShieldCheck size={12} /> Verificado
+                                    </span>
+                                )}
                                 {op.inadimplente && (
                                     <span style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                         <AlertTriangle size={12} /> Inadimplente

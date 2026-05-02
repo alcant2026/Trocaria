@@ -2415,48 +2415,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     <CreditCard size={24} color="var(--primary)" />
                                 </div>
                                 <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Recebimentos Automáticos</h3>
-                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure como você deseja receber o dinheiro das suas vendas.</p>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Links de Afiliados</h3>
+                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Compartilhe links de produtos e servicos. Ao clicar, o usuario e redirecionado diretamente para o site do anunciante. Nao processamos pagamentos — apenas conectamos pessoas.</p>
                                 </div>
-                            </div>
-
-                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src="https://www.mercadopago.com.br/instore/merchant/static/images/logo-mp.png" alt="Mercado Pago" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
-                                        <span style={{ fontWeight: 600 }}>Mercado Pago (Split)</span>
-                                    </div>
-                                    <div className={`badge ${mpStatus.conectado ? 'badge--success' : 'badge--warning'}`}>
-                                        {mpStatus.conectado ? 'CONECTADO' : 'NÃO CONECTADO'}
-                                    </div>
-                                </div>
-                                
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                                    Ao conectar sua conta, o valor das suas vendas cairá diretamente no seu Mercado Pago, já descontando a taxa da plataforma. Isso evita bitributação e agiliza seu recebimento.
-                                </p>
-
-                                {mpStatus.conectado ? (
-                                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Conta Vinculada: <strong>{mpStatus.mp_user_id}</strong></div>
-                                        <button 
-                                            className="btn btn-sm" 
-                                            style={{ background: 'rgba(255,61,0,0.1)', color: 'var(--danger)', width: '100%', marginTop: '10px' }}
-                                            onClick={handleDesconectarMP}
-                                            disabled={loadingMP}
-                                        >
-                                            {loadingMP ? 'Processando...' : 'Desconectar Conta'}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ width: '100%', marginTop: '10px', fontWeight: 700 }}
-                                        onClick={handleConectarMP}
-                                        disabled={loadingMP}
-                                    >
-                                        {loadingMP ? 'Carregando...' : 'CONECTAR AGORA'}
-                                    </button>
-                                )}
                             </div>
                         </div>
                     )}

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
@@ -29,9 +29,11 @@ class PagamentoRequest(BaseModel):
 
 @router.get("/oportunidades")
 async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    solicitacoes = db.query(SolicitacaoEmprestimo).filter(
+    solicitacoes = db.query(SolicitacaoEmprestimo).options(
+        joinedload(SolicitacaoEmprestimo.usuario)
+    ).filter(
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
-    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
+    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).limit(50).all()
     resultado = []
     for s in solicitacoes:
         resultado.append({

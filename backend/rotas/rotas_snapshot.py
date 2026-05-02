@@ -82,35 +82,24 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
         saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
 
-        # 0.1 Calcular Rentabilidade do Pool (Otimizado via SQL Aggregation)
-        # O rendimento é o que o saldo atual excede o capital que ainda está "em risco" (aportado e não resgatado)
-        capital_aportado = db.query(func.sum(Transacao.valor)).filter(
-            Transacao.usuario_id == usuario.id,
-            Transacao.tipo.in_([TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]),
-            Transacao.status == "concluido",
-            ~Transacao.detalhes.ilike("%GAVETA%"),
-            ~Transacao.detalhes.ilike("%ABERTURA DE CAIXA%"),
-            ~Transacao.detalhes.ilike("%ENCERRADO%")
-        ).scalar() or Decimal("0.00")
-
-        capital_resgatado = db.query(func.sum(Transacao.valor)).filter(
-            Transacao.usuario_id == usuario.id,
-            Transacao.tipo.in_([TipoTransacao.RESGATE_CAIXA, TipoTransacao.RESGATE_POOL]),
-            Transacao.status == "concluido",
-            ~Transacao.detalhes.ilike("%GAVETA%"),
-            ~Transacao.detalhes.ilike("%ABERTURA DE CAIXA%"),
-            ~Transacao.detalhes.ilike("%ENCERRADO%")
-        ).scalar() or Decimal("0.00")
+        # 0.1 Calcular Métricas Financeiras (Otimizado)
+        capital_aportado = Decimal("0.00")
+        capital_resgatado = Decimal("0.00")
+        if usuario.saldo_caixa and usuario.saldo_caixa > 0:
+            capital_aportado = db.query(func.coalesce(func.sum(Transacao.valor), 0)).filter(
+                Transacao.usuario_id == usuario.id,
+                Transacao.tipo.in_([TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]),
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+            capital_resgatado = db.query(func.coalesce(func.sum(Transacao.valor), 0)).filter(
+                Transacao.usuario_id == usuario.id,
+                Transacao.tipo.in_([TipoTransacao.RESGATE_CAIXA, TipoTransacao.RESGATE_POOL]),
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
 
         capital_liquido = max(Decimal("0.00"), capital_aportado - capital_resgatado)
-        
-        if saldo_caixa_total <= 0:
-            rendimento_abs = Decimal("0.00")
-            rendimento_pct = 0.0
-            capital_liquido = Decimal("0.00")
-        else:
-            rendimento_abs = max(Decimal("0.00"), saldo_caixa_total - capital_liquido)
-            rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
+        rendimento_abs = max(Decimal("0.00"), (usuario.saldo_caixa or 0) - capital_liquido)
+        rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
 
         snapshot = {
             "perfil": {

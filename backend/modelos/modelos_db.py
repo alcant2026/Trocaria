@@ -210,6 +210,7 @@ class Transacao(Base):
         Index('idx_transacao_user_status', 'usuario_id', 'status'),
         Index('idx_transacao_parceiro_status', 'parceiro_id', 'status'),
         Index('idx_transacao_tipo_status', 'tipo', 'status'),
+        Index('idx_transacao_data', 'data_criacao'),
     )
 
 class Parceiro(Base):

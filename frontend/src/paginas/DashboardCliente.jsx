@@ -641,30 +641,63 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             return;
         }
 
-        if (v > limiteInfo.limite_disponivel) {
-            setMensagem(`Erro: Seu limite disponível é de R$ ${limiteInfo.limite_disponivel.toFixed(2)}.`);
-            return;
-        }
-
         if (!aceiteTermos) {
             showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso para continuar.', type: 'warning' });
             return;
         }
 
+        setLoadingAction(true);
         try {
-            const res = await api.post('/emprestimos/solicitar', {
+            // Primeiro gera a taxa de R$ 2 via PIX
+            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao', {
                 valor: v,
                 parcelas: parseInt(parcelas),
                 aceite_termos: true
             });
-            setMensagem(res.message || 'Crédito aprovado e depositado!');
-            setActiveView('home');
-            setValor('');
-            setParcelas(1);
-            setPassoSolicitar(1);
-            carregarSnapshot();
+
+            if (taxaRes.qr_code) {
+                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id });
+                showModal({
+                    title: 'Pagar Taxa de R$ 2,00',
+                    message: 'Pague a taxa de R$ 2,00 via PIX para solicitar o apoio. Depois de pagar, clique em "Já Paguei".',
+                    type: 'info',
+                    onConfirm: async () => {
+                        try {
+                            const res = await api.post('/emprestimos/solicitar', {
+                                valor: v,
+                                parcelas: parseInt(parcelas),
+                                aceite_termos: true
+                            });
+                            setMensagem(res.message || 'Pedido de apoio criado!');
+                            setActiveView('home');
+                            setValor('');
+                            setParcelas(1);
+                            setPassoSolicitar(1);
+                            carregarSnapshot();
+                        } catch (err) {
+                            setMensagem('Erro: ' + err.message);
+                        }
+                    },
+                    confirmText: 'Ja Paguei! Confirmar'
+                });
+            } else {
+                // Sem PIX (ambiente simulado), cria direto
+                const res = await api.post('/emprestimos/solicitar', {
+                    valor: v,
+                    parcelas: parseInt(parcelas),
+                    aceite_termos: true
+                });
+                setMensagem(res.message || 'Pedido de apoio criado!');
+                setActiveView('home');
+                setValor('');
+                setParcelas(1);
+                setPassoSolicitar(1);
+                carregarSnapshot();
+            }
         } catch (err) {
-            setMensagem('Erro: ' + err.message);
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoadingAction(false);
         }
     };
 
@@ -787,21 +820,27 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     }, [activeView]);
 
-    const handleGerarPix = async () => {
+    const handleDepositarVirtual = async () => {
         const v = parseFloat(valorNotificacao);
         if (!v || v <= 0) {
-            showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
+            showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
+            return;
+        }
+        if (v < 10) {
+            showModal({ title: 'Valor Mínimo', message: 'O valor mínimo para depósito virtual é R$ 10,00.', type: 'warning' });
             return;
         }
         setLoadingAction(true);
         try {
-            const payload = {
-                valor: v,
-                parceiro_id: parceiroIdDeposito ? parseInt(parceiroIdDeposito) : null
-            };
-            const res = await api.post('/financeiro/pix/gerar', payload);
-            setQrCodeData(res);
-            setPassoDeposito(2); // Avança pra tela do QR Code pix
+            const res = await api.post('/emprestimos/depositar-virtual', { valor_pagamento: v });
+            if (res.qr_code_taxa) {
+                setQrCodeData({ qr_code: res.qr_code_taxa, payment_id: res.payment_id || 'virtual' });
+                setPassoDeposito(2);
+            } else {
+                showModal({ title: 'Pronto!', message: `R$ ${v.toFixed(2)} adicionado! Taxa de R$ ${res.taxa_paga.toFixed(2)}.`, type: 'success' });
+                carregarSnapshot();
+                setActiveView('home');
+            }
         } catch (err) {
             showModal({ title: 'Erro', message: err.response?.data?.detail || err.message, type: 'error' });
         } finally {
@@ -1367,260 +1406,74 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <div className="card">
                         <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '4px' }}>
-                                {[1, 2, 3].map(i => (
+                                {[1, 2].map(i => (
                                     <div key={i} style={{ width: '20px', height: '4px', borderRadius: '2px', background: i <= passoDeposito ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
                                 ))}
                             </div>
                         </div>
 
-                        {/* PASSO 1: VALOR E MÉTODO */}
                         {passoDeposito === 1 && (
                             <div className="animate-fade-in">
-                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Quanto deseja adicionar e como prefere pagar?</p>
+                                <p className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>Adicione crédito virtual ao seu grupo de apoio.</p>
                                 
                                 <div className="info-block mb-2" style={{ background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)', padding: '12px' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                                         <ShieldCheck size={18} color="var(--primary)" style={{ marginTop: '2px' }} />
                                         <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
-                                            <strong>Custódia Descentralizada</strong><br />
-                                            O Psy Pay utiliza uma rede de lojistas parceiros. Ao escolher um lojista abaixo para gerar seu PIX, seu saldo será garantido diretamente pela custódia do parceiro escolhido.
+                                            Você paga apenas <strong>2% de taxa</strong> sobre o valor depositado.<br />
+                                            Ex: R$ 100 → paga R$ 2 de taxa via PIX, recebe R$ 100 de crédito virtual.
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <div className="input-group mb-1">
-                                    <label>Escolha o Lojista (Recebedor)</label>
-                                    <select
-                                        className="input-field"
-                                        value={parceiroIdDeposito}
-                                        onChange={(e) => setParceiroIdDeposito(e.target.value)}
-                                        style={{ marginBottom: '1rem' }}
-                                    >
-                                        <option value="">Plataforma (Custódia Direta)</option>
-                                        {parceiros.filter(p => p.mp_conectado).map(p => (
-                                            <option key={p.id} value={p.id}>{p.nome}</option>
-                                        ))}
-                                    </select>
-                                    {parceiros.filter(p => p.mp_conectado).length === 0 && (
-                                        <div className="alert alert-warning mb-3" style={{ fontSize: '0.6rem' }}>
-                                            <AlertTriangle size={16} className="text-warning mr-2 inline-block" /> Nenhum lojista parceiro disponível para PIX no momento. Usando conta administrativa.
-                                        </div>
-                                    )}
+                                    <label>Valor do Crédito Virtual</label>
+                                    <input type="number" className="input-field" placeholder="R$ 0,00" min="10"
+                                        value={valorNotificacao}
+                                        onChange={(e) => setValorNotificacao(e.target.value)}
+                                        style={{ fontSize: '1.5rem', fontWeight: 800, textAlign: 'center', padding: '1rem' }}
+                                    />
                                 </div>
 
-                                <div className="input-group mb-1">
-                                    <label>Escolha o Método</label>
-                                    <div style={{ display: 'flex', gap: '10px' }}>
-                                        <button
-                                            className={`btn ${metodoDeposito === 'pix' ? 'btn-primary' : 'btn-outline'}`}
-                                            style={{ flex: 1, padding: '0.6rem' }}
-                                            onClick={() => setMetodoDeposito('pix')}
-                                        >
-                                            Via PIX
-                                        </button>
-                                        <button
-                                            className={`btn ${metodoDeposito === 'especie' ? 'btn-primary' : 'btn-outline'}`}
-                                            style={{ flex: 1, padding: '0.6rem' }}
-                                            onClick={() => setMetodoDeposito('especie')}
-                                        >
-                                            Em Espécie
-                                        </button>
+                                {valorNotificacao && parseFloat(valorNotificacao) >= 10 && (
+                                    <div className="info-block mb-1" style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '12px' }}>
+                                        <div className="flex-between"><span>Crédito:</span><strong>R$ {parseFloat(valorNotificacao).toFixed(2)}</strong></div>
+                                        <div className="flex-between"><span>Taxa (2%):</span><strong style={{ color: 'var(--success)' }}>R$ {(parseFloat(valorNotificacao) * 0.02).toFixed(2)}</strong></div>
+                                        <div className="flex-between" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                                            <span>Você paga via PIX:</span><strong style={{ color: 'var(--danger)' }}>R$ {(parseFloat(valorNotificacao) * 0.02).toFixed(2)}</strong>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="input-group">
-                                    <label>Valor do Depósito</label>
-                                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '4px', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <input
-                                            type="number"
-                                            className="input-field"
-                                            placeholder="R$ 0,00"
-                                            min="0"
-                                            style={{ flex: 1, border: 'none', background: 'transparent', margin: 0, padding: '0.85rem', textAlign: 'center', width: '100%', fontSize: '1.2rem', fontWeight: 800 }}
-                                            value={valorNotificacao}
-                                            onChange={(e) => {
-                                                const v = e.target.value;
-                                                if (v === '' || parseFloat(v) >= 0) setValorNotificacao(v);
-                                            }}
-                                        />
-                                    </div>
-                                    {valorNotificacao && parseFloat(valorNotificacao) > 0 && (
-                                        <div className="animate-fade-in" style={{ marginTop: '8px', padding: '10px', borderRadius: '8px', background: 'rgba(var(--primary-rgb), 0.05)', border: '1px solid rgba(var(--primary-rgb), 0.1)', textAlign: 'center' }}>
-                                            <div className="font-bold text-sm">
-                                                <span>Saldo a receber: </span>
-                                                <span className="text-success">R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                * Depósito integral sem taxas para o cliente.
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div style={{ marginTop: '1.5rem' }}>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        style={{ width: '100%' }} 
-                                        onClick={() => {
-                                            if (parseFloat(valorNotificacao) > 0) {
-                                                if (metodoDeposito === 'pix') {
-                                                    handleGerarPix();
-                                                } else {
-                                                    setPassoDeposito(2);
-                                                }
-                                            } else {
-                                                showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
-                                            }
-                                        }}
-                                        disabled={loadingAction}
-                                    >
-                                        {loadingAction && metodoDeposito === 'pix' ? 'Gerando...' : 'Continuar'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* PASSO 2: INSTRUÇÕES OU QR CODE PIX */}
-                        {passoDeposito === 2 && (
-                            <div className="animate-fade-in">
-                                {metodoDeposito === 'pix' ? (
-                                    <div className="text-center">
-                                        <p className="mb-1 text-muted">Aguardando pagamento do PIX abaixo:</p>
-                                        
-                                        {timeLeft && (
-                                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-                                                <div className="badge-notification bg-dark" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', color: 'var(--primary)', borderRadius: '30px', fontSize: '0.9rem', fontWeight: 800, border: '1px solid rgba(var(--primary-rgb), 0.3)', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-                                                    <Clock size={18} className="animate-pulse" /> Expira em: {timeLeft}
-                                                </div>
-                                            </div>
-                                        )}
-                                        
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-                                            <img 
-                                                src={`data:image/png;base64,${qrCodeData.qr_code_base64}`} 
-                                                alt="QR Code PIX" 
-                                                style={{ width: '220px', height: '220px', borderRadius: '16px', border: '3px solid var(--primary)', padding: '10px', background: '#fff' }} 
-                                            />
-                                        </div>
-                                        
-                                        <div className="info-block mb-1" style={{ position: 'relative' }}>
-                                            <div className="info-label">Pix Copia e Cola</div>
-                                            <div className="info-value" style={{ 
-                                                fontSize: '0.8rem', 
-                                                wordBreak: 'break-all', 
-                                                background: 'rgba(255,255,255,0.05)', 
-                                                padding: '10px', 
-                                                borderRadius: '8px',
-                                                userSelect: 'all'
-                                            }}>
-                                                {qrCodeData.qr_code}
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(qrCodeData.qr_code);
-                                                    setCopiadoPix(true);
-                                                    setTimeout(() => setCopiadoPix(false), 2000);
-                                                }}
-                                                className="btn btn-outline"
-                                                style={{ width: '100%', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                                            >
-                                                {copiadoPix ? <Check size={18} /> : <Copy size={18} />}
-                                                {copiadoPix ? 'Código Copiado!' : 'Copiar Código PIX'}
-                                            </button>
-                                        </div>
-                                        <div className="info-block mb-1">
-                                            <div className="info-label">Valor a pagar</div>
-                                            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                                        </div>
-                                        
-                                        <button 
-                                            className="btn btn-primary" 
-                                            style={{ width: '100%', marginBottom: '10px' }}
-                                            onClick={handleSincronizarPix}
-                                            disabled={loadingAction}
-                                        >
-                                            {loadingAction ? 'Verificando...' : 'Já realizei o pagamento'}
-                                        </button>
-                                        
-                                        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                                            Assim que você pagar, o saldo atualizará automaticamente em até 10 segundos aqui na sua tela.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="text-center mb-1">
-                                            <div style={{ background: 'rgba(255, 145, 0, 0.1)', border: '1px solid var(--warning)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px' }}>SEU CÓDIGO DE ATENDIMENTO</p>
-                                                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--warning)', letterSpacing: '4px', margin: 0 }}>{usuario.id}</h2>
-                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '10px' }}>Apresente este código ao parceiro lojista</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="input-group">
-                                            <label>Onde você está?</label>
-                                            <select
-                                                className="input-field"
-                                                value={parceiroIdDeposito}
-                                                onChange={(e) => setParceiroIdDeposito(e.target.value)}
-                                                style={{ marginBottom: '1rem' }}
-                                            >
-                                                <option value="">Buscar loja próxima...</option>
-                                                {parceiros.filter(p => p.caixa_aberto).map(p => (
-                                                    <option key={p.id} value={p.id}>{p.nome} - {p.endereco}</option>
-                                                ))}
-                                            </select>
-                                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', fontSize: '0.75rem', lineHeight: '1.5' }}>
-                                                <p style={{ margin: 0 }}><strong>Como funciona:</strong></p>
-                                                <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
-                                                    <li>Entregue o dinheiro físico ao lojista.</li>
-                                                    <li>O saldo cairá na sua conta <strong>na hora</strong>.</li>
-                                                    <li>Taxa de serviço: <strong>5%</strong> (cobrada no ato).</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                            <button 
-                                                className="btn btn-primary" 
-                                                style={{ flex: 2, background: 'var(--warning)', color: '#000' }} 
-                                                disabled={!parceiroIdDeposito}
-                                                onClick={() => setPassoDeposito(3)}
-                                            >
-                                                Entendi, Continuar
-                                            </button>
-                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoDeposito(1)}>Voltar</button>
-                                        </div>
-                                    </>
                                 )}
+
+                                <button className="btn btn-primary w-full mt-1"
+                                    disabled={!valorNotificacao || parseFloat(valorNotificacao) < 10 || loadingAction}
+                                    onClick={handleDepositarVirtual}>
+                                    {loadingAction ? 'Gerando PIX...' : 'Gerar PIX da Taxa'}
+                                </button>
                             </div>
                         )}
 
-                        {/* PASSO 3: CONFIRMAÇÃO FINAL (Apenas Espécie) */}
-                        {passoDeposito === 3 && metodoDeposito === 'especie' && (
-                            <div className="animate-fade-in text-center" style={{ padding: '1rem 0' }}>
-                                <div style={{ background: 'rgba(var(--success-rgb), 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                                    <CheckCircle2 size={40} color="var(--success)" />
-                                </div>
-                                <h3 className="mb-1">Quase lá!</h3>
-                                <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
-                                    Estamos verificando seu depósito de <strong>R$ {parseFloat(valorNotificacao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>.
+                        {passoDeposito === 2 && qrCodeData.qr_code && (
+                            <div className="animate-fade-in text-center">
+                                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pague a taxa via PIX</h3>
+                                <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>
+                                    Escaneie o QR Code abaixo para pagar a taxa. O crédito virtual será liberado automaticamente.
                                 </p>
-                                <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>
-                                    O saldo aparecerá na sua conta assim que o pagamento for confirmado pelo Parceiro.
-                                </p>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
-                                    <button className="btn btn-primary" onClick={handleNotificarDeposito} disabled={loadingAction}>
-                                        <CheckCircle size={18} /> {loadingAction ? 'Processando...' : 'Confirmar e Notificar'}
-                                    </button>
-                                    <button className="btn btn-secondary" onClick={() => setPassoDeposito(2)} disabled={loadingAction}>Revisar Dados</button>
+                                {qrCodeData.qr_code_base64 && (
+                                    <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
+                                )}
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '1rem', wordBreak: 'break-all' }}>
+                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Código PIX (copiar e colar):</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>{qrCodeData.qr_code}</p>
                                 </div>
+                                <button className="btn btn-primary w-full" onClick={() => { setPassoDeposito(1); setQrCodeData({}); carregarSnapshot(); }}>
+                                    Já Paguei! Verificar Saldo
+                                </button>
                             </div>
                         )}
                     </div>
                 )
             }
-
             {
                 activeView === 'saque' && (
                     <div className="card">

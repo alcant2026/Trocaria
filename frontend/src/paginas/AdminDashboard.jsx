@@ -45,21 +45,19 @@ import ModalPremium from '../componentes/ModalPremium';
 const TIPOS_LABEL = {
     deposito: 'Depósito',
     saque: 'Saque',
-    investimento: 'Investimento',
     recebimento: 'Recebimento',
     compra_score: 'Compra de Score',
     desbloqueio_dados: 'Verificação KYC',
     taxa_saque: 'Taxa de Saque',
-    taxa_intermediacao: 'Taxa de Intermediação',
-    taxa_conveniencia: 'Taxa de Conveniência',
-    aporte_capital: 'Aporte de Capital',
+    taxa_servico: 'Taxa de Serviço',
+    taxa_plataforma: 'Taxa da Plataforma',
+    taxa_match: 'Taxa de Match',
     taxa_postagem: 'Taxa de Postagem',
-    retorno_investimento: 'Retorno de Investimento',
-    aporte_caixa: 'Aporte Caixa (Investimento)',
-    resgate_caixa: 'Resgate Caixa (Desinvestimento)',
-    bonus_pagador_caixa: 'Bônus de Fidelidade',
-    retorno_pool: 'Retorno Fundo Coletivo',
-    taxa_adm_emprestimo: 'Comissão Gestão 10%'
+    comissao_parceiro: 'Comissão Recebida',
+    assinatura: 'Assinatura Premium',
+    doacao: 'Doação',
+    bonus: 'Bônus',
+    ajuste: 'Ajuste',
 };
 
 const TAXAS_PRAZOS = {
@@ -459,7 +457,10 @@ const AdminDashboard = () => {
                         <BarChart3 size={20} /> <span>Financeiro</span>
                     </div>
                     <div className={`nav-item ${activeTab === 'emprestimos' ? 'active' : ''}`} onClick={() => setActiveTab('emprestimos')}>
-                        <Banknote size={20} /> <span>Crédito</span>
+                        <CreditCard size={16} /> Pedidos
+                    </div>
+                    <div className={`nav-item ${activeTab === 'financeiro' ? 'active' : ''}`} onClick={() => setActiveTab('financeiro')}>
+                        <BarChart3 size={16} /> Movimentação
                     </div>
                     <div className={`nav-item ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>
                         <Users size={20} /> <span>Usuários</span>
@@ -484,7 +485,7 @@ const AdminDashboard = () => {
                             <h1>{activeTab === 'dashboard' ? 'Fiscal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
                             <div className="live-indicator-dot" title="Monitoramento em Tempo Real Ativo"></div>
                         </div>
-                        <p className="text-muted">Gestão estratégica e financeira da economia Psy Pay.</p>
+                        <p className="text-muted">Visão geral da plataforma.</p>
                     </div>
                     
                     <div className="header-actions">
@@ -516,42 +517,42 @@ const AdminDashboard = () => {
                                 trend={null}
                             />
                             <StatCard 
-                                label="Receita Bruta (Mês)" 
+                                label="Taxas do Mês" 
                                 value={`R$ ${fiscal.lucro_plataforma_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={TrendingUp}
                                 color="var(--primary)"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Lucro Líquido Real" 
+                                label="Saldo Líquido" 
                                 value={`R$ ${fiscal.lucro_real_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={TrendingUp}
                                 color="var(--success)"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Custo Intermediação (Checkout Pro)" 
+                                label="Taxas Operacionais" 
                                 value={`R$ ${fiscal.total_taxas_mp?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={CreditCard}
                                 color="#ff4d4d"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Custos Infra (Mensal)" 
+                                label="Custos Fixos" 
                                 value={`R$ ${fiscal.custos_infra_estimados?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={Zap}
                                 color="var(--warning)"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Liquidez do Pool" 
+                                label="Saldo em Grupo" 
                                 value={`R$ ${fiscal.saldo_pool_caixa?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 icon={Banknote}
                                 color="var(--secondary)"
                                 trend={null}
                             />
                             <StatCard 
-                                label="Crédito Ativo" 
+                                label="Apoios Ativos" 
                                 value={`R$ ${fiscal.total_credito_ativo?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`}
                                 icon={ShieldCheck}
                                 color="#4da6ff"
@@ -806,17 +807,17 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: FINANCEIRO (DETALHAMENTO 10%) --- */}
+                {/* --- VIEW: MOVIMENTAÇÃO --- */}
                 {activeTab === 'fiscal' && (
                     <div className="animate-fade-in">
                         <div className="fiscal-grid">
                             <section className="glass-panel">
-                                <h3>Detalhamento de Receitas</h3>
-                                <p className="text-muted text-xs mb-2">Monitoramento da saúde operacional da Psy Pay.</p>
+                                <h3>Taxas Arrecadadas</h3>
+                                <p className="text-muted text-xs mb-2">Resumo de taxas de serviço da plataforma.</p>
                                 
                                 <div className="grid-2">
                                     <div className="revenue-item">
-                                        <span className="info-label">KYC & Score</span>
+                                        <span className="info-label">Verificações KYC</span>
                                         <span className="font-bold">R$ {fiscal.detalhamento_lucro.kyc_score?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item">
@@ -824,15 +825,15 @@ const AdminDashboard = () => {
                                         <span className="font-bold">R$ {fiscal.detalhamento_lucro.taxas_saque?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item" style={{ border: '1px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
-                                        <span className="info-label text-primary">Comissão Gestão (10%)</span>
+                                        <span className="info-label text-primary">Taxa de Serviço</span>
                                         <span className="font-bold text-primary">R$ {fiscal.detalhamento_lucro.taxa_adm_emprestimo?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item">
-                                        <span className="info-label">Intermediação P2P</span>
+                                        <span className="info-label">Taxa de Match</span>
                                         <span className="font-bold">R$ {fiscal.detalhamento_lucro.taxa_intermediacao?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item">
-                                        <span className="info-label">Aportes Institucionais</span>
+                                        <span className="info-label">Contribuições</span>
                                         <span className="font-bold">R$ {fiscal.detalhamento_lucro.aportes_externos?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item" style={{ border: '1px solid var(--secondary)', background: 'rgba(var(--secondary-rgb), 0.05)' }}>
@@ -844,17 +845,17 @@ const AdminDashboard = () => {
                                         <span className="font-bold" style={{ color: '#FFD600' }}>R$ {fiscal.detalhamento_lucro.assinaturas?.toLocaleString('pt-BR')}</span>
                                     </div>
                                     <div className="revenue-item" style={{ border: '1px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.05)' }}>
-                                        <span className="info-label" style={{ color: '#ff4d4d' }}>Bonificações (Marketplace)</span>
+                                        <span className="info-label" style={{ color: '#ff4d4d' }}>Bônus Concedidos</span>
                                         <span className="font-bold" style={{ color: '#ff4d4d' }}>- R$ {fiscal.detalhamento_lucro.premios_marketplace?.toLocaleString('pt-BR')}</span>
                                     </div>
                                 </div>
                             </section>
 
                             <section className="glass-panel">
-                                <h3>Ações de Caixa</h3>
+                                <h3>Ações Administrativas</h3>
                                 <div className="flex-column gap-1 mt-1">
                                     <button className="btn btn-primary w-full gap-1" onClick={() => handleOpenAcao('saque')}>
-                                        <ArrowUpRight size={18} /> Resgatar Lucro Líquido
+                                        <ArrowUpRight size={18} /> Retirar Saldo Disponível
                                     </button>
                                     <button className="btn btn-outline w-full gap-1" onClick={() => handleOpenAcao('aporte')}>
                                         <PlusCircle size={18} /> Injetar Capital (Aporte)

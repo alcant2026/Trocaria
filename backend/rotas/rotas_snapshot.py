@@ -697,6 +697,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "valor_parcela": round(float(valor_parcela), 2),
                 "valor_total_restante": round(valor_total_restante, 2),
                 "status": s.status.value,
+                "pagamento_pendente": s.confirmacao_pagamento_data is not None and s.confirmacao_recebimento_data is None,
+                "confirmacao_pagamento_data": s.confirmacao_pagamento_data.isoformat() if s.confirmacao_pagamento_data else None,
                 "tipo_garantia": s.tipo_garantia,
                 "garantia_descricao": s.garantia_descricao,
                 "parceiro_nome": s.parceiro.nome if s.parceiro else None,

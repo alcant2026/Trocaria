@@ -2504,20 +2504,35 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                     </div>
                                                                 </div>
 
-                                                                {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                        {emp.tipo === 'tomador' ? (
-                                                                            <>
-                                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                                                                    <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela, emp.chave_pix_pagamento)}>Pagar Parcela</button>
-                                                                                    <button className="btn btn-outline" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handleQuitarTotalP2P(emp.id, emp.valor_total_restante, emp.chave_pix_pagamento)}>Quitar Tudo</button>
-                                                                                </div>
-                                                                                <button className="btn btn-sm" style={{ padding: '8px', fontSize: '0.75rem', color: '#FFD600', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,214,0,0.3)', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => handlePagarAvulsoP2P(emp.id, emp.chave_pix_pagamento)}>Pagar outro valor</button>
-                                                                            </>
+                                                                 {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
+                                                                     <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                        {emp.pagamento_pendente ? (
+                                                                            <div style={{ padding: '10px', borderRadius: '10px', background: 'rgba(var(--warning-rgb), 0.1)', border: '1px solid rgba(var(--warning-rgb), 0.2)', textAlign: 'center' }}>
+                                                                                {emp.tipo === 'tomador' ? (
+                                                                                    <p style={{ fontSize: '0.75rem', color: 'var(--warning)', margin: 0 }}>Aguardando confirmacao do credor...</p>
+                                                                                ) : (
+                                                                                    <p style={{ fontSize: '0.75rem', color: 'var(--success)', margin: '0 0 8px 0' }}>Tomador ja enviou o PIX! Confira sua conta e confirme.</p>
+                                                                                )}
+                                                                                {emp.tipo !== 'tomador' && (
+                                                                                    <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem' }} onClick={() => handleConfirmarPagtoRecebido(emp.id)}>Confirmar Recebimento</button>
+                                                                                )}
+                                                                            </div>
                                                                         ) : (
-                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem', width: '100%' }} onClick={() => handleConfirmarPagtoRecebido(emp.id)}>Confirmar Recebimento</button>
+                                                                             <>
+                                                                                {emp.tipo === 'tomador' ? (
+                                                                                    <>
+                                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela, emp.chave_pix_pagamento)}>Pagar Parcela</button>
+                                                                                            <button className="btn btn-outline" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handleQuitarTotalP2P(emp.id, emp.valor_total_restante, emp.chave_pix_pagamento)}>Quitar Tudo</button>
+                                                                                        </div>
+                                                                                        <button className="btn btn-sm" style={{ padding: '8px', fontSize: '0.75rem', color: '#FFD600', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,214,0,0.3)', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => handlePagarAvulsoP2P(emp.id, emp.chave_pix_pagamento)}>Pagar outro valor</button>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>Aguardando tomador enviar o pagamento...</p>
+                                                                                )}
+                                                                            </>
                                                                         )}
-                                                                    </div>
+                                                                     </div>
                                                                 )}
                                                             </div>
                                                         ))}

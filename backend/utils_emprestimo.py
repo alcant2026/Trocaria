@@ -42,6 +42,19 @@ def calcular_divida_total(solicitacao: SolicitacaoEmprestimo):
     return valor_quittance_base + mora_atraso
 
 
+def calcular_valor_parcela(solicitacao: SolicitacaoEmprestimo) -> dict:
+    taxa_mensal = solicitacao.taxa_juros / 100
+    total_com_juros = solicitacao.valor * (1 + (taxa_mensal * solicitacao.prazo_meses))
+    valor_parcela_base = total_com_juros / solicitacao.prazo_meses
+    mora = calcular_mora(solicitacao, valor_parcela_base)
+    return {
+        "parcela": float(valor_parcela_base),
+        "juros": float(total_com_juros - solicitacao.valor) / solicitacao.prazo_meses,
+        "mora": float(mora),
+        "total": float(valor_parcela_base + mora)
+    }
+
+
 def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: str, valor_pago: Decimal) -> dict:
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
@@ -50,13 +63,17 @@ def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: st
     ).first()
 
     if not solicitacao:
-        raise ValueError("Empréstimo não encontrado ou não está ativo.")
+        raise ValueError("Emprestimo nao encontrado ou nao esta ativo.")
 
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     if parcelas_restantes <= 0:
-        raise ValueError("Empréstimo já está totalmente pago.")
+        raise ValueError("Emprestimo ja esta totalmente pago.")
 
     hoje = datetime.datetime.now(datetime.timezone.utc)
+
+    # Calcular mora se estiver atrasado
+    detalhes_parcela = calcular_valor_parcela(solicitacao)
+    tem_mora = detalhes_parcela["mora"] > 0
 
     db.add(Transacao(
         usuario_id=pagador_id,
@@ -64,7 +81,7 @@ def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: st
         tipo=TipoTransacao.CONFIRMACAO_PAGAMENTO,
         status="pendente",
         data_criacao=hoje,
-        detalhes=f"Pagamento confirmado pelo tomador — Pedido #{solicitacao.id}. Aguardando confirmação do credor."
+        detalhes=f"Pagamento de R$ {valor_pago} confirmado pelo tomador — Pedido #{solicitacao.id}. {('Mora: R$ ' + str(detalhes_parcela["mora"])) if tem_mora else 'Em dia.'} Aguardando confirmacao do credor."
     ))
 
     solicitacao.confirmacao_pagamento_data = hoje
@@ -73,7 +90,10 @@ def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: st
     return {
         "message": "Pagamento registrado! O credor precisa confirmar o recebimento.",
         "solicitacao_id": solicitacao.id,
-        "credor_id": solicitacao.credor_id
+        "credor_id": solicitacao.credor_id,
+        "valor_pago": float(valor_pago),
+        "mora_aplicada": detalhes_parcela["mora"],
+        "em_dia": not tem_mora
     }
 
 
@@ -85,18 +105,27 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
     ).first()
 
     if not solicitacao:
-        raise ValueError("Empréstimo não encontrado ou não está ativo.")
+        raise ValueError("Emprestimo nao encontrado ou nao esta ativo.")
 
     credor = db.query(Usuario).filter(Usuario.id == credor_id).first()
     tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
 
     solicitacao.parcelas_pagas += 1
 
-    if solicitacao.parcelas_pagas == 1:
-        credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + solicitacao.valor
+    # Calcular valores
+    taxa_mensal = solicitacao.taxa_juros / 100
+    principal_parcela = solicitacao.valor / solicitacao.prazo_meses
+    juros_parcela = solicitacao.valor * taxa_mensal
+    valor_parcela = principal_parcela + juros_parcela
+    mora = calcular_mora(solicitacao, valor_parcela)
+    tem_mora = mora > 0
 
-    juros_parcela = solicitacao.valor * (solicitacao.taxa_juros / 100)
-    credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + juros_parcela
+    # Liberar para o credor: principal + juros + mora
+    credor.credito_virtual = (credor.credito_virtual or Decimal("0.00")) + valor_parcela + mora
+
+    tipo_pagamento = "parcela"
+    if solicitacao.valor_amortizado is None:
+        solicitacao.valor_amortizado = Decimal("0.00")
 
     if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
         solicitacao.status = StatusSolicitacao.CONCLUIDO
@@ -104,15 +133,22 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
         tomador.inadimplente = False
         credor.emprestimos_ativos = max(0, (credor.emprestimos_ativos or 1) - 1)
         tomador.emprestimos_concluidos = (tomador.emprestimos_concluidos or 0) + 1
+        tipo_pagamento = "quitacao"
     else:
         solicitacao.proximo_vencimento += datetime.timedelta(days=30)
 
+    # Score
+    if not tem_mora:
+        tomador.score = (tomador.score or Decimal("0.00")) + Decimal("5.0")
+        if tomador.score > Decimal("1000"):
+            tomador.score = Decimal("1000")
+
     db.add(Transacao(
         usuario_id=credor_id,
-        valor=Decimal("0.00"),
+        valor=valor_parcela + mora,
         tipo=TipoTransacao.CONFIRMACAO_RECEBIMENTO,
         status="concluido",
-        detalhes=f"Recebimento confirmado — Parcela {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}"
+        detalhes=f"Recebimento confirmado — {tipo_pagamento.upper()} {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}" + (f" (Mora: R$ {mora})" if tem_mora else "")
     ))
 
     db.commit()
@@ -120,7 +156,11 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
         "message": "Recebimento confirmado! Parcela registrada.",
         "parcelas_pagas": solicitacao.parcelas_pagas,
         "total_parcelas": solicitacao.prazo_meses,
-        "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO
+        "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO,
+        "tipo_pagamento": tipo_pagamento,
+        "valor_recebido": float(valor_parcela + mora),
+        "mora_aplicada": float(mora),
+        "em_dia": not tem_mora
     }
 
 
@@ -131,7 +171,7 @@ def aplicar_calote(solicitacao_id: int, db: Session) -> dict:
     ).first()
 
     if not solicitacao:
-        raise ValueError("Empréstimo não encontrado ou não está ativo.")
+        raise ValueError("Emprestimo nao encontrado ou nao esta ativo.")
 
     tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
     credor = db.query(Usuario).filter(Usuario.id == solicitacao.credor_id).first()
@@ -150,7 +190,7 @@ def aplicar_calote(solicitacao_id: int, db: Session) -> dict:
         valor=solicitacao.valor,
         tipo=TipoTransacao.CONFIRMACAO_PAGAMENTO,
         status="cancelado",
-        detalhes=f"CALOTE — Empréstimo #{solicitacao.id} marcado como inadimplente"
+        detalhes=f"CALOTE — Pedido #{solicitacao.id} marcado como inadimplente"
     ))
 
     db.commit()

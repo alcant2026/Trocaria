@@ -630,30 +630,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
         setLoadingAction(true);
         try {
-            // Gerar taxa de publicacao R$ 2 via PIX
             const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao');
             if (taxaRes.qr_code) {
                 setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id });
-                showModal({
-                    title: 'Pague R$ 2,00 para Publicar',
-                    message: 'Pague a taxa de R$ 2,00 via PIX para publicar seu pedido de apoio.',
-                    type: 'info',
-                    onConfirm: async () => {
-                        try {
-                            const res = await api.post('/emprestimos/solicitar', {
-                                valor: v, parcelas: parseInt(parcelas),
-                                taxa_compensacao: tx, aceite_termos: true
-                            });
-                            setMensagem(res.message || 'Pedido criado!');
-                            setActiveView('home');
-                            setValor(''); setParcelas(1); setPassoSolicitar(1);
-                            carregarSnapshot();
-                        } catch (err2) {
-                            setMensagem('Erro: ' + (err2.response?.data?.detail || err2.message));
-                        }
-                    },
-                    confirmText: 'Ja Paguei! Publicar'
-                });
+                setActiveView('pagar-taxa');
             } else {
                 const res = await api.post('/emprestimos/solicitar', {
                     valor: v, parcelas: parseInt(parcelas),
@@ -1627,6 +1607,45 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
                 )
             }
+
+            {/* TELA DE PAGAR TAXA VIA PIX */}
+            {activeView === 'pagar-taxa' && qrCodeData.qr_code && (
+                <div className="card text-center">
+                    <div className="flex-end mb-1">
+                        <button onClick={() => setActiveView('home')} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '8px' }}>
+                            <ArrowLeft size={20} />
+                        </button>
+                    </div>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pague a Taxa via PIX</h3>
+                    <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
+                        Pague R$ 2,00 para publicar seu pedido de apoio.
+                    </p>
+                    {qrCodeData.qr_code_base64 && (
+                        <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
+                    )}
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '1rem', wordBreak: 'break-all' }}>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Código PIX:</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>{qrCodeData.qr_code}</p>
+                    </div>
+                    <button className="btn btn-primary w-full" onClick={async () => {
+                        try {
+                            const res = await api.post('/emprestimos/solicitar', {
+                                valor: parseFloat(valor), parcelas: parseInt(parcelas),
+                                taxa_compensacao: parseFloat(taxaCompensacao), aceite_termos: true
+                            });
+                            setMensagem(res.message || 'Pedido criado!');
+                            setActiveView('home');
+                            setValor(''); setParcelas(1); setPassoSolicitar(1);
+                            setQrCodeData({});
+                            carregarSnapshot();
+                        } catch (err) {
+                            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+                        }
+                    }}>
+                        Já Paguei! Publicar Pedido
+                    </button>
+                </div>
+            )}
 
             {activeView === 'oportunidades' && (
                 <OportunidadesLista

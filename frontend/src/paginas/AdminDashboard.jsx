@@ -492,14 +492,11 @@ const AdminDashboard = () => {
 
                 <nav className="sidebar-nav">
                     <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-                        <LayoutDashboard size={20} /> <span>Fiscal Hub</span>
+                        <LayoutDashboard size={20} /> <span>Dashboard</span>
                     </div>
                     <div className={`nav-item ${activeTab === 'pendentes' ? 'active' : ''}`} onClick={() => setActiveTab('pendentes')}>
                         <ListTodo size={20} /> <span>Aprovações</span>
                         {pendentes.length > 0 && <span className="badge-notification">{pendentes.length}</span>}
-                    </div>
-                    <div className={`nav-item ${activeTab === 'fiscal' ? 'active' : ''}`} onClick={() => setActiveTab('fiscal')}>
-                        <BarChart3 size={20} /> <span>Financeiro</span>
                     </div>
                     <div className={`nav-item ${activeTab === 'emprestimos' ? 'active' : ''}`} onClick={() => setActiveTab('emprestimos')}>
                         <CreditCard size={16} /> Pedidos

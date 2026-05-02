@@ -1084,24 +1084,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
             {/* Top Grid for PC: Balance and Pending Actions */}
             <div className="dashboard-grid">
-                {/* CARD DE SALDO */}
-                <div className="card balance-card">
-                    {isFirstLoad ? (
-                        <div className="skeleton-loading" style={{ height: '160px' }}></div>
-                    ) : (
-                        <>
-                            <div className="flex-between mb-1">
-                                <span className="text-muted">Saldo Disponível</span>
-                                <div className="balance-actions">
-                                    <button className="btn-icon" onClick={() => setVerSaldo(!verSaldo)}>
-                                        {verSaldo ? <Eye size={18} /> : <EyeOff size={18} />}
-                                    </button>
-                                    <RefreshCw 
-                                        size={18} 
-                                        className={`cursor-pointer ${loadingAction ? 'animate-spin' : ''}`} 
-                                        onClick={carregarSnapshot} 
-                                    />
-                                </div>
+
                             </div>
                             <div className="balance-value">
                                 <span className="currency">R$</span>

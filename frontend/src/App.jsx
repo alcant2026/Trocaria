@@ -161,9 +161,6 @@ const App = () => {
                         <a href="#cliente" className={`nav-item ${['cliente', 'tomador'].includes(page) ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
                         </a>
-                        <a href="#grupo" className={`nav-item ${page === 'grupo' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <TrendingUp size={20} /> Grupo de Apoio
-                        </a>
                         <a href="#marketplace" className={`nav-item ${page === 'marketplace' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ShoppingBag size={20} /> Marketplace
                         </a>

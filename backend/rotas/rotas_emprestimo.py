@@ -17,7 +17,7 @@ from fpdf import FPDF
 from rotas.rotas_snapshot import cache_snapshot_data
 from limitador import limiter
 
-router = APIRouter(prefix="/emprestimos", tags=["Empréstimos P2P"])
+router = APIRouter(prefix="/emprestimos", tags=["Pedidos de Apoio"])
 
 class SolicitacaoRequest(BaseModel):
     valor: Decimal = Field(gt=0, le=10000)
@@ -353,7 +353,7 @@ class ContratoPDF(FPDF):
         
         self.set_font('Helvetica', 'I', 10)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 5, 'Plataforma de Crédito Colaborativo', 0, 1, 'C')
+        self.cell(0, 5, 'Rede de Apoio entre Pares', 0, 1, 'C')
         self.ln(5)
         self.set_draw_color(255, 204, 0)
         self.line(10, 35, 200, 35)
@@ -362,7 +362,7 @@ class ContratoPDF(FPDF):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f'Página {self.page_no()} | Psy Pay | Autenticado Digitalmente', 0, 0, 'C')
+        self.cell(0, 10, f'Página {self.page_no()} | Psy Pay | Documento entre Particulares', 0, 0, 'C')
 
 @router.get("/contrato/pdf/{id}")
 async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -394,7 +394,7 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     
     pdf.set_font('Helvetica', 'B', 16)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f'CONTRATO DE CRÉDITO P2P - #{solicitacao.id}', 0, 1, 'L')
+    pdf.cell(0, 10, f'TERMO DE APOIO ENTRE PARTICULARES - #{solicitacao.id}', 0, 1, 'L')
     pdf.ln(5)
 
     pdf.set_font('Helvetica', 'B', 12)
@@ -402,26 +402,26 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     pdf.set_font('Helvetica', '', 10)
     cpf_tomador = f"***.{tomador.cpf[-4:]}" if len(tomador.cpf) >= 4 else "***"
     cpf_credor = f"***.{credor.cpf[-4:]}" if credor and len(credor.cpf) >= 4 else "***"
-    pdf.multi_cell(0, 6, f"CREDOR: {credor.nome if credor else 'A definir'} (CPF: {cpf_credor})\n"
-                         f"DEVEDOR: {tomador.nome} (CPF: {cpf_tomador})")
+    pdf.multi_cell(0, 6, f"APOIADOR: {credor.nome if credor else 'A definir'} (CPF: {cpf_credor})\n"
+                         f"RECEBEDOR: {tomador.nome} (CPF: {cpf_tomador})")
     pdf.ln(5)
 
     pdf.set_font('Helvetica', 'B', 12)
-    pdf.cell(0, 10, '2. QUADRO RESUMO', 0, 1, 'L')
+    pdf.cell(0, 10, '2. VALORES COMBINADOS', 0, 1, 'L')
     pdf.set_fill_color(245, 245, 245)
     pdf.set_font('Helvetica', 'B', 10)
     pdf.cell(95, 8, 'DESCRIÇÃO', 1, 0, 'L', True)
     pdf.cell(95, 8, 'VALOR', 1, 1, 'L', True)
     pdf.set_font('Helvetica', '', 10)
-    pdf.cell(95, 8, 'Valor do Empréstimo', 1, 0, 'L')
+    pdf.cell(95, 8, 'Valor do Apoio', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {solicitacao.valor:,.2f}', 1, 1, 'L')
-    pdf.cell(95, 8, 'Taxa de Juros Mensal', 1, 0, 'L')
-    pdf.cell(95, 8, f'{solicitacao.taxa_juros}% a.m.', 1, 1, 'L')
+    pdf.cell(95, 8, 'Taxa de Compensação Mensal', 1, 0, 'L')
+    pdf.cell(95, 8, f'{solicitacao.taxa_juros}%', 1, 1, 'L')
     pdf.cell(95, 8, 'Prazo', 1, 0, 'L')
-    pdf.cell(95, 8, f'{solicitacao.prazo_meses} Parcelas', 1, 1, 'L')
-    pdf.cell(95, 8, 'Valor da Parcela', 1, 0, 'L')
+    pdf.cell(95, 8, f'{solicitacao.prazo_meses} Retribuições', 1, 1, 'L')
+    pdf.cell(95, 8, 'Valor de Cada Retribuição', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {valor_parcela:,.2f}', 1, 1, 'L')
-    pdf.cell(95, 8, 'TOTAL DEVEDOR', 1, 0, 'L')
+    pdf.cell(95, 8, 'TOTAL A RETRIBUIR', 1, 0, 'L')
     pdf.cell(95, 8, f'R$ {total_final:,.2f}', 1, 1, 'L')
     pdf.ln(10)
 
@@ -429,10 +429,10 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     pdf.cell(0, 10, '3. CONDIÇÕES', 0, 1, 'L')
     pdf.set_font('Helvetica', '', 9)
     termos = (
-        "3.1. O valor do empréstimo é transferido diretamente entre as partes via PIX, sem intermediação da plataforma.\n\n"
-        "3.2. O pagamento das parcelas é realizado via PIX diretamente ao credor. A plataforma apenas registra as confirmações.\n\n"
-        "3.3. O atraso no pagamento acarreta multa de 2% e juros de mora de 0.1% ao dia.\n\n"
-        "3.4. Este contrato possui validade digital mediante o aceite eletrônico das partes no sistema."
+        "3.1. O valor do apoio é transferido diretamente entre as partes via PIX, sem intermediação da plataforma.\n\n"
+        "3.2. A retribuição das parcelas é realizada via PIX diretamente ao apoiador. A plataforma apenas registra as confirmações.\n\n"
+        "3.3. O atraso na retribuição acarreta multa de 2% e compensação de 0.1% ao dia.\n\n"
+        "3.4. Este termo possui validade digital mediante o aceite eletrônico das partes no sistema."
     )
     pdf.multi_cell(0, 5, termos)
     pdf.ln(10)

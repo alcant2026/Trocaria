@@ -60,7 +60,7 @@ class AporteCaixaRequest(BaseModel):
     codigo_2fa: str = ""
     aceite_termos: bool = False
 
-router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
+router = APIRouter(prefix="/financeiro", tags=["Movimentação"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 

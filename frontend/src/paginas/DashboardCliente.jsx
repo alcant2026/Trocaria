@@ -108,48 +108,40 @@ const ContractTimer = ({ expira4h, expira5d, arrecadado }) => {
 const TIPOS_LABEL = {
     deposito: 'Depósito',
     saque: 'Saque',
-    investimento: 'Investimento',
     recebimento: 'Recebimento',
     compra_score: 'Compra de Score',
     desbloqueio_dados: 'Taxa de Verificação',
     taxa_saque: 'Taxa de Saque',
-    taxa_intermediacao: 'Taxa de Intermediação',
-    taxa_conveniencia: 'Taxa de Conveniência',
+    taxa_intermediacao: 'Taxa de Serviço',
+    taxa_servico: 'Taxa de Serviço',
+    taxa_plataforma: 'Taxa da Plataforma',
+    taxa_match: 'Taxa de Match',
     pagamento_parcela: 'Pagamento de Parcela',
     taxa_postagem: 'Taxa de Postagem',
     comissao_parceiro: 'Comissão Recebida',
-    aporte_caixa: 'Aporte Caixa',
-    resgate_caixa: 'Resgate Caixa',
-    aporte_pool: 'Aporte no Fundo',
-    resgate_pool: 'Resgate do Fundo',
-    abertura_gaveta: 'Fundo p/ Gaveta',
-    fechamento_gaveta: 'Fechamento de Caixa',
-    bonus_pagador_caixa: 'Bônus de Fidelidade',
-    retorno_pool: 'Retorno Fundo Coletivo',
-    retorno_investimento: 'Retorno de Investimento',
     assinatura: 'Assinatura Premium',
+    doacao: 'Doação',
+    bonus: 'Bônus',
+    ajuste: 'Ajuste',
 };
 
 const NOMES_SECOES = {
     home: 'Início',
-    pool: 'Fundo Coletivo',
-    solicitar: 'Solicitar Crédito',
+    grupo: 'Grupo de Apoio',
+    solicitar: 'Pedir Apoio',
     depositar: 'Adicionar Saldo',
     saque: 'Realizar Saque',
     historico: 'Minhas Atividades',
-    contratos: 'Meus Contratos',
-    score: 'Upgrade de Perfil',
+    contratos: 'Meus Termos',
+    score: 'Perfil',
     marketplace: 'Marketplace',
     caixa_parceiro: 'Painel do Lojista',
     notificacoes: 'Notificações',
 };
 
-// Tipos que são saídas do tipo "taxa/pagamento"
-const TIPOS_TAXA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'saque', 'investimento', 'pagamento_parcela', 'aporte_caixa', 'aporte_pool', 'abertura_gaveta', 'assinatura']);
-// Tipos que são entradas (positivos)
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'resgate_caixa', 'resgate_pool', 'fechamento_gaveta', 'bonus_pagador_caixa', 'retorno_pool', 'retorno_investimento']);
-// Todos os tipos negativos (sem badge CONCLUIDO)
-const TIPOS_NEGATIVO = new Set(['saque', 'investimento', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_conveniencia', 'pagamento_parcela', 'taxa_postagem', 'aporte_caixa', 'aporte_pool', 'abertura_gaveta', 'assinatura']);
+const TIPOS_SAIDA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'saque', 'pagamento_parcela', 'taxa_postagem', 'assinatura']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'doacao', 'bonus']);
+const TIPOS_NEGATIVO = new Set(['saque', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'pagamento_parcela', 'taxa_postagem', 'assinatura']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -159,7 +151,7 @@ const formatarTipo = (tipo, detalhes) => {
     return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
 };
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
-const corValor = (tipo) => TIPOS_TAXA.has(tipo) || tipo === 'saque' || tipo === 'investimento' || tipo === 'aporte_caixa' || tipo === 'aporte_pool' || tipo === 'abertura_gaveta' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+const corValor = (tipo) => TIPOS_SAIDA.has(tipo) || tipo === 'saque' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
 // Timer regressivo para cards do marketplace
 const MarketTimer = ({ expiresAt }) => {

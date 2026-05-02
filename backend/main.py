@@ -200,6 +200,7 @@ for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeir
     app.include_router(router_module.router, prefix="/api")
 
 @app.get("/__warmup")
+@app.get("/api/__warmup")
 async def warmup():
     return {"status": "ready"}
 

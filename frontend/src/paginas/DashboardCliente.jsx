@@ -2608,123 +2608,68 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setShowPostarLink(false); 
                     setDadosNovoLink({ nome_produto: '', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' }); 
                 }}
-                title="Novo Anúncio Grátis"
+                title="Novo Anúncio"
                 type="info"
             >
                 <div style={{ textAlign: 'left' }}>
-                    <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Anuncie grátis por 24h com 50 views. Preencha os dados ou use a colagem inteligente.</p>
-                    
+                    <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Anuncie gratuitamente por 24h. Preencha os dados do seu produto ou servico.</p>
+
                     <div className="input-group mb-1">
-                        <label style={{ color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={16} /> Colagem Inteligente (Smart Paste)</label>
-                        <textarea 
-                            className="smart-paste-area" 
-                            placeholder="Cole aqui a descrição completa do produto para auto-preenchimento..."
-                            onChange={(e) => handleSmartPaste(e.target.value)}
-                        />
+                        <label>Nome do Produto / Servico</label>
+                        <input className="input-field" placeholder="Ex: Curso de Marketing Digital" value={dadosNovoLink.nome_produto} onChange={(e) => setDadosNovoLink({...dadosNovoLink, nome_produto: e.target.value})} />
                     </div>
 
                     <div className="input-group mb-1">
-                        <label>Nome do Produto</label>
-                        <input className="input-field" value={dadosNovoLink.nome_produto} onChange={(e) => setDadosNovoLink({...dadosNovoLink, nome_produto: e.target.value})} />
+                        <label>Descricao</label>
+                        <textarea className="input-field" rows="3" placeholder="Descreva seu produto ou servico..." style={{ width: '100%', resize: 'none' }}
+                            value={dadosNovoLink.descricao} onChange={(e) => setDadosNovoLink({...dadosNovoLink, descricao: e.target.value})} />
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         <div className="input-group mb-1">
                             <label>Valor (R$)</label>
-                            <input 
-                                type="number" 
-                                className="input-field" 
-                                placeholder="R$ 0,00"
-                                value={dadosNovoLink.valor} 
-                                onChange={(e) => setDadosNovoLink({...dadosNovoLink, valor: e.target.value})} 
-                            />
+                            <input type="number" className="input-field" placeholder="0,00" value={dadosNovoLink.valor} onChange={(e) => setDadosNovoLink({...dadosNovoLink, valor: e.target.value})} />
                         </div>
                         <div className="input-group mb-1">
-                            <label>Vendas (texto)</label>
-                            <input 
-                                className="input-field" 
-                                placeholder="Ex: 8mil+ vendas"
-                                value={dadosNovoLink.vendas_texto} 
-                                onChange={(e) => setDadosNovoLink({...dadosNovoLink, vendas_texto: e.target.value})} 
-                            />
+                            <label>Categoria</label>
+                            <select className="input-field" style={{ width: '100%', padding: '10px', borderRadius: '8px' }}
+                                value={dadosNovoLink.categoria} onChange={(e) => setDadosNovoLink({...dadosNovoLink, categoria: e.target.value})}>
+                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
                         </div>
                     </div>
 
                     <div className="input-group mb-1">
-                        <label>URL Imagem</label>
-                        <input className="input-field" value={dadosNovoLink.url_imagem} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_imagem: e.target.value})} />
+                        <label>URL da Imagem</label>
+                        <input className="input-field" placeholder="https://..." value={dadosNovoLink.url_imagem} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_imagem: e.target.value})} />
                     </div>
 
                     <div className="input-group mb-1">
-                        <label>Categoria</label>
-                        <select 
-                            className="input-field" 
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px' }}
-                            value={dadosNovoLink.categoria} 
-                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, categoria: e.target.value})}
-                        >
-                            {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-
-                    <div className="input-group mb-1">
-                        <label>Descrição Detalhada (OLX Style)</label>
-                        <textarea 
-                            className="input-field" 
-                            rows="4"
-                            placeholder="Descreva o estado do produto, garantias, o que acompanha, etc."
-                            style={{ width: '100%', resize: 'none' }}
-                            value={dadosNovoLink.descricao} 
-                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, descricao: e.target.value})}
-                        />
-                    </div>
-
-                    <div className="input-group mb-1">
-                        <label>Seu Link Afiliado/WhatsApp</label>
-                        <input 
-                            className="input-field" 
-                            placeholder="Link do produto ou número do WhatsApp"
-                            value={dadosNovoLink.url_afiliado} 
-                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} 
-                        />
+                        <label>Link de Afiliado / WhatsApp</label>
+                        <input className="input-field" placeholder="https://seu-link.com ou 5511999999999"
+                            value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            <Info size={14} className="text-warning inline-block mr-1" /> Se inserir apenas o número do WhatsApp, criaremos o link automaticamente para você!
+                            <Info size={14} className="text-warning inline-block mr-1" /> Se inserir so o numero do WhatsApp, criamos o link automaticamente.
                         </p>
-                    </div>
-
-                    <div className="input-group mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.15)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: 700 }}>
-                            <Lock size={14} /> Código 2FA (Authenticator)
-                        </label>
-                        <input 
-                            className="input-field" 
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={6}
-                            placeholder="000000"
-                            style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '8px', fontWeight: 800 }}
-                            value={dadosNovoLink.codigo_2fa || ''}
-                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, codigo_2fa: e.target.value.replace(/\D/g, '')})}
-                        />
                     </div>
 
                     <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                            <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Psy Pay atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
+                            <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, voce declara ser o unico responsavel pelo produto/servico. A Psy Pay atua apenas como plataforma de classificados e nao se responsabiliza por vicios, defeitos ou falta de entrega.
                         </p>
                     </div>
 
-                    <button className="btn btn-primary w-full mt-1" disabled={!dadosNovoLink.codigo_2fa || dadosNovoLink.codigo_2fa.length < 6} onClick={async () => {
+                    <button className="btn btn-primary w-full mt-1" disabled={!dadosNovoLink.nome_produto || !dadosNovoLink.url_afiliado} onClick={async () => {
                         try {
                             await api.post('/comunidade/postar-link', dadosNovoLink);
                             setShowPostarLink(false);
                             setDadosNovoLink({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' });
                             carregarMeusLinksMarketplace();
-                            showModal({ title: 'Sucesso!', message: 'Anúncio publicado com sucesso!', type: 'success' });
+                            showModal({ title: 'Sucesso!', message: 'Anuncio publicado!', type: 'success' });
                         } catch (err) { 
-                            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao postar', type: 'danger' }); 
+                            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao publicar', type: 'danger' }); 
                         }
-                    }}>Publicar Agora</button>
+                    }}>Publicar Anuncio</button>
                 </div>
             </ModalPremium>
 

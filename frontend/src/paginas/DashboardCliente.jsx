@@ -668,13 +668,32 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const handlePagarParcela = async (id, valorParcela) => {
+    const handlePagarParcela = async (id, valorParcela, chavePix) => {
+        const msg = `Envie R$ ${valorParcela.toFixed(2)} via PIX para:\n\n${chavePix || '---'}\n\nDepois de enviar, confirme aqui.`;
+        showModal({
+            title: 'Pagar Parcela',
+            message: msg,
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: valorParcela });
+                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro: ' + err.message);
+                }
+            },
+            confirmText: 'Ja Enviei o PIX'
+        });
+    };
+
+    const handleConfirmarPagtoRecebido = async (id) => {
         try {
-            const res = await api.post(`/emprestimos/pagar-parcela/${id}`, { valor_pagamento: valorParcela });
+            const res = await api.post('/emprestimos/confirmar-recebimento/' + id);
             setMensagem(res.message);
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro ao pagar: ' + err.message);
+            setMensagem('Erro: ' + err.message);
         }
     };
 
@@ -2444,51 +2463,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                 </div>
 
                                                                 {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela)}>Pagar Parcela</button>
-                                                                            <button className="btn btn-outline" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handleQuitar(emp.id)}>Quitar Tudo</button>
-                                                                        </div>
-
-                                                                        {showAvulsoPorId[emp.id] ? (
-                                                                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', border: '1px solid var(--primary-low)' }}>
-                                                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                                                    <div style={{ position: 'relative', flex: 1 }}>
-                                                                                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', opacity: 0.6 }}>R$</span>
-                                                                                        <input
-                                                                                            type="number"
-                                                                                            className="input-field"
-                                                                                            placeholder="0,00"
-                                                                                            style={{ paddingLeft: '30px', fontSize: '0.85rem' }}
-                                                                                            value={valorAvulsoPorId[emp.id] || ''}
-                                                                                            onChange={(e) => setValorAvulsoPorId(prev => ({ ...prev, [emp.id]: e.target.value }))}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <button className="btn btn-primary" style={{ padding: '0 15px', fontSize: '0.75rem', width: 'auto' }} onClick={() => handlePagamentoAvulso(emp.id)}>Pagar</button>
-                                                                                    <button className="btn btn-secondary" style={{ padding: '0 10px', width: 'auto' }} onClick={() => { setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: false })); setValorAvulsoPorId(prev => ({ ...prev, [emp.id]: '' })); }}><X size={14} /></button>
-                                                                                </div>
-                                                                                <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>Adiciona taxa de R$ 1,50 ao contrato.</p>
-                                                                            </div>
+                                                                    <div style={{ marginTop: '12px' }}>
+                                                                        {emp.tipo === 'tomador' ? (
+                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem', width: '100%' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela, emp.chave_pix_pagamento)}>Pagar Parcela</button>
                                                                         ) : (
-                                                                            <button
-                                                                                style={{
-                                                                                    fontSize: '0.75rem',
-                                                                                    color: '#FFD600',
-                                                                                    background: 'rgba(0,0,0,0.85)',
-                                                                                    padding: '8px 16px',
-                                                                                    textAlign: 'center',
-                                                                                    width: '100%',
-                                                                                    border: '1px solid rgba(255,214,0,0.3)',
-                                                                                    borderRadius: '10px',
-                                                                                    cursor: 'pointer',
-                                                                                    fontWeight: 700,
-                                                                                    letterSpacing: '0.3px',
-                                                                                    transition: 'var(--transition)'
-                                                                                }}
-                                                                                onClick={() => setShowAvulsoPorId(prev => ({ ...prev, [emp.id]: true }))}
-                                                                            >
-                                                                                Pagar outro valor
-                                                                            </button>
+                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem', width: '100%' }} onClick={() => handleConfirmarPagtoRecebido(emp.id)}>Confirmar Recebimento</button>
                                                                         )}
                                                                     </div>
                                                                 )}

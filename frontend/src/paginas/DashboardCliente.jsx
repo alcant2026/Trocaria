@@ -1085,39 +1085,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {/* Top Grid for PC: Balance and Pending Actions */}
             <div className="dashboard-grid">
 
-                            </div>
-                            <div className="balance-value">
-                                <span className="currency">R$</span>
-                                <span className="amount">
-                                    {verSaldo ? (usuario.credito_virtual || usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '••••••'}
-                                </span>
-                            </div>
-                            
-                            {/* EXIBIÇÃO PROEMINENTE DO PSY ID 🆔 */}
-                            <div className="flex-between mt-1" style={{ background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ textAlign: 'left' }}>
-                                    <span className="text-muted" style={{ fontSize: '0.65rem', display: 'block', fontWeight: 800 }}>MEU PSY ID (Atendimento)</span>
-                                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '2px' }}>{usuario.id}</span>
-                                </div>
-                                <button 
-                                    onClick={handleCopiarId}
-                                    style={{ background: 'var(--primary)', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', color: '#000' }}
-                                >
-                                    {copiadoId ? 'COPIADO!' : 'COPIAR'}
-                                </button>
-                            </div>
-
-                            <div className="balance-footer mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                                <div className="flex-between">
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>
-                                        PSY SCORE: <span className="text-primary">{(usuario.score || 0).toFixed(1)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-
                 {usuario.divida_total > 0 && (
                     <div className="hide-on-mobile">
                         {/* PC-only Widget: Resumo Financeiro */}

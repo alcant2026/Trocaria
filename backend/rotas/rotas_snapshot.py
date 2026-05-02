@@ -654,9 +654,15 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
         # --- TOMADOR DATA ---
         print(f"[DEBUG SNAPSHOT] Iniciando bloco TOMADOR")
-        solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.usuario_id == usuario.id).all()
+        solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(
+            SolicitacaoEmprestimo.usuario_id == usuario.id
+        ).all()
+        solicitacoes_credor = db.query(SolicitacaoEmprestimo).filter(
+            SolicitacaoEmprestimo.credor_id == usuario.id
+        ).all()
+        todas_solicitacoes = list(solicitacoes_tomador) + list(solicitacoes_credor)
         meus_emp_list = []
-        for s in solicitacoes_tomador:
+        for s in todas_solicitacoes:
             # Replicando lógica de juros e parcelas de rotas_emprestimo (Incluindo taxas financiadas)
             taxa_mensal = s.taxa_juros / 100
             total_com_juros = s.valor * (Decimal("1") + (taxa_mensal * s.prazo_meses))
@@ -676,6 +682,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             meus_emp_list.append({
                 "id": s.id,
+                "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
+                "contraparte_nome": s.credor.nome if s.credor else "Aguardando" if s.usuario_id == usuario.id else s.usuario.nome,
+                "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
                 "valor": float(s.valor),
                 "valor_arrecadado": float(s.valor_arrecadado),
                 "taxa_juros": float(s.taxa_juros),

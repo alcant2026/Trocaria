@@ -2310,9 +2310,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                                 </button>
                                                                             )}
                                                                         </div>
-                                                                        <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Crédito #{emp.id}</h3>
+                                                                        <h3 className="mt-1" style={{ fontSize: '0.95rem', fontWeight: 800 }}>Apoio #{emp.id}</h3>
                                                                         <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-                                                                            Você recebe: <strong style={{ color: 'var(--text-main)' }}>R$ {emp.valor.toLocaleString('pt-BR')}</strong>
+                                                                            {emp.tipo === 'tomador' ? `Você recebe de: ${emp.contraparte_nome || 'Aguardando'}` : `Você enviou para: ${emp.contraparte_nome || 'Aguardando'}`}
+                                                                            <br />
+                                                                            Chave PIX: <strong style={{ color: 'var(--text-main)' }}>{emp.chave_pix_pagamento || '—'}</strong>
+                                                                        </div>
+                                                                        <div className="mt-0-5" style={{ fontSize: '0.7rem' }}>
+                                                                            {emp.tipo === 'tomador' ? `Recebeu: R$ ${emp.valor.toLocaleString('pt-BR')}` : `Enviou: R$ ${emp.valor.toLocaleString('pt-BR')}`}
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-right">

@@ -760,6 +760,25 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             db.commit()
                             logger.info(f"✅ CREDITO VIRTUAL: R$ {transacao.valor} liberado para {usuario.nome}")
                             cache_snapshot_data.pop(usuario.id, None)
+                        elif transacao.tipo == TipoTransacao.ASSINATURA:
+                            agora = datetime.datetime.now(datetime.timezone.utc)
+                            dias = 365 if "ANUAL" in (transacao.detalhes or "") else 30
+                            if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
+                                usuario.assinatura_expira_em += datetime.timedelta(days=dias)
+                            else:
+                                usuario.is_subscriber = True
+                                usuario.assinatura_expira_em = agora + datetime.timedelta(days=dias)
+                            bonus = Decimal("100") if dias == 365 else Decimal("20")
+                            usuario.score = (usuario.score or Decimal("0")) + bonus
+                            if usuario.score > Decimal("1000"):
+                                usuario.score = Decimal("1000")
+                            transacao.status = "concluido"
+                            if not transacao.payment_id:
+                                transacao.payment_id = str(payment_id)
+                            transacao.detalhes += f" | Premium ativado - {dias} dias"
+                            db.commit()
+                            logger.info(f"✅ ASSINATURA: Premium ativado para {usuario.nome} por {dias} dias")
+                            cache_snapshot_data.pop(usuario.id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"
@@ -1655,8 +1674,7 @@ async def admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Fo
     return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": result["credito_virtual"]}
 
 @router.post("/assinar-plano")
-async def assinar_plano_premium(dados: AssinarPlanoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Ativa o plano de assinatura Mensal ou Anual."""
+async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     if dados.plano == 'anual':
         preco = Decimal("199.99")
         dias = 365
@@ -1665,52 +1683,40 @@ async def assinar_plano_premium(dados: AssinarPlanoRequest, db: Session = Depend
         preco = Decimal("19.99")
         dias = 30
         nome_plano = "MENSAL"
-    
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-    
-    if usuario.saldo < preco:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. O plano {nome_plano} custa R$ {preco}.")
 
-    # Deduzir saldo
-    usuario.saldo -= preco
-    
-    # Benefício do Plano: Dias de Premium
-    agora = datetime.datetime.now(datetime.timezone.utc)
-    if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
-        usuario.assinatura_expira_em += datetime.timedelta(days=dias)
-    else:
-        usuario.is_subscriber = True
-        usuario.assinatura_expira_em = agora + datetime.timedelta(days=dias)
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).first()
 
-    # NOVO: Bônus de Score Imediato pela Fidelidade
-    bonus_score = Decimal("100.0") if dados.plano == 'anual' else Decimal("20.0")
-    usuario.score += bonus_score
-    if usuario.score > Decimal("1000.0"):
-        usuario.score = Decimal("1000.0")
+    from limitador import limiter
+    from rotas.rotas_financeiro import sdk
+    if not sdk:
+        return {"message": "MP nao configurado", "simulacao": True, "preco": float(preco)}
 
-    # Registrar Transação
+    payment_data = {
+        "transaction_amount": float(preco),
+        "description": f"Assinatura Premium {nome_plano} - {usuario.nome}",
+        "payment_method_id": "pix",
+        "payer": {"email": usuario.email}
+    }
+    result = sdk.payment().create(payment_data)
+    payment = result.get("response", {})
+    if result.get("status") not in [200, 201]:
+        raise HTTPException(status_code=400, detail="Erro ao gerar PIX.")
+
     transacao = Transacao(
-        usuario_id=usuario.id,
-        valor=preco,
-        tipo=TipoTransacao.ASSINATURA,
-        status="concluido",
-        detalhes=f"Assinatura Premium Marketplace ({nome_plano} - {dias} dias)"
+        usuario_id=usuario.id, valor=preco, tipo=TipoTransacao.ASSINATURA,
+        status="pendente", payment_id=str(payment.get("id")), metodo="pix",
+        detalhes=f"Assinatura Premium {nome_plano} ({dias} dias)"
     )
     db.add(transacao)
-    
-    # O valor vai para o lucro da plataforma
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo += preco
-
     db.commit()
-    return {"message": f"Parabéns! Seu plano {nome_plano} foi ativado com sucesso.", "expira_em": usuario.assinatura_expira_em}
-    cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
-    
+
     return {
-        "message": "Parabéns! Você agora é um membro Premium Psy Pay.",
-        "expira_em": usuario.assinatura_expira_em.isoformat()
+        "message": f"Pague R$ {preco} via PIX para ativar o plano {nome_plano}.",
+        "preco": float(preco), "plano": nome_plano,
+        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code"),
+        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64"),
+        "payment_id": payment.get("id"),
+        "transacao_id": transacao.id
     }
 
 @router.get("/admin/fiscal")

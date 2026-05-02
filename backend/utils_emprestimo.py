@@ -6,7 +6,7 @@ from typing import Optional
 
 
 def calcular_mora(solicitacao: SolicitacaoEmprestimo, valor_parcela: Decimal) -> Decimal:
-    agora = datetime.datetime.now(datetime.timezone.utc)
+    agora = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     if not solicitacao.proximo_vencimento or agora <= solicitacao.proximo_vencimento:
         return Decimal("0.00")
     atraso = (agora - solicitacao.proximo_vencimento).days

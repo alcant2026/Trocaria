@@ -30,20 +30,23 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
     Endpoint de Snapshot Autocontido com Cache de 15s.
     """
     agora_ts = datetime.now(timezone.utc).timestamp()
+    agora_naive = datetime.now(timezone.utc).replace(tzinfo=None)
     
     # Lazy-Cleaning: Expurgar solicitações expiradas (4h/5d) antes de ler o BD
     try:
         from utils_emprestimo import processar_expiracoes_interna
-        usuarios_afetados = processar_expiracoes_interna(db)
-        if usuarios_afetados:
-            print(f"[LAZY-CLEANING] Snapshot limpou solicitações expiradas para {len(usuarios_afetados)} usuários.")
-            # Invalida cache apenas dos afetados
-            for uid in usuarios_afetados:
-                cache_snapshot_data.pop(uid, None)
-            # Admin sempre vê tudo, então invalidamos ele também por segurança se houver mudanças globais
-            cache_snapshot_data.pop("000PL", None)
-    except Exception as e:
-        print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
+    except ImportError:
+        processar_expiracoes_interna = None
+    if processar_expiracoes_interna:
+        try:
+            usuarios_afetados = processar_expiracoes_interna(db)
+            if usuarios_afetados:
+                print(f"[LAZY-CLEANING] Snapshot limpou solicitações expiradas para {len(usuarios_afetados)} usuários.")
+                for uid in usuarios_afetados:
+                    cache_snapshot_data.pop(uid, None)
+                cache_snapshot_data.pop("000PL", None)
+        except Exception as e:
+            print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
     
     
     # Verificar Cache
@@ -178,7 +181,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         # --- NOVO: MARKETPLACE DA COMUNIDADE (CPM ADS) ---
         print(f"[DEBUG SNAPSHOT] Buscando anúncios da comunidade")
         from modelos.modelos_db import LinkAfiliado
-        agora = datetime.now(timezone.utc)
+        agora = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # 1. LIMPEZA INTELIGENTE DO MARKETPLACE
         # GRÁTIS: expirou (24h) OU views acabaram → DELETA do BD (libera espaço)
@@ -246,7 +249,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         if usuario.is_admin:
             # Configurações de tempo para a visão fiscal de 30 dias
             from datetime import timedelta
-            agora_br = datetime.now(TZ_BRASILIA)
+            agora_br = datetime.now(TZ_BRASILIA).replace(tzinfo=None)
             data_30_dias_atras = agora_br - timedelta(days=30)
             
             print(f"[DEBUG SNAPSHOT] Iniciando bloco ADMIN")
@@ -582,7 +585,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             ).all()
 
             # Mapeamento de fidelidade por usuário
-            agora_utc = datetime.now(timezone.utc)
+            agora_utc = datetime.now(timezone.utc).replace(tzinfo=None)
             fidelidade_map = {uid: False for uid in user_ids}
             
             for uid in user_ids:
@@ -769,5 +772,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         return snapshot
 
     except Exception as e:
+        import traceback
         print(f"Erro no Snapshot: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Erro interno ao gerar snapshot.")

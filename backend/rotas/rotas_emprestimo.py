@@ -291,6 +291,15 @@ async def depositar_virtual(dados: PagamentoRequest, request: Request, db: Sessi
     if dados.valor_pagamento < Decimal("10.00"):
         raise HTTPException(status_code=400, detail="Valor mínimo: R$ 10,00")
 
+    # Impedir múltiplos depósitos pendentes
+    dep_pendente = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario_logado.id,
+        Transacao.tipo == TipoTransacao.TAXA_DEPOSITO_VIRTUAL,
+        Transacao.status == "pendente"
+    ).first()
+    if dep_pendente:
+        raise HTTPException(status_code=400, detail="Você já tem um depósito virtual pendente. Aguarde ou cancele antes de criar outro.")
+
     taxa = dados.valor_pagamento * Decimal("0.02")
 
     from rotas.rotas_financeiro import sdk
@@ -329,6 +338,21 @@ async def depositar_virtual(dados: PagamentoRequest, request: Request, db: Sessi
         "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
         "payment_id": payment.get("id")
     }
+
+@router.post("/cancelar-pendente")
+@limiter.limit("3/minute")
+async def cancelar_pendente(request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    transacao = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario_logado.id,
+        Transacao.tipo.in_([TipoTransacao.TAXA_DEPOSITO_VIRTUAL, TipoTransacao.TAXA_SOLICITACAO]),
+        Transacao.status == "pendente"
+    ).first()
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Nenhuma transação pendente encontrada.")
+    transacao.status = "cancelado"
+    transacao.detalhes += " | Cancelado pelo usuário"
+    db.commit()
+    return {"message": "Transação pendente cancelada."}
 
 @router.post("/resgatar-virtual")
 @limiter.limit("3/minute")

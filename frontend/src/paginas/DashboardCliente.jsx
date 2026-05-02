@@ -1066,46 +1066,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     };
 
     const handleReverPix = async (transacaoId) => {
-        setLoadingAction(true);
         try {
             const res = await api.get(`/financeiro/deposito/pix-detalhes/${transacaoId}`);
             setQrCodeData({
                 qr_code: res.qr_code,
                 qr_code_base64: res.qr_code_base64,
-                payment_id: res.payment_id
+                payment_id: res.payment_id,
+                expires_at: res.expires_at
             });
-            setValorNotificacao(res.valor);
-            
-            // Calcular tempo restante se disponível
-            if (res.expires_at) {
-                const exp = new Date(res.expires_at);
-                const agora = new Date();
-                const diff = Math.floor((exp - agora) / 1000);
-                if (diff > 0) {
-                    const min = Math.floor(diff / 60);
-                    const seg = diff % 60;
-                    setTimeLeft(`${min}:${seg < 10 ? '0' : ''}${seg}`);
-                } else {
-                    setTimeLeft('Expirado');
-                }
-            }
-
-            setMetodoDeposito('pix');
-            setPassoDeposito(2);
             setActiveView('depositar');
-            showModal({ 
-                title: 'QR Code Recuperado', 
-                message: 'Você foi redirecionado para a tela de pagamento do seu depósito pendente.', 
-                type: 'success' 
-            });
+            setPassoDeposito(2);
         } catch (err) {
-            showModal({ 
-                title: 'Erro ao Recuperar PIX', 
-                message: err.response?.data?.detail || 'Não foi possível carregar os dados deste PIX agora.', 
-                type: 'danger' 
-            });
-        } finally {
-            setLoadingAction(false);
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleCancelarPendente = async () => {
+        if (!confirm('Cancelar esta transação pendente?')) return;
+        try {
+            const res = await api.post('/emprestimos/cancelar-pendente');
+            setMensagem(res.message || 'Transação cancelada.');
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
         }
     };
 
@@ -2119,6 +2102,20 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                         disabled={loadingAction}
                                                     >
                                                         <QrCode size={14} /> Pagar Agora
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* BOTÃO CANCELAR (Depósitos Virtuais e Taxas Pendentes) */}
+                                            {h.status === 'pendente' && (h.tipo === 'taxa_deposito_virtual' || h.tipo === 'taxa_solicitacao') && (
+                                                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <button 
+                                                        className="btn btn-outline" 
+                                                        style={{ width: '100%', fontSize: '0.75rem', padding: '8px', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                                                        onClick={() => handleCancelarPendente(h.id)}
+                                                        disabled={loadingAction}
+                                                    >
+                                                        <X size={14} /> Cancelar
                                                     </button>
                                                 </div>
                                             )}

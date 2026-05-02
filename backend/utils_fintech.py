@@ -139,13 +139,6 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
     if not credor:
         raise ValueError("Investidor não encontrado.")
 
-    score_credor = credor.score or Decimal("0.00")
-    if score_credor < Decimal("850.00"):
-        raise ValueError(
-            f"Score mínimo para investir é 850. Seu score atual é {score_credor}. "
-            f"Complete seu cadastro, pague taxas em dia e aumente seu score."
-        )
-
     credito_atual = credor.credito_virtual or Decimal("0.00")
     if credito_atual < solicitacao.valor:
         raise ValueError(

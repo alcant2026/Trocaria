@@ -103,6 +103,9 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                                     </span>
                                 )}
                             </div>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--success)', margin: '4px 0 0' }}>
+                                PIX: {op.chave_pix_tomador}
+                            </p>
                         </div>
                         <button
                             className="btn btn-primary btn-sm"

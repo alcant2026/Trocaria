@@ -20,7 +20,7 @@ const GerenciarPool = ({
                         <div className="flex-between mb-1">
                             <span className="text-muted" style={{ fontSize: '0.85rem' }}>Saldo disponível para apoiar:</span>
                             <span style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--primary)' }}>
-                                R$ {(usuario.saldo_grupo || usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                R$ {(usuario.credito_virtual || usuario.saldo_grupo || usuario.saldo_pool || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </span>
                         </div>
 

@@ -114,6 +114,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "id": usuario.id,
                 "nome": usuario.nome,
                 "saldo": float(usuario.saldo),
+                "credito_virtual": float(usuario.credito_virtual or 0),
                 "score": float(usuario.score),
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,

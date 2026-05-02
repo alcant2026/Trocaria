@@ -655,13 +655,14 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "arrecadado": float(sl.valor_arrecadado)
                 })
 
-        # --- TOMADOR DATA ---
-        print(f"[DEBUG SNAPSHOT] Iniciando bloco TOMADOR")
+        # --- MEUS CONTRATOS ---
+        print(f"[DEBUG SNAPSHOT] Iniciando bloco CONTRATOS")
         solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(
             SolicitacaoEmprestimo.usuario_id == usuario.id
         ).all()
         solicitacoes_credor = db.query(SolicitacaoEmprestimo).filter(
-            SolicitacaoEmprestimo.credor_id == usuario.id
+            SolicitacaoEmprestimo.credor_id == usuario.id,
+            SolicitacaoEmprestimo.usuario_id != usuario.id  # Evita duplicata quando é o mesmo usuário
         ).all()
         todas_solicitacoes = list(solicitacoes_tomador) + list(solicitacoes_credor)
         meus_emp_list = []
@@ -686,7 +687,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             meus_emp_list.append({
                 "id": s.id,
                 "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
-                "contraparte_nome": s.credor.nome if s.credor else "Aguardando" if s.usuario_id == usuario.id else s.usuario.nome,
+                "contraparte_nome": s.credor.nome if s.credor and s.usuario_id == usuario.id else (s.usuario.nome if s.usuario else "—"),
                 "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
                 "valor": float(s.valor),
                 "valor_arrecadado": float(s.valor_arrecadado),

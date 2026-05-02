@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Star, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, Star, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
 import api from '../api';
 
 const OportunidadesLista = ({ usuario, onUpdate }) => {
@@ -8,6 +8,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [loading, setLoading] = useState(true);
     const [aceitando, setAceitando] = useState(null);
     const [aceito, setAceito] = useState(null);
+    const [copiado, setCopiado] = useState(false);
 
     useEffect(() => {
         carregar();
@@ -29,12 +30,23 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
         setAceitando(id);
         try {
             const result = await api.post(`/emprestimos/aceitar-oferta/${id}`);
+            setCopiado(false);
             setAceito(result);
             carregar();
         } catch (e) {
             alert('Erro: ' + e.message);
         }
         setAceitando(null);
+    };
+
+    const copiarPix = async (texto) => {
+        try {
+            await navigator.clipboard.writeText(texto);
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 3000);
+        } catch {
+            prompt('Copie a chave PIX:', texto);
+        }
     };
 
     return (
@@ -64,11 +76,23 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', margin: 0 }}>
                             {aceito.tomador_nome}
                         </p>
-                        <p style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--success)', margin: '5px 0' }}>
-                            PIX: {aceito.chave_pix_tomador}
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0' }}>
+                            <p style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--success)', margin: 0 }}>
+                                PIX: {aceito.chave_pix_tomador}
+                            </p>
+                            <button
+                                onClick={() => copiarPix(aceito.chave_pix_tomador)}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'var(--primary)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                                {copiado ? <Check size={14} /> : <Copy size={14} />}
+                                {copiado ? 'Copiado' : 'Copiar'}
+                            </button>
+                        </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '5px 0' }}>
-                            Score do recebedor: {aceito.score_tomador} | {aceito.parcelas}x de ~R$ {(aceito.valor / aceito.parcelas).toFixed(2)}
+                            Score: {aceito.score_tomador} | {aceito.parcelas}x de ~R$ {(aceito.valor / aceito.parcelas).toFixed(2)}
+                        </p>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--warning)', margin: '5px 0 0', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                            Total a receber de volta: R$ {(aceito.valor * (1 + 0.05 * aceito.parcelas)).toFixed(2)} ({aceito.parcelas}x R$ {(aceito.valor * (1 + 0.05 * aceito.parcelas) / aceito.parcelas).toFixed(2)})
                         </p>
                     </div>
                     <button className="btn btn-primary mt-1" onClick={() => setAceito(null)} style={{ width: '100%' }}>

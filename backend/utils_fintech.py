@@ -44,10 +44,27 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
     if not credor:
         raise ValueError("Usuário não encontrado.")
 
+    # Taxa de match: 2% do valor (min R$ 2, max R$ 20)
+    taxa_match = solicitacao.valor * Decimal("0.02")
+    if taxa_match < Decimal("2.00"):
+        taxa_match = Decimal("2.00")
+    if taxa_match > Decimal("20.00"):
+        taxa_match = Decimal("20.00")
+
+    solicitacao.taxas_adicionais = (solicitacao.taxas_adicionais or Decimal("0.00")) + taxa_match
     solicitacao.status = StatusSolicitacao.APROVADO
     solicitacao.credor_id = credor.id
     solicitacao.chave_pix_credor = credor.chave_pix_publica or credor.chave_pix
     solicitacao.proximo_vencimento = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+
+    # Registrar transação da taxa
+    db.add(Transacao(
+        usuario_id=tomador.id,
+        valor=taxa_match,
+        tipo=TipoTransacao.TAXA_MATCH,
+        status="concluido",
+        detalhes=f"Taxa de match de R$ {taxa_match} — Pedido #{solicitacao.id}"
+    ))
 
     db.commit()
 
@@ -56,5 +73,7 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
         "tomador_nome": tomador.nome,
         "chave_pix_tomador": tomador.chave_pix_publica or tomador.chave_pix,
         "valor": float(solicitacao.valor),
+        "taxa_match": float(taxa_match),
+        "total_com_taxa": float(solicitacao.valor + taxa_match),
         "parcelas": solicitacao.prazo_meses,
     }

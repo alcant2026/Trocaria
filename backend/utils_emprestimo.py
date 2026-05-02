@@ -15,6 +15,7 @@ def calcular_mora(solicitacao: SolicitacaoEmprestimo, valor_parcela: Decimal) ->
 def calcular_divida_total(solicitacao: SolicitacaoEmprestimo):
     taxa_mensal = solicitacao.taxa_juros / 100
     total_com_juros = solicitacao.valor * (1 + (taxa_mensal * solicitacao.prazo_meses))
+    total_com_juros += (solicitacao.taxas_adicionais or Decimal("0.00"))
     valor_parcela_base = total_com_juros / solicitacao.prazo_meses
     parcelas_restantes = solicitacao.prazo_meses - solicitacao.parcelas_pagas
     valor_quittance_base = valor_parcela_base * parcelas_restantes

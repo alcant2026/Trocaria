@@ -89,11 +89,13 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                             </button>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '5px 0' }}>
-                            Score: {aceito.score_tomador} | {aceito.parcelas}x de ~R$ {(aceito.valor / aceito.parcelas).toFixed(2)}
+                            Score: {aceito.score_tomador} | {aceito.parcelas}x
                         </p>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--warning)', margin: '5px 0 0', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
-                            Total a receber de volta: R$ {(aceito.valor * (1 + 0.05 * aceito.parcelas)).toFixed(2)} ({aceito.parcelas}x R$ {(aceito.valor * (1 + 0.05 * aceito.parcelas) / aceito.parcelas).toFixed(2)})
-                        </p>
+                        {aceito.taxa_match && (
+                            <p style={{ fontSize: '0.75rem', color: 'var(--warning)', margin: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                                Taxa de match (2%): R$ {aceito.taxa_match.toFixed(2)} — paga pelo tomador
+                            </p>
+                        )}
                     </div>
                     <button className="btn btn-primary mt-1" onClick={() => setAceito(null)} style={{ width: '100%' }}>
                         OK, Já Enviei o PIX
@@ -131,15 +133,19 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                                 PIX: {op.chave_pix_tomador}
                             </p>
                         </div>
-                        <button
-                            className="btn btn-primary btn-sm"
+                        {op.taxa_match_estimada > 0 && (
+                            <p style={{ fontSize: '0.65rem', color: 'var(--warning)', margin: '2px 0 0' }}>
+                                Taxa de match estimada: R$ {op.taxa_match_estimada.toFixed(2)}
+                            </p>
+                        )}
+                    </div>
+                    <button className="btn btn-primary btn-sm"
                             disabled={aceitando === op.id || op.inadimplente}
                             onClick={() => aceitar(op.id)}
                             style={{ padding: '6px 12px', fontSize: '0.75rem' }}
                         >
                             {aceitando === op.id ? '...' : 'Aceitar'}
                         </button>
-                    </div>
                 </div>
             ))}
         </div>

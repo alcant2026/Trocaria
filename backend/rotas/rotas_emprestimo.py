@@ -39,6 +39,7 @@ async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario =
             "tomador_nome": s.usuario.nome,
             "chave_pix_tomador": s.usuario.chave_pix_publica or s.usuario.chave_pix,
             "valor": float(s.valor),
+            "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
             "parcelas": s.prazo_meses,
             "taxa_compensacao": float(s.taxa_juros),
             "score_tomador": float(s.usuario.score),
@@ -92,13 +93,15 @@ async def listar_meus(db: Session = Depends(get_db), usuario: Usuario = Depends(
     ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
     resultado = []
     for s in como_tomador + como_credor:
-        total = s.valor * (1 + (s.taxa_juros / 100) * s.prazo_meses)
+        taxas_extra = s.taxas_adicionais or Decimal("0.00")
+        total = s.valor * (1 + (s.taxa_juros / 100) * s.prazo_meses) + taxas_extra
         vp = total / s.prazo_meses
         resultado.append({
             "id": s.id, "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
             "contraparte": s.credor.nome if s.credor else "Aguardando",
             "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
             "valor": float(s.valor), "taxa": float(s.taxa_juros),
+            "taxa_match": float(taxas_extra),
             "parcelas": s.prazo_meses, "pagas": s.parcelas_pagas,
             "valor_parcela": round(float(vp), 2),
             "total": round(float(total), 2),

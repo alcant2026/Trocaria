@@ -66,6 +66,7 @@ import CaixaParceiro from './CaixaParceiro';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
 import OportunidadesLista from '../componentes/OportunidadesLista';
+import PagamentoPolling from '../componentes/PagamentoPolling';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -630,19 +631,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
         setLoadingAction(true);
         try {
-            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao');
+            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao', {
+                valor: v, parcelas: parseInt(parcelas),
+                taxa_compensacao: tx, aceite_termos: true
+            });
             if (taxaRes.qr_code) {
-                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id });
+                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id, transacao_id: taxaRes.transacao_id });
                 setActiveView('pagar-taxa');
             } else {
-                const res = await api.post('/emprestimos/solicitar', {
-                    valor: v, parcelas: parseInt(parcelas),
-                    taxa_compensacao: tx, aceite_termos: true
-                });
-                setMensagem(res.message || 'Pedido criado!');
-                setActiveView('home');
-                setValor(''); setParcelas(1); setPassoSolicitar(1);
-                carregarSnapshot();
+                setMensagem('Erro ao gerar PIX.');
             }
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
@@ -1612,13 +1609,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {activeView === 'pagar-taxa' && qrCodeData.qr_code && (
                 <div className="card text-center">
                     <div className="flex-end mb-1">
-                        <button onClick={() => setActiveView('home')} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '8px' }}>
+                        <button onClick={() => { setActiveView('home'); setQrCodeData({}); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '8px' }}>
                             <ArrowLeft size={20} />
                         </button>
                     </div>
                     <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pague a Taxa via PIX</h3>
                     <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
-                        Pague R$ 2,00 para publicar seu pedido de apoio.
+                        Pague R$ 2,00 para publicar seu pedido. O pedido sera criado automaticamente apos a confirmacao do pagamento.
                     </p>
                     {qrCodeData.qr_code_base64 && (
                         <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
@@ -1627,23 +1624,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Código PIX:</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>{qrCodeData.qr_code}</p>
                     </div>
-                    <button className="btn btn-primary w-full" onClick={async () => {
-                        try {
-                            const res = await api.post('/emprestimos/solicitar', {
-                                valor: parseFloat(valor), parcelas: parseInt(parcelas),
-                                taxa_compensacao: parseFloat(taxaCompensacao), aceite_termos: true
-                            });
-                            setMensagem(res.message || 'Pedido criado!');
-                            setActiveView('home');
-                            setValor(''); setParcelas(1); setPassoSolicitar(1);
-                            setQrCodeData({});
-                            carregarSnapshot();
-                        } catch (err) {
-                            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-                        }
-                    }}>
-                        Já Paguei! Publicar Pedido
-                    </button>
+                    <PagamentoPolling transacaoId={qrCodeData.transacao_id} onConfirmado={() => {
+                        setActiveView('home');
+                        setQrCodeData({});
+                        setValor(''); setParcelas(1); setPassoSolicitar(1);
+                        carregarSnapshot();
+                        setMensagem('Pagamento confirmado! Pedido criado com sucesso.');
+                    }} />
                 </div>
             )}
 

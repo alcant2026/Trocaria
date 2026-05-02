@@ -77,7 +77,7 @@ async def solicitar_emprestimo(
 
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")
-async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     valor_taxa = Decimal("2.00")
@@ -96,6 +96,13 @@ async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db)
     else:
         payment = {"id": "simulado"}
 
+    import json as _json
+    dados_solicitacao = _json.dumps({
+        "valor": float(dados.valor),
+        "parcelas": dados.parcelas,
+        "taxa": float(dados.taxa_compensacao)
+    })
+
     transacao = Transacao(
         usuario_id=usuario_logado.id,
         valor=valor_taxa,
@@ -103,7 +110,7 @@ async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db)
         status="pendente",
         payment_id=str(payment.get("id")),
         metodo="pix",
-        detalhes=f"Taxa de publicacao de pedido de apoio"
+        detalhes=f"PENDENTE_SOLICITACAO:{dados_solicitacao}"
     )
     db.add(transacao)
     db.commit()
@@ -116,6 +123,16 @@ async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db)
         "payment_id": payment.get("id"),
         "transacao_id": transacao.id
     }
+
+@router.get("/verificar-transacao/{transacao_id}")
+async def verificar_transacao(transacao_id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    transacao = db.query(Transacao).filter(
+        Transacao.id == transacao_id,
+        Transacao.usuario_id == usuario_logado.id
+    ).first()
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transacao nao encontrada.")
+    return {"status": transacao.status, "tipo": transacao.tipo.value}
 
 @router.post("/aceitar-oferta/{id}")
 @limiter.limit("5/minute")

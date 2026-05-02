@@ -785,8 +785,34 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes += f" | Premium ativado - {dias} dias"
                             db.commit()
-                            logger.info(f"✅ ASSINATURA: Premium ativado para {usuario.nome} por {dias} dias")
+                            logger.info(f"ASSINATURA: Premium ativado para {usuario.nome} por {dias} dias")
                             cache_snapshot_data.pop(usuario.id, None)
+                        elif transacao.tipo == TipoTransacao.TAXA_SOLICITACAO:
+                            import json as _json
+                            dados_str = transacao.detalhes.replace("PENDENTE_SOLICITACAO:", "") if transacao.detalhes else None
+                            if dados_str:
+                                try:
+                                    dados = _json.loads(dados_str)
+                                    from utils_fintech import criar_solicitacao_p2p
+                                    solic = criar_solicitacao_p2p(
+                                        usuario_id=usuario.id,
+                                        valor=Decimal(str(dados["valor"])),
+                                        prazo=dados["parcelas"],
+                                        taxa=Decimal(str(dados["taxa"])),
+                                        db=db
+                                    )
+                                    transacao.status = "concluido"
+                                    transacao.detalhes = f"Taxa paga - Pedido #{solic.id} criado"
+                                    if not transacao.payment_id:
+                                        transacao.payment_id = str(payment_id)
+                                    db.commit()
+                                    logger.info(f"✅ SOLICITACAO: Pedido #{solic.id} criado apos pagamento de {usuario.nome}")
+                                    cache_snapshot_data.pop(usuario.id, None)
+                                except Exception as e:
+                                    logger.error(f"Erro ao criar solicitacao apos pagamento: {e}")
+                                    transacao.status = "concluido"
+                                    transacao.detalhes += f" | Pago mas erro ao criar: {e}"
+                                    db.commit()
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

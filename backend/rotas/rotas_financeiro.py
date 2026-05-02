@@ -9,9 +9,17 @@ from pydantic import BaseModel, Field
 import os
 import mercadopago
 
-# Inicializa SDK Mercado Pago
-mp_access_token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
-sdk = mercadopago.SDK(mp_access_token) if mp_access_token else None
+# SDK do Mercado Pago (lazy)
+_sdk_instance = None
+
+def get_sdk():
+    global _sdk_instance
+    if _sdk_instance is None:
+        token = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
+        _sdk_instance = mercadopago.SDK(token) if token else None
+    return _sdk_instance
+
+sdk = get_sdk()
 from limitador import limiter
 from fastapi.responses import FileResponse
 from decimal import Decimal
@@ -1687,7 +1695,8 @@ async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).first()
 
     from limitador import limiter
-    from rotas.rotas_financeiro import sdk
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
     if not sdk:
         return {"message": "MP nao configurado", "simulacao": True, "preco": float(preco)}
 

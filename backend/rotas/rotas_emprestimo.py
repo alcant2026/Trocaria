@@ -78,7 +78,8 @@ async def solicitar_emprestimo(
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")
 async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    from rotas.rotas_financeiro import sdk
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
     valor_taxa = Decimal("2.00")
 
     if sdk:

@@ -287,18 +287,16 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 if p.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
                     docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == p.usuario.id).order_by(DocumentoVerificacao.id.desc()).first()
                     if docs:
-                        def parse_url(path):
+                        def parse_url(path, tipo):
                             if not path: return None
-                            # Se o path no BD vier como 'uploads/arquivo.png', removemos o prefixo para usar /api/uploads/arquivo.png
-                            clean_path = path.replace("uploads/", "").replace("uploads\\", "")
-                            return f"/api/uploads/{clean_path}"
+                            return f"/api/admin/view-doc/{docs.usuario_id}/{tipo}"
 
                         info_p["tem_rg"] = bool(docs.caminho_rg)
                         info_p["tem_renda"] = bool(docs.caminho_renda)
                         info_p["tem_residencia"] = bool(docs.caminho_residencia)
-                        info_p["url_rg"] = parse_url(docs.caminho_rg)
-                        info_p["url_renda"] = parse_url(docs.caminho_renda)
-                        info_p["url_residencia"] = parse_url(docs.caminho_residencia)
+                        info_p["url_rg"] = parse_url(docs.caminho_rg, "rg")
+                        info_p["url_renda"] = parse_url(docs.caminho_renda, "renda")
+                        info_p["url_residencia"] = parse_url(docs.caminho_residencia, "residencia")
 
                 pendentes_list.append(info_p)
 

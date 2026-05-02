@@ -216,8 +216,8 @@ async def root():
 async def api_root():
     return {"status": "online", "message": "Psy Pay API Gateway"}
 
-# Segurança: Pasta de uploads protegida via rota /api/admin/view-doc
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Pasta de uploads servida apenas via rota /api/admin/view-doc (protegida por auth)
+# NÃO usar StaticFiles para evitar acesso público a documentos de usuários
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

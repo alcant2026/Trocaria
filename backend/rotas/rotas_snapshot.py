@@ -620,7 +620,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "valor": float(sa.valor),
                     "valor_arrecadado": float(sa.valor_arrecadado),
                     "score": float(sa.usuario.score),
-                    "taxa": float(sa.taxa_mensal)
+                    "taxa": float(sa.taxa_juros)
                 })
 
             # 7. Gestão de Parceiros (Apenas ativos para o HUB)

@@ -289,7 +289,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     if docs:
                         def parse_url(path, tipo):
                             if not path: return None
-                            return f"/api/admin/view-doc/{docs.usuario_id}/{tipo}"
+                            return f"/api/financeiro/admin/view-doc/{docs.usuario_id}/{tipo}"
 
                         info_p["tem_rg"] = bool(docs.caminho_rg)
                         info_p["tem_renda"] = bool(docs.caminho_renda)

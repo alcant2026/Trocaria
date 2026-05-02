@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, text, or_
 import logging
@@ -1592,8 +1592,23 @@ async def listar_kyc_pendentes(db: Session = Depends(get_db), admin: Usuario = D
     return resultado
 
 @router.get("/admin/view-doc/{usuario_id}/{tipo_doc}")
-async def view_documento(usuario_id: str, tipo_doc: str, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+async def view_documento(usuario_id: str, tipo_doc: str, request: Request, token: Optional[str] = None, db: Session = Depends(get_db)):
+    from rotas.rotas_auth import verificar_token_manual
     from modelos.modelos_db import DocumentoVerificacao
+
+    user_id = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        user_id = verificar_token_manual(auth_header[7:])
+    if not user_id and token:
+        user_id = verificar_token_manual(token)
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token ausente ou inválido")
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
     doc = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.usuario_id == usuario_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documentos não encontrados")

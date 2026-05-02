@@ -321,7 +321,6 @@ const AdminDashboard = () => {
             return;
         }
 
-        // Se a BASE_URL termina em /api e a url começa com /api, removemos a duplicidade
         let fullUrl = url;
         if (url.startsWith('/api')) {
             const apiRoot = BASE_URL.endsWith('/api') ? BASE_URL.replace('/api', '') : BASE_URL;
@@ -330,7 +329,11 @@ const AdminDashboard = () => {
             fullUrl = `${BASE_URL}${url}`;
         }
 
-        console.log("📂 Abrindo documento:", fullUrl);
+        const token = api.getToken();
+        if (token) {
+            fullUrl += `${fullUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+        }
+
         window.open(fullUrl, '_blank', 'noopener,noreferrer');
     };
 

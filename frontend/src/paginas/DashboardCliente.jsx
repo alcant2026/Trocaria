@@ -66,6 +66,7 @@ import CaixaParceiro from './CaixaParceiro';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
 import GerenciarPool from '../componentes/GerenciarPool';
+import OportunidadesLista from '../componentes/OportunidadesLista';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -1182,7 +1183,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <div className="action-grid animate-fade-in">
                         <div className="action-btn" onClick={() => setActiveView('pool')} style={{ borderColor: 'var(--primary)', background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15) 0%, rgba(var(--primary-rgb), 0.05) 100%)', boxShadow: '0 4px 15px rgba(var(--primary-rgb), 0.1)' }}>
                             <Coins size={32} color="var(--primary)" />
-                            <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Fundo Coletivo</span>
+                            <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Grupo de Apoio</span>
+                        </div>
+                        <div className="action-btn" onClick={() => setActiveView('oportunidades')}>
+                            <HandCoins size={28} color="var(--success)" />
+                            <span>Ver Pedidos</span>
                         </div>
                         <div className="action-btn" onClick={() => setActiveView('solicitar')}>
                             <PlusCircle size={28} color="var(--primary)" />
@@ -1857,6 +1862,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 )
             }
 
+            {activeView === 'oportunidades' && (
+                <OportunidadesLista
+                    usuario={usuario}
+                    onUpdate={() => { carregarSnapshot(); setActiveView('home'); }}
+                />
+            )}
             {
                 activeView === 'score' && (
                     <div className="card">

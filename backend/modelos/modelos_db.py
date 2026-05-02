@@ -42,6 +42,7 @@ class TipoTransacao(enum.Enum):
     CONFIRMACAO_RECEBIMENTO = "confirmacao_recebimento"
     ASSINATURA = "assinatura"
     RESGATE_PONTOS = "resgate_pontos"
+    BONUS = "bonus"
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"

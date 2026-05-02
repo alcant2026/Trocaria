@@ -274,7 +274,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
         # SEGURANÇA: Bloquear se for o próprio dono do link
         is_proprio_link = link.usuario_id == usuario.id
         
-        if usuario and usuario.is_subscriber and not is_proprio_link:
+        if usuario and not is_proprio_link:
             # SEGURANÇA: Verificar se já clicou neste link nas últimas 24 horas
             vinte_quatro_horas_atras = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=24)
             ja_clicou = db.query(HistoricoClique).filter(
@@ -287,33 +287,25 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
                 # Registro novo clique no histórico para trava de 24h
                 novo_clique = HistoricoClique(usuario_id=usuario.id, link_id=link.id)
                 db.add(novo_clique)
-                
-                # Regra de Pontos Aleatórios
-                pontos_ganhos = 1
-                if link.is_boosted and link.ponto_max > 1:
-                    pontos_ganhos = random.randint(link.ponto_min, link.ponto_max)
-                
-                usuario.pontos_marketplace += pontos_ganhos
-                
-                # CONVERSÃO AUTOMÁTICA: 1000 pontos = R$ 0,10
-                if usuario.pontos_marketplace >= 1000:
-                    valor_credito = Decimal("0.10")
-                    
-                    # Tira do lucro da plataforma (000PL)
-                    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-                    if plataforma and plataforma.saldo >= valor_credito:
-                        plataforma.saldo -= valor_credito
-                        usuario.saldo += valor_credito
-                        usuario.pontos_marketplace -= 1000
-                        
-                        # Registrar transação de bonificação
-                        db.add(Transacao(
-                            usuario_id=usuario.id,
-                            valor=valor_credito,
-                            tipo=TipoTransacao.RETORNO_POOL,
-                            status="concluido",
-                            detalhes="Conversão Automática: 1.000 Pontos Marketplace → Saldo"
-                        ))
+
+                # REGRA DE PONTOS:
+                # - Gratuito: 1 ponto fixo
+                # - Premium: sorteio tipo TikTok (1 a 5 pontos aleatórios)
+                if usuario.is_subscriber:
+                    pontos_ganhos = random.randint(1, 5)
+                else:
+                    pontos_ganhos = 1
+
+                usuario.pontos_marketplace = (usuario.pontos_marketplace or 0) + pontos_ganhos
+
+                # Registrar transação de pontos
+                db.add(Transacao(
+                    usuario_id=usuario.id,
+                    valor=Decimal(str(pontos_ganhos)),
+                    tipo=TipoTransacao.BONUS,
+                    status="concluido",
+                    detalhes=f"{pontos_ganhos} ponto(s) por clique no link #{link.id}" + (" (Premium Bônus)" if usuario.is_subscriber else "")
+                ))
     
     # Consumir 1 view
     if link.visualizacoes_restantes > 0:

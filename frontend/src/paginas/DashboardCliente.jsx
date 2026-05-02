@@ -65,7 +65,6 @@ import BannerCookies from '../componentes/BannerCookies';
 import CaixaParceiro from './CaixaParceiro';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
-import GerenciarPool from '../componentes/GerenciarPool';
 import OportunidadesLista from '../componentes/OportunidadesLista';
 
 const useCountdown = (isoDate) => {
@@ -108,41 +107,33 @@ const ContractTimer = ({ expira4h, expira5d, arrecadado }) => {
 // Mapeamento global de tipos de transação
 const TIPOS_LABEL = {
     deposito: 'Depósito',
-    saque: 'Saque',
     recebimento: 'Recebimento',
-    compra_score: 'Compra de Score',
-    desbloqueio_dados: 'Taxa de Verificação',
-    taxa_saque: 'Taxa de Saque',
-    taxa_intermediacao: 'Taxa de Serviço',
+    desbloqueio_dados: 'Verificação',
     taxa_servico: 'Taxa de Serviço',
     taxa_plataforma: 'Taxa da Plataforma',
     taxa_match: 'Taxa de Match',
-    pagamento_parcela: 'Pagamento de Parcela',
-    taxa_postagem: 'Taxa de Postagem',
-    comissao_parceiro: 'Comissão Recebida',
+    taxa_solicitacao: 'Taxa de Publicação',
+    confirmacao_pagamento: 'Pagamento Pendente',
+    confirmacao_recebimento: 'Recebimento Confirmado',
+    pagamento_parcela: 'Pagamento',
+    comissao_parceiro: 'Comissão',
     assinatura: 'Assinatura Premium',
-    doacao: 'Doação',
     bonus: 'Bônus',
-    ajuste: 'Ajuste',
 };
 
 const NOMES_SECOES = {
     home: 'Início',
-    grupo: 'Grupo de Apoio',
+    oportunidades: 'Ver Pedidos',
     solicitar: 'Pedir Apoio',
-    depositar: 'Adicionar Saldo',
-    saque: 'Realizar Saque',
     historico: 'Minhas Atividades',
     contratos: 'Meus Termos',
     score: 'Perfil',
     marketplace: 'Marketplace',
-    caixa_parceiro: 'Painel do Lojista',
-    notificacoes: 'Notificações',
 };
 
-const TIPOS_SAIDA = new Set(['compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'saque', 'pagamento_parcela', 'taxa_postagem', 'assinatura']);
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'doacao', 'bonus']);
-const TIPOS_NEGATIVO = new Set(['saque', 'compra_score', 'desbloqueio_dados', 'taxa_saque', 'taxa_intermediacao', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'pagamento_parcela', 'taxa_postagem', 'assinatura']);
+const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
+const TIPOS_NEGATIVO = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura']);
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
@@ -186,7 +177,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [showTermos, setShowTermos] = useState(false);
     const [copiadoPix, setCopiadoPix] = useState(false);
     const [copiadoId, setCopiadoId] = useState(false);
-    const [valorPool, setValorPool] = useState('');
 
     // Modal Premium State
     const [modalPremium, setModalPremium] = useState({
@@ -913,23 +903,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const handleAportePool = async () => {
-        const v = parseFloat(valorPool);
-        if (!v || v <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
-        setLoadingAction(true);
-        try {
-            await api.post('/financeiro/investir-pool', { valor: v });
-            showModal({ title: 'Sucesso!', message: 'Aporte realizado no Fundo Coletivo!', type: 'success' });
-            setValorPool('');
-            setActiveView('home');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
-        } finally {
-            setLoadingAction(false);
-        }
-    };
-
     const verificarStatusMP = async () => {
         try {
             const res = await api.get('/marketplace/status');
@@ -962,23 +935,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             showModal({ title: 'Erro', message: 'Erro ao desconectar conta.', type: 'danger' });
         } finally {
             setLoadingMP(false);
-        }
-    };
-
-    const handleResgatePool = async () => {
-        const v = parseFloat(valorPool);
-        if (!v || v <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
-        setLoadingAction(true);
-        try {
-            await api.post('/financeiro/resgatar-pool', { valor: v });
-            showModal({ title: 'Sucesso!', message: 'Resgate realizado com sucesso!', type: 'success' });
-            setValorPool('');
-            setActiveView('home');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
-        } finally {
-            setLoadingAction(false);
         }
     };
 
@@ -1173,10 +1129,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
                             <div className="balance-footer mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
                                 <div className="flex-between">
-                                    <div className="flex-center" style={{ gap: '5px', fontSize: '0.8rem', color: 'var(--success)', fontWeight: 600 }}>
-                                        <TrendingUp size={14} /> 
-                                        <span>+{(usuario.rendimento_pool_pct || 0).toFixed(2)}% do Pool</span>
-                                    </div>
                                     <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>
                                         PSY SCORE: <span className="text-primary">{(usuario.score || 0).toFixed(1)}</span>
                                     </div>
@@ -1257,13 +1209,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <PlusCircle size={28} color="var(--primary)" />
                             <span>Solicitar</span>
                         </div>
-                        <div className="action-btn" onClick={() => setActiveView('depositar')}>
-                            <ArrowUpCircle size={28} />
-                            <span>Depositar</span>
-                        </div>
-                        <div className="action-btn" onClick={() => setActiveView('saque')}>
-                            <ArrowDownCircle size={28} />
-                            <span>Sacar</span>
+                        <div className="action-btn" onClick={() => setActiveView('oportunidades')}>
+                            <HandCoins size={28} color="var(--success)" />
+                            <span>Ver Pedidos</span>
                         </div>
                         <div className="action-btn" onClick={() => setActiveView('historico')}>
                             <History size={28} />
@@ -1334,16 +1282,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setTaxaCompensacao={setTaxaCompensacao}
                     loadingAction={loadingAction}
                     handleSolicitar={handleSolicitar}
-                />
-            )}
-            {activeView === 'pool' && (
-                <GerenciarPool
-                    usuario={usuario}
-                    valorPool={valorPool}
-                    setValorPool={setValorPool}
-                    handleAportePool={handleAportePool}
-                    handleResgatePool={handleResgatePool}
-                    isFirstLoad={isFirstLoad}
                 />
             )}
             {activeView === 'loja' && (

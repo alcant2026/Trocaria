@@ -10,27 +10,27 @@ def calcular_limite_credito(usuario: Usuario, db: Session) -> Decimal:
         return usuario.limite_credito_personalizado
 
     if not usuario.is_verified:
-        return Decimal("0.00")
+        return Decimal("10.00")
 
     score = usuario.score or Decimal("0.00")
+    limite = Decimal("20.00")
 
     if score >= Decimal("900.00"):
-        return Decimal("500.00")
+        limite = Decimal("500.00")
     elif score >= Decimal("800.00"):
-        return Decimal("200.00")
+        limite = Decimal("200.00")
     elif score >= Decimal("700.00"):
         bonus = ((score - Decimal("700.00")) / Decimal("100.00")) * Decimal("50.00")
-        return min(Decimal("200.00"), Decimal("50.00") + bonus)
+        limite = min(Decimal("200.00"), Decimal("50.00") + bonus)
     elif score >= Decimal("500.00"):
         bonus = ((score - Decimal("500.00")) / Decimal("100.00")) * Decimal("10.00")
-        return Decimal("20.00") + bonus
+        limite = Decimal("20.00") + bonus
 
-    return Decimal("0.00")
+    return limite
 
 
 def verificar_isencao_taxa(usuario: Usuario) -> bool:
-    score = usuario.score or Decimal("0.00")
-    return score >= Decimal("500.0")
+    return True
 
 
 def saldo_disponivel_pool(db: Session) -> Decimal:

@@ -83,6 +83,10 @@ const SolicitarEmprestimo = ({
                                 R$ {(((parseFloat(valor) * (1 + (0.05 * parcelas)))) / parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                             <small className="text-muted">Total a retribuir: R$ {((parseFloat(valor) * (1 + (0.05 * parcelas)))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>
+                            <div className="flex-between mt-0-5">
+                                <span className="text-muted" style={{ fontSize: '0.7rem' }}>Taxa de serviço:</span>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>R$ 2,00</span>
+                            </div>
                         </div>
                     )}
 
@@ -111,6 +115,10 @@ const SolicitarEmprestimo = ({
                         <div className="flex-between mb-1">
                             <span className="text-muted">Retribuição Combinada:</span>
                             <span style={{ fontWeight: 700, color: 'var(--success)' }}>R$ {(parseFloat(valor) * 0.05 * parcelas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex-between mb-1">
+                            <span className="text-muted">Taxa de Serviço:</span>
+                            <span style={{ fontWeight: 700 }}>R$ 2,00</span>
                         </div>
                         <div className="flex-between" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', marginTop: '5px' }}>
                             <span style={{ fontWeight: 600 }}>Retribuição Mensal:</span>

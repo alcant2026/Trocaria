@@ -96,13 +96,12 @@ async def solicitar_emprestimo(
     
     if not usuario.is_verified:
         raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA.")
-    
-    limite = calcular_limite_credito(usuario, db)
-    if dados.valor > limite:
-        raise HTTPException(status_code=400, detail=f"Valor excede seu limite disponível (R$ {limite}).")
 
     if not dados.aceite_termos:
         raise HTTPException(status_code=400, detail="Aceite os termos.")
+
+    if dados.valor > Decimal("10000"):
+        raise HTTPException(status_code=400, detail="Valor máximo: R$ 10.000")
 
     taxa_juros_padrao = Decimal("5.0")
     
@@ -251,9 +250,7 @@ async def gerar_taxa_origem(id: int, db: Session = Depends(get_db), usuario_loga
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")
 async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    valor_taxa = dados.valor * Decimal("0.03")
-    if valor_taxa < Decimal("1.00"):
-        valor_taxa = Decimal("1.00")
+    valor_taxa = Decimal("2.00")
 
     from rotas.rotas_financeiro import sdk
     if not sdk:

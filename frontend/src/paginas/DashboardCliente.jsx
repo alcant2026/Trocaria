@@ -921,8 +921,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
+    const handleSolicitarResgate = async () => {
+        try {
+            const res = await api.post('/marketplace/solicitar-resgate');
+            showModal({ title: 'Resgate Solicitado', message: res.message, type: 'success' });
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
     const handleDesconectarMP = async () => {
-        if (!confirm('Deseja realmente desconectar sua conta do Mercado Pago? Você não poderá receber pagamentos split até conectar novamente.')) return;
+        if (!confirm('Deseja realmente desconectar sua conta do Mercado Pago?')) return;
         setLoadingMP(true);
         try {
             await api.post('/marketplace/desconectar');
@@ -2350,7 +2360,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Seus Pontos</div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)' }}>{usuario.pontos_marketplace || 0} <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>pts</span></div>
+                                 <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)' }}>{usuario.pontos_marketplace || 0} <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>pts</span></div>
+                                {(usuario.pontos_marketplace || 0) >= 1000 && (
+                                    <button className="btn btn-sm btn-primary mt-0-5" style={{ fontSize: '0.65rem', padding: '4px 8px' }} onClick={handleSolicitarResgate}>
+                                        Solicitar Resgate
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ) : (

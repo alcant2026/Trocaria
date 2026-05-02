@@ -149,6 +149,43 @@ const AdminDashboard = () => {
         }
     };
 
+    // Resgates de Pontos
+    const [resgates, setResgates] = useState([]);
+    const [loadingResgates, setLoadingResgates] = useState(false);
+
+    const carregarResgates = async () => {
+        setLoadingResgates(true);
+        try {
+            const data = await api.get('/marketplace/admin/resgates-pendentes');
+            setResgates(data || []);
+        } catch (e) {
+            console.error('Erro ao carregar resgates:', e);
+        }
+        setLoadingResgates(false);
+    };
+
+    const handleAprovarResgate = async (id) => {
+        if (!confirm('Confirmar resgate? O admin deve enviar o PIX para o usuario.')) return;
+        try {
+            const res = await api.post('/marketplace/admin/aprovar-resgate/' + id);
+            setMensagem(res.message);
+            carregarResgates();
+        } catch (e) {
+            setMensagem('Erro: ' + (e.message || e));
+        }
+    };
+
+    const handleRejeitarResgate = async (id) => {
+        if (!confirm('Rejeitar resgate? Os pontos serao devolvidos.')) return;
+        try {
+            const res = await api.post('/marketplace/admin/rejeitar-resgate/' + id);
+            setMensagem(res.message);
+            carregarResgates();
+        } catch (e) {
+            setMensagem('Erro: ' + (e.message || e));
+        }
+    };
+
     // Ações de Caixa
     const [showAcaoModal, setShowAcaoModal] = useState(false); 
     const [acaoTipo, setAcaoTipo] = useState(''); // 'saque' ou 'aporte'
@@ -510,6 +547,9 @@ const AdminDashboard = () => {
                     <div className={`nav-item ${activeTab === 'parceiros' ? 'active' : ''}`} onClick={() => setActiveTab('parceiros')}>
                         <Store size={20} /> <span>Lojistas</span>
                     </div>
+                    <div className={`nav-item ${activeTab === 'resgates' ? 'active' : ''}`} onClick={() => { setActiveTab('resgates'); carregarResgates(); }}>
+                        <Sparkles size={20} /> <span>Resgates</span>
+                    </div>
                 </nav>
 
                 <div className="sidebar-footer">
@@ -859,6 +899,57 @@ const AdminDashboard = () => {
                         )}
                     </div>
                 )}
+
+                {activeTab === 'resgates' && (
+                    <div className="glass-panel animate-fade-in">
+                        <div className="section-header">
+                            <h3>Resgates de Pontos</h3>
+                            <button className="btn btn-sm btn-outline" onClick={carregarResgates}><RefreshCw size={14} /> Atualizar</button>
+                        </div>
+
+                        {loadingResgates ? (
+                            <p className="text-muted">Carregando...</p>
+                        ) : resgates.length === 0 ? (
+                            <div className="empty-state">
+                                <Sparkles size={48} className="mb-1 opacity-20" />
+                                <p>Nenhum resgate pendente.</p>
+                            </div>
+                        ) : (
+                            <div className="table-responsive">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>CPF</th>
+                                            <th>Chave PIX</th>
+                                            <th>Valor</th>
+                                            <th>Data</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {resgates.map(r => (
+                                            <tr key={r.id} className="row-hover">
+                                                <td className="font-bold">{r.usuario_nome}</td>
+                                                <td className="text-xs">{r.usuario_cpf}</td>
+                                                <td style={{ color: 'var(--success)', fontWeight: 700 }}>{r.chave_pix}</td>
+                                                <td>R$ {r.valor.toFixed(2)}</td>
+                                                <td className="text-xs text-muted">{r.data ? new Date(r.data).toLocaleString('pt-BR') : '—'}</td>
+                                                <td>
+                                                    <div className="flex-start gap-1">
+                                                        <button className="btn btn-sm btn-primary" style={{ padding: '4px 10px', fontSize: '0.7rem' }} onClick={() => handleAprovarResgate(r.id)}>Aprovar</button>
+                                                        <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.7rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => handleRejeitarResgate(r.id)}>Rejeitar</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {activeTab === 'usuarios' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">

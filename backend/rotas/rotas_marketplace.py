@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import os
 import httpx
 import datetime
+from decimal import Decimal
 from database import get_db
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao
-from rotas.rotas_auth import obter_usuario_logado
+from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 import mercadopago
 import logging
 
@@ -189,3 +191,88 @@ async def gerar_pagamento_split(
         "valor": valor,
         "taxa": taxa_plataforma
     }
+
+
+# --- RESGATE DE PONTOS ---
+PONTOS_POR_REAL = 1000  # 1000 pontos = R$ 1
+
+@router.post("/solicitar-resgate")
+async def solicitar_resgate(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    pontos = usuario.pontos_marketplace or 0
+    if pontos < PONTOS_POR_REAL:
+        raise HTTPException(status_code=400, detail=f"Minimo de {PONTOS_POR_REAL} pontos para resgate. Voce tem {pontos}.")
+
+    # Verificar se ja tem resgate pendente
+    pendente = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.RESGATE_PONTOS,
+        Transacao.status == "pendente"
+    ).first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Voce ja tem um resgate pendente.")
+
+    valor = Decimal(pontos / PONTOS_POR_REAL)
+    transacao = Transacao(
+        usuario_id=usuario.id, valor=valor, tipo=TipoTransacao.RESGATE_PONTOS,
+        status="pendente", metodo="pix",
+        detalhes=f"Resgate de {pontos} pontos — R$ {valor}"
+    )
+    db.add(transacao)
+    usuario.pontos_marketplace = 0
+    db.commit()
+    return {"message": f"Solicitacao de resgate de R$ {valor} criada!", "valor": float(valor)}
+
+
+@router.get("/admin/resgates-pendentes")
+async def listar_resgates_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    resgates = db.query(Transacao).filter(
+        Transacao.tipo == TipoTransacao.RESGATE_PONTOS,
+        Transacao.status == "pendente"
+    ).order_by(Transacao.data_criacao.desc()).all()
+    resultado = []
+    for r in resgates:
+        user = db.query(Usuario).filter(Usuario.id == r.usuario_id).first()
+        resultado.append({
+            "id": r.id,
+            "usuario_nome": user.nome if user else "—",
+            "usuario_cpf": user.cpf if user else "—",
+            "chave_pix": user.chave_pix_publica or user.chave_pix if user else "—",
+            "valor": float(r.valor),
+            "data": r.data_criacao.isoformat() if r.data_criacao else None
+        })
+    return resultado
+
+
+@router.post("/admin/aprovar-resgate/{transacao_id}")
+async def aprovar_resgate(transacao_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    transacao = db.query(Transacao).filter(
+        Transacao.id == transacao_id,
+        Transacao.tipo == TipoTransacao.RESGATE_PONTOS,
+        Transacao.status == "pendente"
+    ).first()
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Resgate nao encontrado.")
+    transacao.status = "concluido"
+    transacao.detalhes += f" | Aprovado por admin {admin.id}"
+    db.commit()
+    return {"message": "Resgate aprovado! Envie o PIX para o usuario.", "chave_pix": None}
+
+
+@router.post("/admin/rejeitar-resgate/{transacao_id}")
+async def rejeitar_resgate(transacao_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    transacao = db.query(Transacao).filter(
+        Transacao.id == transacao_id,
+        Transacao.tipo == TipoTransacao.RESGATE_PONTOS,
+        Transacao.status == "pendente"
+    ).first()
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Resgate nao encontrado.")
+    # Devolve os pontos
+    user = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).first()
+    if user:
+        pontos_perdidos = int(transacao.valor * PONTOS_POR_REAL)
+        user.pontos_marketplace = (user.pontos_marketplace or 0) + pontos_perdidos
+    transacao.status = "cancelado"
+    transacao.detalhes += f" | Rejeitado por admin {admin.id}"
+    db.commit()
+    return {"message": "Resgate rejeitado. Pontos devolvidos ao usuario."}

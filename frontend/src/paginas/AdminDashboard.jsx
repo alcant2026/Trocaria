@@ -524,10 +524,9 @@ const AdminDashboard = () => {
                 <header className="admin-header">
                     <div className="header-title">
                         <div className="flex-start gap-1">
-                            <h1>{activeTab === 'dashboard' ? 'Fiscal' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Hub</h1>
-                            <div className="live-indicator-dot" title="Monitoramento em Tempo Real Ativo"></div>
+                            <h1>Painel Administrativo</h1>
                         </div>
-                        <p className="text-muted">Visão geral da plataforma.</p>
+                        <p className="text-muted">Rede de Apoio entre Pares.</p>
                     </div>
                     
                     <div className="header-actions">
@@ -547,99 +546,18 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: DASHBOARD / OVERVIEW --- */}
+                {/* --- VIEW: DASHBOARD --- */}
                 {activeTab === 'dashboard' && (
                     <div className="animate-fade-in">
                         <div className="stats-grid">
-                            <StatCard 
-                                label="Custódia Descentralizada" 
-                                value={`R$ ${fiscal.saldo_usuarios_gerenciado?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={ShieldCheck}
-                                color="var(--primary)"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Taxas do Mês" 
-                                value={`R$ ${fiscal.lucro_plataforma_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={TrendingUp}
-                                color="var(--primary)"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Saldo Líquido" 
-                                value={`R$ ${fiscal.lucro_real_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={TrendingUp}
-                                color="var(--success)"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Taxas Operacionais" 
-                                value={`R$ ${fiscal.total_taxas_mp?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={CreditCard}
-                                color="#ff4d4d"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Custos Fixos" 
-                                value={`R$ ${fiscal.custos_infra_estimados?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={Zap}
-                                color="var(--warning)"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Saldo em Grupo" 
-                                value={`R$ ${fiscal.saldo_pool_caixa?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                icon={Banknote}
-                                color="var(--secondary)"
-                                trend={null}
-                            />
-                            <StatCard 
-                                label="Apoios Ativos" 
-                                value={`R$ ${fiscal.total_credito_ativo?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`}
-                                icon={ShieldCheck}
-                                color="#4da6ff"
-                                trend={null}
-                            />
+                            <StatCard label="Usuários" value={snapshot?.admin?.total_usuarios || 0} icon={Users} color="var(--primary)" trend={null} />
+                            <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_ativos?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
+                            <StatCard label="Pedidos Pendentes" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={Clock} color="var(--warning)" trend={null} />
+                            <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
+                            <StatCard label="Parceiros" value={snapshot?.admin?.gestao_parceiros?.length || 0} icon={Store} color="var(--secondary)" trend={null} />
                         </div>
-
-                        {/* --- NOVA SEÇÃO: GESTÃO FISCAL --- */}
-                        <div className="glass-panel mb-3 animate-fade-in" style={{ borderLeft: '4px solid var(--primary)', marginBottom: '20px' }}>
-                            <div className="section-header">
-                                <div className="flex-start gap-1">
-                                    <ShieldCheck size={20} color="var(--primary)" />
-                                    <div>
-                                        <h3 style={{ margin: 0 }}>Gestão Fiscal e Auditoria (CPF)</h3>
-                                        <p className="text-xs text-muted">Gere documentos para comprovação de custódia e preenchimento de Carnê-Leão.</p>
-                                    </div>
-                                </div>
-                                <div className="flex-start gap-1">
-                                    <div className="flex-start gap-1" style={{ background: 'var(--bg-accent)', padding: '5px 10px', borderRadius: '8px' }}>
-                                        <div className="text-xs font-bold text-muted">DE:</div>
-                                        <input 
-                                            type="date" 
-                                            value={dataInicio} 
-                                            onChange={(e) => setDataInicio(e.target.value)}
-                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '12px', outline: 'none' }}
-                                        />
-                                        <div className="text-xs font-bold text-muted">ATÉ:</div>
-                                        <input 
-                                            type="date" 
-                                            value={dataFim} 
-                                            onChange={(e) => setDataFim(e.target.value)}
-                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '12px', outline: 'none' }}
-                                        />
-                                    </div>
-                                    <button 
-                                        className="btn btn-primary" 
-                                        onClick={handleDownloadFiscalPDF}
-                                        disabled={loadingFiscalPDF}
-                                        style={{ height: '36px', padding: '0 15px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                        {loadingFiscalPDF ? (
-                                            <><RefreshCw size={14} className="spin" /> GERANDO...</>
-                                        ) : (
-                                            <><BarChart3 size={14} /> GERAR PDF FISCAL</>
-                                        )}
+                    </div>
+                )}
                                     </button>
 
                                     <button 
@@ -732,43 +650,63 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: PENDENTES (REFORMULADO) --- */}
+                {/* --- VIEW: PENDENTES (KYC) --- */}
                 {activeTab === 'pendentes' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Fila de Auditoria Financeira</h3>
-                            <div className="flex-start gap-1">
-                                <Filter size={16} /> <span className="text-xs">FILTRAR (PENDENTES)</span>
-                            </div>
+                            <h3>Verificações KYC Pendentes</h3>
                         </div>
 
-                        <div className="table-responsive">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Usuário</th>
-                                        <th>Tipo</th>
-                                        <th>Valor</th>
-                                        <th>Data/Hora</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {pendentes.map(p => (
-                                        <tr key={p.transacao_id} className="row-hover">
-                                            <td>
-                                                <div className="flex-start gap-1">
-                                                    <div className="user-avatar">{p.usuario_nome.charAt(0)}</div>
-                                                    <div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {kycPendentes.length === 0 ? (
+                            <div className="empty-state">
+                                <ShieldCheck size={48} className="mb-1 opacity-20" />
+                                <p>Nenhuma verificação pendente.</p>
+                            </div>
+                        ) : (
+                            <div className="table-responsive">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>CPF</th>
+                                            <th>Documentos</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {kycPendentes.map(p => (
+                                            <tr key={p.transacao_id || p.id} className="row-hover">
+                                                <td>
+                                                    <div className="flex-start gap-1">
+                                                        <div className="user-avatar">{p.usuario_nome?.charAt(0)}</div>
+                                                        <div>
                                                             <p className="font-bold">{p.usuario_nome}</p>
-                                                            {p.tipo === 'desbloqueio_dados' && (
-                                                                <div style={{ display: 'flex', gap: '4px' }}>
-                                                                    {p.url_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_rg)}><Eye size={12} /> RG</button>}
-                                                                    {p.url_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_renda)}><Eye size={12} /> Renda</button>}
-                                                                    {p.url_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_residencia)}><Eye size={12} /> Res.</button>}
-                                                                </div>
-                                                            )}
+                                                            {p.detalhes && <p className="text-xs text-primary">{p.detalhes}</p>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="text-xs">{p.usuario_cpf}</td>
+                                                <td>
+                                                    <div className="flex-start gap-0-5">
+                                                        {p.url_rg && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_rg)}><Eye size={12} /> RG</button>}
+                                                        {p.url_renda && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_renda)}><Eye size={12} /> Renda</button>}
+                                                        {p.url_residencia && <button className="btn-doc-mini" onClick={() => handleAbrirDocumento(p.url_residencia)}><Eye size={12} /> Res.</button>}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="flex-start gap-1">
+                                                        <button className="btn btn-icon-small text-success" onClick={() => handleConfirmarVerificacao(p)}><CheckCircle size={18} /></button>
+                                                        <button className="btn btn-icon-small text-danger" onClick={() => handleRejeitar(p.transacao_id || p.id)}><XCircle size={18} /></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
                                                         </div>
                                                         <p className="text-xs text-muted">CPF: {p.usuario_cpf}</p>
                                                         {p.detalhes && (
@@ -920,40 +858,38 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: EMPRÉSTIMOS ATIVOS --- */}
+                {/* --- VIEW: PEDIDOS DE APOIO --- */}
                 {activeTab === 'emprestimos' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Gestão de Crédito Ativo</h3>
-                            <div className="flex-start gap-1">
-                                <Zap size={16} color="var(--primary)" /> <span>Monitoramento P2P</span>
-                            </div>
+                            <h3>Pedidos de Apoio</h3>
                         </div>
 
-                        <div className="grid-2">
-                            {solicitacoesAtivas.length === 0 ? (
-                                <div className="empty-state">Nenhuma solicitação aguardando aporte institucional no momento.</div>
-                            ) : (
-                                solicitacoesAtivas.map(sa => (
-                                    <div key={sa.id} className="revenue-item" style={{ flexDirection: 'column', gap: '8px' }}>
-                                        <div className="flex-between">
-                                            <p className="font-bold">{sa.tomador}</p>
-                                            <span className="text-xs text-primary">Score {sa.score}</span>
-                                        </div>
-                                        <div className="progress-bar-bg">
-                                            <div 
-                                                className="progress-bar-fill" 
-                                                style={{ width: `${(sa.valor_arrecadado / sa.valor) * 100}%`, background: 'var(--primary)' }}
-                                            ></div>
-                                        </div>
-                                        <div className="flex-between text-xs text-muted">
-                                            <span>R$ {sa.valor_arrecadado.toLocaleString('pt-BR')} / R$ {sa.valor.toLocaleString('pt-BR')}</span>
-                                            <span>Juros {sa.taxa}% a.m</span>
-                                        </div>
-                                        <button className="btn btn-primary text-xs py-1 mt-1">Investimento Institucional</button>
-                                    </div>
-                                ))
-                            )}
+                        <div className="table-responsive">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tomador</th>
+                                        <th>Valor</th>
+                                        <th>Taxa</th>
+                                        <th>Parcelas</th>
+                                        <th>Score</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(snapshot?.cliente_emprestimos || []).filter(e => e.status === 'pendente').map(s => (
+                                        <tr key={s.id} className="row-hover">
+                                            <td className="font-bold">{s.contraparte_nome || s.tomador_nome || '—'}</td>
+                                            <td>R$ {s.valor?.toFixed(2)}</td>
+                                            <td>{s.taxa}%</td>
+                                            <td>{s.parcelas}x</td>
+                                            <td>{s.score_tomador || '—'}</td>
+                                            <td><span className="badge badge-warning">Pendente</span></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
@@ -1096,15 +1032,11 @@ const AdminDashboard = () => {
                 {activeTab === 'usuarios' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Gestão de Membros</h3>
+                            <h3>Usuários</h3>
                             <div className="search-bar">
                                 <Search size={16} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Buscar por nome ou CPF..." 
-                                    value={filtroUsuarios}
-                                    onChange={(e) => setFiltroUsuarios(e.target.value)}
-                                />
+                                <input type="text" placeholder="Buscar por nome ou CPF..." value={filtroUsuarios}
+                                    onChange={(e) => setFiltroUsuarios(e.target.value)} />
                             </div>
                         </div>
 
@@ -1114,9 +1046,8 @@ const AdminDashboard = () => {
                                     <tr>
                                         <th>Membro</th>
                                         <th>Score</th>
-                                        <th>Saldo Conta</th>
-                                        <th>Saldo Pool</th>
-                                        <th>Status</th>
+                                        <th>Verificado</th>
+                                        <th>Admin</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1127,33 +1058,19 @@ const AdminDashboard = () => {
                                                     <div className="user-avatar">{u.nome.charAt(0)}</div>
                                                     <div>
                                                         <p className="font-bold">{u.nome}</p>
-                                                        <p className="text-xs text-muted">{u.cpf}</p>
+                                                        <p className="text-xs text-muted">{u.cpf} (ID: {u.id})</p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td>
-                                                <span className="text-primary font-bold">{u.score}</span>
-                                            </td>
-                                            <td>R$ {u.saldo.toLocaleString('pt-BR')}</td>
-                                            <td>
-                                                <div className="flex-start gap-1">
-                                                    R$ {u.saldo_caixa.toLocaleString('pt-BR')}
-                                                    {u.is_good_payer && (
-                                                        <span className="loyalty-badge" title="Bônus Fidelidade 1.5x Ativo" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <Star size={12} color="var(--warning)" fill="var(--warning)" /> 1.5x
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    <span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>
-                                                        {u.is_verified ? 'Verificado' : 'Pendente'}
-                                                    </span>
-                                                    <button className="btn btn-outline text-xs" onClick={() => { setLimiteData({ id: u.id, valor: '' }); setShowLimiteModal(true); }}>
-                                                        Ajustar Limite
-                                                    </button>
-                                                </div>
+                                            <td><span className="text-primary font-bold">{u.score}</span></td>
+                                            <td><span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>{u.is_verified ? 'Sim' : 'Não'}</span></td>
+                                            <td>{u.is_admin ? 'Sim' : '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                                             </td>
                                         </tr>
                                     ))}

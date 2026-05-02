@@ -2649,6 +2649,24 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <input className="input-field" placeholder="https://seu-link.com ou 5511999999999"
                             value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            <Info size={14} /> Se inserir so o numero do WhatsApp, criamos o link automaticamente.
+                        </p>
+                    </div>
+
+                    <div className="input-group mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.15)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: 700 }}>
+                            <Lock size={14} /> Codigo 2FA (anti-spam)
+                        </label>
+                        <input className="input-field" type="text" inputMode="numeric" maxLength={6}
+                            placeholder="000000"
+                            style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '8px', fontWeight: 800 }}
+                            value={dadosNovoLink.codigo_2fa || ''}
+                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, codigo_2fa: e.target.value.replace(/\D/g, '')})} />
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>Para evitar spam, ative o 2FA no menu Seguranca e informe o codigo do Google Authenticator.</p>
+                    </div>
+                        <input className="input-field" placeholder="https://seu-link.com ou 5511999999999"
+                            value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                             <Info size={14} className="text-warning inline-block mr-1" /> Se inserir so o numero do WhatsApp, criamos o link automaticamente.
                         </p>
                     </div>

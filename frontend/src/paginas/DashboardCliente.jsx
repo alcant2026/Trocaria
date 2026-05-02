@@ -2384,7 +2384,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                             <div style={{ flex: 1 }}>
                                 <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#FFD600' }}>Seja um Membro Premium Marketplace</h4>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe 1 ponto por link aberto e converta em saldo real automaticamente!</p>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0' }}>Ganhe de 1 a 5 pontos por clique (aleatório) e converta em dinheiro real! Grátis: 1 ponto fixo.</p>
                             </div>
                             <button 
                                 className="btn btn-primary btn-sm" 
@@ -2883,10 +2883,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <div style={{ textAlign: 'left', marginBottom: '20px', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>O que você ganha:</p>
                         <ul style={{ margin: 0, paddingLeft: '0', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '2', listStyle: 'none' }}>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Coins size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Cashback em Pontos</strong> — 1 ponto por link aberto, convertível em saldo real.</span></li>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><TrendingDown size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Taxa Zero em Vendas</strong> — Anuncie e venda sem pagar comissão à plataforma.</span></li>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Rocket size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Prioridade de Saque</strong> — Seus saques são processados antes dos demais.</span></li>
-                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Gem size={16} style={{ color: '#FFD600', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Selo VIP</strong> — Badge dourado exclusivo no seu perfil e anúncios em destaque.</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Coins size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Pontos Turbo</strong> — Ganhe de <strong>1 a 5 pontos aleatórios</strong> por clique (vs 1 fixo do plano grátis).</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><TrendingDown size={16} style={{ color: 'var(--success)', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Destaque nos Anúncios</strong> — Seus links aparecem primeiro no Marketplace.</span></li>
+                            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Gem size={16} style={{ color: '#FFD600', flexShrink: 0 }} /> <span><strong style={{ color: 'var(--text-main)' }}>Selo VIP</strong> — Badge dourado exclusivo no seu perfil.</span></li>
                         </ul>
                     </div>
 
@@ -2956,7 +2955,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
 
                     <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '14px', opacity: 0.7 }}>
-                        O valor é descontado do saldo da sua carteira Psy Pay. Certifique-se de ter saldo disponível antes de assinar.
+                        Pagamento via PIX (Mercado Pago). Após o pagamento, a assinatura é ativada automaticamente.
                     </p>
 
                     {loadingAssinatura && <div className="mt-1" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Processando assinatura...</div>}

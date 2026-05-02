@@ -697,6 +697,48 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
+    const handleQuitarTotalP2P = async (id, total, chavePix) => {
+        const msg = 'Envie R$ ' + total.toFixed(2) + ' via PIX para:\n\n' + (chavePix || '---') + '\n\nDepois de enviar, confirme aqui.';
+        showModal({
+            title: 'Quitar Total',
+            message: msg,
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: total });
+                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro: ' + err.message);
+                }
+            },
+            confirmText: 'Ja Enviei o PIX'
+        });
+    };
+
+    const handlePagarAvulsoP2P = async (id, chavePix) => {
+        const valor = prompt('Digite o valor que deseja pagar:');
+        if (!valor) return;
+        const v = parseFloat(valor);
+        if (!v || v <= 0) { setMensagem('Valor invalido.'); return; }
+        const msg = 'Envie R$ ' + v.toFixed(2) + ' via PIX para:\n\n' + (chavePix || '---') + '\n\nDepois de enviar, confirme aqui.';
+        showModal({
+            title: 'Pagar R$ ' + v.toFixed(2),
+            message: msg,
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: v });
+                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
+                    carregarSnapshot();
+                } catch (err) {
+                    setMensagem('Erro: ' + err.message);
+                }
+            },
+            confirmText: 'Ja Enviei o PIX'
+        });
+    };
+
     const handlePagamentoAvulso = async (id) => {
         const val = parseFloat(valorAvulsoPorId[id]);
         if (!val || val <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor válido para o pagamento mensal.', type: 'error' });
@@ -2463,9 +2505,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                 </div>
 
                                                                 {emp.status === 'aprovado' && emp.parcelas_pagas < emp.parcelas && (
-                                                                    <div style={{ marginTop: '12px' }}>
+                                                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                                         {emp.tipo === 'tomador' ? (
-                                                                            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem', width: '100%' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela, emp.chave_pix_pagamento)}>Pagar Parcela</button>
+                                                                            <>
+                                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                                                    <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handlePagarParcela(emp.id, emp.valor_parcela, emp.chave_pix_pagamento)}>Pagar Parcela</button>
+                                                                                    <button className="btn btn-outline" style={{ padding: '10px', fontSize: '0.8rem' }} onClick={() => handleQuitarTotalP2P(emp.id, emp.valor_total_restante, emp.chave_pix_pagamento)}>Quitar Tudo</button>
+                                                                                </div>
+                                                                                <button className="btn btn-sm" style={{ padding: '8px', fontSize: '0.75rem', color: '#FFD600', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,214,0,0.3)', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }} onClick={() => handlePagarAvulsoP2P(emp.id, emp.chave_pix_pagamento)}>Pagar outro valor</button>
+                                                                            </>
                                                                         ) : (
                                                                             <button className="btn btn-primary" style={{ padding: '10px', fontSize: '0.8rem', width: '100%' }} onClick={() => handleConfirmarPagtoRecebido(emp.id)}>Confirmar Recebimento</button>
                                                                         )}

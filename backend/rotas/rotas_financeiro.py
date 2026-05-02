@@ -748,51 +748,54 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                 if transacao and transacao.status == "pendente":
                     usuario = db.query(Usuario).filter(Usuario.id == transacao.usuario_id).with_for_update().first()
                     if usuario:
-                        # ABSORÇÃO DE TAXAS: O usuário recebe o valor bruto total (Realidade comercial)
-                        # A plataforma absorve o custo do Mercado Pago subtraindo do seu saldo de lucro.
                         fee_details = payment.get("fee_details", [])
                         total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
-                        
-                        usuario.saldo += valor_mp
-                        transacao.status = "concluido"
-                        if not transacao.payment_id:
-                            transacao.payment_id = str(payment_id)
-                        
-                        if f"ID: {payment_id}" not in (transacao.detalhes or ""):
-                            transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
-                        
-                        transacao.detalhes += f" | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
 
-                        # NOVO: Gamificação de Reputação (Se for venda do Marketplace)
-                        if transacao.tipo == TipoTransacao.RECEBIMENTO:
-                            usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
-                            usuario.score += Decimal("5.0")
-                            if usuario.score > Decimal("1000.0"):
-                                usuario.score = Decimal("1000.0")
-                            logger.info(f"🏆 REPUTAÇÃO: {usuario.nome} completou uma venda! +1 Venda, +5 Score.")
+                        if transacao.tipo == TipoTransacao.TAXA_DEPOSITO_VIRTUAL:
+                            usuario.credito_virtual = (usuario.credito_virtual or Decimal("0.00")) + transacao.valor
+                            transacao.status = "concluido"
+                            if not transacao.payment_id:
+                                transacao.payment_id = str(payment_id)
+                            transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id} | Credito virtual de R$ {transacao.valor} liberado!"
+                            db.commit()
+                            logger.info(f"✅ CREDITO VIRTUAL: R$ {transacao.valor} liberado para {usuario.nome}")
+                            cache_snapshot_data.pop(usuario.id, None)
+                        else:
+                            usuario.saldo += valor_mp
+                            transacao.status = "concluido"
+                            if not transacao.payment_id:
+                                transacao.payment_id = str(payment_id)
 
-                        # ATUALIZAÇÃO DESCENTRALIZADA: Crédito de Custódia para o Parceiro (Bruto)
-                        # O parceiro assume a custódia do valor total que o cliente vê no app.
-                        if transacao.parceiro_id:
-                            parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
-                            if parceiro:
-                                parceiro.saldo_caixa_atual += valor_mp
-                                logger.info(f"🏦 CUSTÓDIA: Parceiro {parceiro.nome} assumiu custódia de R$ {valor_mp} (Bruto).")
-                                transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
-                        
-                        # Deduz as taxas do Mercado Pago do lucro da plataforma (Absorção)
-                        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-                        if plataforma:
-                            plataforma.saldo -= total_fee_mp
-                            logger.info(f"💸 TAXA ABSORVIDA: R$ {total_fee_mp} descontados do lucro da plataforma.")
-                        
-                        if usuario.id != "000PL":
-                            atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
-                        
-                        db.commit()
-                        logger.info(f"✅ WEBHOOK MP: Saldo de R$ {transacao.valor} creditado para {usuario.nome}")
-                        cache_snapshot_data.pop(usuario.id, None)
-                        cache_snapshot_data.pop("000PL", None)
+                            if f"ID: {payment_id}" not in (transacao.detalhes or ""):
+                                transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
+
+                            transacao.detalhes += f" | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
+
+                            if transacao.tipo == TipoTransacao.RECEBIMENTO:
+                                usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
+                                usuario.score += Decimal("5.0")
+                                if usuario.score > Decimal("1000.0"):
+                                    usuario.score = Decimal("1000.0")
+                                logger.info(f"REPUTACAO: {usuario.nome} completou uma venda!")
+
+                            if transacao.parceiro_id:
+                                parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
+                                if parceiro:
+                                    parceiro.saldo_caixa_atual += valor_mp
+                                    transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
+
+                            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
+                            if plataforma:
+                                plataforma.saldo -= total_fee_mp
+                                logger.info(f"TAXA ABSORVIDA: R$ {total_fee_mp} descontados.")
+
+                            if usuario.id != "000PL":
+                                atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+
+                            db.commit()
+                            logger.info(f"WEBHOOK MP: Saldo de R$ {transacao.valor} creditado para {usuario.nome}")
+                            cache_snapshot_data.pop(usuario.id, None)
+                            cache_snapshot_data.pop("000PL", None)
                     else:
                         logger.error(f"❌ WEBHOOK MP: Usuário {transacao.usuario_id} não encontrado no DB.")
                 elif transacao and transacao.status == "concluido":

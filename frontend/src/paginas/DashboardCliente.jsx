@@ -833,11 +833,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setLoadingAction(true);
         try {
             const res = await api.post('/emprestimos/depositar-virtual', { valor_pagamento: v });
-            if (res.qr_code_taxa) {
-                setQrCodeData({ qr_code: res.qr_code_taxa, qr_code_base64: res.qr_code_base64, payment_id: res.payment_id || 'virtual' });
+            if (res.qr_code) {
+                setQrCodeData({ qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, payment_id: res.payment_id || 'virtual' });
                 setPassoDeposito(2);
             } else {
-                showModal({ title: 'Pronto!', message: `R$ ${v.toFixed(2)} adicionado! Taxa de R$ ${res.taxa_paga.toFixed(2)}.`, type: 'success' });
+                showModal({ title: 'Pronto!', message: `Crédito de R$ ${v.toFixed(2)} liberado!`, type: 'success' });
                 carregarSnapshot();
                 setActiveView('home');
             }

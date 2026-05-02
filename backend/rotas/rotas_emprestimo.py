@@ -308,13 +308,24 @@ async def depositar_virtual(dados: PagamentoRequest, request: Request, db: Sessi
     else:
         payment = {"id": "simulado"}
 
-    result = adicionar_credito_virtual(usuario_logado.id, dados.valor_pagamento, db)
+    # Cria transação pendente - o crédito só é liberado quando o webhook confirmar o pagamento
+    transacao = Transacao(
+        usuario_id=usuario_logado.id,
+        valor=dados.valor_pagamento,
+        tipo=TipoTransacao.TAXA_DEPOSITO_VIRTUAL,
+        status="pendente",
+        payment_id=str(payment.get("id")),
+        metodo="pix",
+        detalhes=f"Depósito virtual de R$ {dados.valor_pagamento} (taxa de R$ {taxa}) - aguardando pagamento"
+    )
+    db.add(transacao)
+    db.commit()
 
     return {
-        "message": f"Depósito virtual de R$ {dados.valor_pagamento} realizado! Taxa de R$ {taxa}.",
-        "credito_virtual": result["credito_virtual"],
-        "taxa_paga": result["taxa_paga"],
-        "qr_code_taxa": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
+        "message": "Pague a taxa via PIX para liberar o crédito virtual.",
+        "valor_credito": float(dados.valor_pagamento),
+        "taxa": float(taxa),
+        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
         "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
         "payment_id": payment.get("id")
     }

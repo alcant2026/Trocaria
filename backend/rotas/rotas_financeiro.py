@@ -1677,6 +1677,15 @@ async def rejeitar_transacao(transacao_id: int, request: Request, motivo: str = 
 class AssinarPlanoRequest(BaseModel):
     plano: str # 'mensal' ou 'anual'
 
+@router.post("/admin/adicionar-saldo")
+async def admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Form(gt=0), db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    from utils_fintech import adicionar_credito_virtual
+    try:
+        result = adicionar_credito_virtual(usuario_id, valor, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": result["credito_virtual"]}
+
 @router.post("/assinar-plano")
 async def assinar_plano_premium(dados: AssinarPlanoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """Ativa o plano de assinatura Mensal ou Anual."""

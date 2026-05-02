@@ -107,6 +107,31 @@ const AdminDashboard = () => {
     const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
 
+    // Add Saldo Manual
+    const [showAddSaldo, setShowAddSaldo] = useState(false);
+    const [addSaldoUserId, setAddSaldoUserId] = useState('');
+    const [addSaldoValor, setAddSaldoValor] = useState('');
+    const [loadingAddSaldo, setLoadingAddSaldo] = useState(false);
+
+    const handleAddSaldo = async () => {
+        if (!addSaldoUserId || !addSaldoValor) return;
+        setLoadingAddSaldo(true);
+        try {
+            const formData = new FormData();
+            formData.append('usuario_id', addSaldoUserId);
+            formData.append('valor', addSaldoValor);
+            await api.post('/financeiro/admin/adicionar-saldo', formData, { isMultipart: true });
+            setMensagem(`R$ ${addSaldoValor} adicionado a ${addSaldoUserId}!`);
+            setAddSaldoUserId('');
+            setAddSaldoValor('');
+            setShowAddSaldo(false);
+            carregarSnapshot();
+        } catch (e) {
+            setMensagem('Erro: ' + (e.message || e));
+        }
+        setLoadingAddSaldo(false);
+    };
+
     // Ações de Caixa
     const [showAcaoModal, setShowAcaoModal] = useState(false); 
     const [acaoTipo, setAcaoTipo] = useState(''); // 'saque' ou 'aporte'
@@ -852,15 +877,27 @@ const AdminDashboard = () => {
                             </section>
 
                             <section className="glass-panel">
-                                <h3>Ações Administrativas</h3>
-                                <div className="flex-column gap-1 mt-1">
-                                    <button className="btn btn-primary w-full gap-1" onClick={() => handleOpenAcao('saque')}>
-                                        <ArrowUpRight size={18} /> Retirar Saldo Disponível
-                                    </button>
-                                    <button className="btn btn-outline w-full gap-1" onClick={() => handleOpenAcao('aporte')}>
-                                        <PlusCircle size={18} /> Injetar Capital (Aporte)
-                                    </button>
-                                </div>
+                                 <h3>Ações Administrativas</h3>
+                                 <div className="flex-column gap-1 mt-1">
+                                     <button className="btn btn-primary w-full gap-1" onClick={() => handleOpenAcao('saque')}>
+                                         <ArrowUpRight size={18} /> Retirar Saldo Disponível
+                                     </button>
+                                     <button className="btn btn-outline w-full gap-1" onClick={() => handleOpenAcao('aporte')}>
+                                         <PlusCircle size={18} /> Injetar Capital (Aporte)
+                                     </button>
+                                     <button className="btn btn-secondary w-full gap-1" onClick={() => setShowAddSaldo(!showAddSaldo)}>
+                                         <PlusCircle size={18} /> Adicionar Saldo a Usuário
+                                     </button>
+                                 </div>
+                                 {showAddSaldo && (
+                                     <div className="mt-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px' }}>
+                                         <input className="input-field mb-0-5" placeholder="ID do usuário" value={addSaldoUserId} onChange={e => setAddSaldoUserId(e.target.value)} />
+                                         <input className="input-field mb-0-5" type="number" placeholder="Valor R$" value={addSaldoValor} onChange={e => setAddSaldoValor(e.target.value)} />
+                                         <button className="btn btn-primary btn-sm w-full" disabled={!addSaldoUserId || !addSaldoValor || loadingAddSaldo} onClick={handleAddSaldo}>
+                                             {loadingAddSaldo ? '...' : 'Confirmar'}
+                                         </button>
+                                     </div>
+                                 )}
                             </section>
                         </div>
                     </div>

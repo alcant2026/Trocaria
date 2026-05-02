@@ -558,97 +558,6 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                 )}
-                                    </button>
-
-                                    <button 
-                                        className="btn" 
-                                        onClick={handleExecutarCobranca}
-                                        disabled={loadingCobranca}
-                                        style={{ 
-                                            height: '36px', 
-                                            padding: '0 15px', 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: '8px', 
-                                            background: '#ff4d4d', 
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontSize: '11px',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {loadingCobranca ? (
-                                            <><RefreshCw size={14} className="spin" /> PROCESSANDO...</>
-                                        ) : (
-                                            <><ShieldAlert size={14} /> EXECUTAR CLÁUSULA 3.3</>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="fiscal-grid">
-                            <section className="glass-panel">
-                                <div className="section-header">
-                                    <h3>Aprovações Pendentes</h3>
-                                    <span className="text-primary text-xs font-bold pointer" onClick={() => setActiveTab('pendentes')}>VER TODAS</span>
-                                </div>
-                                {pendentes.length === 0 ? (
-                                    <div className="empty-state">Tudo em dia por aqui! <Sparkles size={14} style={{ display: 'inline', verticalAlign: 'middle', opacity: 0.6 }} /></div>
-                                ) : (
-                                    pendentes.slice(0, 3).map(p => (
-                                        <div key={p.transacao_id} className="revenue-item row-hover">
-                                            <div className="flex-start gap-1">
-                                                <div className="user-avatar">{p.usuario_nome.charAt(0)}</div>
-                                                <div>
-                                                    <p className="font-bold">{p.usuario_nome}</p>
-                                                    <p className="text-xs text-muted">{TIPOS_LABEL[p.tipo]}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-bold">R$ {p.valor.toLocaleString('pt-BR')}</p>
-                                                <p className="text-xs text-muted">{formatarDataBR(p.data)}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </section>
-
-                            <section className="glass-panel">
-                                <h3>Saúde do Sistema</h3>
-                                <div className="mt-1">
-                                    <div className="flex-between">
-                                        <div className="stat-label">Processamento (CPU) - {fiscal.cpu_threads || 0} Threads</div>
-                                        <span className="text-xs font-bold" style={{ color: (fiscal.cpu_uso > 80) ? 'var(--danger)' : 'var(--primary)' }}>{fiscal.cpu_uso?.toFixed(1) || '0.0'}%</span>
-                                    </div>
-                                    <div className="progress-bar-bg mb-1">
-                                        <div 
-                                            className="progress-bar-fill" 
-                                            style={{ 
-                                                width: `${fiscal.cpu_uso || 0}%`, 
-                                                background: (fiscal.cpu_uso > 80) ? 'var(--danger)' : 'var(--primary)' 
-                                            }}
-                                        ></div>
-                                    </div>
-                                    <div className="flex-between" style={{ marginTop: '0.5rem' }}>
-                                        <div className="stat-label">Memória RAM - {fiscal.ram_total || 0} GB</div>
-                                        <span className="text-xs font-bold" style={{ color: (fiscal.ram_uso > 90) ? 'var(--danger)' : 'var(--success)' }}>{fiscal.ram_uso?.toFixed(1) || '0.0'}%</span>
-                                    </div>
-                                    <div className="progress-bar-bg">
-                                        <div 
-                                            className="progress-bar-fill" 
-                                            style={{ 
-                                                width: `${fiscal.ram_uso || 0}%`, 
-                                                background: (fiscal.ram_uso > 90) ? 'var(--danger)' : 'var(--success)' 
-                                            }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            </section>
-                        </div>
-                    </div>
-                )}
 
                 {/* --- VIEW: PENDENTES (KYC) --- */}
                 {activeTab === 'pendentes' && (
@@ -705,85 +614,6 @@ const AdminDashboard = () => {
                                 </table>
                             </div>
                         )}
-                    </div>
-                )}
-                                                        </div>
-                                                        <p className="text-xs text-muted">CPF: {p.usuario_cpf}</p>
-                                                        {p.detalhes && (
-                                                            <p className="text-xs text-primary" style={{ marginTop: '4px', maxWidth: '300px', wordBreak: 'break-all' }}>
-                                                                <strong>Nota:</strong> {p.detalhes}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span className={`status-pill ${p.tipo === 'deposito' ? 'status-success' : 'status-danger'}`} style={p.tipo === 'desbloqueio_dados' ? {background: 'var(--primary)', color: 'white'} : {}}>
-                                                    {TIPOS_LABEL[p.tipo]}
-                                                </span>
-                                            </td>
-                                            <td className="font-bold">{p.tipo === 'desbloqueio_dados' ? 'GRÁTIS' : `R$ ${p.valor.toLocaleString('pt-BR')}`}</td>
-                                            <td className="text-muted text-xs">{formatarDataBR(p.data)}</td>
-                                            <td>
-                                                <div className="flex-start gap-1">
-                                                    <button className="btn btn-icon-small text-danger" onClick={() => handleRejeitar(p.transacao_id)}>
-                                                        <XCircle size={18} />
-                                                    </button>
-                                                    <button className="btn btn-icon-small text-success" onClick={() => handleAprovar(p.transacao_id, p.tipo)}>
-                                                        <CheckCircle size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* SEÇÃO: SAQUES RECENTES CONCLUÍDOS (NOVO) */}
-                        <div className="section-header mt-3" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <History size={20} color="var(--success)" />
-                                <h3>Saques Recentes (Auditoria de Recebimento)</h3>
-                            </div>
-                        </div>
-                        <div className="table-responsive">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Membro</th>
-                                        <th>Valor Líquido</th>
-                                        <th>Status do Log</th>
-                                        <th>Confirmação Cliente</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(adminData.concluidos_recentes || []).map(c => (
-                                        <tr key={c.transacao_id} className="row-hover">
-                                            <td className="text-xs">
-                                                <p className="font-bold">{c.usuario_nome}</p>
-                                                <p className="text-muted">{formatarDataBR(c.data)}</p>
-                                            </td>
-                                            <td className="font-bold">R$ {c.valor.toLocaleString('pt-BR')}</td>
-                                            <td className="text-xs text-muted" style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {c.detalhes || 'Sem logs.'}
-                                            </td>
-                                            <td>
-                                                {c.confirmado_cliente ? (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)', fontSize: '0.75rem', fontWeight: 700 }}>
-                                                        <CheckCircle2 size={16} /> Recebido em {new Date(c.data_confirmacao_cliente).toLocaleDateString('pt-BR')}
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--warning)', fontSize: '0.75rem' }}>
-                                                        <Timer size={16} /> Aguardando Confirmação
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                 )}
 
@@ -1065,13 +895,6 @@ const AdminDashboard = () => {
                                             <td><span className="text-primary font-bold">{u.score}</span></td>
                                             <td><span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>{u.is_verified ? 'Sim' : 'Não'}</span></td>
                                             <td>{u.is_admin ? 'Sim' : '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

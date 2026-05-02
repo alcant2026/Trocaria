@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
 import hashlib
-from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao
+from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao, Transacao, TipoTransacao
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from utils_fintech import criar_solicitacao_p2p, aceitar_oferta
@@ -72,6 +72,47 @@ async def solicitar_emprestimo(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"message": "Pedido de apoio criado!", "id": nova.id, "valor": float(dados.valor), "status": "pendente"}
+
+@router.post("/gerar-taxa-solicitacao")
+@limiter.limit("3/minute")
+async def gerar_taxa_solicitacao(request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    from rotas.rotas_financeiro import sdk
+    valor_taxa = Decimal("2.00")
+
+    if sdk:
+        payment_data = {
+            "transaction_amount": float(valor_taxa),
+            "description": f"Taxa de publicacao - {usuario_logado.nome}",
+            "payment_method_id": "pix",
+            "payer": {"email": usuario_logado.email}
+        }
+        result = sdk.payment().create(payment_data)
+        payment = result.get("response", {})
+        if result.get("status") not in [200, 201]:
+            raise HTTPException(status_code=400, detail="Erro ao gerar PIX.")
+    else:
+        payment = {"id": "simulado"}
+
+    transacao = Transacao(
+        usuario_id=usuario_logado.id,
+        valor=valor_taxa,
+        tipo=TipoTransacao.TAXA_SOLICITACAO,
+        status="pendente",
+        payment_id=str(payment.get("id")),
+        metodo="pix",
+        detalhes=f"Taxa de publicacao de pedido de apoio"
+    )
+    db.add(transacao)
+    db.commit()
+
+    return {
+        "message": "Pague R$ 2,00 via PIX para publicar seu pedido.",
+        "valor": float(valor_taxa),
+        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
+        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
+        "payment_id": payment.get("id"),
+        "transacao_id": transacao.id
+    }
 
 @router.post("/aceitar-oferta/{id}")
 @limiter.limit("5/minute")

@@ -643,14 +643,40 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
         setLoadingAction(true);
         try {
-            const res = await api.post('/emprestimos/solicitar', {
-                valor: v, parcelas: parseInt(parcelas),
-                taxa_compensacao: tx, aceite_termos: true
-            });
-            setMensagem(res.message || 'Pedido criado!');
-            setActiveView('home');
-            setValor(''); setParcelas(1); setPassoSolicitar(1);
-            carregarSnapshot();
+            // Gerar taxa de publicacao R$ 2 via PIX
+            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao');
+            if (taxaRes.qr_code) {
+                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id });
+                showModal({
+                    title: 'Pague R$ 2,00 para Publicar',
+                    message: 'Pague a taxa de R$ 2,00 via PIX para publicar seu pedido de apoio.',
+                    type: 'info',
+                    onConfirm: async () => {
+                        try {
+                            const res = await api.post('/emprestimos/solicitar', {
+                                valor: v, parcelas: parseInt(parcelas),
+                                taxa_compensacao: tx, aceite_termos: true
+                            });
+                            setMensagem(res.message || 'Pedido criado!');
+                            setActiveView('home');
+                            setValor(''); setParcelas(1); setPassoSolicitar(1);
+                            carregarSnapshot();
+                        } catch (err2) {
+                            setMensagem('Erro: ' + (err2.response?.data?.detail || err2.message));
+                        }
+                    },
+                    confirmText: 'Ja Paguei! Publicar'
+                });
+            } else {
+                const res = await api.post('/emprestimos/solicitar', {
+                    valor: v, parcelas: parseInt(parcelas),
+                    taxa_compensacao: tx, aceite_termos: true
+                });
+                setMensagem(res.message || 'Pedido criado!');
+                setActiveView('home');
+                setValor(''); setParcelas(1); setPassoSolicitar(1);
+                carregarSnapshot();
+            }
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
         } finally { setLoadingAction(false); }

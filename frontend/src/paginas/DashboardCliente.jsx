@@ -1065,7 +1065,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <ShieldAlert size={24} color="var(--warning)" title="Conta não verificada" />
                     )}
                 </h1>
-                <p className="text-muted">Seu saldo disponível no grupo.</p>
+                <p className="text-muted">Rede de Apoio entre Pares.</p>
             </header>
 
             {mensagem && (
@@ -1194,21 +1194,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     )}
 
                     <div className="action-grid animate-fade-in">
-                        <div className="action-btn" onClick={() => setActiveView('pool')} style={{ borderColor: 'var(--primary)', background: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.15) 0%, rgba(var(--primary-rgb), 0.05) 100%)', boxShadow: '0 4px 15px rgba(var(--primary-rgb), 0.1)' }}>
-                            <Coins size={32} color="var(--primary)" />
-                            <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.9rem' }}>Grupo de Apoio</span>
-                        </div>
-                        <div className="action-btn" onClick={() => setActiveView('oportunidades')}>
-                            <HandCoins size={28} color="var(--success)" />
-                            <span>Ver Pedidos</span>
+                        <div className="action-btn" onClick={() => setActiveView('oportunidades')} style={{ borderColor: 'var(--success)', background: 'linear-gradient(135deg, rgba(var(--success-rgb), 0.15) 0%, rgba(var(--success-rgb), 0.05) 100%)' }}>
+                            <HandCoins size={32} color="var(--success)" />
+                            <span style={{ color: 'var(--success)', fontWeight: 800, fontSize: '0.9rem' }}>Ver Pedidos</span>
                         </div>
                         <div className="action-btn" onClick={() => setActiveView('solicitar')}>
                             <PlusCircle size={28} color="var(--primary)" />
                             <span>Solicitar</span>
-                        </div>
-                        <div className="action-btn" onClick={() => setActiveView('oportunidades')}>
-                            <HandCoins size={28} color="var(--success)" />
-                            <span>Ver Pedidos</span>
                         </div>
                         <div className="action-btn" onClick={() => setActiveView('historico')}>
                             <History size={28} />

@@ -1048,7 +1048,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <ShieldAlert size={24} color="var(--warning)" title="Conta não verificada" />
                     )}
                 </h1>
-                <p className="text-muted">Seu dinheiro rendendo e crescendo.</p>
+                <p className="text-muted">Seu saldo disponível no grupo.</p>
             </header>
 
             {mensagem && (
@@ -1089,7 +1089,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <div className="balance-value">
                                 <span className="currency">R$</span>
                                 <span className="amount">
-                                    {verSaldo ? usuario.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '••••••'}
+                                    {verSaldo ? (usuario.credito_virtual || usuario.saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '••••••'}
                                 </span>
                             </div>
                             

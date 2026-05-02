@@ -224,6 +224,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
     const [valor, setValor] = useState('');
     const [parcelas, setParcelas] = useState(1);
+    const [taxaCompensacao, setTaxaCompensacao] = useState('5');
     const [senhaSaque, setSenhaSaque] = useState('');
     const [showSenhaSaque, setShowSenhaSaque] = useState(false);
 
@@ -636,69 +637,23 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const handleSolicitar = async (e) => {
         e.preventDefault();
         const v = parseFloat(valor);
-        if (!v || v <= 0) {
-            setMensagem('Erro: O valor solicitado deve ser maior que zero.');
-            return;
-        }
-
-        if (!aceiteTermos) {
-            showModal({ title: 'Termos de Uso', message: 'Você deve aceitar os termos de uso para continuar.', type: 'warning' });
-            return;
-        }
-
+        if (!v || v <= 0) { setMensagem('Valor invalido.'); return; }
+        if (!aceiteTermos) { showModal({ title: 'Termos', message: 'Aceite os termos.', type: 'warning' }); return; }
+        const tx = parseFloat(taxaCompensacao);
+        if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
         setLoadingAction(true);
         try {
-            // Primeiro gera a taxa de R$ 2 via PIX
-            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao', {
-                valor: v,
-                parcelas: parseInt(parcelas),
-                aceite_termos: true
+            const res = await api.post('/emprestimos/solicitar', {
+                valor: v, parcelas: parseInt(parcelas),
+                taxa_compensacao: tx, aceite_termos: true
             });
-
-            if (taxaRes.qr_code) {
-                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id });
-                showModal({
-                    title: 'Pagar Taxa de R$ 2,00',
-                    message: 'Pague a taxa de R$ 2,00 via PIX para solicitar o apoio. Depois de pagar, clique em "Já Paguei".',
-                    type: 'info',
-                    onConfirm: async () => {
-                        try {
-                            const res = await api.post('/emprestimos/solicitar', {
-                                valor: v,
-                                parcelas: parseInt(parcelas),
-                                aceite_termos: true
-                            });
-                            setMensagem(res.message || 'Pedido de apoio criado!');
-                            setActiveView('home');
-                            setValor('');
-                            setParcelas(1);
-                            setPassoSolicitar(1);
-                            carregarSnapshot();
-                        } catch (err) {
-                            setMensagem('Erro: ' + err.message);
-                        }
-                    },
-                    confirmText: 'Ja Paguei! Confirmar'
-                });
-            } else {
-                // Sem PIX (ambiente simulado), cria direto
-                const res = await api.post('/emprestimos/solicitar', {
-                    valor: v,
-                    parcelas: parseInt(parcelas),
-                    aceite_termos: true
-                });
-                setMensagem(res.message || 'Pedido de apoio criado!');
-                setActiveView('home');
-                setValor('');
-                setParcelas(1);
-                setPassoSolicitar(1);
-                carregarSnapshot();
-            }
+            setMensagem(res.message || 'Pedido criado!');
+            setActiveView('home');
+            setValor(''); setParcelas(1); setPassoSolicitar(1);
+            carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        } finally {
-            setLoadingAction(false);
-        }
+        } finally { setLoadingAction(false); }
     };
 
     const handlePagarParcela = async (id, valorParcela, chavePix) => {
@@ -1349,7 +1304,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setValor={setValor}
                     parcelas={parcelas}
                     setParcelas={setParcelas}
-                    limiteInfo={limiteInfo}
+                    taxaCompensacao={taxaCompensacao}
+                    setTaxaCompensacao={setTaxaCompensacao}
                     loadingAction={loadingAction}
                     handleSolicitar={handleSolicitar}
                 />

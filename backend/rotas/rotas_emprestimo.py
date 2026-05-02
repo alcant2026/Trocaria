@@ -315,6 +315,7 @@ async def depositar_virtual(dados: PagamentoRequest, request: Request, db: Sessi
         "credito_virtual": result["credito_virtual"],
         "taxa_paga": result["taxa_paga"],
         "qr_code_taxa": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
+        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
         "payment_id": payment.get("id")
     }
 

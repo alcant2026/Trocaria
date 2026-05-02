@@ -834,7 +834,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         try {
             const res = await api.post('/emprestimos/depositar-virtual', { valor_pagamento: v });
             if (res.qr_code_taxa) {
-                setQrCodeData({ qr_code: res.qr_code_taxa, payment_id: res.payment_id || 'virtual' });
+                setQrCodeData({ qr_code: res.qr_code_taxa, qr_code_base64: res.qr_code_base64, payment_id: res.payment_id || 'virtual' });
                 setPassoDeposito(2);
             } else {
                 showModal({ title: 'Pronto!', message: `R$ ${v.toFixed(2)} adicionado! Taxa de R$ ${res.taxa_paga.toFixed(2)}.`, type: 'success' });

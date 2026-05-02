@@ -252,7 +252,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
     const [tipoUpgrade, setTipoUpgrade] = useState(null);
-    const [limiteInfo, setLimiteInfo] = useState({ limite_total: 0, limite_disponivel: 0, isento_taxa: false });
     const [mensagem, setMensagem] = useState(null);
 
     // Estados do Marketplace
@@ -515,8 +514,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 setMeusEmprestimos(data.cliente_emprestimos || []);
                 localStorage.setItem('meus_emprestimos_snapshot', JSON.stringify(data.cliente_emprestimos));
             }
-            
-            api.get('/emprestimos/limite').then(setLimiteInfo).catch(console.error);
             
             if (data.historico) {
                 setHistorico(data.historico);

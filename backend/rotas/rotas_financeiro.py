@@ -378,104 +378,54 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
 @router.post("/investir-pool")
 @limiter.limit("5/minute")
 async def investir_pool(dados: NotificacaoDeposito, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Move saldo da conta principal para o Fundo Coletivo (Pool)."""
-    # Lock para evitar bit-flipping de saldo
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
     
     if not usuario.is_verified:
-        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para realizar investimentos no Pool.")
+        raise HTTPException(status_code=403, detail="Conta precisa estar verificada.")
     
-    if usuario.saldo < dados.valor:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente para investimento no Pool.")
-    
-    # Registro de Auditoria (IP/Device)
-    auditoria = RegistroAuditoria(
-        ip=request.client.host,
-        user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.now(datetime.timezone.utc)
-    )
-    db.add(auditoria)
-    db.flush()
+    if (usuario.credito_virtual or Decimal("0.00")) < dados.valor:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. Disponível: R$ {usuario.credito_virtual or 0}")
 
-    usuario.saldo -= dados.valor
-    usuario.saldo_caixa += dados.valor
+    usuario.credito_virtual -= dados.valor
+    usuario.saldo_caixa = (usuario.saldo_caixa or Decimal("0.00")) + dados.valor
     
     transacao = Transacao(
         usuario_id=usuario.id,
         valor=dados.valor,
-        tipo=TipoTransacao.APORTE_POOL,
+        tipo=TipoTransacao.DEPOSITO,
         status="concluido",
-        detalhes="Aporte no Pool (Aceite de Termos e Risco Confirmado)",
-        auditoria_id=auditoria.id
+        detalhes=f"Disponibilizado para o grupo: R$ {dados.valor}"
     )
     db.add(transacao)
-    registrar_acao_admin(db, usuario.id, "APORTE_CAIXA_POOL", alvo_id=usuario.id, detalhes=f"Valor: {dados.valor}", ip=request.client.host)
-    
-    # NOVO: Ganho de Score por aporte no Pool
     atualizar_score(db, usuario.id, dados.valor, "APORTE_POOL")
 
     db.commit()
     cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
-    return {"message": f"Aporte de R$ {dados.valor:.2f} realizado com sucesso!", "novo_saldo_caixa": float(usuario.saldo_caixa)}
+    return {"message": f"R$ {dados.valor} disponibilizado no grupo!", "novo_saldo": float(usuario.credito_virtual)}
 
 @router.post("/resgatar-pool")
 @limiter.limit("5/minute")
 async def resgatar_pool(dados: NotificacaoDeposito, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Resgata saldo do Pool validando dívidas ativas como colateral."""
-    # Lock preventivo
     usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-
-    # NOVO: Validação de Dívida Ativa (Colateral)
-    # O saldo no Pool garante o empréstimo. O usuário só pode sacar o que exceder a dívida.
-    emprestimo_ativo = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
-    ).first()
     
-    if emprestimo_ativo:
-        from utils_emprestimo import calcular_divida_total
-        divida_total = calcular_divida_total(emprestimo_ativo)
-        saldo_disponivel = max(Decimal("0.00"), usuario.saldo_caixa - divida_total)
-
-        if dados.valor > saldo_disponivel:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Saldo Bloqueado: R$ {divida_total:,.2f} do seu Pool estão retidos como garantia do seu empréstimo ativo. Saldo disponível para resgate: R$ {saldo_disponivel:,.2f}."
-            )
-
-    if usuario.saldo_caixa < dados.valor:
-        raise HTTPException(status_code=400, detail="Saldo no Caixa insuficiente para resgate.")
-    
-    # Registro de Auditoria
-    auditoria = RegistroAuditoria(
-        ip=request.client.host,
-        user_agent=request.headers.get("user-agent"),
-        data_registro=datetime.datetime.now(datetime.timezone.utc)
-    )
-    db.add(auditoria)
-    db.flush()
+    saldo_caixa_atual = usuario.saldo_caixa or Decimal("0.00")
+    if dados.valor > saldo_caixa_atual:
+        raise HTTPException(status_code=400, detail=f"Saldo no grupo insuficiente. Disponível: R$ {saldo_caixa_atual}")
 
     usuario.saldo_caixa -= dados.valor
-    usuario.saldo += dados.valor
-    
-    transacao = Transacao(
+    usuario.credito_virtual = (usuario.credito_virtual or Decimal("0.00")) + dados.valor
+
+    db.add(Transacao(
         usuario_id=usuario.id,
         valor=dados.valor,
-        tipo=TipoTransacao.RESGATE_POOL,
+        tipo=TipoTransacao.SAQUE,
         status="concluido",
-        detalhes="Resgate do Pool (Fintech Liquidez Diária)",
-        auditoria_id=auditoria.id
-    )
-    db.add(transacao)
-
-    # Perda de Score proporcional por resgate (opcional, mantendo para controle de risco)
-    atualizar_score(db, usuario.id, dados.valor, "RESGATE_POOL")
+        detalhes=f"Retirado do grupo: R$ {dados.valor}"
+    ))
 
     db.commit()
     cache_snapshot_data.pop(usuario.id, None)
-    cache_snapshot_data.pop("000PL", None)
-    return {"message": f"Resgate de R$ {dados.valor:.2f} realizado!", "novo_saldo": float(usuario.saldo)}
+    return {"message": f"R$ {dados.valor} retirado do grupo!", "novo_saldo": float(usuario.credito_virtual)}
 
 @router.post("/notificar-deposito")
 @limiter.limit("2/minute")

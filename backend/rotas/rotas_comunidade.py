@@ -115,7 +115,9 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="Link nao encontrado.")
     pendente = db.query(Transacao).filter(Transacao.detalhes == f"DESTAQUE_LINK:{link.id}", Transacao.status == "pendente").first()
     if pendente:
-        raise HTTPException(status_code=400, detail="Pagamento pendente ja existe para este link.")
+        if pendente.payment_id:
+            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(DESTAQUE_PRECO), "ja_existente": True}
+        pendente.status = "cancelado"
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
@@ -143,7 +145,9 @@ async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="Pacote invalido.")
     pendente = db.query(Transacao).filter(Transacao.detalhes == f"BOOST_LINK:{link.id}:{dados.pacote_id}", Transacao.status == "pendente").first()
     if pendente:
-        raise HTTPException(status_code=400, detail="Pagamento pendente ja existe para este link.")
+        if pendente.payment_id:
+            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(pacote["preco"]), "views": pacote["views"], "ja_existente": True}
+        pendente.status = "cancelado"
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:

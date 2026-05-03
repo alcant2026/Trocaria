@@ -376,7 +376,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
     const [kycDetails, setKycDetails] = useState('');
     const [fotoRG, setFotoRG] = useState(null);
-    const [fotoRenda, setFotoRenda] = useState(null);
     const [fotoResidencia, setFotoResidencia] = useState(null);
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
@@ -922,13 +921,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     };
 
     const confirmarSolicitarVerificacao = async () => {
-        if (!fotoRG || !fotoRenda || !fotoResidencia) return showModal({ title: 'Documentos Incompletos', message: 'Anexe os 3 documentos (RG, Renda e Residência) para prosseguir.', type: 'warning' });
+        if (!fotoRG || !fotoResidencia) return showModal({ title: 'Documentos Incompletos', message: 'Anexe a selfie e o documento (RG/CNH) para prosseguir.', type: 'warning' });
         setLoadingAction(true);
         try {
             const formData = new FormData();
             formData.append('detalhes', kycDetails || '');
             formData.append('foto_rg', fotoRG);
-            formData.append('foto_renda', fotoRenda);
             formData.append('foto_residencia', fotoResidencia);
 
             const res = await api.post('/score/solicitar-verificacao', formData, { 
@@ -937,7 +935,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             showModal({ title: 'Solicitação Enviada', message: res.data ? res.data.message : res.message, type: 'success' });
             setKycDetails('');
             setFotoRG(null);
-            setFotoRenda(null);
             setFotoResidencia(null);
             setPassoUpgrade(1);
             setTipoUpgrade(null);
@@ -1805,43 +1802,20 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 flexDirection: 'column', 
                                                 gap: '10px' 
                                             }}>
-                                                {/* CAMPO 1: RG */}
+                                                {/* CAMPO 1: SELFIE */}
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRG ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRG ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        1. Foto do RG ou CNH (Frente e Verso) {fotoRG && <CheckCircle size={16} className="text-success inline-block ml-2" />}
+                                                        Selfie segurando o documento {fotoRG && <CheckCircle size={16} className="text-success inline-block ml-2" />}
                                                     </label>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*,.pdf" 
-                                                        onChange={(e) => setFotoRG(e.target.files[0])} 
-                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
-                                                    />
+                                                    <input type="file" accept="image/*" onChange={(e) => setFotoRG(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
                                                 </div>
 
-                                                {/* CAMPO 2: RESIDENCIA */}
+                                                {/* CAMPO 2: RG FRENTE E VERSO */}
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoResidencia ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        2. Comprovante de Residência {fotoResidencia && <CheckCircle size={16} className="text-success inline-block ml-2" />}
+                                                        Foto do RG ou CNH (Frente e Verso) {fotoResidencia && <CheckCircle size={16} className="text-success inline-block ml-2" />}
                                                     </label>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*,application/pdf" 
-                                                        onChange={(e) => setFotoResidencia(e.target.files[0])} 
-                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
-                                                    />
-                                                </div>
-
-                                                {/* CAMPO 3: RENDA */}
-                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRenda ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRenda ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        3. Comprovante de Renda {fotoRenda && <CheckCircle size={16} className="text-success inline-block ml-2" />}
-                                                    </label>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*,application/pdf" 
-                                                        onChange={(e) => setFotoRenda(e.target.files[0])} 
-                                                        style={{ fontSize: '0.75rem', width: '100%' }} 
-                                                    />
+                                                    <input type="file" accept="image/*,.pdf" onChange={(e) => setFotoResidencia(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
                                                 </div>
                                             </div>
                                         </div>
@@ -1862,7 +1836,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                             <button 
                                                 className="btn btn-primary" 
                                                 style={{ flex: 2 }} 
-                                                disabled={tipoUpgrade === 'verificacao' && (!fotoRG || !fotoRenda || !fotoResidencia)}
+                                                disabled={tipoUpgrade === 'verificacao' && (!fotoRG || !fotoResidencia)}
                                                 onClick={() => setPassoUpgrade(3)}
                                             >
                                                 Confirmar Solicitação

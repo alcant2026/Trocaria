@@ -1042,7 +1042,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <span className="activity-value" style={{ color: corValor(h.tipo) }}>
-                                            {prefixoValor(h.tipo)} R$ {h.valor.toLocaleString('pt-BR')}
+                                            {prefixoValor(h.tipo)} {h.tipo === 'bonus' ? `${h.valor} pts` : `R$ ${h.valor.toLocaleString('pt-BR')}`}
                                         </span>
                                         <div style={{ fontSize: '0.6rem', fontWeight: 600, marginTop: '2px', color: h.status === 'concluido' ? 'var(--success)' : h.status === 'pendente' ? 'var(--warning)' : h.status === 'cancelado' ? 'var(--text-muted)' : 'var(--danger)' }}>
                                             {h.status === 'concluido' ? 'Sucesso' : h.status === 'pendente' ? 'Pendente' : h.status === 'cancelado' ? 'Cancelado' : h.status === 'falhou' ? 'Falhou' : h.status || ''}
@@ -1439,7 +1439,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 </div>
                                                 <div className="text-right">
                                                     <p style={{ fontWeight: 800, color: corValor(h.tipo) }}>
-                                                        {prefixoValor(h.tipo)} R$ {h.valor?.toLocaleString('pt-BR')}
+                                                        {prefixoValor(h.tipo)} {h.tipo === 'bonus' ? `${h.valor} pts` : `R$ ${h.valor?.toLocaleString('pt-BR')}`}
                                                     </p>
                                                     {/* Badge de status apenas para entradas ou pendentes */}
                                                     {(!TIPOS_NEGATIVO.has(h.tipo) || h.status !== 'concluido') && (

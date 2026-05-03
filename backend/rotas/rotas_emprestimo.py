@@ -61,6 +61,9 @@ async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario =
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")
 async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    pendente = db.query(Transacao).filter(Transacao.usuario_id == usuario_logado.id, Transacao.tipo == TipoTransacao.TAXA_SOLICITACAO, Transacao.status == "pendente").first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Voce ja tem um pagamento pendente. Aguarde ou cancele antes de gerar outro.")
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     valor_taxa = Decimal("2.00")

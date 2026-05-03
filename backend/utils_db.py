@@ -138,31 +138,59 @@ def executar_limpeza_banco(engine):
     Remove registros obsoletos para economizar espaço no banco de dados.
     Mantém a integridade financeira deletando apenas intenções falhas ou expiradas.
     """
-    logger.info("🧹 DATABASE: Iniciando rotina de Reciclagem de Dados...")
+    logger.info("INICIANDO ROTINA DE RECICLAGEM DE DADOS...")
     is_postgres = "postgresql" in str(engine.url)
-    
-    # Comandos de limpeza (SQL nativo para performance)
+
+    prefix = "" if is_postgres else ""
+
     queries = []
-    
+
     if is_postgres:
-        # PostgreSQL / Neon
-        queries = [
-            # 1. Finanças: Deleta depósitos PIX expirados/cancelados há mais de 15 dias
-            "DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo = 'deposito' AND data_criacao < NOW() - INTERVAL '15 days'",
-            
-            # 2. Marketplace: Deleta links inativos há mais de 30 dias
-            "DELETE FROM links_afiliados WHERE is_active = FALSE AND data_criacao < NOW() - INTERVAL '30 days'",
-            
-            # 3. Auditoria: Deleta logs básicos de ações manuais com mais de 90 dias
-            "DELETE FROM acoes_admin WHERE data_acao < NOW() - INTERVAL '90 days'"
-        ]
+        # 1. Transacoes PIX de taxa nunca pagas ha mais de 7 dias
+        queries.append("""
+            DELETE FROM transacoes WHERE status = 'pendente'
+            AND tipo IN ('taxa_solicitacao', 'taxa_match', 'desbloqueio_dados', 'assinatura')
+            AND data_criacao < NOW() - INTERVAL '7 days'
+        """)
+        # 2. Depositos/Saques expirados ou cancelados ha mais de 15 dias
+        queries.append("""
+            DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado')
+            AND tipo IN ('deposito', 'saque')
+            AND data_criacao < NOW() - INTERVAL '15 days'
+        """)
+        # 3. Solicitacoes de apoio expiradas (pendentes ha mais de 7 dias)
+        queries.append("""
+            DELETE FROM solicitacoes_emprestimo WHERE status = 'pendente'
+            AND data_criacao < NOW() - INTERVAL '7 days'
+        """)
+        # 4. Links de afiliados inativos ha mais de 30 dias
+        queries.append("""
+            DELETE FROM links_afiliados WHERE is_active = FALSE
+            AND data_criacao < NOW() - INTERVAL '30 days'
+        """)
+        # 5. Historico de cliques antigo (mais de 60 dias)
+        queries.append("""
+            DELETE FROM historico_cliques_marketplace
+            WHERE data_clique < NOW() - INTERVAL '60 days'
+        """)
+        # 6. Logs de admin antigos (mais de 90 dias)
+        queries.append("""
+            DELETE FROM acoes_admin WHERE data_acao < NOW() - INTERVAL '90 days'
+        """)
+        # 7. Verificacoes KYC pendentes ha mais de 30 dias (sem docs = lixo)
+        queries.append("""
+            DELETE FROM documentos_verificacao WHERE status = 'pendente'
+            AND data_envio < NOW() - INTERVAL '30 days'
+        """)
     else:
-        # SQLite (Desenvolvimento Local)
-        queries = [
-            "DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo = 'deposito' AND data_criacao < datetime('now', '-15 days')",
-            "DELETE FROM links_afiliados WHERE is_active = 0 AND data_criacao < datetime('now', '-30 days')",
-            "DELETE FROM acoes_admin WHERE data_acao < datetime('now', '-90 days')"
-        ]
+        # SQLite
+        queries.append("DELETE FROM transacoes WHERE status = 'pendente' AND tipo IN ('taxa_solicitacao', 'taxa_match', 'desbloqueio_dados', 'assinatura') AND data_criacao < datetime('now', '-7 days')")
+        queries.append("DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo IN ('deposito', 'saque') AND data_criacao < datetime('now', '-15 days')")
+        queries.append("DELETE FROM solicitacoes_emprestimo WHERE status = 'pendente' AND data_criacao < datetime('now', '-7 days')")
+        queries.append("DELETE FROM links_afiliados WHERE is_active = 0 AND data_criacao < datetime('now', '-30 days')")
+        queries.append("DELETE FROM historico_cliques_marketplace WHERE data_clique < datetime('now', '-60 days')")
+        queries.append("DELETE FROM acoes_admin WHERE data_acao < datetime('now', '-90 days')")
+        queries.append("DELETE FROM documentos_verificacao WHERE status = 'pendente' AND data_envio < datetime('now', '-30 days')")
 
     with engine.connect() as conn:
         for sql in queries:
@@ -170,10 +198,34 @@ def executar_limpeza_banco(engine):
                 result = conn.execute(text(sql))
                 conn.commit()
                 if result.rowcount > 0:
-                    logger.info(f"✨ Limpeza: {result.rowcount} registros removidos via: {sql[:40]}...")
+                    logger.info(f"Limpeza: {result.rowcount} registros removidos.")
             except Exception as e:
-                logger.error(f"⚠️ Erro ao executar limpeza SQL: {e}")
+                logger.error(f"Erro ao executar limpeza: {e}")
                 conn.rollback()
 
-    logger.info("✅ DATABASE: Reciclagem de Dados concluída.")
+    # 8. Limpeza de arquivos KYC orfaos (uploads sem registro no banco)
+    if is_postgres:
+        try:
+            import os
+            import glob as _glob
+            uploads_dir = "uploads"
+            if os.path.isdir(uploads_dir):
+                with engine.connect() as conn:
+                    docs = conn.execute(text("SELECT caminho_rg, caminho_renda, caminho_residencia FROM documentos_verificacao WHERE caminho_rg IS NOT NULL OR caminho_renda IS NOT NULL OR caminho_residencia IS NOT NULL")).fetchall()
+                    caminhos_validos = set()
+                    for row in docs:
+                        for path in row:
+                            if path: caminhos_validos.add(path)
+                    for f in os.listdir(uploads_dir):
+                        full = os.path.join(uploads_dir, f)
+                        if os.path.isfile(full) and full not in caminhos_validos:
+                            try:
+                                os.remove(full)
+                                logger.info(f"Arquivo orfao removido: {full}")
+                            except Exception:
+                                pass
+        except Exception as e:
+            logger.error(f"Erro na limpeza de arquivos: {e}")
+
+    logger.info("RECICLAGEM DE DADOS CONCLUIDA.")
 

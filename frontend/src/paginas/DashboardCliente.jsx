@@ -54,7 +54,6 @@ import {
     PartyPopper,
     Info,
     QrCode,
-    FileDown,
     Flame,
     TrendingDown,
     User
@@ -222,34 +221,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [senhaSaque, setSenhaSaque] = useState('');
     const [showSenhaSaque, setShowSenhaSaque] = useState(false);
 
-    // Relatório PDF (Receita Federal)
-    const [showModalRelatorio, setShowModalRelatorio] = useState(false);
-    const [anoRelatorio, setAnoRelatorio] = useState(new Date().getFullYear());
     const [loadingPDF, setLoadingPDF] = useState(false);
-
-    const handleDownloadPDF = async () => {
-        try {
-            setLoadingPDF(true);
-            const res = await api.getBlob(`/financeiro/relatorio/pdf?ano=${anoRelatorio}`);
-            
-            // Tratamento de blob para download direto
-            const blob = res.data || res;
-            const url = window.URL.createObjectURL(new Blob([blob]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `INFORME_PSY_PAY_${usuario.nome.replace(/\s+/g, '_')}_${anoRelatorio}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            setMensagem('Informe gerado com sucesso!');
-            setShowModalRelatorio(false);
-        } catch (err) {
-            console.error('Erro ao baixar PDF:', err);
-            setMensagem('Erro ao gerar relatório. Tente novamente.');
-        } finally {
-            setLoadingPDF(false);
-        }
-    };
     const [codigo2faSaque, setCodigo2faSaque] = useState('');
     const [passoDeposito, setPassoDeposito] = useState(1);
     const [passoSaque, setPassoSaque] = useState(1);
@@ -1485,13 +1457,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <div className="card animate-fade-in">
                         <div className="flex-end mb-1">
                             <div style={{ display: 'flex', gap: '8px' }}>
-                                <button 
-                                    className="btn btn-outline btn-sm" 
-                                    style={{ gap: '6px', fontSize: '0.75rem', padding: '8px 12px', border: 'none', background: 'rgba(255,255,255,0.05)' }}
-                                    onClick={() => setShowModalRelatorio(true)}
-                                >
-                                    <FileDown size={14} /> Informe IRPF
-                                </button>
                                 <History size={18} color="var(--text-muted)" />
                             </div>
                         </div>
@@ -2547,45 +2512,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             <BannerCookies usuario={usuario} onUpdate={carregarSnapshot} />
 
             {/* MODAL PARA SELEÇÃO DE ANO DO RELATÓRIO PDF */}
-            {showModalRelatorio && (
-                <div className="modal-overlay">
-                    <div className="modal-card">
-                        <div className="modal-icon" style={{ background: 'rgba(var(--primary-rgb), 0.1)', color: 'var(--primary)' }}>
-                            <FileDown size={32} />
-                        </div>
-                        <h2>Informe de Rendimentos</h2>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-                            Escolha o ano-calendário para gerar o documento oficial de auxílio à Receita Federal (IRPF).
-                        </p>
-                        
-                        <div className="input-group" style={{ marginBottom: '20px' }}>
-                            <label>Selecione o Ano</label>
-                            <select 
-                                className="input-field" 
-                                value={anoRelatorio} 
-                                onChange={(e) => setAnoRelatorio(parseInt(e.target.value))}
-                                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
-                            >
-                                {[2026, 2025, 2024, 2023, 2022].map(ano => (
-                                    <option key={ano} value={ano} style={{ background: '#1a1a1a' }}>{ano}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="flex-center-column" style={{ gap: '15px', width: '100%' }}>
-                            <button 
-                                className="btn btn-primary" 
-                                style={{ width: '100%' }}
-                                onClick={handleDownloadPDF}
-                                disabled={loadingPDF}
-                            >
-                                {loadingPDF ? <RefreshCw className="animate-spin" size={18} /> : 'Gerar e Baixar PDF'}
-                            </button>
-                            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowModalRelatorio(false)}>Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

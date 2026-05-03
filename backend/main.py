@@ -7,7 +7,7 @@ import os
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema, executar_limpeza_banco
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_marketplace
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace
 
 app = FastAPI(title="PSY PAY API P2P")
 
@@ -197,7 +197,7 @@ async def startup_db_setup():
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
-ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_marketplace]
+ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace]
 for module in ROUTER_MODULES:
     app.include_router(module.router, prefix="/api")
 for module in ROUTER_MODULES:

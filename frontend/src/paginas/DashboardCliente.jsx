@@ -62,7 +62,6 @@ import {
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
 import BannerCookies from '../componentes/BannerCookies';
-import CaixaParceiro from './CaixaParceiro';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
 import OportunidadesLista from '../componentes/OportunidadesLista';
@@ -1155,12 +1154,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             <ShoppingBag size={28} color="var(--primary)" />
                             <span>Marketplace</span>
                         </div>
-                        {usuario.is_parceiro && (
-                            <div className="action-btn" onClick={() => setActiveView('caixa_parceiro')} style={{ borderColor: 'var(--warning)', background: 'rgba(255, 145, 0, 0.05)' }}>
-                                <Store size={28} color="var(--warning)" />
-                                <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Meu Caixa</span>
-                            </div>
-                        )}
                     </div>
                     
                     <h3 className="section-title">Últimas Atividades</h3>
@@ -1215,10 +1208,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     <LojaAfiliados onMensagem={setMensagem} />
                 </div>
             )}
-            {activeView === 'caixa_parceiro' && (
-                <CaixaParceiro onBack={() => setActiveView('home')} setMensagem={setMensagem} usuario={usuario} onUpdate={carregarSnapshot} />
-            )}
-
             {/* Modal de Termos de Uso */}
             {
                 showTermos && (

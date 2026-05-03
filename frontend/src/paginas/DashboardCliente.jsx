@@ -1955,26 +1955,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                         </span>
                                                         <span className="market-views"><Eye size={11} /> {l.views_totais || 0}</span>
                                                     </div>
-                                                    <h3 className="market-title" style={{ marginBottom: '8px' }}>{l.nome_produto}</h3>
+                                                    <h3 className="market-title" style={{ marginBottom: '4px' }}>{l.nome_produto?.length > 60 ? l.nome_produto.substring(0, 60) + '...' : l.nome_produto}</h3>
                                                     
-                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                                                        <button 
-                                                            className="btn btn-primary" 
-                                                            style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: '0 10px' }}
-                                                            onClick={() => window.open(l.url_afiliado, '_blank')}
-                                                        >
-                                                            COMPRAR
-                                                        </button>
-                                                        <button 
-                                                            className="btn btn-secondary" 
-                                                            style={{ height: '32px', fontSize: '0.75rem', padding: '0 10px', background: 'rgba(255,255,255,0.05)' }}
-                                                            onClick={() => setSelectedAdDetails(l)}
-                                                        >
-                                                            DETALHES
-                                                        </button>
-                                                    </div>
-
-                                                    <div className="market-meta" style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                                                    <div className="market-meta" style={{ marginTop: '4px', borderTop: 'none', paddingTop: 0 }}>
                                                         <span className="market-author">por {l.anunciante}</span>
                                                         <div className="market-stars">
                                                         {[1, 2, 3, 4, 5].map((s) => {

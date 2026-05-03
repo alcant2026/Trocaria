@@ -62,6 +62,18 @@ app.add_middleware(SlowAPIMiddleware)
 import time
 from collections import defaultdict
 
+# Middleware CORS global (garante headers mesmo em erros)
+@app.middleware("http")
+async def cors_global(request: Request, call_next):
+    response = await call_next(request)
+    origin = request.headers.get("origin", "")
+    if origin and any(origin.startswith(allowed) for allowed in ["http://localhost", "https://cred30", "https://cred320", "https://psy-pay", "https://peer"]):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
 RATE_LIMIT_MUTATION = 20
 RATE_LIMIT_WINDOW = 60
 mutex_count = defaultdict(list)
@@ -198,6 +210,10 @@ async def startup_db_setup():
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
 for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos, rotas_marketplace]:
     app.include_router(router_module.router, prefix="/api")
+
+# Também registra rotas sem /api pra compatibilidade com frontend legado
+for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos, rotas_marketplace]:
+    app.include_router(router_module.router)
 
 @app.get("/__warmup")
 @app.get("/api/__warmup")

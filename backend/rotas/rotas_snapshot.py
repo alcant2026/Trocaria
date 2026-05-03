@@ -311,8 +311,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 p_saldo = Decimal("0.00")
                 p_saldo_caixa = Decimal("0.00")
             else:
-                p_saldo = plataforma.saldo
-                p_saldo_caixa = plataforma.saldo_caixa
+                p_saldo = plataforma.saldo or Decimal("0.00")
+                p_saldo_caixa = plataforma.saldo_caixa or Decimal("0.00")
 
             total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.usuario_id == "000PL", # Saques agora são no 000PL

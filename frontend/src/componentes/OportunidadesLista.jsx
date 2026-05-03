@@ -162,17 +162,16 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         >
                             {aceitando === op.id ? '...' : 'Aceitar'}
                         </button>
-                    </div>
-                ))}
-            </div>
+                </div>
+            ))}
 
             {showTermosAceite && (
-                <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                <div className="modal-overlay">
+                    <div className="modal-card" style={{ maxWidth: '500px' }}>
                         <TermosPlataforma
                             tipo="apoiar"
                             onAceitar={aceitarAposAceite}
-                            onVoltar={() => setShowTermosAceite(false)}
+                            onVoltar={function() { setShowTermosAceite(false); }}
                         />
                     </div>
                 </div>

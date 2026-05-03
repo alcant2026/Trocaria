@@ -166,6 +166,15 @@ async def startup_db_setup():
 
         from modelos.modelos_db import Usuario
         with SessionLocal() as db:
+            if not db.query(Usuario).filter(Usuario.id == "000PL").first():
+                plataforma = Usuario(
+                    id="000PL", nome="Plataforma Psy Pay", email="financeiro@psypay.com.br",
+                    cpf="00000000000", senha_hash="plataforma", chave_pix="financeiro@psypay.com.br",
+                    is_admin=False, is_active=True
+                )
+                db.add(plataforma)
+                db.commit()
+                print("✅ Conta plataforma 000PL criada")
             if not db.query(Usuario).filter(Usuario.is_admin == True).first():
                 import secrets
                 admin_id = "ADM01"

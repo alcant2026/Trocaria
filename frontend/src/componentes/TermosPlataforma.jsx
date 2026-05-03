@@ -2,12 +2,12 @@ import React from 'react';
 
 const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
     return (
-        <div style={{ padding: '10px 0' }}>
+        <div style={{ padding: '10px 0', display: 'flex', flexDirection: 'column', height: '100%' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                 {tipo === 'criar' ? 'Regras para Pedir Apoio' : 'Regras para Apoiar'}
             </h3>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', marginBottom: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', maxHeight: '350px', overflowY: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', marginBottom: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', overflowY: 'auto' }}>
                 
                 <p><strong style={{ color: 'var(--text-main)' }}>1. Responsabilidade dos Usuarios</strong><br />
                 O Psy Pay e apenas uma plataforma de conexao entre pessoas. Nao participamos, garantimos ou nos responsabilizamos pelos acordos firmados entre os usuarios. Cada usuario e integralmente responsavel por suas escolhas e pelo cumprimento dos compromissos assumidos.</p>
@@ -39,7 +39,7 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
                 </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
                 <button className="btn btn-primary" style={{ flex: 2 }} onClick={onAceitar}>
                     Aceitar e Continuar
                 </button>

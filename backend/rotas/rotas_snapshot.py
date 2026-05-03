@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from rotas.rotas_auth import obter_usuario_logado
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, Investimento, StatusSolicitacao, DocumentoVerificacao
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, SolicitacaoEmprestimo, StatusSolicitacao, DocumentoVerificacao
 from sqlalchemy import func, case, and_, or_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
@@ -722,40 +722,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "expira_4h": s.data_expiracao_4h.isoformat() if s.data_expiracao_4h else None,
                 "expira_5d": s.data_expiracao_5d.isoformat() if s.data_expiracao_5d else None
             })
-            
-        print(f"[DEBUG SNAPSHOT] Buscando carteira do investidor")
-        carteira_raw = db.query(Investimento).filter(Investimento.investidor_id == usuario.id).all()
-        carteira_list = []
-        for i in carteira_raw:
-            s = i.solicitacao
-            taxa_mensal = s.taxa_juros / 100
-            valor_total_ativo = i.valor_investido * (Decimal("1") + (taxa_mensal * s.prazo_meses))
-            valor_mensal = valor_total_ativo / s.prazo_meses
-            
-            valor_recebido = i.pago_para_investidor
-            valor_restante = max(0, float(valor_total_ativo - valor_recebido))
-            if s.status == StatusSolicitacao.CONCLUIDO:
-                valor_restante = 0.0
 
-            carteira_list.append({
-                "id": i.id,
-                "solicitacao_id": s.id,
-                "valor_investido": float(i.valor_investido),
-                "valor_mensal": round(float(valor_mensal), 2),
-                "valor_recebido": float(valor_recebido),
-                "valor_restante": round(valor_restante, 2),
-                "status_emprestimo": s.status.value,
-                "tomador_nome": s.usuario.nome.split()[0],
-                "tomador_is_verified": s.usuario.is_verified,
-                "taxa": float(s.taxa_juros),
-                "parcelas_pagas": s.parcelas_pagas,
-                "total_parcelas": s.prazo_meses
-            })
-
-        snapshot["investidor"] = {
-            "solicitacoes_disponiveis": solic_list,
-            "carteira": carteira_list
-        }
+        snapshot["investidor"] = {"solicitacoes_disponiveis": solic_list, "carteira": []}
 
         # Salvar no Cache antes de retornar
         print(f"[DEBUG SNAPSHOT] Finalizado com sucesso para {usuario.id}")

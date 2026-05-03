@@ -62,10 +62,8 @@ pool_args = {
 engine_args = {}
 
 if not is_sqlite:
-    # No Neon Free, o limite de conexões é baixo (~10-20). 
-    # Aumentamos para 5 com 10 de overflow para evitar travamentos sob carga média.
-    pool_args["pool_size"] = 5
-    pool_args["max_overflow"] = 10
+    pool_args["pool_size"] = 2
+    pool_args["max_overflow"] = 3
 else:
     engine_args["connect_args"] = {"check_same_thread": False}
 

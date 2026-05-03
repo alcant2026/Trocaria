@@ -111,7 +111,7 @@ async def validate_host(request: Request, call_next):
     response = await call_next(request)
     return response
 
-FILE_UPLOAD_MAX_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_MAX_SIZE = 2 * 1024 * 1024
 
 @app.middleware("http")
 async def limit_file_upload(request: Request, call_next):
@@ -123,11 +123,9 @@ async def limit_file_upload(request: Request, call_next):
     response = await call_next(request)
     return response
 
-# Middleware para Log de Plataforma (Apenas Log, sem Banco)
+# Middleware para Log de Plataforma (silencioso em producao)
 @app.middleware("http")
 async def log_plataforma(request: Request, call_next):
-    plataforma = request.headers.get("X-Platform", "web").upper()
-    print(f"📡 [{plataforma}] {request.method} {request.url.path}")
     response = await call_next(request)
     return response
 

@@ -35,12 +35,15 @@ class ConfirmacaoRequest(BaseModel):
     tipo: str = "parcela"  # parcela, avulso, quitacao
 
 @router.get("/oportunidades")
-async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    solicitacoes = db.query(SolicitacaoEmprestimo).options(
+async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    offset = (page - 1) * limit
+    query = db.query(SolicitacaoEmprestimo).options(
         joinedload(SolicitacaoEmprestimo.usuario)
     ).filter(
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
-    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).limit(50).all()
+    )
+    total = query.count()
+    solicitacoes = query.order_by(SolicitacaoEmprestimo.data_criacao.desc()).offset(offset).limit(limit).all()
     resultado = []
     for s in solicitacoes:
         resultado.append({
@@ -56,7 +59,7 @@ async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario =
             "inadimplente": s.usuario.inadimplente,
             "data_criacao": s.data_criacao.isoformat()
         })
-    return {"oportunidades": resultado}
+    return {"oportunidades": resultado, "total": total, "page": page, "has_more": (offset + len(solicitacoes)) < total}
 
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")

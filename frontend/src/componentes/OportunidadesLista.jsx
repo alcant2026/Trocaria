@@ -8,6 +8,8 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [oportunidades, setOportunidades] = useState([]);
     const [poolTotal, setPoolTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
     const [aceitando, setAceitando] = useState(null);
     const [aceito, setAceito] = useState(null);
     const [copiado, setCopiado] = useState(false);
@@ -15,14 +17,22 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [pendenteAceitarId, setPendenteAceitarId] = useState(null);
 
     useEffect(() => {
-        carregar();
+        carregar(true);
     }, []);
 
-    const carregar = async () => {
+    const carregar = async (reset = false) => {
+        if (reset) setPage(1);
+        const p = reset ? 1 : page;
         setLoading(true);
         try {
-            const data = await api.get('/emprestimos/oportunidades');
-            setOportunidades(data.oportunidades || []);
+            const data = await api.get(`/emprestimos/oportunidades?page=${p}&limit=10`);
+            const novos = data.oportunidades || [];
+            if (reset) {
+                setOportunidades(novos);
+            } else {
+                setOportunidades(prev => [...prev, ...novos]);
+            }
+            setHasMore(data.has_more || false);
             setPoolTotal(data.pool_disponivel || 0);
         } catch (e) {
             console.error('Erro ao carregar oportunidades:', e);
@@ -177,6 +187,24 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         </button>
                 </div>
             ))}
+
+            {hasMore && (
+                <div className="text-center mt-1">
+                    <button className="btn btn-secondary btn-sm" onClick={async () => {
+                        const nextPage = page + 1;
+                        setPage(nextPage);
+                        setLoading(true);
+                        try {
+                            const data = await api.get(`/emprestimos/oportunidades?page=${nextPage}&limit=10`);
+                            setOportunidades(prev => [...prev, ...(data.oportunidades || [])]);
+                            setHasMore(data.has_more || false);
+                        } catch (e) { console.error(e); }
+                        setLoading(false);
+                    }} disabled={loading} style={{ padding: '8px 20px' }}>
+                        {loading ? 'Carregando...' : 'Carregar Mais Pedidos'}
+                    </button>
+                </div>
+            )}
 
             {showTermosAceite && (
                 <div className="modal-overlay">

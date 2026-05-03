@@ -163,6 +163,59 @@ async def registrar_calote(request: Request, id: int, db: Session = Depends(get_
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+TAXA_COBRANCA = Decimal("2.00")
+
+@router.post("/cobrar/{id}")
+@limiter.limit("2/minute")
+async def cobrar_devedor(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.credor_id == usuario.id,
+        SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.CANCELADO])
+    ).first()
+    if not solicitacao:
+        raise HTTPException(status_code=404, detail="Contrato nao encontrado ou voce nao e o credor.")
+    tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
+    if not tomador:
+        raise HTTPException(status_code=404, detail="Tomador nao encontrado.")
+    tem_calote = tomador.score == 0 or solicitacao.status == StatusSolicitacao.CANCELADO
+    if not tem_calote:
+        raise HTTPException(status_code=400, detail="Este contrato nao esta em situacao de cobranca.")
+    if usuario.saldo < TAXA_COBRANCA:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobranca. R$ {TAXA_COBRANCA:.2f} necessario.")
+    debito_total = calcular_divida_total(solicitacao)
+    usuario.saldo -= TAXA_COBRANCA
+    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+    if plataforma:
+        plataforma.saldo += TAXA_COBRANCA
+    tx = Transacao(usuario_id=usuario.id, valor=TAXA_COBRANCA, tipo=TipoTransacao.TAXA_SOLICITACAO, status="concluido", detalhes=f"Cobranca do contrato #{solicitacao.id}")
+    db.add(tx)
+    db.commit()
+    from utils_email import enviar_email_recuperacao
+    email_enviado = False
+    if tomador.email:
+        try:
+            enviar_email_recuperacao(tomador.email, tomador.nome, f"VC TEM UMA COBRANCA PENDENTE - CONTRATO #{solicitacao.id}")
+            email_enviado = True
+        except Exception as e:
+            print(f"Erro ao enviar email de cobranca: {e}")
+    whatsapp_link = None
+    if tomador.telefone:
+        apenas_num = "".join(filter(str.isdigit, tomador.telefone))
+        if not apenas_num.startswith("55"):
+            apenas_num = "55" + apenas_num
+        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito_total):.2f} referente ao contrato #{solicitacao.id} com {usuario.nome}. Entre em contato para regularizar. - Psy Pay"
+        import urllib.parse
+        whatsapp_link = f"https://wa.me/{apenas_num}?text={urllib.parse.quote(msg)}"
+    return {
+        "message": f"Cobranca enviada para {tomador.nome}. Taxa de R$ {TAXA_COBRANCA:.2f} cobrada.",
+        "email_enviado": email_enviado,
+        "whatsapp_link": whatsapp_link,
+        "telefone_tomador": tomador.telefone,
+        "email_tomador": tomador.email,
+        "debito": float(debito_total)
+    }
+
 
 class ContratoPDF(FPDF):
     def header(self):

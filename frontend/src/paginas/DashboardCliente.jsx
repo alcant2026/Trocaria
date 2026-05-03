@@ -1770,8 +1770,17 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                         <span className={`badge ${emp.status === 'concluido' ? 'badge-secondary' : 'badge-danger'}`} style={{ fontSize: '0.55rem' }}>
                                                                             {emp.status.toUpperCase()}
                                                                         </span>
-                                                                        <p style={{ fontSize: '0.8rem', fontWeight: 600, marginTop: '4px' }}>Empréstimo #{emp.id}</p>
+                                                                        <p style={{ fontSize: '0.8rem', fontWeight: 600, marginTop: '4px' }}>Apoio #{emp.id}</p>
                                                                         <p className="text-muted" style={{ fontSize: '0.65rem' }}>Total: R$ {emp.valor.toLocaleString('pt-BR')}</p>
+                                                                        {emp.status === 'cancelado' && emp.tipo !== 'tomador' && (
+                                                                            <button className="btn btn-primary btn-sm" style={{ marginTop: '8px', fontSize: '0.7rem', padding: '4px 10px' }} onClick={async () => {
+                                                                                try {
+                                                                                    const r = await api.post('/emprestimos/cobrar/' + emp.id);
+                                                                                    setMensagem({ tipo: 'sucesso', texto: r.message });
+                                                                                    if (r.whatsapp_link) window.open(r.whatsapp_link, '_blank');
+                                                                                } catch (e) { setMensagem({ tipo: 'erro', texto: e.message }); }
+                                                                            }}>Cobrar Devedor (R$ 2,00)</button>
+                                                                        )}
                                                                     </div>
                                                                     <div className="text-right">
                                                                         <p style={{ fontSize: '0.75rem', fontWeight: 700, color: emp.status === 'concluido' ? 'var(--success)' : 'var(--danger)' }}>

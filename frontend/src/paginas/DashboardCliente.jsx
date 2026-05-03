@@ -1911,7 +1911,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </div>
                     )}
 
-                    {marketplaceTab === 'explorar' ? (<div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', width: '100%' }}><div style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}>
+                    {marketplaceTab === 'explorar' ? (<div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', width: '100%' }}><div style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}>
                         {                        loadingMarket && marketplaceLinks.length === 0 ? (
                             <div className="marketplace-grid">
                                 {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-loading" style={{ height: '180px', borderRadius: '12px' }}></div>)}

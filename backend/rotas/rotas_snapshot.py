@@ -111,6 +111,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,
                 "kyc_status": kyc_status,
+                "email": usuario.email,
+                "telefone": usuario.telefone,
                 "cpf": usuario.cpf,
                 "chave_pix": usuario.chave_pix,
                 "cidade": usuario.cidade,

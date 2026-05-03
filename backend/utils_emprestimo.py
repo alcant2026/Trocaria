@@ -51,6 +51,9 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
     if not solicitacao:
         raise ValueError("Emprestimo nao encontrado.")
 
+    hoje = datetime.datetime.now(datetime.timezone.utc)
+    em_dia = not solicitacao.proximo_vencimento or hoje <= solicitacao.proximo_vencimento.replace(tzinfo=None) + datetime.timedelta(days=1)
+
     if tipo_pagamento == "quitacao":
         solicitacao.parcelas_pagas = solicitacao.prazo_meses
         solicitacao.status = StatusSolicitacao.CONCLUIDO
@@ -63,11 +66,19 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
         else:
             solicitacao.proximo_vencimento += datetime.timedelta(days=30)
 
+    # Atualizar score do tomador
+    tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
+    if tomador:
+        if em_dia:
+            tomador.score = min((tomador.score or Decimal("0")) + Decimal("5"), Decimal("1000"))
+        else:
+            tomador.score = max((tomador.score or Decimal("0")) - Decimal("10"), Decimal("0"))
+
     detalhes_pgto = {"parcela": "Parcela", "avulso": "Pagamento parcial", "quitacao": "Quitacao total"}
     db.add(Transacao(
         usuario_id=credor_id, valor=Decimal("0.00"), tipo=TipoTransacao.CONFIRMACAO_RECEBIMENTO,
         status="concluido",
-        detalhes=f"Recebimento confirmado — {detalhes_pgto.get(tipo_pagamento, 'Parcela')} {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}"
+        detalhes=f"Recebimento confirmado — {detalhes_pgto.get(tipo_pagamento, 'Parcela')} {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}" + (" (em dia)" if em_dia else " (em atraso)")
     ))
     db.commit()
     return {
@@ -75,7 +86,8 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
         "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO,
         "tipo_pagamento": tipo_pagamento,
         "parcelas_pagas": solicitacao.parcelas_pagas,
-        "total_parcelas": solicitacao.prazo_meses
+        "total_parcelas": solicitacao.prazo_meses,
+        "em_dia": em_dia
     }
 
 

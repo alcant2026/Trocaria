@@ -926,9 +926,23 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* Grid de Produtos */
 .marketplace-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: 1fr;
     gap: 10px;
     margin-top: 10px;
+}
+
+@media (min-width: 900px) {
+    .marketplace-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .market-img-wrapper {
+        width: 120px;
+        min-width: 120px;
+        height: 120px;
+    }
 }
 
 @media (max-width: 600px) {
@@ -958,7 +972,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 /* Informações do Produto - À direita da imagem */
 .market-info {
-    padding: 10px 12px;
+    padding: 8px 10px 8px 10px;
     display: flex;
     flex-direction: column;
     flex: 1;

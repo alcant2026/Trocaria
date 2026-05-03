@@ -34,72 +34,14 @@ class AvaliarRequest(BaseModel):
 
 class CompraViewsRequest(BaseModel):
     link_id: int
-    pacote_id: int # 1: 500 views (R$ 5), 2: 1500 views (R$ 12), 3: 5000 views (R$ 35)
+    pacote_id: int # 1: 100 views (R$ 1), 2: 500 views (R$ 5), 3: 1500 views (R$ 12), 4: 5000 views (R$ 35)
 
 PRECO_VIEWS = {
-    1: {"views": 500, "preco": Decimal("5.00"), "ponto_min": 1, "ponto_max": 5},
-    2: {"views": 1500, "preco": Decimal("12.00"), "ponto_min": 5, "ponto_max": 15},
-    3: {"views": 5000, "preco": Decimal("35.00"), "ponto_min": 15, "ponto_max": 50},
+    1: {"views": 100, "preco": Decimal("1.00"), "label": "Basico"},
+    2: {"views": 500, "preco": Decimal("5.00"), "label": "Popular"},
+    3: {"views": 1500, "preco": Decimal("12.00"), "label": "Intermediario"},
+    4: {"views": 5000, "preco": Decimal("35.00"), "label": "Avancado"},
 }
-
-@router.post("/postar-link")
-@limiter.limit("2/minute")
-async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """
-    Postagem gratuita por 24 horas (Carência inicial).
-    Exige 2FA (Google Authenticator) para prevenir spam.
-    """
-    url_final = dados.url_afiliado.strip()
-    
-    # Lógica de WhatsApp Inteligente
-    if not url_final.lower().startswith(('http://', 'https://')):
-        # Remove caracteres de formatação (espaços, parênteses, traços)
-        so_numeros = "".join(filter(str.isdigit, url_final))
-        if 8 <= len(so_numeros) <= 13:
-            # Se não tiver DDI 55 e for um número brasileiro plausível (DDD + número)
-            if not so_numeros.startswith('55') and len(so_numeros) <= 11:
-                so_numeros = '55' + so_numeros
-            url_final = f"https://wa.me/{so_numeros}"
-
-    # ANTI-SPAM: Exigir 2FA ativo
-    if not usuario.two_factor_enabled or not usuario.totp_secret:
-        raise HTTPException(
-            status_code=403,
-            detail="Para anunciar no Marketplace, ative a Autenticação de Dois Fatores (Google Authenticator) nas configurações."
-        )
-    
-    if not dados.codigo_2fa:
-        raise HTTPException(status_code=400, detail="Código 2FA obrigatório para postar anúncio.")
-    
-    totp = pyotp.TOTP(usuario.totp_secret)
-    if not totp.verify(dados.codigo_2fa):
-        raise HTTPException(status_code=401, detail="Código 2FA inválido ou expirado.")
-    
-    # Limite de 3 links ativos por usuário para evitar spam gratuito
-    total_ativos = db.query(LinkAfiliado).filter(LinkAfiliado.usuario_id == usuario.id, LinkAfiliado.is_active == True).count()
-    if total_ativos >= 3:
-        raise HTTPException(status_code=400, detail="Você já possui 3 links ativos. Impulsione um ou aguarde a expiração.")
-
-    novo_link = LinkAfiliado(
-        nome_produto=dados.nome_produto,
-        descricao=dados.descricao,
-        categoria=dados.categoria,
-        url_afiliado=url_final,
-        url_imagem=dados.url_imagem,
-        valor=dados.valor,
-        nota=dados.nota,
-        vendas_texto=dados.vendas_texto,
-        usuario_id=usuario.id,
-        visualizacoes_restantes=50,
-        is_boosted=False,
-        data_expiracao=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
-    )
-    
-    db.add(novo_link)
-    db.commit()
-    db.refresh(novo_link)
-    
-    return {"message": "Link postado com sucesso! Voce tem 24h e 50 visualizacoes de bonus.", "id": novo_link.id}
 
 DESTAQUE_PRECO = Decimal("5.00")
 
@@ -126,6 +68,36 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
         db.add(t); db.commit()
         qr = p.get("point_of_interaction", {}).get("transaction_data", {})
         return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+class PixBoostRequest(BaseModel):
+    link_id: int
+    pacote_id: int
+
+@router.post("/gerar-pix-boost")
+async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    link = db.query(LinkAfiliado).filter(LinkAfiliado.id == dados.link_id, LinkAfiliado.usuario_id == usuario.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link nao encontrado.")
+    pacote = PRECO_VIEWS.get(dados.pacote_id)
+    if not pacote:
+        raise HTTPException(status_code=400, detail="Pacote invalido.")
+    pendente = db.query(Transacao).filter(Transacao.detalhes == f"BOOST_LINK:{link.id}:{dados.pacote_id}", Transacao.status == "pendente").first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Pagamento pendente ja existe para este link.")
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
+    if not sdk:
+        raise HTTPException(status_code=503, detail="Gateway indisponivel.")
+    try:
+        p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+        if not p or p.get("status") not in ("approved", "pending", "in_process"):
+            raise HTTPException(status_code=502, detail="Erro ao gerar PIX.")
+        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
+        db.add(t); db.commit()
+        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 

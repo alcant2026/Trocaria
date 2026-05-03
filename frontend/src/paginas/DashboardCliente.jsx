@@ -251,6 +251,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [showBoostModal, setShowBoostModal] = useState(false);
     const [boostTarget, setBoostTarget] = useState(null);
     const [pixDestaque, setPixDestaque] = useState(null);
+    const [pixBoost, setPixBoost] = useState(null);
     const [pixAssinatura, setPixAssinatura] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
@@ -2188,21 +2189,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 type="warning"
             >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Escolha um pacote de views para turbinar seu anuncio. Pagamento via PIX.</p>
                     {[
-                        { id: 1, v: 500, p: 5 },
-                        { id: 2, v: 1500, p: 12 },
-                        { id: 3, v: 5000, p: 35 }
+                        { id: 1, v: 100, p: 1, desc: 'Teste o alcance por 1 real' },
+                        { id: 2, v: 500, p: 5, desc: 'Alcance medio para mais pessoas' },
+                        { id: 3, v: 1500, p: 12, desc: 'Alcance avancado com bom custo-beneficio' },
+                        { id: 4, v: 5000, p: 35, desc: 'Alcance maximo para vender rapido' }
                     ].map(pkg => (
-                        <div key={pkg.id} className="card-minimal flex-between clickable" onClick={async () => {
+                        <div key={pkg.id} className="card-minimal clickable" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onClick={async () => {
                             try {
-                                await api.post('/comunidade/comprar-views', { link_id: boostTarget.id, pacote_id: pkg.id });
-                                setShowBoostModal(false);
-                                carregarSnapshot();
-                                showModal({ title: 'Ativado!', message: pkg.v + ' views adicionadas.', type: 'success' });
-                            } catch (err) { showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao turbinar anúncio', type: 'danger' }); }
+                                const res = await api.post('/comunidade/gerar-pix-boost', { link_id: boostTarget.id, pacote_id: pkg.id });
+                                if (res.payment_id && res.qr_code) {
+                                    setShowBoostModal(false);
+                                    setPixBoost({ payment_id: res.payment_id, transacao_id: res.transacao_id, qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, valor: res.valor, views: res.views });
+                                } else {
+                                    showModal({ title: 'Erro', message: 'Erro ao gerar PIX.', type: 'danger' });
+                                }
+                            } catch (err) { showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao turbinar', type: 'danger' }); }
                         }}>
-                            <div><p className="font-bold">{pkg.v} Views</p></div>
-                            <span className="text-primary font-bold">R$ {pkg.p}</span>
+                            <div>
+                                <p className="font-bold" style={{ margin: '0 0 2px' }}>{pkg.v} Views</p>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0 }}>{pkg.desc}</p>
+                            </div>
+                            <span className="text-primary font-bold" style={{ fontSize: '1.1rem' }}>R$ {pkg.p}</span>
                         </div>
                     ))}
                 </div>
@@ -2230,6 +2239,32 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             }} />
                         )}
                         <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixDestaque(null)}>Fechar</button>
+                    </div>
+                </div>
+            )}
+
+            {pixBoost && (
+                <div className="modal-overlay" onClick={() => setPixBoost(null)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
+                        <h3 style={{ marginBottom: '10px' }}>Turbinar Anuncio</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Adquira {pixBoost.views} views para seu anuncio! Pague via PIX.</p>
+                        {pixBoost.qr_code_base64 && (
+                            <img src={`data:image/png;base64,${pixBoost.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
+                        )}
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, flex: 1, wordBreak: 'break-all', margin: 0 }}>{pixBoost.qr_code}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(pixBoost.qr_code); setMensagem({ tipo: 'sucesso', texto: 'Codigo PIX copiado!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                                <Copy size={16} />
+                            </button>
+                        </div>
+                        {pixBoost.transacao_id && (
+                            <PagamentoPolling transacaoId={pixBoost.transacao_id} onConcluido={() => {
+                                setPixBoost(null);
+                                carregarSnapshot();
+                                showModal({ title: 'Views Adicionadas!', message: `${pixBoost.views} views adicionadas ao seu anuncio.`, type: 'success' });
+                            }} />
+                        )}
+                        <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixBoost(null)}>Fechar</button>
                     </div>
                 </div>
             )}

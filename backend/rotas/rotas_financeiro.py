@@ -714,6 +714,28 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             except Exception as e:
                                 logger.error(f"DESTAQUE: Erro ao destacar link: {e}")
                             cache_snapshot_data.pop(usuario.id, None)
+                        elif transacao.tipo == TipoTransacao.TAXA_POSTAGEM and transacao.detalhes and "BOOST_LINK:" in transacao.detalhes:
+                            try:
+                                partes = transacao.detalhes.split(":")
+                                link_id = int(partes[1])
+                                pacote_id = int(partes[2])
+                                from modelos.modelos_db import LinkAfiliado
+                                from rotas.rotas_comunidade import PRECO_VIEWS
+                                link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
+                                pacote = PRECO_VIEWS.get(pacote_id)
+                                if link and pacote:
+                                    link.is_boosted = True
+                                    link.visualizacoes_restantes += pacote["views"]
+                                    link.data_expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+                                transacao.status = "concluido"
+                                if not transacao.payment_id:
+                                    transacao.payment_id = str(payment_id)
+                                plataforma.saldo += Decimal(str(valor_mp))
+                                db.commit()
+                                logger.info(f"BOOST: Link #{link_id} +{pacote['views'] if pacote else '?'} views (R${valor_mp})")
+                            except Exception as e:
+                                logger.error(f"BOOST: Erro ao processar boost: {e}")
+                            cache_snapshot_data.pop(usuario.id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

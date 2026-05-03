@@ -198,11 +198,6 @@ async def startup_db_setup():
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
 for router_module in [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_parceiros_caixa, rotas_comunidade, rotas_relatorio, rotas_admin_fiscal, rotas_dividendos, rotas_marketplace]:
     app.include_router(router_module.router, prefix="/api")
-    app.include_router(router_module.router)
-
-@app.options("/{path:path}")
-async def cors_preflight(path: str):
-    return {}
 
 @app.get("/__warmup")
 @app.get("/api/__warmup")

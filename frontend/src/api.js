@@ -4,8 +4,14 @@ const androidDevUrl = import.meta.env.VITE_API_URL_ANDROID || 'http://10.0.2.2:8
 
 const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 
-// Prioriza URL de variável de ambiente se definida (mesmo em dev se quisermos forçar o apontamento remoto)
-export const BASE_URL = viteUrl || (import.meta.env.DEV 
+// Garante que a URL base sempre termine com /api
+function normalizarUrl(url) {
+    if (!url) return url;
+    const u = url.replace(/\/+$/, '');
+    return u.endsWith('/api') ? u : u + '/api';
+}
+
+export const BASE_URL = normalizarUrl(viteUrl) || (import.meta.env.DEV 
     ? (isCapacitor ? androidDevUrl : '/api') 
     : productionUrl);
 

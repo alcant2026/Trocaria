@@ -1282,39 +1282,37 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             )}
 
                             {/* MEUS DADOS / EDITAR PERFIL */}
-                            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.15)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <h4 style={{ fontSize: '0.85rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>MEUS DADOS</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email</label>
-                                            <input type="email" className="input" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder={usuario.email || 'Seu email'} />
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Telefone</label>
-                                            <input type="tel" className="input" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder={usuario.telefone || '(DDD) 9xxxx-xxxx'} />
-                                        </div>
+                            <div className="card-minimal" style={{ marginTop: '1.5rem', padding: '1.2rem' }}>
+                                <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Meus Dados</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                        <input type="email" className="input-field" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder={usuario.email || 'Seu email'} />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Telefone</label>
+                                        <input type="tel" className="input-field" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder={usuario.telefone || '(DDD) 9xxxx-xxxx'} />
                                     </div>
                                     <div>
                                         <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Chave PIX</label>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <input type="text" className="input" style={{ flex: 1 }} value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder={usuario.chave_pix || 'Sua chave PIX'} />
-                                            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={async () => {
-                                                const campos = {};
-                                                if (editEmail !== usuario.email && editEmail.trim()) campos.email = editEmail.trim();
-                                                if (editTelefone !== usuario.telefone && editTelefone.trim()) campos.telefone = editTelefone.trim();
-                                                if (editChavePix !== usuario.chave_pix && editChavePix.trim()) campos.chave_pix = editChavePix.trim();
-                                                if (Object.keys(campos).length === 0) { setMensagem({ tipo: 'info', texto: 'Nenhum campo alterado.' }); return; }
-                                                try {
-                                                    const res = await api.put('/auth/perfil', campos);
-                                                    setMensagem({ tipo: 'sucesso', texto: res.message });
-                                                    carregarSnapshot();
-                                                } catch (e) {
-                                                    setMensagem({ tipo: 'erro', texto: e?.response?.data?.detail || 'Erro ao salvar.' });
-                                                }
-                                            }}>Salvar</button>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <input type="text" className="input-field" style={{ flex: 1 }} value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder={usuario.chave_pix || 'Sua chave PIX'} />
                                         </div>
                                     </div>
+                                    <button className="btn btn-primary w-full" onClick={async () => {
+                                        const campos = {};
+                                        if (editEmail !== usuario.email && editEmail.trim()) campos.email = editEmail.trim();
+                                        if (editTelefone !== usuario.telefone && editTelefone.trim()) campos.telefone = editTelefone.trim();
+                                        if (editChavePix !== usuario.chave_pix && editChavePix.trim()) campos.chave_pix = editChavePix.trim();
+                                        if (Object.keys(campos).length === 0) { setMensagem({ tipo: 'info', texto: 'Nenhum campo alterado.' }); return; }
+                                        try {
+                                            const res = await api.put('/auth/perfil', campos);
+                                            setMensagem({ tipo: 'sucesso', texto: res.message });
+                                            carregarSnapshot();
+                                        } catch (e) {
+                                            setMensagem({ tipo: 'erro', texto: e?.response?.data?.detail || 'Erro ao salvar.' });
+                                        }
+                                    }}>Salvar Alteracoes</button>
                                 </div>
                             </div>
 

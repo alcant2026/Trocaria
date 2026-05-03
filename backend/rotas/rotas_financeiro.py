@@ -608,6 +608,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                     if usuario:
                         fee_details = payment.get("fee_details", [])
                         total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
+                        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
 
                         if transacao.tipo == TipoTransacao.TAXA_DEPOSITO_VIRTUAL:
                             usuario.credito_virtual = (usuario.credito_virtual or Decimal("0.00")) + transacao.valor
@@ -634,6 +635,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes += f" | Premium ativado - {dias} dias"
+                            plataforma.saldo += Decimal(str(valor_mp))
                             db.commit()
                             logger.info(f"ASSINATURA: Premium ativado para {usuario.nome} por {dias} dias")
                             cache_snapshot_data.pop(usuario.id, None)
@@ -655,18 +657,21 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     transacao.detalhes = f"Taxa paga - Pedido #{solic.id} criado"
                                     if not transacao.payment_id:
                                         transacao.payment_id = str(payment_id)
+                                    plataforma.saldo += Decimal(str(valor_mp))
                                     db.commit()
-                                    logger.info(f"✅ SOLICITACAO: Pedido #{solic.id} criado apos pagamento de {usuario.nome}")
+                                    logger.info(f"SOLICITACAO: Pedido #{solic.id} criado + R$ {valor_mp} receita")
                                     cache_snapshot_data.pop(usuario.id, None)
                                 except Exception as e:
                                     logger.error(f"Erro ao criar solicitacao apos pagamento: {e}")
                                     transacao.status = "concluido"
                                     transacao.detalhes += f" | Pago mas erro ao criar: {e}"
+                                    plataforma.saldo += Decimal(str(valor_mp))
                                     db.commit()
                         elif transacao.tipo == TipoTransacao.TAXA_MATCH:
                             try:
                                 from utils_fintech import confirmar_match
                                 result = confirmar_match(db, transacao.id)
+                                plataforma.saldo += Decimal(str(valor_mp))
                                 logger.info(f"MATCH: {result['message']}")
                             except Exception as e:
                                 logger.error(f"MATCH: Erro ao confirmar match: {e}")
@@ -685,6 +690,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes = "Conta verificada apos pagamento KYC"
+                            plataforma.saldo += Decimal(str(valor_mp))
                             db.commit()
                             logger.info(f"KYC: Conta de {usuario.nome} verificada apos pagamento de R$14,99")
                             cache_snapshot_data.pop(usuario.id, None)
@@ -712,7 +718,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     parceiro.saldo_caixa_atual += valor_mp
                                     transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
 
-                            plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
                             if plataforma:
                                 plataforma.saldo -= total_fee_mp
                                 logger.info(f"TAXA ABSORVIDA: R$ {total_fee_mp} descontados.")

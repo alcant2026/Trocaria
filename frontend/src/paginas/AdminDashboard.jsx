@@ -544,9 +544,6 @@ const AdminDashboard = () => {
                     <div className={`nav-item ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>
                         <Users size={20} /> <span>Usuários</span>
                     </div>
-                    <div className={`nav-item ${activeTab === 'parceiros' ? 'active' : ''}`} onClick={() => setActiveTab('parceiros')}>
-                        <Store size={20} /> <span>Lojistas</span>
-                    </div>
                     <div className={`nav-item ${activeTab === 'resgates' ? 'active' : ''}`} onClick={() => { setActiveTab('resgates'); carregarResgates(); }}>
                         <Sparkles size={20} /> <span>Resgates</span>
                     </div>
@@ -593,8 +590,7 @@ const AdminDashboard = () => {
                             <StatCard label="Usuários" value={snapshot?.admin?.total_usuarios || 0} icon={Users} color="var(--primary)" trend={null} />
                             <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_ativos?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
                             <StatCard label="Pedidos Pendentes" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={Clock} color="var(--warning)" trend={null} />
-                            <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
-                            <StatCard label="Parceiros" value={snapshot?.admin?.gestao_parceiros?.length || 0} icon={Store} color="var(--secondary)" trend={null} />
+                             <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
                         </div>
                     </div>
                 )}
@@ -800,103 +796,6 @@ const AdminDashboard = () => {
                                 </div>
                             ));
                         })()}
-                    </div>
-                )}
-
-                {activeTab === 'parceiros' && (
-                    <div className="glass-panel animate-fade-in">
-                        <div className="section-header">
-                            <h3>Parceiros de Caixa (Lojistas)</h3>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button 
-                                    className="btn btn-outline text-xs gap-1" 
-                                    onClick={handleSincronizarTokens}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', borderColor: 'var(--success)', color: 'var(--success)' }}
-                                    title="Sincroniza o token do Mercado Pago do usuário dono para a loja parceira"
-                                >
-                                    <RefreshCw size={14} /> Sincronizar Tokens MP
-                                </button>
-                                <button className="btn btn-primary text-xs gap-1" onClick={() => setShowNovoParceiroModal(true)}>
-                                    <PlusCircle size={16} /> Novo Parceiro
-                                </button>
-                            </div>
-                        </div>
-                        
-                        {parceiros.length === 0 ? (
-                            <div className="empty-state">
-                                <Store size={48} className="mb-1 opacity-20" />
-                                <p>Nenhum parceiro cadastrado.</p>
-                            </div>
-                        ) : (
-                            <div className="table-responsive">
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Nome do Ponto</th>
-                                            <th>ID Dono</th>
-                                            <th>Status Caixa</th>
-                                            <th>Prazo / Taxa</th>
-                                            <th>Saldo Atual</th>
-                                            <th>Comissões</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {parceiros.map(p => (
-                                            <tr key={p.id} className="row-hover">
-                                                <td>
-                                                    <div className="flex-start gap-1">
-                                                        <div className="user-avatar" style={{ background: 'var(--secondary)' }}><Store size={14} /></div>
-                                                        <div>
-                                                            <p className="font-bold">{p.nome}</p>
-                                                            <p className="text-xs text-muted">{p.endereco}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className="text-xs font-mono">{p.usuario_id || 'Sem Vínculo'}</span>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <span className={`status-pill ${p.caixa_aberto ? 'status-success' : 'status-danger'}`}>
-                                                            {p.caixa_aberto ? 'ABERTO' : 'FECHADO'}
-                                                        </span>
-                                                        <span className={`text-xs font-bold ${p.mp_conectado ? 'text-success' : 'text-warning'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            {p.mp_conectado ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                                                            {p.mp_conectado ? 'MP CONECTADO' : 'SEM MP'}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="flex-column" style={{ gap: '2px' }}>
-                                                        <span className="text-xs font-bold text-primary" style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>
-                                                            D+{p.prazo_liquidacao || 0}
-                                                        </span>
-                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                                            {p.taxa_comissao}% comissão
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="text-primary font-bold">R$ {p.saldo_atual.toLocaleString('pt-BR')}</td>
-                                                <td className="text-success">R$ {p.comissao.toLocaleString('pt-BR')}</td>
-                                                <td>
-                                                    <button 
-                                                        className="btn btn-outline btn-danger text-xs p-1"
-                                                        title="Excluir Parceiro"
-                                                        onClick={() => {
-                                                            setParceiroParaExcluir(p);
-                                                            setShowExcluirParceiroModal(true);
-                                                        }}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
                     </div>
                 )}
 

@@ -534,6 +534,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         "total_taxas_mp": float(total_taxas_mp),
                         "custos_infra_estimados": float(total_infra),
                         "saldo_pool_caixa": float(saldo_pool_caixa),
+                        "saldo_plataforma": float(p_saldo),
                         "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
                         "lucro_acumulado_pool": float(juros_acumulados_pool),
                         "total_credito_ativo": float(total_credito_ativo),

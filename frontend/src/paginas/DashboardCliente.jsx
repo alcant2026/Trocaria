@@ -1247,7 +1247,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     padding: '4px 10px', 
                                                     borderRadius: '6px' 
                                                 }}>
-                                                    {usuario.kyc_status === 'pendente' ? 'Aguarde 24h' : 'R$ 14,99'}
+                                                    {usuario.kyc_status === 'pendente' ? 'Aguarde 24h' : 'GRATIS'}
                                                 </span>
                                                 <div style={{ color: usuario.kyc_status === 'pendente' ? 'var(--text-muted)' : 'var(--success)', fontSize: '0.75rem', fontWeight: 600 }}>
                                                     {usuario.kyc_status === 'pendente' ? 'Análise em curso' : 'Começar Agora →'}
@@ -1417,29 +1417,26 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     </div>
                                                     <div>
                                                         <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Verificacao de Conta</h3>
-                                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pague R$ 14,99 e tenha sua conta verificada instantaneamente. Ganhe +10 pontos no score!</p>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Envie seus documentos e tenha sua conta verificada gratuitamente. Ganhe +10 pontos no score!</p>
                                                     </div>
                                                 </div>
                                                 <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--success-rgb), 0.05)', border: '1px solid rgba(var(--success-rgb), 0.1)' }}>
                                                     <div className="info-label">Valor</div>
-                                                    <div className="info-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)' }}>R$ 14,99</div>
+                                                    <div className="info-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)' }}>GRATIS</div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
                                                     <button className="btn btn-primary" style={{ flex: 2 }} onClick={async () => {
                                                         try {
                                                             setLoading(true);
-                                                            const res = await api.post('/score/gerar-taxa-verificacao');
-                                                            if (res.payment_id && res.qr_code) {
-                                                                setQrCodeVerificacao({ payment_id: res.payment_id, qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, transacao_id: res.transacao_id, valor: res.valor });
-                                                            } else {
-                                                                setMensagem({ tipo: 'erro', texto: typeof res.detail === 'string' ? res.detail : 'Erro ao gerar PIX.' });
-                                                            }
+                                                            await api.post('/score/solicitar-verificacao', { detalhes: 'Solicitacao via Upgrade' });
+                                                            setMensagem({ tipo: 'sucesso', texto: 'Documentos enviados! Aguarde a analise do administrador.' });
+                                                            setPassoUpgrade(1);
                                                         } catch (e) {
-                                                            const msg = e?.response?.data?.detail || 'Erro ao gerar PIX. Tente novamente.';
+                                                            const msg = e?.response?.data?.detail || 'Erro ao solicitar verificacao.';
                                                             setMensagem({ tipo: 'erro', texto: msg });
                                                         } finally { setLoading(false); }
                                                     }} disabled={loading}>
-                                                        {loading ? <span className="spinner" /> : 'Pagar R$ 14,99 via PIX'}
+                                                        {loading ? <span className="spinner" /> : 'Solicitar Verificacao (Gratis)'}
                                                     </button>
                                                     <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                                 </div>

@@ -1150,18 +1150,25 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
 
 @router.get("/admin/kyc-pendentes")
 async def listar_kyc_pendentes(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    from modelos.modelos_db import DocumentoVerificacao
+    from modelos.modelos_db import DocumentoVerificacao, Transacao
     docs = db.query(DocumentoVerificacao).filter(DocumentoVerificacao.status == "pendente").all()
     resultado = []
     for d in docs:
+        transacao = db.query(Transacao).filter(
+            Transacao.usuario_id == d.usuario_id,
+            Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS,
+            Transacao.status == "pendente"
+        ).first()
         resultado.append({
+            "id": d.id,
+            "transacao_id": transacao.id if transacao else None,
             "usuario_id": d.usuario_id,
             "usuario_nome": d.usuario.nome,
             "usuario_cpf": d.usuario.cpf,
             "data_envio": d.data_envio.isoformat(),
-            "tem_rg": bool(d.caminho_rg),
-            "tem_renda": bool(d.caminho_renda),
-            "tem_residencia": bool(d.caminho_residencia),
+            "url_rg": f"/financeiro/admin/view-doc/{d.usuario_id}/rg" if d.caminho_rg else None,
+            "url_renda": f"/financeiro/admin/view-doc/{d.usuario_id}/renda" if d.caminho_renda else None,
+            "url_residencia": f"/financeiro/admin/view-doc/{d.usuario_id}/residencia" if d.caminho_residencia else None,
         })
     return resultado
 

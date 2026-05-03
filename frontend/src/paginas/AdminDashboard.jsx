@@ -393,6 +393,18 @@ const AdminDashboard = () => {
         setShowRejeitarModal(true);
     };
 
+    const handleConfirmarVerificacao = async (p) => {
+        if (!window.confirm(`Aprovar verificacao de ${p.usuario_nome}?`)) return;
+        try {
+            const id = p.transacao_id || p.id;
+            await api.post(`/financeiro/admin/confirmar/${id}`);
+            setMensagem(`Verificacao de ${p.usuario_nome} aprovada!`);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
     const confirmarRejeicao = async () => {
         setLoadingRejeicao(true);
         try {

@@ -1969,7 +1969,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             border: '1px solid rgba(255,255,255,0.05)',
                             marginBottom: '2rem'
                         }}>
-                            <RankingSemanal usuario={usuario} />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
                                 <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
                                     <CreditCard size={24} color="var(--primary)" />
@@ -1982,7 +1981,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </div>
                     )}
 
-                    {marketplaceTab === 'explorar' ? (
+                    {marketplaceTab === 'explorar' ? (<div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}><div style={{ flex: 1, minWidth: 0 }}>
                         loadingMarket && marketplaceLinks.length === 0 ? (
                             <div className="marketplace-grid">
                                 {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-loading" style={{ height: '280px', borderRadius: '16px' }}></div>)}
@@ -2086,6 +2085,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <button className="btn btn-link" onClick={() => setShowPostarLink(true)}>Seja o primeiro a anunciar!</button>
                             </div>
                         )
+                    </div><RankingSemanal usuario={usuario} sidebar /></div>
                     ) : (
                         loadingMarket && meusLinksMarketplace.length === 0 ? (
                             <div className="marketplace-grid">

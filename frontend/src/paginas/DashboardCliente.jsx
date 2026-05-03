@@ -1234,7 +1234,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                         {usuario.kyc_status === 'pendente' ? 'Solicitação em Análise' : 'Verificação de Conta'}
                                                     </h3>
                                                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                        {usuario.kyc_status === 'pendente' ? 'Nossa equipe está revisando seus documentos.' : 'Envie seus documentos para obter o selo e liberar crédito.'}
+                                                        {usuario.kyc_status === 'pendente' ? 'Nossa equipe esta revisando seus documentos.' : 'Envie selfie + documento para ganhar o selo de verificacao e +10 pontos no score.'}
                                                     </p>
                                                 </div>
                                             </div>

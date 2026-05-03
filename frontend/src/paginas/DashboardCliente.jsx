@@ -363,7 +363,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             // Atualizar localmente a nota e o total no feed
             setMarketplaceLinks(prev => prev.map(l => {
                 if (l.id === linkId) {
-                    return { ...l, nota: res.data.nova_media, total_avaliacoes: res.data.total_avaliacoes };
+                    return { ...l, nota: res.nova_media, total_avaliacoes: res.total_avaliacoes };
                 }
                 return l;
             }));
@@ -1978,7 +1978,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     <span className="market-sales-count">{l.nota ? Number(l.nota).toFixed(1) : '0.0'} ({l.total_avaliacoes || 0})</span>
                                                 </div>
                                                 {!l.patrocinado && l.expires_at && <div className="market-timer-row"><Timer size={11} /><MarketTimer expiresAt={l.expires_at} /></div>}
-                                                <a href={l.url_afiliado} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm market-cta" onClick={() => { api.post('/comunidade/registrar-view', { link_id: l.id }).catch(() => {}); }}>Ver Produto</a>
+                                                <a href={l.url_afiliado} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm market-cta" onClick={() => { api.post('/comunidade/registrar-view', { link_id: l.id }).catch(e => console.error('View error:', e)); }}>Ver Produto</a>
                                             </div>
                                         </div>
                                     ))}

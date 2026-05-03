@@ -926,8 +926,8 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* Grid de Produtos */
 .marketplace-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 10px;
     margin-top: 10px;
 }
 

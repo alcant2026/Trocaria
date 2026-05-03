@@ -1,0 +1,235 @@
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key } from 'lucide-react';
+
+const Perfil = () => {
+    const [status2fa, setStatus2fa] = useState(null);
+    const [secretData, setSecretData] = useState(null);
+    const [codigo, setCodigo] = useState('');
+    const [mensagem, setMensagem] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [copiado, setCopiado] = useState(false);
+    const [senhaParaDesativar, setSenhaParaDesativar] = useState('');
+    const [codigoParaDesativar, setCodigoParaDesativar] = useState('');
+    const [showDesativarForm, setShowDesativarForm] = useState(false);
+    const [showSenha, setShowSenha] = useState(false);
+    const [usuario, setUsuario] = useState(null);
+    const [editEmail, setEditEmail] = useState('');
+    const [editTelefone, setEditTelefone] = useState('');
+    const [editChavePix, setEditChavePix] = useState('');
+    const [salvando, setSalvando] = useState(false);
+
+    useEffect(() => {
+        carregarStatus();
+        carregarPerfil();
+    }, []);
+
+    const carregarStatus = async () => {
+        try {
+            const res = await api.get('/auth/perfil');
+            setStatus2fa(res.two_factor_enabled);
+            setUsuario(res);
+        } catch (err) {
+            console.error("Erro ao carregar perfil:", err);
+        }
+    };
+
+    const carregarPerfil = async () => {
+        try {
+            const res = await api.get('/auth/perfil');
+            setUsuario(res);
+            setEditEmail(res.email || '');
+            setEditTelefone(res.telefone || '');
+            setEditChavePix(res.chave_pix || '');
+        } catch (err) {
+            console.error("Erro ao carregar perfil:", err);
+        }
+    };
+
+    const gerar2fa = async () => {
+        setLoading(true);
+        setMensagem('');
+        try {
+            const res = await api.post('/auth/2fa/gerar');
+            setSecretData(res);
+            if (res.error) {
+                setMensagem(res.error);
+            }
+        } catch (err) {
+            setMensagem(err.message || "Erro ao conectar com o servidor.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const copiarChave = () => {
+        if (!secretData?.secret) return;
+        navigator.clipboard.writeText(secretData.secret);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+    };
+
+    const ativar2fa = async () => {
+        if (!codigo) return;
+        setLoading(true);
+        try {
+            await api.post(`/auth/2fa/ativar?codigo=${codigo}`);
+            setMensagem("2FA ativado com sucesso!");
+            setStatus2fa(true);
+            setSecretData(null);
+            const user = JSON.parse(localStorage.getItem('usuario')) || {};
+            user.two_factor_enabled = true;
+            localStorage.setItem('usuario', JSON.stringify(user));
+        } catch (err) {
+            setMensagem(err.response?.data?.detail || "Codigo invalido.");
+        }
+        setLoading(false);
+    };
+
+    const desativar2fa = async () => {
+        if (!senhaParaDesativar || !codigoParaDesativar) return;
+        setLoading(true);
+        try {
+            await api.post(`/auth/2fa/desativar?senha=${senhaParaDesativar}&codigo=${codigoParaDesativar}`);
+            setMensagem("2FA desativado com sucesso.");
+            setStatus2fa(false);
+            setSenhaParaDesativar('');
+            setCodigoParaDesativar('');
+            setShowDesativarForm(false);
+            const user = JSON.parse(localStorage.getItem('usuario')) || {};
+            user.two_factor_enabled = false;
+            localStorage.setItem('usuario', JSON.stringify(user));
+        } catch (err) {
+            setMensagem(err.response?.data?.detail || "Senha ou codigo incorretos.");
+        }
+        setLoading(false);
+    };
+
+    const salvarDados = async () => {
+        const campos = {};
+        if (editEmail !== usuario?.email && editEmail.trim()) campos.email = editEmail.trim();
+        if (editTelefone !== usuario?.telefone && editTelefone.trim()) campos.telefone = editTelefone.trim();
+        if (editChavePix !== usuario?.chave_pix && editChavePix.trim()) campos.chave_pix = editChavePix.trim();
+        if (Object.keys(campos).length === 0) { setMensagem('Nenhum campo alterado.'); return; }
+        setSalvando(true);
+        try {
+            const res = await api.put('/auth/perfil', campos);
+            setMensagem(res.message);
+            carregarPerfil();
+        } catch (e) {
+            setMensagem(e?.response?.data?.detail || 'Erro ao salvar.');
+        }
+        setSalvando(false);
+    };
+
+    return (
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
+            {/* DADOS DO PERFIL */}
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(var(--primary-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <User size={24} color="var(--primary)" />
+                    </div>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{usuario?.nome || 'Carregando...'}</h2>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{usuario?.cpf || ''}</p>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Mail size={12} /> Email</label>
+                        <input type="email" className="input-field" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Seu email" />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Phone size={12} /> Telefone</label>
+                        <input type="tel" className="input-field" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder="(DDD) 9xxxx-xxxx" />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Key size={12} /> Chave PIX</label>
+                        <input type="text" className="input-field" value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder="Sua chave PIX" />
+                    </div>
+                    <button className="btn btn-primary w-full" onClick={salvarDados} disabled={salvando}>
+                        {salvando ? 'Salvando...' : 'Salvar Alteracoes'}
+                    </button>
+                </div>
+            </div>
+
+            {/* SEGURANCA 2FA */}
+            <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: 'var(--radius-md)', background: status2fa ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 145, 0, 0.1)', color: status2fa ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {status2fa ? <ShieldCheck size={24} /> : <ShieldAlert size={24} />}
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1rem' }}>Autenticacao 2FA (TOTP)</h3>
+                        <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                            {status2fa ? "Protecao ATIVA" : "Protecao sua conta com 2FA"}
+                        </p>
+                    </div>
+                </div>
+
+                {!status2fa && !secretData && (
+                    <div className="text-center">
+                        <button className="btn btn-primary" onClick={gerar2fa} disabled={loading}>
+                            {loading ? "Processando..." : "Configurar 2FA Agora"}
+                        </button>
+                    </div>
+                )}
+
+                {!status2fa && secretData && (
+                    <div style={{ textAlign: 'center' }}>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.9)', padding: '1.2rem', borderRadius: '24px', display: 'inline-block', marginBottom: '1.5rem' }}>
+                            <img src={secretData.qr_code} alt="QR Code 2FA" style={{ width: '180px', height: '180px', display: 'block', borderRadius: '12px' }} />
+                        </div>
+                        <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '8px' }}>Chave Manual:</p>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '10px' }}>
+                                <code style={{ color: 'var(--primary)', fontSize: '1rem', fontWeight: 'bold', letterSpacing: '1px', wordBreak: 'break-all' }}>{secretData.secret}</code>
+                                <button onClick={copiarChave} style={{ background: 'none', border: 'none', color: copiado ? 'var(--success)' : 'var(--text-muted)', cursor: 'pointer' }}>
+                                    {copiado ? <Check size={18} /> : <Copy size={18} />}
+                                </button>
+                            </div>
+                            {copiado && <p style={{ fontSize: '0.7rem', color: 'var(--success)' }}>Copiado!</p>}
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginBottom: '1rem' }}>Guarde a chave em local seguro.</p>
+                        <div className="input-group" style={{ marginBottom: '10px' }}>
+                            <input type="text" placeholder="Codigo de 6 digitos" className="input-field" value={codigo} onChange={(e) => setCodigo(e.target.value)} maxLength={6} style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '1.2rem' }} />
+                        </div>
+                        <button className="btn btn-primary" onClick={ativar2fa} disabled={loading || codigo.length < 6}>
+                            {loading ? "Validando..." : "Confirmar e Ativar"}
+                        </button>
+                    </div>
+                )}
+
+                {status2fa && (
+                    <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: 'var(--success)', marginBottom: '0.8rem' }}><Lock size={36} /></div>
+                        <p style={{ fontWeight: 600, marginBottom: '1rem' }}>Sua conta esta protegida com 2FA.</p>
+                        {!showDesativarForm ? (
+                            <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => setShowDesativarForm(true)}>Desativar 2FA</button>
+                        ) : (
+                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', textAlign: 'left' }}>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginBottom: '1rem' }}>A desativacao reduz a seguranca da sua conta.</p>
+                                <input type={showSenha ? "text" : "password"} placeholder="Sua senha" className="input-field" value={senhaParaDesativar} onChange={(e) => setSenhaParaDesativar(e.target.value)} style={{ marginBottom: '8px' }} />
+                                <input type="text" placeholder="Codigo 2FA" className="input-field" value={codigoParaDesativar} onChange={(e) => setCodigoParaDesativar(e.target.value)} maxLength={6} style={{ marginBottom: '10px' }} />
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button className="btn btn-danger" style={{ flex: 1 }} onClick={desativar2fa} disabled={loading}>{loading ? "Desativando..." : "Desativar"}</button>
+                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowDesativarForm(false)}>Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {mensagem && (
+                    <div className={`alert mt-1 ${mensagem.includes('sucesso') || mensagem.includes('ativo') ? 'alert-success' : 'alert-danger'}`}>
+                        {mensagem}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default Perfil;

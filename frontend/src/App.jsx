@@ -16,7 +16,7 @@ import DashboardCliente from './paginas/DashboardCliente';
 import AdminDashboard from './paginas/AdminDashboard';
 import Login from './paginas/Login';
 import Registro from './paginas/Registro';
-import Seguranca from './paginas/Seguranca';
+import Perfil from './paginas/Perfil';
 import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
@@ -169,8 +169,8 @@ const App = () => {
                                 <Settings size={20} /> Admin
                             </a>
                         )}
-                        <a href="#seguranca" className={`nav-item ${page === 'seguranca' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Segurança
+                        <a href="#perfil" className={`nav-item ${page === 'perfil' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                            <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Perfil
                         </a>
                     </div>
                     <div className="drawer-footer">
@@ -206,9 +206,9 @@ const App = () => {
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
                 {page === 'vincular-mp' && <MarketplaceCallback />}
                 {page === 'admin' && <AdminDashboard />}
-                {page === 'seguranca' && <Seguranca />}
+                {page === 'perfil' && <Perfil />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
-                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'seguranca', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
+                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
             </main>
 
             {modalExcluir && (

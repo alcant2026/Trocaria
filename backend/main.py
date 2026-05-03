@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import uvicorn
 import os
 from database import engine, SessionLocal, Base
@@ -117,15 +118,7 @@ async def validate_host(request: Request, call_next):
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
     host_clean = host.split(":")[0].lower()
     if host_clean not in ALLOWED_HOSTS:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=403, content={"detail": "Host não permitido."})
-    client_ip_str = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host or ""
-    try:
-        client_ip = ipaddress.ip_address(client_ip_str)
-        if not any(client_ip in net for net in CLOUDFLARE_NETS):
-            return JSONResponse(status_code=403, content={"detail": "Acesso permitido apenas via Cloudflare."})
-    except ValueError:
-        pass
+        return JSONResponse(status_code=403, content={"detail": "Host nao permitido."})
     response = await call_next(request)
     return response
 

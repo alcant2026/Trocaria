@@ -927,11 +927,11 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 .marketplace-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
     margin-top: 10px;
 }
 
-@media (min-width: 1200px) {
+@media (min-width: 1400px) {
     .marketplace-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -939,9 +939,9 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 @media (max-width: 600px) {
     .market-img-wrapper {
-        width: 100px;
-        min-width: 100px;
-        height: 100px;
+        width: 90px;
+        min-width: 90px;
+        height: 90px;
     }
 }
 
@@ -972,7 +972,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 /* Informações do Produto - À direita da imagem */
 .market-info {
-    padding: 8px 10px 8px 10px;
+    padding: 6px 8px;
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -1090,11 +1090,9 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     color: var(--text-main);
     margin: 0 0 4px;
     line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .market-meta {

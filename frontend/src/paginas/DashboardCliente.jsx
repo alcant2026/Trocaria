@@ -367,9 +367,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 }
                 return l;
             }));
-            // Feedback silencioso ou pequeno toast seria bom, mas opcional
+            // Feedback visual
+            setMensagem({ tipo: 'sucesso', texto: `Avaliacao ${nota} estrela(s) registrada!` });
         } catch (err) {
-            showModal({ title: 'Erro na Avaliação', message: err.response?.data?.detail || 'Erro ao avaliar', type: 'danger' });
+            setMensagem({ tipo: 'erro', texto: err.response?.data?.detail || err.message || 'Erro ao avaliar' });
         }
     };
 

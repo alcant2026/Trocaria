@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Star, ShieldCheck, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
 import api from '../api';
 import TermosPlataforma from './TermosPlataforma';
+import PagamentoPolling from './PagamentoPolling';
 
 const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [oportunidades, setOportunidades] = useState([]);
@@ -41,7 +42,11 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
         try {
             const result = await api.post(`/emprestimos/aceitar-oferta/${id}`, { aceite_termos_plataforma: true });
             setCopiado(false);
-            setAceito(result);
+            if (result.qr_code) {
+                setAceito({ ...result, aguardando_pagamento: true, transacao_id: result.transacao_id });
+            } else {
+                setAceito(result);
+            }
             carregar();
         } catch (e) {
             alert('Erro: ' + e.message);
@@ -74,7 +79,22 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
 
             {loading && <p className="text-muted">Carregando...</p>}
 
-            {aceito && (
+            {aceito && aceito.aguardando_pagamento && (
+                <div className="info-block mb-1" style={{ background: 'rgba(var(--warning-rgb), 0.08)', border: '1px solid rgba(var(--warning-rgb), 0.2)', padding: '15px', borderRadius: '16px' }}>
+                    <h4 style={{ textAlign: 'center', marginBottom: '10px' }}>Pague a Taxa de Match</h4>
+                    <p style={{ fontSize: '0.85rem', textAlign: 'center', marginBottom: '15px' }}>
+                        Pague R$ {aceito.taxa_match.toFixed(2)} via PIX para confirmar seu apoio.
+                    </p>
+                    {aceito.qr_code_base64 && (
+                        <img src={`data:image/jpeg;base64,${aceito.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto 15px', borderRadius: '12px' }} />
+                    )}
+                    <PagamentoPolling transacaoId={aceito.transacao_id} onConfirmado={() => {
+                        carregar();
+                    }} />
+                </div>
+            )}
+
+            {aceito && !aceito.aguardando_pagamento && (
                 <div className="info-block mb-1" style={{ background: 'rgba(var(--success-rgb), 0.08)', border: '1px solid rgba(var(--success-rgb), 0.2)', padding: '15px', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                         <CheckCircle size={24} color="var(--success)" />
@@ -91,10 +111,8 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                             <p style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--success)', margin: 0 }}>
                                 PIX: {aceito.chave_pix_tomador}
                             </p>
-                            <button
-                                onClick={() => copiarPix(aceito.chave_pix_tomador)}
-                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'var(--primary)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            >
+                            <button onClick={() => copiarPix(aceito.chave_pix_tomador)}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'var(--primary)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {copiado ? <Check size={14} /> : <Copy size={14} />}
                                 {copiado ? 'Copiado' : 'Copiar'}
                             </button>
@@ -102,13 +120,8 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '5px 0' }}>
                             Score: {aceito.score_tomador} | {aceito.parcelas}x
                         </p>
-                        {aceito.taxa_match && (
-                            <p style={{ fontSize: '0.75rem', color: 'var(--warning)', margin: '5px 0', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
-                                Taxa de match (2%): R$ {aceito.taxa_match.toFixed(2)} — paga pelo tomador
-                            </p>
-                        )}
                     </div>
-                    <button className="btn btn-primary mt-1" onClick={() => setAceito(null)} style={{ width: '100%' }}>
+                    <button className="btn btn-primary mt-1" onClick={() => { setAceito(null); carregar(); }} style={{ width: '100%' }}>
                         OK, Já Enviei o PIX
                     </button>
                 </div>

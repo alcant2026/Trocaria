@@ -813,6 +813,19 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     transacao.status = "concluido"
                                     transacao.detalhes += f" | Pago mas erro ao criar: {e}"
                                     db.commit()
+                        elif transacao.tipo == TipoTransacao.TAXA_MATCH:
+                            try:
+                                from utils_fintech import confirmar_match
+                                result = confirmar_match(db, transacao.id)
+                                logger.info(f"MATCH: {result['message']}")
+                            except Exception as e:
+                                logger.error(f"MATCH: Erro ao confirmar match: {e}")
+                                transacao.status = "concluido"
+                                if not transacao.payment_id:
+                                    transacao.payment_id = str(payment_id)
+                                db.commit()
+                            cache_snapshot_data.pop(usuario.id, None)
+                            cache_snapshot_data.pop(transacao.usuario_id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

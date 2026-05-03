@@ -558,27 +558,15 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         } finally { setLoadingAction(false); }
     };
 
-    const handlePagarParcela = async (id, valorParcela, chavePix) => {
-        const msg = `Envie R$ ${valorParcela.toFixed(2)} via PIX para:\n\n${chavePix || '---'}\n\nDepois de enviar, confirme aqui.`;
-        showModal({
-            title: 'Pagar Parcela',
-            message: msg,
-            type: 'info',
-            onConfirm: async () => {
-                try {
-                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: valorParcela });
-                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro: ' + err.message);
-                }
-            },
-            confirmText: 'Ja Enviei o PIX'
-        });
+    const handlePagarParcela = (id, valorParcela, chavePix) => {
+        setPagamentoDados({ id, valor: valorParcela, chave_pix: chavePix, tipo: 'parcela' });
+        setShowPagamentoModal(true);
     };
 
     const [showConfirmarTipo, setShowConfirmarTipo] = useState(false);
     const [confirmarTipoId, setConfirmarTipoId] = useState(null);
+    const [showPagamentoModal, setShowPagamentoModal] = useState(false);
+    const [pagamentoDados, setPagamentoDados] = useState({});
 
     const handleConfirmarPagtoRecebido = (id) => {
         setConfirmarTipoId(id);
@@ -597,46 +585,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setConfirmarTipoId(null);
     };
 
-    const handleQuitarTotalP2P = async (id, total, chavePix) => {
-        const msg = 'Envie R$ ' + total.toFixed(2) + ' via PIX para:\n\n' + (chavePix || '---') + '\n\nDepois de enviar, confirme aqui.';
-        showModal({
-            title: 'Quitar Total',
-            message: msg,
-            type: 'info',
-            onConfirm: async () => {
-                try {
-                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: total });
-                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro: ' + err.message);
-                }
-            },
-            confirmText: 'Ja Enviei o PIX'
-        });
+    const handleQuitarTotalP2P = (id, total, chavePix) => {
+        setPagamentoDados({ id, valor: total, chave_pix: chavePix, tipo: 'quitacao' });
+        setShowPagamentoModal(true);
     };
 
-    const handlePagarAvulsoP2P = async (id, chavePix) => {
-        const valor = prompt('Digite o valor que deseja pagar:');
-        if (!valor) return;
-        const v = parseFloat(valor);
-        if (!v || v <= 0) { setMensagem('Valor invalido.'); return; }
-        const msg = 'Envie R$ ' + v.toFixed(2) + ' via PIX para:\n\n' + (chavePix || '---') + '\n\nDepois de enviar, confirme aqui.';
-        showModal({
-            title: 'Pagar R$ ' + v.toFixed(2),
-            message: msg,
-            type: 'info',
-            onConfirm: async () => {
-                try {
-                    const res = await api.post('/emprestimos/confirmar-pagamento/' + id, { valor_pagamento: v });
-                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro: ' + err.message);
-                }
-            },
-            confirmText: 'Ja Enviei o PIX'
-        });
+    const handlePagarAvulsoP2P = (id, chavePix) => {
+        setPagamentoDados({ id, valor: 0, chave_pix: chavePix, tipo: 'avulso' });
+        setShowPagamentoModal(true);
     };
 
     const handlePagamentoAvulso = async (id) => {
@@ -2303,6 +2259,53 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             }} />
                         )}
                         <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixAssinatura(null)}>Fechar</button>
+                    </div>
+                </div>
+            )}
+
+            {showPagamentoModal && (
+                <div className="modal-overlay" onClick={() => setShowPagamentoModal(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+                        <h3 style={{ textAlign: 'center', marginBottom: '10px' }}>
+                            {pagamentoDados.tipo === 'avulso' ? 'Pagar Outro Valor' : pagamentoDados.tipo === 'quitacao' ? 'Quitar Total' : 'Pagar Parcela'}
+                        </h3>
+                        <div style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '15px', borderRadius: '12px', marginBottom: '15px' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Chave PIX do Credor:</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <strong style={{ fontSize: '0.9rem', wordBreak: 'break-all', flex: 1 }}>{pagamentoDados.chave_pix || '---'}</strong>
+                                <button onClick={() => { navigator.clipboard.writeText(pagamentoDados.chave_pix || ''); setMensagem({ tipo: 'sucesso', texto: 'Chave PIX copiada!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
+                                    <Copy size={16} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="input-group mb-1">
+                            <label>Valor a pagar (R$)</label>
+                            <input type="number" className="input-field" step="0.01" min="0.01"
+                                value={pagamentoDados.tipo === 'avulso' ? (pagamentoDados.avulsoValor || '') : (pagamentoDados.valor || 0)}
+                                onChange={(e) => {
+                                    if (pagamentoDados.tipo === 'avulso') {
+                                        setPagamentoDados(prev => ({ ...prev, avulsoValor: e.target.value }));
+                                    }
+                                }}
+                                disabled={pagamentoDados.tipo !== 'avulso'}
+                                placeholder="0,00"
+                            />
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
+                                const valorPagar = pagamentoDados.tipo === 'avulso' ? parseFloat(pagamentoDados.avulsoValor) : pagamentoDados.valor;
+                                if (!valorPagar || valorPagar <= 0) { setMensagem({ tipo: 'erro', texto: 'Valor invalido.' }); return; }
+                                try {
+                                    await api.post('/emprestimos/confirmar-pagamento/' + pagamentoDados.id, { valor_pagamento: valorPagar });
+                                    setShowPagamentoModal(false);
+                                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
+                                    carregarSnapshot();
+                                } catch (err) { setMensagem({ tipo: 'erro', texto: err.message }); }
+                            }}>
+                                <CheckCircle size={16} /> Ja Enviei o PIX
+                            </button>
+                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowPagamentoModal(false)}>Cancelar</button>
+                        </div>
                     </div>
                 </div>
             )}

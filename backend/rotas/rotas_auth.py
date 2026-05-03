@@ -314,6 +314,7 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,
         "cpf": usuario.cpf,
+        "email": usuario.email,
         "chave_pix": usuario.chave_pix,
         "telefone": usuario.telefone,
         "cidade": usuario.cidade,

@@ -2067,7 +2067,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                         showModal({ title: 'Erro', message: 'Erro ao gerar PIX.', type: 'danger' });
                                                                     }
                                                                 } catch (e) {
-                                                                    showModal({ title: 'Erro', message: e?.response?.data?.detail || 'Erro.', type: 'danger' });
+                                                                    showModal({ title: 'Erro', message: e.message || 'Erro ao gerar PIX.', type: 'danger' });
                                                                 }
                                                             }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Star size={12} /> Destacar R$5</button>
                                                             <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Zap size={12} /> Turbinar</button>
@@ -2205,7 +2205,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 } else {
                                     showModal({ title: 'Erro', message: 'Erro ao gerar PIX.', type: 'danger' });
                                 }
-                            } catch (err) { showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao turbinar', type: 'danger' }); }
+                            } catch (err) { showModal({ title: 'Erro', message: err.message || 'Erro ao turbinar', type: 'danger' }); }
                         }}>
                             <div>
                                 <p className="font-bold" style={{ margin: '0 0 2px' }}>{pkg.v} Views</p>

@@ -121,14 +121,20 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
-    p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
-    if not p or p.get("status") not in ("approved", "pending", "in_process"):
-        raise HTTPException(status_code=502, detail="Erro ao gerar PIX no Mercado Pago.")
-    t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
-    db.add(t); db.commit()
-    qr = p.get("point_of_interaction", {}).get("transaction_data", {})
-    return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel. Configure MERCADOPAGO_ACCESS_TOKEN nas variaveis de ambiente.")
+    try:
+        p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+        if not p or p.get("status") not in ("approved", "pending", "in_process"):
+            erro_mp = p.get("message", "Erro desconhecido") if p else "Resposta vazia"
+            raise HTTPException(status_code=502, detail=f"Erro ao gerar PIX: {erro_mp}")
+        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
+        db.add(t); db.commit()
+        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao gerar PIX: {str(e)}")
 
 
 class PixBoostRequest(BaseModel):
@@ -151,14 +157,20 @@ async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db),
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
-    p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
-    if not p or p.get("status") not in ("approved", "pending", "in_process"):
-        raise HTTPException(status_code=502, detail="Erro ao gerar PIX no Mercado Pago.")
-    t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
-    db.add(t); db.commit()
-    qr = p.get("point_of_interaction", {}).get("transaction_data", {})
-    return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel. Configure MERCADOPAGO_ACCESS_TOKEN.")
+    try:
+        p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+        if not p or p.get("status") not in ("approved", "pending", "in_process"):
+            erro_mp = p.get("message", "Erro desconhecido") if p else "Resposta vazia do MP"
+            raise HTTPException(status_code=502, detail=f"Erro MP: {erro_mp}")
+        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
+        db.add(t); db.commit()
+        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao gerar PIX: {str(e)}")
 
 @router.post("/comprar-views")
 async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

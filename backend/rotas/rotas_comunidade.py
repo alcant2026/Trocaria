@@ -297,6 +297,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
                     pontos_ganhos = 1
 
                 usuario.pontos_marketplace = (usuario.pontos_marketplace or 0) + pontos_ganhos
+                usuario.pontos_semanais = (usuario.pontos_semanais or 0) + pontos_ganhos
 
                 # Registrar transação de pontos
                 db.add(Transacao(

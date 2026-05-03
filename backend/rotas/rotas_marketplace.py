@@ -276,3 +276,77 @@ async def rejeitar_resgate(transacao_id: int, db: Session = Depends(get_db), adm
     transacao.detalhes += f" | Rejeitado por admin {admin.id}"
     db.commit()
     return {"message": "Resgate rejeitado. Pontos devolvidos ao usuario."}
+
+
+# --- RANKING SEMANAL (CAMPEONATO) ---
+@router.get("/ranking-semanal")
+async def ranking_semanal(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    from modelos.modelos_db import Usuario
+    top20 = db.query(Usuario).filter(Usuario.pontos_semanais > 0).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
+    ranking = []
+    for i, u in enumerate(top20, 1):
+        ranking.append({"posicao": i, "id": u.id, "nome": u.nome, "pontos": u.pontos_semanais or 0,
+            "premio": round((u.pontos_semanais or 0) / 1000, 2), "destaque": u.id == usuario.id})
+    minha_pos = next((i for i, u in enumerate(top20, 1) if u.id == usuario.id), None)
+    meus_pontos = usuario.pontos_semanais or 0
+    agora = datetime.datetime.now()
+    dias_ate_sabado = (5 - agora.weekday()) % 7
+    if dias_ate_sabado == 0 and agora.hour >= 18:
+        dias_ate_sabado = 7
+    prox_sabado = (agora + datetime.timedelta(days=dias_ate_sabado)).replace(hour=18, minute=0, second=0, microsecond=0)
+    return {"ranking": ranking, "minha_posicao": minha_pos, "meus_pontos": meus_pontos,
+        "top20_minimo": top20[-1].pontos_semanais if len(top20) >= 20 else 0, "proximo_pagamento": prox_sabado.isoformat()}
+
+
+@router.get("/admin/ranking-completo")
+async def ranking_completo(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    from modelos.modelos_db import Usuario
+    usuarios = db.query(Usuario).filter(
+        Usuario.pontos_semanais > 0
+    ).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
+
+    resultado = []
+    for i, u in enumerate(usuarios, 1):
+        resultado.append({
+            "posicao": i,
+            "id": u.id,
+            "nome": u.nome,
+            "cpf": u.cpf,
+            "chave_pix": u.chave_pix_publica or u.chave_pix,
+            "pontos": u.pontos_semanais or 0,
+            "premio": round((u.pontos_semanais or 0) / 1000, 2)
+        })
+    return {"ranking": resultado}
+
+
+@router.post("/admin/finalizar-semana")
+async def finalizar_semana(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    from modelos.modelos_db import Usuario
+    from datetime import datetime
+
+    top20 = db.query(Usuario).filter(
+        Usuario.pontos_semanais > 0
+    ).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
+
+    processados = []
+    for u in top20:
+        premio = (u.pontos_semanais or 0) / 1000
+        if premio < 1.0:
+            continue
+
+        transacao = Transacao(
+            usuario_id=u.id, valor=Decimal(str(premio)),
+            tipo=TipoTransacao.RESGATE_PONTOS, status="concluido",
+            detalhes=f"Premiacao semanal - {u.pontos_semanais} pts = R$ {premio}"
+        )
+        db.add(transacao)
+        u.pontos_semanais = 0
+        processados.append({
+            "nome": u.nome,
+            "cpf": u.cpf,
+            "chave_pix": u.chave_pix_publica or u.chave_pix,
+            "premio": round(premio, 2)
+        })
+
+    db.commit()
+    return {"message": f"Semana finalizada! {len(processados)} premiados.", "premiados": processados}

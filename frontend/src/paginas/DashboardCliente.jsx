@@ -67,6 +67,7 @@ import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
 import OportunidadesLista from '../componentes/OportunidadesLista';
 import TermosPlataforma from '../componentes/TermosPlataforma';
 import PagamentoPolling from '../componentes/PagamentoPolling';
+import RankingSemanal from '../componentes/RankingSemanal';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -2395,6 +2396,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             border: '1px solid rgba(255,255,255,0.05)',
                             marginBottom: '2rem'
                         }}>
+                            <RankingSemanal usuario={usuario} />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
                                 <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '10px', borderRadius: '12px' }}>
                                     <CreditCard size={24} color="var(--primary)" />

@@ -104,6 +104,7 @@ class Usuario(Base):
     is_subscriber = Column(Boolean, default=False)
     assinatura_expira_em = Column(DateTime, nullable=True)
     pontos_marketplace = Column(Integer, default=0)
+    pontos_semanais = Column(Integer, default=0)
 
     # NOVO: Regra de Dividendos Participativos
     gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)

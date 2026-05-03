@@ -1784,7 +1784,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px', color: 'var(--danger)' }}>Calote</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>-200 pontos e marcado como inadimplente.</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Zera o score e marca como inadimplente.</div>
                                                 </div>
                                             </div>
                                         </div>

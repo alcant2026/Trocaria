@@ -1417,26 +1417,64 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     </div>
                                                     <div>
                                                         <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Verificacao de Conta</h3>
-                                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Envie seus documentos e tenha sua conta verificada gratuitamente. Ganhe +10 pontos no score!</p>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Envie seus documentos para verificacao gratuita. Apos aprovado, ganha +10 pontos no score!</p>
                                                     </div>
                                                 </div>
+
+                                                {(() => {
+                                                    const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
+                                                    if (kycRejeitado) {
+                                                        return (
+                                                            <div style={{ background: 'rgba(255, 61, 0, 0.08)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '10px', borderRadius: '10px', marginBottom: '1rem' }}>
+                                                                <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <AlertCircle size={14} /> TENTATIVA ANTERIOR REJEITADA
+                                                                </p>
+                                                                <p style={{ color: '#fff', fontSize: '0.8rem', marginTop: '4px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
+                                                <div className="input-group mb-1">
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRG && fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                                                                Selfie segurando o documento {fotoRG && fotoResidencia && <CheckCircle size={16} className="text-success ml-1" />}
+                                                            </label>
+                                                            <input type="file" accept="image/*" onChange={(e) => setFotoRG(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
+                                                        </div>
+                                                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
+                                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                                                                Foto do RG ou CNH {fotoResidencia && <CheckCircle size={16} className="text-success ml-1" />}
+                                                            </label>
+                                                            <input type="file" accept="image/*,.pdf" onChange={(e) => setFotoResidencia(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--success-rgb), 0.05)', border: '1px solid rgba(var(--success-rgb), 0.1)' }}>
                                                     <div className="info-label">Valor</div>
                                                     <div className="info-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)' }}>GRATIS</div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                                    <button className="btn btn-primary" style={{ flex: 2 }} onClick={async () => {
+                                                    <button className="btn btn-primary" style={{ flex: 2 }} disabled={!fotoRG || !fotoResidencia || loading} onClick={async () => {
                                                         try {
                                                             setLoading(true);
-                                                            await api.post('/score/solicitar-verificacao', { detalhes: 'Solicitacao via Upgrade' });
+                                                            const form = new FormData();
+                                                            if (fotoRG) form.append('foto_rg', fotoRG);
+                                                            if (fotoResidencia) form.append('foto_residencia', fotoResidencia);
+                                                            form.append('detalhes', 'Solicitacao via Upgrade');
+                                                            await api.post('/score/solicitar-verificacao', form, { isMultipart: true });
                                                             setMensagem({ tipo: 'sucesso', texto: 'Documentos enviados! Aguarde a analise do administrador.' });
+                                                            setFotoRG(null); setFotoResidencia(null);
                                                             setPassoUpgrade(1);
                                                         } catch (e) {
-                                                            const msg = e?.response?.data?.detail || 'Erro ao solicitar verificacao.';
+                                                            const msg = e?.response?.data?.detail || 'Erro ao enviar documentos.';
                                                             setMensagem({ tipo: 'erro', texto: msg });
                                                         } finally { setLoading(false); }
-                                                    }} disabled={loading}>
-                                                        {loading ? <span className="spinner" /> : 'Solicitar Verificacao (Gratis)'}
+                                                    }}>
+                                                        {loading ? <span className="spinner" /> : 'Enviar Documentos (Gratis)'}
                                                     </button>
                                                     <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                                 </div>

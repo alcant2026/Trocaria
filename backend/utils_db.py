@@ -149,7 +149,7 @@ def executar_limpeza_banco(engine):
         # 1. Transacoes PIX de taxa nunca pagas ha mais de 7 dias
         queries.append("""
             DELETE FROM transacoes WHERE status = 'pendente'
-            AND tipo IN ('taxa_solicitacao', 'taxa_match', 'desbloqueio_dados', 'assinatura')
+            AND tipo IN ('taxa_solicitacao', 'desbloqueio_dados', 'assinatura')
             AND data_criacao < NOW() - INTERVAL '7 days'
         """)
         # 2. Depositos/Saques expirados ou cancelados ha mais de 15 dias

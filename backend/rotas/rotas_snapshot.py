@@ -567,7 +567,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             
             # 5. Adicionar lista resumida de usuários para gestão rápida no novo painel
             # OTIMIZAÇÃO: Busca em lote para evitar N+1 no loop
-            usuarios_query = db.query(Usuario).filter(Usuario.id != "000PL").limit(100).all()
+            usuarios_query = db.query(Usuario).filter(Usuario.id != "000PL").limit(50).all()
             user_ids = [u.id for u in usuarios_query]
             
             # Pré-busca de empréstimos para cálculo de fidelidade em lote

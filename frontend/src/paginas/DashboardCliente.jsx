@@ -1912,9 +1912,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     )}
 
                     {marketplaceTab === 'explorar' ? (<div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}><div style={{ flex: 1, minWidth: 0 }}>
-                        {loadingMarket && marketplaceLinks.length === 0 ? (
+                        {                        loadingMarket && marketplaceLinks.length === 0 ? (
                             <div className="marketplace-grid">
-                                {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-loading" style={{ height: '280px', borderRadius: '16px' }}></div>)}
+                                {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton-loading" style={{ height: '140px', borderRadius: '12px' }}></div>)}
                             </div>
                         ) : marketplaceLinks.length > 0 ? (
                             <>
@@ -2019,7 +2019,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     ) : (
                         loadingMarket && meusLinksMarketplace.length === 0 ? (
                             <div className="marketplace-grid">
-                                {[1,2,3].map(i => <div key={i} className="skeleton-loading" style={{ height: '280px', borderRadius: '16px' }}></div>)}
+                                {[1,2,3].map(i => <div key={i} className="skeleton-loading" style={{ height: '140px', borderRadius: '12px' }}></div>)}
                             </div>
                         ) : meusLinksMarketplace.length > 0 ? (
                             <>

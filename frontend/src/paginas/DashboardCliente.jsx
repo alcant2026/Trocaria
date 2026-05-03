@@ -1166,8 +1166,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
                     )}
                     <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '1rem', wordBreak: 'break-all' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Código PIX:</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>{qrCodeData.qr_code}</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Codigo PIX:</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, flex: 1, margin: 0 }}>{qrCodeData.qr_code}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(qrCodeData.qr_code); setMensagem('Codigo PIX copiado!'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }} title="Copiar codigo PIX">
+                                <Copy size={16} />
+                            </button>
+                        </div>
                     </div>
                     <PagamentoPolling transacaoId={qrCodeData.transacao_id} onConfirmado={() => {
                         setActiveView('home');
@@ -2290,13 +2295,16 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {pixDestaque && (
                 <div className="modal-overlay" onClick={() => setPixDestaque(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
-                        <h3 style={{ marginBottom: '10px' }}>Destaque seu Anúncio</h3>
+                        <h3 style={{ marginBottom: '10px' }}>Destaque seu Anuncio</h3>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ 5,00 via PIX para destacar seu anuncio por 7 dias!</p>
                         {pixDestaque.qr_code_base64 && (
                             <img src={`data:image/png;base64,${pixDestaque.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
                         )}
-                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
-                            <p style={{ fontSize: '0.75rem', fontWeight: 700 }}>{pixDestaque.qr_code}</p>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, flex: 1, wordBreak: 'break-all', margin: 0 }}>{pixDestaque.qr_code}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(pixDestaque.qr_code); setMensagem({ tipo: 'sucesso', texto: 'Codigo PIX copiado!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }} title="Copiar codigo PIX">
+                                <Copy size={16} />
+                            </button>
                         </div>
                         {pixDestaque.transacao_id && (
                             <PagamentoPolling transacaoId={pixDestaque.transacao_id} onConcluido={() => {
@@ -2318,8 +2326,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         {pixAssinatura.qr_code_base64 && (
                             <img src={`data:image/png;base64,${pixAssinatura.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
                         )}
-                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
-                            <p style={{ fontSize: '0.75rem', fontWeight: 700 }}>{pixAssinatura.qr_code}</p>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, flex: 1, wordBreak: 'break-all', margin: 0 }}>{pixAssinatura.qr_code}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(pixAssinatura.qr_code); setMensagem({ tipo: 'sucesso', texto: 'Codigo PIX copiado!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }} title="Copiar codigo PIX">
+                                <Copy size={16} />
+                            </button>
                         </div>
                         {pixAssinatura.transacao_id && (
                             <PagamentoPolling transacaoId={pixAssinatura.transacao_id} onConcluido={() => {

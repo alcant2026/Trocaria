@@ -9,14 +9,14 @@ const RankingSemanal = ({ usuario, sidebar }) => {
 
     useEffect(() => {
         carregar();
-        intervalRef.current = setInterval(carregar, 30000);
+        intervalRef.current = setInterval(carregar, 10000);
         return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     }, []);
 
     const carregar = async () => {
         try {
             const res = await api.get('/marketplace/ranking-semanal');
-            setData(res);
+            if (res) setData(res);
         } catch (e) {
             console.error('Erro ranking:', e);
         }

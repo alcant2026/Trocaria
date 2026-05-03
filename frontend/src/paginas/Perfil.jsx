@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft } from 'lucide-react';
 
 const Perfil = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -124,6 +124,12 @@ const Perfil = () => {
 
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+                <button onClick={() => window.location.hash = 'cliente'} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <ArrowLeft size={20} />
+                </button>
+                <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>Perfil</h2>
+            </div>
             {/* DADOS DO PERFIL */}
             <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>

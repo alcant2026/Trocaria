@@ -131,71 +131,6 @@ async def desconectar_mp(db: Session = Depends(get_db), usuario: Usuario = Depen
     db.commit()
     return {"message": "Conta Mercado Pago desconectada."}
 
-@router.post("/gerar-pagamento-split")
-async def gerar_pagamento_split(
-    vendedor_id: str, 
-    valor: float, 
-    db: Session = Depends(get_db),
-    comprador: Usuario = Depends(obter_usuario_logado)
-):
-    """Gera um pagamento PIX em nome do vendedor, separando a taxa da plataforma."""
-    vendedor = db.query(Usuario).filter(Usuario.id == vendedor_id).first()
-    if not vendedor or not vendedor.mp_access_token:
-        raise HTTPException(status_code=400, detail="Vendedor não encontrado ou não conectou o Mercado Pago.")
-    
-    # Definimos a taxa da plataforma (ex: 5% ou valor fixo)
-    # Aqui vou usar 5% como exemplo, mas você pode ajustar
-    taxa_plataforma = round(valor * 0.05, 2)
-    
-    # Inicializa o SDK com o token do VENDEDOR
-    sdk = mercadopago.SDK(vendedor.mp_access_token)
-    
-    payment_data = {
-        "transaction_amount": valor,
-        "description": f"Compra no Marketplace - Psy Pay (Vendedor: {vendedor.nome})",
-        "payment_method_id": "pix",
-        "application_fee": taxa_plataforma,
-        "payer": {
-            "email": comprador.email,
-            "identification": {
-                "type": "CPF",
-                "number": comprador.cpf.replace(".", "").replace("-", "")
-            }
-        },
-        "notification_url": f"https://cred30.site/api/financeiro/webhook/mercadopago" # Webhook global
-    }
-    
-    result = sdk.payment().create(payment_data)
-    payment = result.get("response", {})
-    
-    if result.get("status") not in [200, 201]:
-        logger.error(f"Erro Split MP: {payment}")
-        raise HTTPException(status_code=400, detail=f"Erro ao gerar pagamento: {payment.get('message')}")
-    
-    # Registra a transação no banco (como pendente)
-    nova_transacao = Transacao(
-        usuario_id=vendedor.id, # O crédito vai pro vendedor
-        valor=valor - taxa_plataforma, # Valor líquido do vendedor
-        tipo=TipoTransacao.RECEBIMENTO,
-        status="pendente",
-        payment_id=str(payment.get("id")),
-        detalhes=f"Venda Marketplace | Comprador: {comprador.nome} | Taxa App: R$ {taxa_plataforma}"
-    )
-    db.add(nova_transacao)
-    db.commit()
-    
-    return {
-        "payment_id": payment.get("id"),
-        "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code"),
-        "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64"),
-        "valor": valor,
-        "taxa": taxa_plataforma
-    }
-
-
-# --- RESGATE DE PONTOS ---
-PONTOS_POR_REAL = 1000  # 1000 pontos = R$ 1
-
 @router.post("/solicitar-resgate")
 async def solicitar_resgate(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     pontos = usuario.pontos_marketplace or 0
@@ -319,34 +254,3 @@ async def ranking_completo(db: Session = Depends(get_db), admin: Usuario = Depen
     return {"ranking": resultado}
 
 
-@router.post("/admin/finalizar-semana")
-async def finalizar_semana(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    from modelos.modelos_db import Usuario
-    from datetime import datetime
-
-    top20 = db.query(Usuario).filter(
-        Usuario.pontos_semanais > 0
-    ).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
-
-    processados = []
-    for u in top20:
-        premio = (u.pontos_semanais or 0) / 1000
-        if premio < 1.0:
-            continue
-
-        transacao = Transacao(
-            usuario_id=u.id, valor=Decimal(str(premio)),
-            tipo=TipoTransacao.RESGATE_PONTOS, status="concluido",
-            detalhes=f"Premiacao semanal - {u.pontos_semanais} pts = R$ {premio}"
-        )
-        db.add(transacao)
-        u.pontos_semanais = 0
-        processados.append({
-            "nome": u.nome,
-            "cpf": u.cpf,
-            "chave_pix": u.chave_pix_publica or u.chave_pix,
-            "premio": round(premio, 2)
-        })
-
-    db.commit()
-    return {"message": f"Semana finalizada! {len(processados)} premiados.", "premiados": processados}

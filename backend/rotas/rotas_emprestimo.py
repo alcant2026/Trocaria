@@ -58,34 +58,6 @@ async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario =
         })
     return {"oportunidades": resultado}
 
-@router.post("/solicitar")
-@limiter.limit("3/minute")
-async def solicitar_emprestimo(
-    request: Request,
-    dados: SolicitacaoRequest, 
-    db: Session = Depends(get_db),
-    usuario_logado: Usuario = Depends(obter_usuario_logado)
-):
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).first()
-    if not usuario.is_verified:
-        raise HTTPException(status_code=403, detail="Conta precisa estar verificada.")
-    if not dados.aceite_termos:
-        raise HTTPException(status_code=400, detail="Aceite os termos de uso.")
-    if not dados.aceite_termos_plataforma:
-        raise HTTPException(status_code=400, detail="Aceite as regras da plataforma.")
-
-    try:
-        nova = criar_solicitacao_p2p(
-            usuario_id=usuario.id, valor=dados.valor,
-            prazo=dados.parcelas, taxa=dados.taxa_compensacao,
-            db=db, ip_cliente=request.client.host,
-            aceite_plataforma=dados.aceite_termos_plataforma
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return {"message": "Pedido de apoio criado!", "id": nova.id, "valor": float(dados.valor), "status": "pendente"}
-
 @router.post("/gerar-taxa-solicitacao")
 @limiter.limit("3/minute")
 async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
@@ -153,35 +125,6 @@ async def aceitar_oferta_endpoint(request: Request, id: int, dados: AceiteReques
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
-
-@router.get("/meus")
-async def listar_meus(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    como_tomador = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.usuario_id == usuario.id
-    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
-    como_credor = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.credor_id == usuario.id,
-        SolicitacaoEmprestimo.usuario_id != usuario.id
-    ).order_by(SolicitacaoEmprestimo.data_criacao.desc()).all()
-    resultado = []
-    for s in como_tomador + como_credor:
-        taxas_extra = s.taxas_adicionais or Decimal("0.00")
-        total = s.valor * (1 + (s.taxa_juros / 100) * s.prazo_meses) + taxas_extra
-        vp = total / s.prazo_meses
-        resultado.append({
-            "id": s.id, "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
-            "contraparte": s.credor.nome if s.credor else "Aguardando",
-            "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
-            "valor": float(s.valor), "taxa": float(s.taxa_juros),
-            "taxa_match": float(taxas_extra),
-            "parcelas": s.prazo_meses, "pagas": s.parcelas_pagas,
-            "valor_parcela": round(float(vp), 2),
-            "total": round(float(total), 2),
-            "status": s.status.value,
-            "pagamento_pendente": bool(s.confirmacao_pagamento_data) and not s.confirmacao_recebimento_data,
-            "vencimento": s.proximo_vencimento.isoformat() if s.proximo_vencimento else None
-        })
-    return resultado
 
 @router.post("/confirmar-pagamento/{id}")
 async def confirmar_pagamento(id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

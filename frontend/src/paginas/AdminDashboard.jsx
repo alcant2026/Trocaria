@@ -338,10 +338,7 @@ const AdminDashboard = () => {
 
         setLoadingCobranca(true);
         try {
-            const token = localStorage.getItem('token_psypay');
-            const response = await api.post(`/api/admin/fiscal/executar-cobranca`, {}, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await api.post(`/admin/fiscal/executar-cobranca`);
 
             if (response.data.status === "sucesso") {
                 toast.success(response.data.mensagem);

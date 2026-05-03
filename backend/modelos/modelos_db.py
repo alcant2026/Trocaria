@@ -62,12 +62,10 @@ class Usuario(Base):
     cpf = Column(String(14), unique=True, index=True, nullable=False)
     senha_hash = Column(Text, nullable=False)
     chave_pix = Column(String(255), nullable=False)
-    chave_pix_publica = Column(String(255), nullable=True)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
     credito_virtual = Column(Numeric(precision=20, scale=2), default=0)
     valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)
-    total_receber = Column(Numeric(precision=20, scale=2), default=0)
     inadimplente = Column(Boolean, default=False)
     qtd_calotes = Column(Integer, default=0)
     emprestimos_ativos = Column(Integer, default=0)
@@ -162,26 +160,11 @@ class SolicitacaoEmprestimo(Base):
     auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="solicitacoes", foreign_keys=[usuario_id])
     credor = relationship("Usuario", foreign_keys=[credor_id], primaryjoin="SolicitacaoEmprestimo.credor_id == Usuario.id")
-    investimentos = relationship("Investimento", back_populates="solicitacao")
 
     from sqlalchemy import Index
     __table_args__ = (
         Index('idx_solicitacao_status_user', 'usuario_id', 'status'),
     )
-
-class Investimento(Base):
-    __tablename__ = "investimentos"
-
-    id = Column(Integer, primary_key=True, index=True)
-    investidor_id = Column(String(5), ForeignKey("usuarios.id"), index=True)
-    solicitacao_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"), index=True)
-    valor_investido = Column(Numeric(precision=20, scale=2), nullable=False)
-    pago_para_investidor = Column(Numeric(precision=20, scale=2), default=0)
-    data_investimento = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    is_pool = Column(Boolean, default=True)
-
-    solicitacao = relationship("SolicitacaoEmprestimo", back_populates="investimentos")
-    investidor = relationship("Usuario")
 
 class Transacao(Base):
     __tablename__ = "transacoes"
@@ -201,13 +184,11 @@ class Transacao(Base):
     # NOVOS: Protocolo de Recebimento do Cliente (Feedback)
     confirmado_cliente = Column(Boolean, default=False)
     data_confirmacao_cliente = Column(DateTime, nullable=True)
-    data_liquidacao = Column(DateTime, nullable=True, index=True) # Data em que a comissão será liberada
     
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
 
     auditoria = relationship("RegistroAuditoria")
     usuario = relationship("Usuario", back_populates="transacoes")
-    parceiro = relationship("Parceiro")
 
     from sqlalchemy import Index
     __table_args__ = (
@@ -216,6 +197,7 @@ class Transacao(Base):
         Index('idx_transacao_tipo_status', 'tipo', 'status'),
         Index('idx_transacao_data', 'data_criacao'),
     )
+
 
 class Parceiro(Base):
     __tablename__ = "parceiros"

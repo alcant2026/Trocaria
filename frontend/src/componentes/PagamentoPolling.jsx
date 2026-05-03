@@ -12,7 +12,7 @@ const PagamentoPolling = ({ transacaoId, onConfirmado }) => {
 
         const verificar = async () => {
             try {
-                const res = await api.get('/verificar-transacao/' + transacaoId);
+                const res = await api.get('/emprestimos/verificar-transacao/' + transacaoId);
                 if (!ativo) return;
                 if (res.status === 'concluido' || res.status === 'pago') {
                     setStatus('confirmado');

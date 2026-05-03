@@ -346,7 +346,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
     # Consumir 1 view
     if link.visualizacoes_restantes > 0:
         link.visualizacoes_restantes -= 1
-        link.visualizacoes_totais += 1
+        link.visualizacoes_totais = (link.visualizacoes_totais or 0) + 1
     
     # Se views acabaram, aplicar regra
     if link.visualizacoes_restantes <= 0:

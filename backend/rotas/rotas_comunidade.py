@@ -333,9 +333,16 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
                     valor=Decimal(str(pontos_ganhos)),
                     tipo=TipoTransacao.BONUS,
                     status="concluido",
-                    detalhes=f"{pontos_ganhos} ponto(s) por clique no link #{link.id}" + (" (Premium Bônus)" if usuario.is_subscriber else "")
+                    detalhes=f"{pontos_ganhos} ponto(s) por clique no link #{link.id}" + (" (Premium Bonus)" if usuario.is_subscriber else "")
                 ))
-    
+                pontos_info = pontos_ganhos
+            else:
+                pontos_info = 0
+        else:
+            pontos_info = 0
+    else:
+        pontos_info = 0
+
     # Consumir 1 view
     if link.visualizacoes_restantes > 0:
         link.visualizacoes_restantes -= 1
@@ -349,7 +356,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
             link.is_active = False
     
     db.commit()
-    return {"ok": True, "views_restantes": link.visualizacoes_restantes}
+    return {"ok": True, "views_restantes": link.visualizacoes_restantes, "pontos_ganhos": pontos_info}
 
 @router.post("/denunciar-link")
 async def denunciar_link(dados: DenunciaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):

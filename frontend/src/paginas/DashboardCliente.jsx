@@ -1981,8 +1981,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 {!l.patrocinado && l.expires_at && <div className="market-timer-row"><Timer size={11} /><MarketTimer expiresAt={l.expires_at} /></div>}
                                                 <button className="btn btn-primary btn-sm market-cta" onClick={async () => {
                                                     try {
-                                                        await api.post('/comunidade/registrar-view', { link_id: l.id });
-                                                    } catch(e) { console.error('View error:', e); }
+                                                        const res = await api.post('/comunidade/registrar-view', { link_id: l.id });
+                                                        setMensagem({ tipo: 'sucesso', texto: res.pontos_ganhos > 0 ? `+${res.pontos_ganhos} ponto(s)!` : 'Clique registrado (sem pontos - ja clicou hoje ou e seu anuncio).' });
+                                                    } catch(e) {
+                                                        setMensagem({ tipo: 'erro', texto: 'Erro ao registrar clique: ' + e.message });
+                                                    }
                                                     window.open(l.url_afiliado, '_blank');
                                                 }}>Ver Produto</button>
                                             </div>

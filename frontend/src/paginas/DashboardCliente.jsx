@@ -273,8 +273,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     });
 
     const CATEGORIAS_MARKETPLACE = [
-        "Geral", "Celulares", "Informática", "Eletrônicos", "Veículos", 
-        "Imóveis", "Serviços", "Empréstimos P2P", "Cursos", "Games"
+        "Geral", "Celulares", "Informatica", "Eletronicos", "Veiculos",
+        "Imoveis", "Servicos", "Cursos", "Games", "Moda", "Casa", "Saude", "Alimentacao"
     ];
     const [showBoostModal, setShowBoostModal] = useState(false);
     const [boostTarget, setBoostTarget] = useState(null);
@@ -1886,18 +1886,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </div>
                         
                         {marketplaceTab === 'explorar' && (
-                            <select 
-                                className="input-field" 
-                                style={{ width: 'auto', minWidth: '150px', height: '38px', borderRadius: '10px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)' }}
-                                value={selectedCategory}
-                                onChange={(e) => {
-                                    setSelectedCategory(e.target.value);
-                                    setPageExplorar(1);
-                                    // carregarExplorarMarketplace(1, e.target.value); // Função será atualizada
-                                }}
-                            >
-                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
+                            <div className="filter-bar">
+                                <select 
+                                    className="input-field m-filter-select"
+                                    value={selectedCategory}
+                                    onChange={(e) => {
+                                        setSelectedCategory(e.target.value);
+                                        setPageExplorar(1);
+                                    }}
+                                >
+                                    {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Todas as Categorias' : cat}</option>)}
+                                </select>
+                            </div>
                         )}
 
                         <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', height: '38px' }}>
@@ -2192,9 +2192,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </div>
                         <div className="input-group mb-1">
                             <label>Categoria</label>
-                            <select className="input-field" style={{ width: '100%', padding: '10px', borderRadius: '8px' }}
+                            <select className="input-field m-filter-select" style={{ width: '100%' }}
                                 value={dadosNovoLink.categoria} onChange={(e) => setDadosNovoLink({...dadosNovoLink, categoria: e.target.value})}>
-                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Selecione uma categoria' : cat}</option>)}
                             </select>
                         </div>
                     </div>

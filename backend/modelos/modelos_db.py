@@ -149,6 +149,9 @@ class SolicitacaoEmprestimo(Base):
     parceiro = relationship("Parceiro")
 
     aceite_termos = Column(Boolean, default=False)
+    aceite_termos_plataforma = Column(Boolean, default=False)
+    ip_aceite_plataforma = Column(String(45), nullable=True)
+    data_aceite_plataforma = Column(DateTime, nullable=True)
     auditoria_id = Column(Integer, ForeignKey("registros_auditoria.id"), nullable=True)
     cpf_aceite = Column(String(14), nullable=True)
     data_aceite = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))

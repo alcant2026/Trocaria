@@ -65,6 +65,7 @@ import BannerCookies from '../componentes/BannerCookies';
 import LojaAfiliados from '../componentes/LojaAfiliados';
 import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
 import OportunidadesLista from '../componentes/OportunidadesLista';
+import TermosPlataforma from '../componentes/TermosPlataforma';
 import PagamentoPolling from '../componentes/PagamentoPolling';
 
 const useCountdown = (isoDate) => {
@@ -380,6 +381,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
         () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
     );
+    const [showTermosAceite, setShowTermosAceite] = useState(false);
+    const [termosTipo, setTermosTipo] = useState('criar');
+
     const [valorAvulsoPorId, setValorAvulsoPorId] = useState({}); // { id: 'valor' }
     const [showAvulsoPorId, setShowAvulsoPorId] = useState({}); // { id: true/false }
 
@@ -627,11 +631,19 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (!aceiteTermos) { showModal({ title: 'Termos', message: 'Aceite os termos.', type: 'warning' }); return; }
         const tx = parseFloat(taxaCompensacao);
         if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
+        setTermosTipo('criar');
+        setShowTermosAceite(true);
+    };
+
+    const handleSolicitarAposAceite = async () => {
+        setShowTermosAceite(false);
+        const v = parseFloat(valor);
+        const tx = parseFloat(taxaCompensacao);
         setLoadingAction(true);
         try {
             const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao', {
                 valor: v, parcelas: parseInt(parcelas),
-                taxa_compensacao: tx, aceite_termos: true
+                taxa_compensacao: tx, aceite_termos: true, aceite_termos_plataforma: true
             });
             if (taxaRes.qr_code) {
                 setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id, transacao_id: taxaRes.transacao_id });
@@ -2674,6 +2686,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     ))}
                 </div>
             </ModalPremium>
+
+            {showTermosAceite && (
+                <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <TermosPlataforma
+                            tipo={termosTipo}
+                            onAceitar={termosTipo === 'criar' ? handleSolicitarAposAceite : () => {}}
+                            onVoltar={() => setShowTermosAceite(false)}
+                        />
+                    </div>
+                </div>
+            )}
 
             <ModalPremium
                 isOpen={modalPremium.isOpen}

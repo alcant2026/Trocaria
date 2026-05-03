@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Star, ShieldCheck, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
 import api from '../api';
+import TermosPlataforma from './TermosPlataforma';
 
 const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [oportunidades, setOportunidades] = useState([]);
@@ -9,6 +10,8 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [aceitando, setAceitando] = useState(null);
     const [aceito, setAceito] = useState(null);
     const [copiado, setCopiado] = useState(false);
+    const [showTermosAceite, setShowTermosAceite] = useState(false);
+    const [pendenteAceitarId, setPendenteAceitarId] = useState(null);
 
     useEffect(() => {
         carregar();
@@ -27,9 +30,16 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     };
 
     const aceitar = async (id) => {
+        setPendenteAceitarId(id);
+        setShowTermosAceite(true);
+    };
+
+    const aceitarAposAceite = async () => {
+        setShowTermosAceite(false);
+        const id = pendenteAceitarId;
         setAceitando(id);
         try {
-            const result = await api.post(`/emprestimos/aceitar-oferta/${id}`);
+            const result = await api.post(`/emprestimos/aceitar-oferta/${id}`, { aceite_termos_plataforma: true });
             setCopiado(false);
             setAceito(result);
             carregar();
@@ -37,6 +47,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
             alert('Erro: ' + e.message);
         }
         setAceitando(null);
+        setPendenteAceitarId(null);
     };
 
     const copiarPix = async (texto) => {
@@ -151,8 +162,21 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         >
                             {aceitando === op.id ? '...' : 'Aceitar'}
                         </button>
+                    </div>
+                ))}
+            </div>
+
+            {showTermosAceite && (
+                <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <TermosPlataforma
+                            tipo="apoiar"
+                            onAceitar={aceitarAposAceite}
+                            onVoltar={() => setShowTermosAceite(false)}
+                        />
+                    </div>
                 </div>
-            ))}
+            )}
         </div>
     );
 };

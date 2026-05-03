@@ -23,9 +23,13 @@ class SolicitacaoRequest(BaseModel):
     parcelas: int = Field(ge=1, le=12)
     taxa_compensacao: Decimal = Field(ge=0, le=100)
     aceite_termos: bool
+    aceite_termos_plataforma: bool = False
 
 class PagamentoRequest(BaseModel):
     valor_pagamento: Decimal = Field(gt=0)
+
+class AceiteRequest(BaseModel):
+    aceite_termos_plataforma: bool = False
 
 @router.get("/oportunidades")
 async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -63,13 +67,16 @@ async def solicitar_emprestimo(
     if not usuario.is_verified:
         raise HTTPException(status_code=403, detail="Conta precisa estar verificada.")
     if not dados.aceite_termos:
-        raise HTTPException(status_code=400, detail="Aceite os termos.")
+        raise HTTPException(status_code=400, detail="Aceite os termos de uso.")
+    if not dados.aceite_termos_plataforma:
+        raise HTTPException(status_code=400, detail="Aceite as regras da plataforma.")
 
     try:
         nova = criar_solicitacao_p2p(
             usuario_id=usuario.id, valor=dados.valor,
             prazo=dados.parcelas, taxa=dados.taxa_compensacao,
-            db=db, ip_cliente=request.client.host
+            db=db, ip_cliente=request.client.host,
+            aceite_plataforma=dados.aceite_termos_plataforma
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -137,9 +144,9 @@ async def verificar_transacao(transacao_id: int, db: Session = Depends(get_db), 
 
 @router.post("/aceitar-oferta/{id}")
 @limiter.limit("5/minute")
-async def aceitar_oferta_endpoint(request: Request, id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+async def aceitar_oferta_endpoint(request: Request, id: int, dados: AceiteRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     try:
-        result = aceitar_oferta(id, usuario_logado.id, db)
+        result = aceitar_oferta(id, usuario_logado.id, db, ip_cliente=request.client.host, aceite_plataforma=dados.aceite_termos_plataforma)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result

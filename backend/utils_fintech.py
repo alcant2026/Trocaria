@@ -4,7 +4,10 @@ from decimal import Decimal
 import datetime
 
 
-def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, ip_cliente: str = None) -> SolicitacaoEmprestimo:
+def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Decimal, db: Session, ip_cliente: str = None, aceite_plataforma: bool = False) -> SolicitacaoEmprestimo:
+    if not aceite_plataforma:
+        raise ValueError("Voce precisa aceitar as regras da plataforma.")
+
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise ValueError("Usuário não encontrado.")
@@ -19,6 +22,9 @@ def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Dec
         data_criacao=agora,
         proximo_vencimento=agora + datetime.timedelta(days=30),
         aceite_termos=True,
+        aceite_termos_plataforma=True,
+        ip_aceite_plataforma=ip_cliente,
+        data_aceite_plataforma=agora,
         data_aceite=agora,
         ip_aceite=ip_cliente,
         cpf_aceite=usuario.cpf
@@ -29,7 +35,10 @@ def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Dec
     return nova_solicitacao
 
 
-def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
+def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session, ip_cliente: str = None, aceite_plataforma: bool = False) -> dict:
+    if not aceite_plataforma:
+        raise ValueError("Voce precisa aceitar as regras da plataforma antes de apoiar.")
+
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
@@ -56,6 +65,9 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session) -> dict:
     solicitacao.credor_id = credor.id
     solicitacao.chave_pix_credor = credor.chave_pix_publica or credor.chave_pix
     solicitacao.proximo_vencimento = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+    solicitacao.aceite_termos_plataforma = True
+    solicitacao.ip_aceite_plataforma = ip_cliente
+    solicitacao.data_aceite_plataforma = datetime.datetime.now(datetime.timezone.utc)
 
     # Registrar transação da taxa
     db.add(Transacao(

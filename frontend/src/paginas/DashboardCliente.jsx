@@ -2159,7 +2159,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '8px', fontWeight: 800 }}
                             value={dadosNovoLink.codigo_2fa || ''}
                             onChange={(e) => setDadosNovoLink({...dadosNovoLink, codigo_2fa: e.target.value.replace(/\D/g, '')})} />
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>Para evitar spam, ative o 2FA no menu Seguranca e informe o codigo do Google Authenticator.</p>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>Para evitar spam, ative o 2FA no menu Perfil e informe o codigo do Google Authenticator.</p>
                     </div>
 
                     <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>

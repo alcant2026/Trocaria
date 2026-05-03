@@ -39,8 +39,8 @@ const Login = ({ onLogin }) => {
                     <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)', boxShadow: '0 0 40px rgba(255, 204, 0, 0.15)' }}>
                         <Logo size={56} showText={false} />
 </div>
-                    <h1 style={{ fontSize: '2.5rem', letterSpacing: '-1px', marginBottom: '0.25rem' }}>Acesse o PSY PAY</h1>
-                    <p style={{ fontSize: '0.95rem', opacity: 0.8 }}>Plataforma Digital de Crédito P2P (Fase Beta)</p>
+                    <h1 style={{ fontSize: '2rem', letterSpacing: '-1px', marginBottom: '0.25rem' }}>Entrar no Psy Pay</h1>
+                    <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>Rede de Apoio entre Pares</p>
                 </div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
@@ -133,15 +133,11 @@ const Login = ({ onLogin }) => {
                                </div>
                           )}
 
-                         <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 10px var(--success)' }}></span>
-                                 Ambiente Seguro & Criptografado (AES-256)
-                             </div>
-                             <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.3' }}>
-                                Suas transações e acessos são protegidos por logs de auditoria sistêmica conforme os termos de uso vigentes.
-                             </p>
-                         </div>
+                          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>
+                                 Sua conexao e segura. Seus dados sao protegidos.
+                              </p>
+                          </div>
                     </form>
                 </div>
 

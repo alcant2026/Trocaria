@@ -94,8 +94,8 @@ const Registro = () => {
             <div className="auth-overlay"></div>
             <div className="auth-content" style={{ maxWidth: '450px' }}>
                 <div className="text-center mb-1">
-                    <h1 style={{ fontSize: '2rem', letterSpacing: '-0.5px' }}>Junte-se ao PSY PAY</h1>
-                    <p style={{ opacity: 0.8, fontSize: '0.9rem' }}>Plataforma Digital de Crédito e Fomento (Fase Beta)</p>
+                    <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px' }}>Criar Conta</h1>
+                    <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>Rede de Apoio entre Pares</p>
                 </div>
 
                 <div className="card" style={{ width: '100%' }}>
@@ -194,7 +194,7 @@ const Registro = () => {
                                 style={{ marginTop: '4px', cursor: 'pointer' }}
                             />
                             <label htmlFor="aceite" style={{ fontSize: '0.8rem', color: '#fff', cursor: 'pointer', lineHeight: '1.4' }}>
-                                Declaro que li e concordo com os <button type="button" onClick={() => setShowTermos(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 600 }}>Termos de Uso (Crédito Digital)</button> e a <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Política de Privacidade (LGPD)</a>.
+                                Declaro que li e concordo com os <button type="button" onClick={() => setShowTermos(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 600 }}>Termos de Uso</button> e a <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Politica de Privacidade</a>.
                             </label>
                         </div>
 

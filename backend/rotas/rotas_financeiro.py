@@ -676,6 +676,18 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 db.commit()
                             cache_snapshot_data.pop(usuario.id, None)
                             cache_snapshot_data.pop(transacao.usuario_id, None)
+                        elif transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
+                            usuario.is_verified = True
+                            usuario.score = (usuario.score or Decimal("0")) + Decimal("10")
+                            if usuario.score > Decimal("1000"):
+                                usuario.score = Decimal("1000")
+                            transacao.status = "concluido"
+                            if not transacao.payment_id:
+                                transacao.payment_id = str(payment_id)
+                            transacao.detalhes = "Conta verificada apos pagamento KYC"
+                            db.commit()
+                            logger.info(f"KYC: Conta de {usuario.nome} verificada apos pagamento de R$14,99")
+                            cache_snapshot_data.pop(usuario.id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

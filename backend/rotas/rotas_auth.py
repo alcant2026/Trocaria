@@ -326,6 +326,39 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "mp_access_token": bool(usuario.mp_access_token)
     }
 
+class AtualizarPerfil(BaseModel):
+    email: str | None = None
+    telefone: str | None = None
+    chave_pix: str | None = None
+
+@router.put("/perfil")
+async def atualizar_perfil(dados: AtualizarPerfil, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    u = db.query(Usuario).filter(Usuario.id == usuario.id).first()
+    alterado = []
+    if dados.email is not None:
+        import re as _re
+        if not _re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', dados.email):
+            raise HTTPException(status_code=400, detail="Email invalido.")
+        if db.query(Usuario).filter(Usuario.email == dados.email, Usuario.id != u.id).first():
+            raise HTTPException(status_code=400, detail="Email ja em uso.")
+        u.email = dados.email
+        alterado.append("email")
+    if dados.telefone is not None:
+        apenas_digitos = re.sub(r'\D', '', dados.telefone)
+        if len(apenas_digitos) not in (10, 11):
+            raise HTTPException(status_code=400, detail="Telefone invalido. Use DDD + numero (10 ou 11 digitos).")
+        u.telefone = dados.telefone
+        alterado.append("telefone")
+    if dados.chave_pix is not None:
+        if not dados.chave_pix.strip():
+            raise HTTPException(status_code=400, detail="Chave PIX nao pode estar vazia.")
+        u.chave_pix = dados.chave_pix.strip()
+        alterado.append("chave_pix")
+    if not alterado:
+        raise HTTPException(status_code=400, detail="Nenhum campo enviado.")
+    db.commit()
+    return {"message": f"Campos atualizados: {', '.join(alterado)}.", "chave_pix": u.chave_pix, "telefone": u.telefone, "email": u.email}
+
 @router.post("/aceitar-cookies")
 async def aceitar_cookies(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
     """Registra o consentimento de cookies para o usuário logado."""

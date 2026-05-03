@@ -5,12 +5,25 @@ from decimal import Decimal
 import datetime
 import os
 import secrets
+import re
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao, DocumentoVerificacao
 from database import get_db
 
 from rotas.rotas_auth import obter_usuario_logado
 
 router = APIRouter(prefix="/score", tags=["Score"])
+
+TAXA_VERIFICACAO = Decimal("14.99")
+
+import logging
+logger = logging.getLogger(__name__)
+
+def validar_email(email: str) -> bool:
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
+
+def validar_telefone_br(telefone: str) -> bool:
+    apenas_digitos = re.sub(r'\D', '', telefone)
+    return len(apenas_digitos) in (10, 11)
 
 class SolicitacaoVerificacao(BaseModel):
     detalhes: str = ""
@@ -104,5 +117,28 @@ async def solicitar_verificacao_com_docs(
         db.add(novo_doc)
 
     db.commit()
-    return {"message": "Documentos enviados com sucesso! Aguarde a análise do administrador.", "saldo": float(usuario.saldo)}
+    return {"message": "Documentos enviados com sucesso! Aguarde a analise do administrador.", "saldo": float(usuario.saldo)}
+
+@router.post("/gerar-taxa-verificacao")
+async def gerar_taxa_verificacao(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    u = db.query(Usuario).filter(Usuario.id == usuario.id).first()
+    if u.is_verified:
+        raise HTTPException(status_code=400, detail="Conta ja verificada.")
+    pendente = db.query(Transacao).filter(Transacao.usuario_id == u.id, Transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS, Transacao.status == "pendente").first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Pagamento pendente ja existe.")
+    from utils_fintech import get_sdk
+    sdk = get_sdk()
+    if not sdk:
+        raise HTTPException(status_code=503, detail="Gateway indisponivel.")
+    try:
+        p = sdk.payment().create({"transaction_amount": 14.99, "description": "Verificacao de Conta", "payment_method_id": "pix", "payer": {"email": u.email}})
+        if not p or p.get("status") not in ("approved", "pending", "in_process"):
+            raise HTTPException(status_code=502, detail="Erro ao gerar PIX.")
+        t = Transacao(usuario_id=u.id, valor=Decimal("14.99"), tipo=TipoTransacao.DESBLOQUEIO_DADOS, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes="Taxa Verificacao KYC R$14,99")
+        db.add(t); db.commit()
+        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": 14.99}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 

@@ -196,7 +196,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         expires_at: null 
     });
     const [timeLeft, setTimeLeft] = useState(null);
-
+    const [qrCodeVerificacao, setQrCodeVerificacao] = useState(null);
     const closeModal = () => setModalPremium(prev => ({ ...prev, isOpen: false }));
     const showModal = (config) => setModalPremium({ ...config, isOpen: true });
 
@@ -205,6 +205,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
     // Forms state
     const [valorNotificacao, setValorNotificacao] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [editTelefone, setEditTelefone] = useState('');
+    const [editChavePix, setEditChavePix] = useState('');
     const [metodoDeposito, setMetodoDeposito] = useState('pix');
     const [parceiroIdDeposito, setParceiroIdDeposito] = useState('');
     const [parceiros, setParceiros] = useState([]);
@@ -438,6 +441,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             if (data.perfil) {
                 setUsuario(data.perfil);
                 localStorage.setItem('usuario_snapshot', JSON.stringify(data.perfil));
+                setEditEmail(data.perfil.email || '');
+                setEditTelefone(data.perfil.telefone || '');
+                setEditChavePix(data.perfil.chave_pix || '');
             }
             if (data.cliente_emprestimos) {
                 setMeusEmprestimos(data.cliente_emprestimos || []);
@@ -448,9 +454,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 setHistorico(data.historico);
                 localStorage.setItem('historico_snapshot', JSON.stringify(data.historico));
             }
-            
-            // Carregar parceiros (silent refresh)
-            api.get('/financeiro/parceiros').then(resP => setParceiros(resP || [])).catch(console.error);
             
             setIsOffline(false);
         } catch (err) {
@@ -1238,7 +1241,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     padding: '4px 10px', 
                                                     borderRadius: '6px' 
                                                 }}>
-                                                    {usuario.kyc_status === 'pendente' ? 'Aguarde 24h' : 'GRÁTIS'}
+                                                    {usuario.kyc_status === 'pendente' ? 'Aguarde 24h' : 'R$ 14,99'}
                                                 </span>
                                                 <div style={{ color: usuario.kyc_status === 'pendente' ? 'var(--text-muted)' : 'var(--success)', fontSize: '0.75rem', fontWeight: 600 }}>
                                                     {usuario.kyc_status === 'pendente' ? 'Análise em curso' : 'Começar Agora →'}
@@ -1271,6 +1274,43 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* MEUS DADOS / EDITAR PERFIL */}
+                            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.15)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <h4 style={{ fontSize: '0.85rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>MEUS DADOS</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email</label>
+                                            <input type="email" className="input" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder={usuario.email || 'Seu email'} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Telefone</label>
+                                            <input type="tel" className="input" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder={usuario.telefone || '(DDD) 9xxxx-xxxx'} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Chave PIX</label>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <input type="text" className="input" style={{ flex: 1 }} value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder={usuario.chave_pix || 'Sua chave PIX'} />
+                                            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={async () => {
+                                                const campos = {};
+                                                if (editEmail !== usuario.email && editEmail.trim()) campos.email = editEmail.trim();
+                                                if (editTelefone !== usuario.telefone && editTelefone.trim()) campos.telefone = editTelefone.trim();
+                                                if (editChavePix !== usuario.chave_pix && editChavePix.trim()) campos.chave_pix = editChavePix.trim();
+                                                if (Object.keys(campos).length === 0) { setMensagem({ tipo: 'info', texto: 'Nenhum campo alterado.' }); return; }
+                                                try {
+                                                    const res = await api.put('/auth/perfil', campos);
+                                                    setMensagem({ tipo: 'sucesso', texto: res.message });
+                                                    carregarSnapshot();
+                                                } catch (e) {
+                                                    setMensagem({ tipo: 'erro', texto: e?.response?.data?.detail || 'Erro ao salvar.' });
+                                                }
+                                            }}>Salvar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                         {/* PASSO 2: DETALHES E INSTRUÇÕES */}
                         {passoUpgrade === 2 && (
@@ -1332,72 +1372,73 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     </div>
                                 ) : (
                                     <div className="animate-fade-in">
-                                        <h3 className="mb-1" style={{ fontSize: '1.1rem' }}>Sua Privacidade em 1º Lugar</h3>
-                                        <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Não armazenamos fotos de documentos na nuvem de forma pública para sua segurança total (LGPD).</p>
-                                        
-                                        {/* Exibir motivo de rejeição anterior se houver */}
-                                        {(() => {
-                                            const kycRejeitado = historico.find(h => h.tipo === 'desbloqueio_dados' && h.status === 'falhou');
-                                            if (kycRejeitado) {
-                                                return (
-                                                    <div style={{ background: 'rgba(255, 61, 0, 0.08)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '10px', borderRadius: '10px', marginBottom: '1rem' }}>
-                                                        <p style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <AlertCircle size={14} /> TENTATIVA ANTERIOR REJEITADA
-                                                        </p>
-                                                        <p style={{ color: '#fff', fontSize: '0.8rem', marginTop: '4px', fontStyle: 'italic' }}>"{kycRejeitado.detalhes}"</p>
+                                        {usuario.is_verified ? (
+                                            <div className="text-center">
+                                                <div style={{ background: 'rgba(var(--success-rgb), 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                                                    <ShieldCheck size={36} color="var(--success)" />
+                                                </div>
+                                                <h3 style={{ color: 'var(--success)', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Conta Verificada</h3>
+                                                <p className="text-muted" style={{ fontSize: '0.85rem' }}>Seu perfil ja possui o selo de verificacao. Obrigado pela confianca!</p>
+                                                {!usuario.is_subscriber && (
+                                                    <button className="btn btn-primary mt-1" onClick={() => { setTipoUpgrade('score'); setPassoUpgrade(2); }}>
+                                                        Ver Regras do Score
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : qrCodeVerificacao ? (
+                                            <div className="text-center">
+                                                <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Pague R$ 14,99 via PIX para verificar sua conta</p>
+                                                {qrCodeVerificacao.qr_code_base64 && (
+                                                    <img src={`data:image/png;base64,${qrCodeVerificacao.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
+                                                )}
+                                                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '0.5rem' }}>
+                                                    <p style={{ fontSize: '0.75rem', fontWeight: 700 }}>{qrCodeVerificacao.qr_code}</p>
+                                                </div>
+                                                {qrCodeVerificacao.transacao_id && (
+                                                    <PagamentoPolling transacaoId={qrCodeVerificacao.transacao_id} onConcluido={() => {
+                                                        carregarSnapshot();
+                                                        setPassoUpgrade(1);
+                                                        setQrCodeVerificacao(null);
+                                                    }} />
+                                                )}
+                                                <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => { setQrCodeVerificacao(null); setPassoUpgrade(1); }}>Voltar</button>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div style={{ display: 'flex', gap: '15px', marginBottom: '1rem' }}>
+                                                    <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '12px', borderRadius: '14px' }}>
+                                                        <ShieldCheck size={28} color="var(--primary)" />
                                                     </div>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
-
-                                        <div className="input-group mb-1">
-                                            <div style={{ 
-                                                display: 'flex', 
-                                                flexDirection: 'column', 
-                                                gap: '10px' 
-                                            }}>
-                                                {/* CAMPO 1: SELFIE */}
-                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoRG ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoRG ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        Selfie segurando o documento {fotoRG && <CheckCircle size={16} className="text-success inline-block ml-2" />}
-                                                    </label>
-                                                    <input type="file" accept="image/*" onChange={(e) => setFotoRG(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
+                                                    <div>
+                                                        <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Verificacao de Conta</h3>
+                                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pague R$ 14,99 e tenha sua conta verificada instantaneamente. Ganhe +10 pontos no score!</p>
+                                                    </div>
                                                 </div>
-
-                                                {/* CAMPO 2: RG FRENTE E VERSO */}
-                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: fotoResidencia ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px', color: fotoResidencia ? 'var(--success)' : 'var(--text-main)' }}>
-                                                        Foto do RG ou CNH (Frente e Verso) {fotoResidencia && <CheckCircle size={16} className="text-success inline-block ml-2" />}
-                                                    </label>
-                                                    <input type="file" accept="image/*,.pdf" onChange={(e) => setFotoResidencia(e.target.files[0])} style={{ fontSize: '0.75rem', width: '100%' }} />
+                                                <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--success-rgb), 0.05)', border: '1px solid rgba(var(--success-rgb), 0.1)' }}>
+                                                    <div className="info-label">Valor</div>
+                                                    <div className="info-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)' }}>R$ 14,99</div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                                    <button className="btn btn-primary" style={{ flex: 2 }} onClick={async () => {
+                                                        try {
+                                                            setLoading(true);
+                                                            const res = await api.post('/score/gerar-taxa-verificacao');
+                                                            if (res.payment_id && res.qr_code) {
+                                                                setQrCodeVerificacao({ payment_id: res.payment_id, qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, transacao_id: res.transacao_id, valor: res.valor });
+                                                            } else {
+                                                                setMensagem({ tipo: 'erro', texto: typeof res.detail === 'string' ? res.detail : 'Erro ao gerar PIX.' });
+                                                            }
+                                                        } catch (e) {
+                                                            const msg = e?.response?.data?.detail || 'Erro ao gerar PIX. Tente novamente.';
+                                                            setMensagem({ tipo: 'erro', texto: msg });
+                                                        } finally { setLoading(false); }
+                                                    }} disabled={loading}>
+                                                        {loading ? <span className="spinner" /> : 'Pagar R$ 14,99 via PIX'}
+                                                    </button>
+                                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                                 </div>
                                             </div>
-                                        </div>
-                                        
-                                        <div className="input-group mb-1">
-                                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Mensagem Opcional ao Avaliador:</label>
-                                            <textarea className="input-field" rows="2" placeholder="Ex: Mudei de endereço ontem..." value={kycDetails} onChange={(e) => setKycDetails(e.target.value)}></textarea>
-                                        </div>
-                                        <div className="info-block mb-1 text-center" style={{ background: 'rgba(var(--success-rgb), 0.05)', border: '1px solid rgba(var(--success-rgb), 0.1)', marginTop: '1rem' }}>
-                                            <div className="info-label">Custo do Upgrade</div>
-                                            <div className="info-value" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>
-                                                GRÁTIS
-                                            </div>
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este serviço é gratuito.</p>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                            <button 
-                                                className="btn btn-primary" 
-                                                style={{ flex: 2 }} 
-                                                disabled={tipoUpgrade === 'verificacao' && (!fotoRG || !fotoResidencia)}
-                                                onClick={() => setPassoUpgrade(3)}
-                                            >
-                                                Confirmar Solicitação
-                                            </button>
-                                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

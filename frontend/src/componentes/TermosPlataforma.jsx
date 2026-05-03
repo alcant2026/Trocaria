@@ -38,7 +38,7 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
                     Ao clicar em "Aceitar e Continuar", voce confirma que leu, entendeu e concorda com estas regras.
                 </p>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '15px', position: 'sticky', bottom: 0, background: 'rgba(0,0,0,0.9)', padding: '10px 0' }}>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '15px', position: 'sticky', bottom: 0, marginLeft: '-15px', marginRight: '-15px', padding: '10px 15px' }}>
                     <button className="btn btn-primary" style={{ flex: 2 }} onClick={onAceitar}>
                         Aceitar e Continuar
                     </button>

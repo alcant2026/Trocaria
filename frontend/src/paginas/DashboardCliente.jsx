@@ -1751,7 +1751,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <p className="text-muted mb-1 text-center" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>Seu score reflete sua confianca na plataforma.</p>
                                         
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--success)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                            <div className="info-block" style={{ background: 'rgba(var(--success-rgb), 0.05)', padding: '12px', borderLeft: '4px solid var(--success)', display: 'flex', gap: '12px', alignItems: 'center' }}>
                                                 <div style={{ background: 'rgba(var(--success-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
                                                     <CheckCircle2 size={20} color="var(--success)" />
                                                 </div>
@@ -1769,7 +1769,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>-10 pontos por parcela paga apos o vencimento.</div>
                                                 </div>
                                             </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                            <div className="info-block" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '12px', alignItems: 'center' }}>
                                                 <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
                                                     <ShieldCheck size={20} color="var(--primary)" />
                                                 </div>
@@ -1778,23 +1778,23 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+10 pontos ao ter a conta verificada.</div>
                                                 </div>
                                             </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid #FFD600', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                <div style={{ background: 'rgba(255,214,0,0.1)', padding: '8px', borderRadius: '8px' }}>
-                                                    <Sparkles size={20} color="#FFD600" />
+                                            <div className="info-block" style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderLeft: '4px solid var(--danger)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(255, 61, 0, 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <ShieldAlert size={20} color="var(--danger)" />
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Premium Marketplace</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe de 1 a 5 pontos aleatorios por clique em links (sorteio).</div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px', color: 'var(--danger)' }}>Calote</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>-200 pontos e marcado como inadimplente.</div>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="mt-1 p-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.75rem' }}>
-                                            <p style={{ margin: 0 }}>Score maximo: 1000. Quanto maior seu score, mais credibilidade voce tem com outros usuarios.</p>
+                                            <p style={{ margin: 0 }}>Score maximo: 1000. Quanto maior seu score, mais credibilidade.</p>
                                         </div>
 
                                         <div className="mt-1">
-                                            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setPassoUpgrade(1)}>Voltar para Opcoes</button>
+                                            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setPassoUpgrade(1)}>Voltar</button>
                                         </div>
                                     </div>
                                 ) : (

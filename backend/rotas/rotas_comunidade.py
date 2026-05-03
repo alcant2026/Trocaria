@@ -59,7 +59,11 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+        import secrets
+        pid = secrets.randbelow(999999999)
+        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
+        db.add(t); db.commit()
+        return {"payment_id": str(pid), "transacao_id": t.id, "qr_code": "00020126580014BR.GOV.BCB.PIX0136123e4567-e12b-12d1-a456-4266141740005204000053039865802BR5913PLATAFORMA6008BRASILIA62070503***6304", "qr_code_base64": None, "valor": float(DESTAQUE_PRECO), "simulado": True}
     try:
         p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
         if not p or p.get("status") not in ("approved", "pending", "in_process"):
@@ -89,7 +93,11 @@ async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db),
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        raise HTTPException(status_code=503, detail="Gateway indisponivel.")
+        import secrets
+        pid = secrets.randbelow(999999999)
+        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
+        db.add(t); db.commit()
+        return {"payment_id": str(pid), "transacao_id": t.id, "qr_code": "00020126580014BR.GOV.BCB.PIX0136123e4567-e12b-12d1-a456-4266141740005204000053039865802BR5913PLATAFORMA6008BRASILIA62070503***6304", "qr_code_base64": None, "valor": float(pacote["preco"]), "views": pacote["views"], "simulado": True}
     try:
         p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
         if not p or p.get("status") not in ("approved", "pending", "in_process"):

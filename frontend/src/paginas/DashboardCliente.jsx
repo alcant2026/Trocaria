@@ -2038,7 +2038,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     )}
                                                 </div>
                                                 <div className="market-info">
-                                                    <h4 className="market-title">{l.nome_produto}</h4>
+                                                    <h4 className="market-title">{l.nome_produto?.length > 60 ? l.nome_produto.substring(0, 60) + '...' : l.nome_produto}</h4>
                                                     <div className="market-rating-row" style={{ marginTop: '-4px', marginBottom: '8px', justifyContent: 'center' }}>
                                                         <div className="market-stars">
                                                             {[1, 2, 3, 4, 5].map((star) => (

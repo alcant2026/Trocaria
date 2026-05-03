@@ -31,7 +31,7 @@ import httpx
 from typing import Optional, List
 from modelos.modelos_db import (
     Usuario, Transacao, TipoTransacao, StatusSolicitacao, 
-    SolicitacaoEmprestimo, Investimento, RegistroAuditoria, 
+    SolicitacaoEmprestimo, RegistroAuditoria, 
     Parceiro, LinkAfiliado
 )
 from utils_emprestimo import calcular_divida_total
@@ -1415,11 +1415,6 @@ async def gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Session = Depend
         "payment_id": payment_id,
         "expires_at": expiracao_iso
     }
-
-class InvestimentoAdminRequest(BaseModel):
-    solicitacao_id: int
-    valor: Decimal = Field(gt=0)
-    motivo: str
 
 @router.post("/admin/fiscal/parceiros")
 async def criar_parceiro(

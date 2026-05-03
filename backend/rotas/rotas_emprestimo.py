@@ -31,6 +31,9 @@ class PagamentoRequest(BaseModel):
 class AceiteRequest(BaseModel):
     aceite_termos_plataforma: bool = False
 
+class ConfirmacaoRequest(BaseModel):
+    tipo: str = "parcela"  # parcela, avulso, quitacao
+
 @router.get("/oportunidades")
 async def listar_oportunidades(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     solicitacoes = db.query(SolicitacaoEmprestimo).options(
@@ -188,9 +191,9 @@ async def confirmar_pagamento(id: int, dados: PagamentoRequest, db: Session = De
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/confirmar-recebimento/{id}")
-async def confirmar_recebimento(id: int, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+async def confirmar_recebimento(id: int, dados: ConfirmacaoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     try:
-        result = confirmar_recebimento_externo(db, id, usuario_logado.id)
+        result = confirmar_recebimento_externo(db, id, usuario_logado.id, tipo_pagamento=dados.tipo)
         if result.get("quitado"):
             atualizar_score(db, usuario_logado.id, Decimal("5.0"), "PAGAMENTO_EM_DIA")
         return result

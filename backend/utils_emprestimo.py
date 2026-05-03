@@ -42,7 +42,7 @@ def confirmar_pagamento_externo(db: Session, solicitacao_id: int, pagador_id: st
     return {"message": "Pagamento registrado! Credor precisa confirmar.", "solicitacao_id": solicitacao.id, "credor_id": solicitacao.credor_id}
 
 
-def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: str) -> dict:
+def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: str, tipo_pagamento: str = "parcela") -> dict:
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == solicitacao_id,
         SolicitacaoEmprestimo.credor_id == credor_id,
@@ -50,18 +50,33 @@ def confirmar_recebimento_externo(db: Session, solicitacao_id: int, credor_id: s
     ).first()
     if not solicitacao:
         raise ValueError("Emprestimo nao encontrado.")
-    solicitacao.parcelas_pagas += 1
-    if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
+
+    if tipo_pagamento == "quitacao":
+        solicitacao.parcelas_pagas = solicitacao.prazo_meses
         solicitacao.status = StatusSolicitacao.CONCLUIDO
+    elif tipo_pagamento == "avulso":
+        pass
     else:
-        solicitacao.proximo_vencimento += datetime.timedelta(days=30)
+        solicitacao.parcelas_pagas += 1
+        if solicitacao.parcelas_pagas >= solicitacao.prazo_meses:
+            solicitacao.status = StatusSolicitacao.CONCLUIDO
+        else:
+            solicitacao.proximo_vencimento += datetime.timedelta(days=30)
+
+    detalhes_pgto = {"parcela": "Parcela", "avulso": "Pagamento parcial", "quitacao": "Quitacao total"}
     db.add(Transacao(
         usuario_id=credor_id, valor=Decimal("0.00"), tipo=TipoTransacao.CONFIRMACAO_RECEBIMENTO,
         status="concluido",
-        detalhes=f"Recebimento confirmado — Parcela {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}"
+        detalhes=f"Recebimento confirmado — {detalhes_pgto.get(tipo_pagamento, 'Parcela')} {solicitacao.parcelas_pagas}/{solicitacao.prazo_meses}"
     ))
     db.commit()
-    return {"message": "Recebimento confirmado!", "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO}
+    return {
+        "message": "Recebimento confirmado!",
+        "quitado": solicitacao.status == StatusSolicitacao.CONCLUIDO,
+        "tipo_pagamento": tipo_pagamento,
+        "parcelas_pagas": solicitacao.parcelas_pagas,
+        "total_parcelas": solicitacao.prazo_meses
+    }
 
 
 def aplicar_calote(solicitacao_id: int, db: Session) -> dict:

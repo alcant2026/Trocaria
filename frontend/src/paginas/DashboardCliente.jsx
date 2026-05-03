@@ -675,14 +675,24 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         });
     };
 
-    const handleConfirmarPagtoRecebido = async (id) => {
+    const [showConfirmarTipo, setShowConfirmarTipo] = useState(false);
+    const [confirmarTipoId, setConfirmarTipoId] = useState(null);
+
+    const handleConfirmarPagtoRecebido = (id) => {
+        setConfirmarTipoId(id);
+        setShowConfirmarTipo(true);
+    };
+
+    const confirmarRecebimentoComTipo = async (tipo) => {
+        setShowConfirmarTipo(false);
         try {
-            const res = await api.post('/emprestimos/confirmar-recebimento/' + id);
+            const res = await api.post('/emprestimos/confirmar-recebimento/' + confirmarTipoId, { tipo });
             setMensagem(res.message);
             carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + err.message);
         }
+        setConfirmarTipoId(null);
     };
 
     const handleQuitarTotalP2P = async (id, total, chavePix) => {
@@ -2695,6 +2705,23 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             onAceitar={termosTipo === 'criar' ? handleSolicitarAposAceite : () => {}}
                             onVoltar={() => setShowTermosAceite(false)}
                         />
+                    </div>
+                </div>
+            )}
+
+            {showConfirmarTipo && (
+                <div className="modal-overlay" onClick={() => setShowConfirmarTipo(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()}>
+                        <h3 style={{ textAlign: 'center', marginBottom: '15px' }}>Confirmar Recebimento</h3>
+                        <p style={{ textAlign: 'center', fontSize: '0.85rem', marginBottom: '20px', color: 'var(--text-muted)' }}>
+                            O que o tomador pagou?
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button className="btn btn-primary" onClick={() => confirmarRecebimentoComTipo('parcela')}>Parcela completa</button>
+                            <button className="btn btn-outline" onClick={() => confirmarRecebimentoComTipo('avulso')}>Pagamento parcial</button>
+                            <button className="btn btn-outline" onClick={() => confirmarRecebimentoComTipo('quitacao')}>Quitacao total</button>
+                            <button className="btn btn-secondary" onClick={() => setShowConfirmarTipo(false)}>Cancelar</button>
+                        </div>
                     </div>
                 </div>
             )}

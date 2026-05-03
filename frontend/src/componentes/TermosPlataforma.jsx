@@ -2,12 +2,12 @@ import React from 'react';
 
 const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
     return (
-        <div style={{ padding: '10px 0', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ padding: '10px 0' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                 {tipo === 'criar' ? 'Regras para Pedir Apoio' : 'Regras para Apoiar'}
             </h3>
 
-            <div style={{ flex: 1, minHeight: 0, background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', marginBottom: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', overflowY: 'auto' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', maxHeight: '55vh', overflowY: 'auto' }}>
                 
                 <p><strong style={{ color: 'var(--text-main)' }}>1. Responsabilidade dos Usuarios</strong><br />
                 O Psy Pay e apenas uma plataforma de conexao entre pessoas. Nao participamos, garantimos ou nos responsabilizamos pelos acordos firmados entre os usuarios. Cada usuario e integralmente responsavel por suas escolhas e pelo cumprimento dos compromissos assumidos.</p>
@@ -37,17 +37,17 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
                 <p style={{ fontSize: '0.7rem', color: 'var(--warning)', marginTop: '15px', textAlign: 'center' }}>
                     Ao clicar em "Aceitar e Continuar", voce confirma que leu, entendeu e concorda com estas regras.
                 </p>
-            </div>
 
-            <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-                <button className="btn btn-primary" style={{ flex: 2 }} onClick={onAceitar}>
-                    Aceitar e Continuar
-                </button>
-                {onVoltar && (
-                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onVoltar}>
-                        Voltar
+                <div style={{ display: 'flex', gap: '10px', marginTop: '15px', position: 'sticky', bottom: 0, background: 'rgba(0,0,0,0.9)', padding: '10px 0' }}>
+                    <button className="btn btn-primary" style={{ flex: 2 }} onClick={onAceitar}>
+                        Aceitar e Continuar
                     </button>
-                )}
+                    {onVoltar && (
+                        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onVoltar}>
+                            Voltar
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

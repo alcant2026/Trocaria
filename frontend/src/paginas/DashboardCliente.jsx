@@ -279,6 +279,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [showBoostModal, setShowBoostModal] = useState(false);
     const [boostTarget, setBoostTarget] = useState(null);
     const [pixDestaque, setPixDestaque] = useState(null);
+    const [pixAssinatura, setPixAssinatura] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
@@ -404,13 +405,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setLoadingAssinatura(true);
         try {
             const res = await api.post('/financeiro/assinar-plano', { plano: tipoPlano });
-            carregarSnapshot();
             setShowAssinarModal(false);
-            showModal({ 
-                title: 'Parabéns!', 
-                message: res.message || 'Agora você é um membro Premium Psy Pay!', 
-                type: 'success' 
-            });
+            if (res.qr_code) {
+                setPixAssinatura({ payment_id: res.payment_id, transacao_id: res.transacao_id, qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, valor: res.preco });
+            } else {
+                showModal({ title: 'Aviso', message: res.message || 'Erro ao gerar PIX. Tente novamente.', type: 'warning' });
+            }
         } catch (err) { 
             showModal({ title: 'Assinatura', message: err.response?.data?.detail || err.message, type: 'danger' }); 
         } finally { 
@@ -2306,6 +2306,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             }} />
                         )}
                         <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixDestaque(null)}>Fechar</button>
+                    </div>
+                </div>
+            )}
+
+            {pixAssinatura && (
+                <div className="modal-overlay" onClick={() => setPixAssinatura(null)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
+                        <h3 style={{ marginBottom: '10px' }}>Pagamento Assinatura Premium</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ {pixAssinatura.valor?.toFixed(2) || '19,99'} via PIX para ativar seu plano!</p>
+                        {pixAssinatura.qr_code_base64 && (
+                            <img src={`data:image/png;base64,${pixAssinatura.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
+                        )}
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700 }}>{pixAssinatura.qr_code}</p>
+                        </div>
+                        {pixAssinatura.transacao_id && (
+                            <PagamentoPolling transacaoId={pixAssinatura.transacao_id} onConcluido={() => {
+                                setPixAssinatura(null);
+                                carregarSnapshot();
+                                showModal({ title: 'Premium Ativo!', message: 'Agora voce e um membro Premium. Aproveite os beneficios!', type: 'success' });
+                            }} />
+                        )}
+                        <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixAssinatura(null)}>Fechar</button>
                     </div>
                 </div>
             )}

@@ -1979,7 +1979,12 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     <span className="market-sales-count">{l.nota ? Number(l.nota).toFixed(1) : '0.0'} ({l.total_avaliacoes || 0})</span>
                                                 </div>
                                                 {!l.patrocinado && l.expires_at && <div className="market-timer-row"><Timer size={11} /><MarketTimer expiresAt={l.expires_at} /></div>}
-                                                <a href={l.url_afiliado} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm market-cta" onClick={() => { api.post('/comunidade/registrar-view', { link_id: l.id }).catch(e => console.error('View error:', e)); }}>Ver Produto</a>
+                                                <button className="btn btn-primary btn-sm market-cta" onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/registrar-view', { link_id: l.id });
+                                                    } catch(e) { console.error('View error:', e); }
+                                                    window.open(l.url_afiliado, '_blank');
+                                                }}>Ver Produto</button>
                                             </div>
                                         </div>
                                     ))}

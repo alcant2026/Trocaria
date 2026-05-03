@@ -947,7 +947,17 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     transition: all 0.2s ease;
     display: flex;
     flex-direction: row;
-    max-height: 140px;
+}
+
+/* Imagem do Produto - Fixa à esquerda */
+.market-img-wrapper {
+    position: relative;
+    width: 180px;
+    min-width: 180px;
+    height: 180px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.3);
+    flex-shrink: 0;
 }
 
 .market-card:hover {

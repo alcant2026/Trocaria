@@ -245,3 +245,12 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     pdf.output(dest='S', name=buf)
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Termo_PsyPay_{}.pdf".format(solicitacao.id)})
+
+@router.post("/cancelar-pendente/{transacao_id}")
+async def cancelar_transacao_pendente(transacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    t = db.query(Transacao).filter(Transacao.id == transacao_id, Transacao.usuario_id == usuario.id, Transacao.status == "pendente").first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Transacao pendente nao encontrada.")
+    t.status = "cancelado"
+    db.commit()
+    return {"message": "Transacao cancelada."}

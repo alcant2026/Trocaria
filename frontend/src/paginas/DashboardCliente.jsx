@@ -866,11 +866,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const handleCancelarPendente = async () => {
-        if (!confirm('Cancelar esta transação pendente?')) return;
+    const handleCancelarPendente = async (id) => {
+        if (!confirm('Cancelar esta transacao pendente?')) return;
         try {
-            const res = await api.post('/emprestimos/cancelar-pendente');
-            setMensagem(res.message || 'Transação cancelada.');
+            const res = await api.post('/emprestimos/cancelar-pendente/' + id);
+            setMensagem(res.message || 'Transacao cancelada.');
             carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));

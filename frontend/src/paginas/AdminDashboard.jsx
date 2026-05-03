@@ -584,9 +584,9 @@ const AdminDashboard = () => {
                 {activeTab === 'dashboard' && (
                     <div className="animate-fade-in">
                         <div className="stats-grid">
-                            <StatCard label="Usuários" value={snapshot?.admin?.total_usuarios || 0} icon={Users} color="var(--primary)" trend={null} />
-                            <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_ativos?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
-                            <StatCard label="Pedidos Pendentes" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={Clock} color="var(--warning)" trend={null} />
+                            <StatCard label="Usuários" value={usuarios.length} icon={Users} color="var(--primary)" trend={null} />
+                            <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
+                            <StatCard label="Pedidos Pendentes" value={solicitacoesAtivas.length} icon={Clock} color="var(--warning)" trend={null} />
                              <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
                         </div>
                     </div>

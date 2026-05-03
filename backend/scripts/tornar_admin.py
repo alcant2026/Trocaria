@@ -1,53 +1,40 @@
 """
-Script para promover um usuário a administrador no banco local (SQLite).
-
-Usa o módulo 'sqlite3' da stdlib — sem dependências extras.
-
-Uso (dentro da pasta backend):
-    python scripts/tornar_admin.py
+Promover usuario a admin no banco (SQLite local ou Neon producao).
+Uso: python scripts/tornar_admin.py [email]
+Se nao passar email, usa padrao josiassm701@gmail.com
+Para forçar Neon: DATABASE_URL=postgresql://... python scripts/tornar_admin.py email@alvo.com
 """
 
-import sqlite3
-import os
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from dotenv import load_dotenv
+load_dotenv()
 
-# Caminho padrão do banco SQLite local (relativo à pasta backend)
-CAMINHO_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cred_plus.db")
-EMAIL_ALVO = "josiassm701@gmail.com"
+EMAIL = sys.argv[1] if len(sys.argv) > 1 else "josiassm701@gmail.com"
 
+# Tenta Neon primeiro, fallback SQLite
+URL = os.getenv("DATABASE_URL") or os.getenv("DATABASE_URL_LOCAL")
+if not URL:
+    URL = f"sqlite:///{os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cred_plus.db')}"
 
-def tornar_admin(email: str, caminho_db: str):
-    if not os.path.exists(caminho_db):
-        print(f"[ERRO] Banco de dados não encontrado em: {caminho_db}")
-        print("       Verifique se o backend já foi iniciado pelo menos uma vez para criar o banco.")
-        return
+from database import normalizar_database_url
+URL = normalizar_database_url(URL)
+from sqlalchemy import create_engine, text
+engine = create_engine(URL, pool_pre_ping=True)
 
-    conn = sqlite3.connect(caminho_db)
-    cursor = conn.cursor()
+print(f"Conectando em: {URL.split('@')[-1].split('?')[0] if '@' in URL else URL}")
+print(f"Alvo: {EMAIL}")
 
-    try:
-        cursor.execute("SELECT id, nome, is_admin FROM usuarios WHERE email = ?", (email,))
-        resultado = cursor.fetchone()
-
-        if not resultado:
-            print(f"[ERRO] Nenhum usuário encontrado com o e-mail: {email}")
-            return
-
-        user_id, nome, is_admin = resultado
-
-        if is_admin:
-            print(f"[INFO] O usuário '{nome}' ({email}) já é administrador.")
-            return
-
-        cursor.execute("UPDATE usuarios SET is_admin = 1 WHERE id = ?", (user_id,))
+with engine.connect() as conn:
+    result = conn.execute(text("SELECT id, nome, is_admin FROM usuarios WHERE email = :e"), {"e": EMAIL})
+    row = result.fetchone()
+    if not row:
+        print(f"ERRO: nenhum usuario com email {EMAIL}")
+        sys.exit(1)
+    uid, nome, is_admin = row
+    if is_admin:
+        print(f"{nome} ({EMAIL}) ja eh admin.")
+    else:
+        conn.execute(text("UPDATE usuarios SET is_admin = TRUE WHERE id = :id"), {"id": uid})
         conn.commit()
-        print(f"[OK] '{nome}' ({email}) agora é ADMINISTRADOR!")
-
-    except sqlite3.Error as e:
-        print(f"[ERRO] Falha no banco de dados: {e}")
-    finally:
-        conn.close()
-
-
-if __name__ == "__main__":
-    print(f"=> Conectando ao banco: {CAMINHO_DB}")
-    tornar_admin(EMAIL_ALVO, CAMINHO_DB)
+        print(f"{nome} ({EMAIL}) agora eh ADMIN!")

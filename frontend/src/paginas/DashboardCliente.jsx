@@ -1747,35 +1747,17 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                                             <TrendingUp size={30} color="var(--primary)" />
                                         </div>
-                                        <h3 className="mb-1 text-center" style={{ fontSize: '1.1rem' }}>Como aumentar seu Score?</h3>
-                                        <p className="text-muted mb-1 text-center" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>Diferente de sistemas antigos, no PSY PAY seu score reflete sua confiança real.</p>
+                                        <h3 className="mb-1 text-center" style={{ fontSize: '1.1rem' }}>Como funciona o Score?</h3>
+                                        <p className="text-muted mb-1 text-center" style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>Seu score reflete sua confianca na plataforma.</p>
                                         
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
-                                                    <PlusCircle size={20} color="var(--primary)" />
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Depósitos</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +1.0 ponto a cada R$ 100,00 depositados.</div>
-                                                </div>
-                                            </div>
-                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--warning)', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                <div style={{ background: 'rgba(255, 145, 0, 0.1)', padding: '8px', borderRadius: '8px' }}>
-                                                    <Landmark size={20} color="var(--warning)" />
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Aporte no Pool (Caixa)</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos a cada R$ 100,00 aplicados no Pool.</div>
-                                                </div>
-                                            </div>
                                             <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--success)', display: 'flex', gap: '12px', alignItems: 'center' }}>
                                                 <div style={{ background: 'rgba(var(--success-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
                                                     <CheckCircle2 size={20} color="var(--success)" />
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Pagamentos em Dia</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe +2.0 pontos fixos por cada parcela paga rigorosamente em dia.</div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Pagamento em Dia</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+5 pontos por parcela paga dentro do prazo.</div>
                                                 </div>
                                             </div>
                                             <div className="info-block" style={{ background: 'rgba(255,61,0,0.05)', padding: '12px', borderLeft: '4px solid var(--danger)', display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1783,18 +1765,36 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     <ArrowDownCircle size={20} color="var(--danger)" />
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--danger)', marginBottom: '2px' }}>Saques/Resgates</div>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>O score diminui (-2.0 pts) ao retirar liquidez da plataforma.</div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px', color: 'var(--danger)' }}>Pagamento Atrasado</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>-10 pontos por parcela paga apos o vencimento.</div>
+                                                </div>
+                                            </div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid var(--primary)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <ShieldCheck size={20} color="var(--primary)" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Verificacao KYC</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+10 pontos ao ter a conta verificada.</div>
+                                                </div>
+                                            </div>
+                                            <div className="info-block" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderLeft: '4px solid #FFD600', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ background: 'rgba(255,214,0,0.1)', padding: '8px', borderRadius: '8px' }}>
+                                                    <Sparkles size={20} color="#FFD600" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '2px' }}>Premium Marketplace</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ganhe de 1 a 5 pontos aleatorios por clique em links (sorteio).</div>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="mt-1 p-1 text-center" style={{ background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', fontSize: '0.75rem' }}>
-                                            <p style={{ margin: 0 }}>O Score máximo é 1000. Recompensamos quem ajuda o ecossistema a crescer!</p>
+                                            <p style={{ margin: 0 }}>Score maximo: 1000. Quanto maior seu score, mais credibilidade voce tem com outros usuarios.</p>
                                         </div>
 
                                         <div className="mt-1">
-                                            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setPassoUpgrade(1)}>Voltar para Opções</button>
+                                            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setPassoUpgrade(1)}>Voltar para Opcoes</button>
                                         </div>
                                     </div>
                                 ) : (

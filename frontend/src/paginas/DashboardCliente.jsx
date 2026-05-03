@@ -2220,7 +2220,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {pixDestaque && (
                 <div className="modal-overlay" onClick={() => setPixDestaque(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
-                        <h3 style={{ marginBottom: '10px' }}>Destaque seu Anuncio {pixDestaque.simulado && <span style={{ fontSize: '0.6rem', color: 'var(--warning)', background: 'rgba(255,214,0,0.1)', padding: '2px 6px', borderRadius: '4px', verticalAlign: 'middle' }}>SIMULADO</span>}</h3>
+                        <h3 style={{ marginBottom: '10px' }}>Destaque seu Anuncio</h3>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ 5,00 via PIX para destacar seu anuncio por 7 dias!</p>
                         {pixDestaque.qr_code_base64 && (
                             <img src={`data:image/png;base64,${pixDestaque.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
@@ -2246,7 +2246,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             {pixBoost && (
                 <div className="modal-overlay" onClick={() => setPixBoost(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
-                        <h3 style={{ marginBottom: '10px' }}>Turbinar Anuncio {pixBoost.simulado && <span style={{ fontSize: '0.6rem', color: 'var(--warning)', background: 'rgba(255,214,0,0.1)', padding: '2px 6px', borderRadius: '4px', verticalAlign: 'middle' }}>SIMULADO</span>}</h3>
+                        <h3 style={{ marginBottom: '10px' }}>Turbinar Anuncio</h3>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Adquira {pixBoost.views} views para seu anuncio! Pague via PIX.</p>
                         {pixBoost.qr_code_base64 && (
                             <img src={`data:image/png;base64,${pixBoost.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />

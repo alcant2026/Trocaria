@@ -9,30 +9,9 @@ from decimal import Decimal
 import datetime
 import pyotp
 import random
-import io
-import base64
-import qrcode
 from limitador import limiter
 
 router = APIRouter(prefix="/comunidade", tags=["Comunidade"])
-
-import os, secrets
-
-def gerar_qrcode_base64(texto: str) -> str:
-    try:
-        img = qrcode.make(texto)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return base64.b64encode(buf.getvalue()).decode()
-    except Exception:
-        return None
-
-def gerar_pix_simulado(valor: float) -> dict:
-    pid = secrets.randbelow(999999999)
-    chave = f"SIMULACAO{pid:09d}"
-    pix_texto = f"00020126580014BR.GOV.BCB.PIX0136{chave}5204000053039865802BR5913PLATAFORMA6008BRASILIA62070503***6304"
-    qr_b64 = gerar_qrcode_base64(pix_texto)
-    return {"payment_id": str(pid), "qr_code": pix_texto, "qr_code_base64": qr_b64, "simulado": True}
 
 class LinkCreate(BaseModel):
     nome_produto: str
@@ -140,23 +119,14 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        pix = gerar_pix_simulado(float(DESTAQUE_PRECO))
-        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
-        db.add(t); db.commit()
-        return {**pix, "transacao_id": t.id, "valor": float(DESTAQUE_PRECO)}
-    try:
-        p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
-        if not p or p.get("status") not in ("approved", "pending", "in_process"):
-            raise Exception("MP retornou status inesperado")
-        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
-        db.add(t); db.commit()
-        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
-        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
-    except Exception as e:
-        pix = gerar_pix_simulado(float(DESTAQUE_PRECO))
-        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
-        db.add(t); db.commit()
-        return {**pix, "transacao_id": t.id, "valor": float(DESTAQUE_PRECO)}
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+    p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    if not p or p.get("status") not in ("approved", "pending", "in_process"):
+        raise HTTPException(status_code=502, detail="Erro ao gerar PIX no Mercado Pago.")
+    t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
+    db.add(t); db.commit()
+    qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+    return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
 
 
 class PixBoostRequest(BaseModel):
@@ -177,23 +147,14 @@ async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db),
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        pix = gerar_pix_simulado(float(pacote["preco"]))
-        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
-        db.add(t); db.commit()
-        return {**pix, "transacao_id": t.id, "valor": float(pacote["preco"]), "views": pacote["views"]}
-    try:
-        p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
-        if not p or p.get("status") not in ("approved", "pending", "in_process"):
-            raise Exception("MP retornou status inesperado")
-        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
-        db.add(t); db.commit()
-        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
-        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
-    except Exception as e:
-        pix = gerar_pix_simulado(float(pacote["preco"]))
-        t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
-        db.add(t); db.commit()
-        return {**pix, "transacao_id": t.id, "valor": float(pacote["preco"]), "views": pacote["views"]}
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+    p = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    if not p or p.get("status") not in ("approved", "pending", "in_process"):
+        raise HTTPException(status_code=502, detail="Erro ao gerar PIX no Mercado Pago.")
+    t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
+    db.add(t); db.commit()
+    qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+    return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
 
 @router.post("/comprar-views")
 async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

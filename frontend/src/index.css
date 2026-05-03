@@ -952,6 +952,19 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     transition: all 0.2s ease;
     display: flex;
     flex-direction: row;
+    width: 100%;
+    word-break: break-word;
+}
+
+/* Informações do Produto - À direita da imagem */
+.market-info {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    justify-content: space-between;
+    overflow: hidden;
 }
 
 /* Imagem do Produto - Fixa à esquerda */

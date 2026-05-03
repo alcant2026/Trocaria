@@ -694,6 +694,26 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             db.commit()
                             logger.info(f"KYC: Conta de {usuario.nome} verificada apos pagamento de R$14,99")
                             cache_snapshot_data.pop(usuario.id, None)
+                        elif transacao.tipo == TipoTransacao.TAXA_POSTAGEM and transacao.detalhes and "DESTAQUE_LINK:" in transacao.detalhes:
+                            try:
+                                link_id = int(transacao.detalhes.split(":")[1])
+                                from modelos.modelos_db import LinkAfiliado
+                                link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
+                                if link:
+                                    link.is_boosted = True
+                                    link.visualizacoes_restantes += 1000
+                                    link.data_expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
+                                    link.ponto_min = 1
+                                    link.ponto_max = 5
+                                transacao.status = "concluido"
+                                if not transacao.payment_id:
+                                    transacao.payment_id = str(payment_id)
+                                plataforma.saldo += Decimal(str(valor_mp))
+                                db.commit()
+                                logger.info(f"DESTAQUE: Link #{link_id} destacado por 7 dias (R${valor_mp})")
+                            except Exception as e:
+                                logger.error(f"DESTAQUE: Erro ao destacar link: {e}")
+                            cache_snapshot_data.pop(usuario.id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

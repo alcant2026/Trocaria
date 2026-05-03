@@ -278,6 +278,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     ];
     const [showBoostModal, setShowBoostModal] = useState(false);
     const [boostTarget, setBoostTarget] = useState(null);
+    const [pixDestaque, setPixDestaque] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
@@ -2134,7 +2135,21 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     {inativo && l.is_boosted ? (
                                                         <button className="btn btn-primary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '36px', fontSize: '0.75rem', marginTop: 'auto' }}><Rocket size={14} /> Reativar com Views</button>
                                                     ) : !inativo ? (
-                                                        <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '36px', fontSize: '0.75rem', marginTop: 'auto' }}><Zap size={14} /> Turbinar Alcance</button>
+                                                        <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                                                            <button className="btn btn-primary w-full gap-1" onClick={async () => {
+                                                                try {
+                                                                    const res = await api.post('/comunidade/gerar-pix-destaque', { link_id: l.id });
+                                                                    if (res.payment_id && res.qr_code) {
+                                                                        setPixDestaque(res);
+                                                                    } else {
+                                                                        showModal({ title: 'Erro', message: 'Erro ao gerar PIX.', type: 'danger' });
+                                                                    }
+                                                                } catch (e) {
+                                                                    showModal({ title: 'Erro', message: e?.response?.data?.detail || 'Erro.', type: 'danger' });
+                                                                }
+                                                            }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Star size={12} /> Destacar R$5</button>
+                                                            <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Zap size={12} /> Turbinar</button>
+                                                        </div>
                                                     ) : (
                                                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anúncio grátis encerrado</p>
                                                     )}
@@ -2271,6 +2286,29 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     ))}
                 </div>
             </ModalPremium>
+
+            {pixDestaque && (
+                <div className="modal-overlay" onClick={() => setPixDestaque(null)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
+                        <h3 style={{ marginBottom: '10px' }}>Destaque seu Anúncio</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ 5,00 via PIX para destacar seu anuncio por 7 dias!</p>
+                        {pixDestaque.qr_code_base64 && (
+                            <img src={`data:image/png;base64,${pixDestaque.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
+                        )}
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700 }}>{pixDestaque.qr_code}</p>
+                        </div>
+                        {pixDestaque.transacao_id && (
+                            <PagamentoPolling transacaoId={pixDestaque.transacao_id} onConcluido={() => {
+                                setPixDestaque(null);
+                                carregarSnapshot();
+                                showModal({ title: 'Destaque Ativado!', message: 'Seu anuncio agora aparece em destaque por 7 dias.', type: 'success' });
+                            }} />
+                        )}
+                        <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixDestaque(null)}>Fechar</button>
+                    </div>
+                </div>
+            )}
 
             {showTermosAceite && (
                 <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>

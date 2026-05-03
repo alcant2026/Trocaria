@@ -99,7 +99,35 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
     db.commit()
     db.refresh(novo_link)
     
-    return {"message": "Link postado com sucesso! Você tem 24h e 50 visualizações de bônus.", "id": novo_link.id}
+    return {"message": "Link postado com sucesso! Voce tem 24h e 50 visualizacoes de bonus.", "id": novo_link.id}
+
+DESTAQUE_PRECO = Decimal("5.00")
+
+class PixDestaqueRequest(BaseModel):
+    link_id: int
+
+@router.post("/gerar-pix-destaque")
+async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    link = db.query(LinkAfiliado).filter(LinkAfiliado.id == dados.link_id, LinkAfiliado.usuario_id == usuario.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link nao encontrado.")
+    pendente = db.query(Transacao).filter(Transacao.detalhes == f"DESTAQUE_LINK:{link.id}", Transacao.status == "pendente").first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Pagamento pendente ja existe para este link.")
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
+    if not sdk:
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+    try:
+        p = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+        if not p or p.get("status") not in ("approved", "pending", "in_process"):
+            raise HTTPException(status_code=502, detail="Erro ao gerar PIX.")
+        t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(p["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
+        db.add(t); db.commit()
+        qr = p.get("point_of_interaction", {}).get("transaction_data", {})
+        return {"payment_id": p["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 @router.post("/comprar-views")
 async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

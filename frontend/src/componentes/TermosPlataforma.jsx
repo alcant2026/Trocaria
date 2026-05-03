@@ -7,7 +7,7 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
                 {tipo === 'criar' ? 'Regras para Pedir Apoio' : 'Regras para Apoiar'}
             </h3>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', marginBottom: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', marginBottom: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', maxHeight: '350px', overflowY: 'auto' }}>
                 
                 <p><strong style={{ color: 'var(--text-main)' }}>1. Responsabilidade dos Usuarios</strong><br />
                 O Psy Pay e apenas uma plataforma de conexao entre pessoas. Nao participamos, garantimos ou nos responsabilizamos pelos acordos firmados entre os usuarios. Cada usuario e integralmente responsavel por suas escolhas e pelo cumprimento dos compromissos assumidos.</p>

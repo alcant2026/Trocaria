@@ -180,7 +180,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
 
             {showTermosAceite && (
                 <div className="modal-overlay">
-                    <div className="modal-card" style={{ maxWidth: '500px' }}>
+                    <div className="modal-card" style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <TermosPlataforma
                             tipo="apoiar"
                             onAceitar={aceitarAposAceite}

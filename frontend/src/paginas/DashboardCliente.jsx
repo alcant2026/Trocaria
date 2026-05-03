@@ -2381,7 +2381,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
             {showTermosAceite && (
                 <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <TermosPlataforma
                             tipo={termosTipo}
                             onAceitar={termosTipo === 'criar' ? handleSolicitarAposAceite : () => {}}

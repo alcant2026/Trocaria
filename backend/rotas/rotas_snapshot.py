@@ -594,9 +594,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "id": u.id,
                     "nome": u.nome,
                     "cpf": u.cpf,
-                    "saldo": float(u.saldo),
-                    "saldo_caixa": float(u.saldo_caixa),
-                    "score": float(u.score),
+                    "saldo": float(u.saldo or 0),
+                    "saldo_caixa": float(u.saldo_caixa or 0),
+                    "score": float(u.score or 0),
                     "is_verified": u.is_verified,
                     "is_good_payer": fidelidade_map.get(u.id, False)
                 })

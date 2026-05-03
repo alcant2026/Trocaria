@@ -63,18 +63,6 @@ app.add_middleware(SlowAPIMiddleware)
 import time
 from collections import defaultdict
 
-# Middleware CORS global (garante headers mesmo em erros)
-@app.middleware("http")
-async def cors_global(request: Request, call_next):
-    response = await call_next(request)
-    origin = request.headers.get("origin", "")
-    if origin and any(origin.startswith(allowed) for allowed in ["http://localhost", "https://cred30", "https://cred320", "https://psy-pay", "https://peer"]):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
-
 RATE_LIMIT_MUTATION = 20
 RATE_LIMIT_WINDOW = 60
 mutex_count = defaultdict(list)

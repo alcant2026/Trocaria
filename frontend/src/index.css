@@ -926,15 +926,20 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* Grid de Produtos */
 .marketplace-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 12px;
     margin-top: 10px;
 }
 
 @media (max-width: 600px) {
     .marketplace-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
         gap: 10px;
+    }
+    .market-img-wrapper {
+        width: 120px;
+        min-width: 120px;
+        height: 120px;
     }
 }
 

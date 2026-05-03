@@ -1031,7 +1031,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 <p>Nenhuma atividade recente.</p>
                             </div>
                         ) : (
-                            historico.slice(0, 5).map((h, i) => (
+                             historico.slice(0, 5).map((h, i) => (
                                 <div key={h.id} className="activity-item">
                                     <div className="activity-icon">
                                         {TIPOS_ENTRADA.has(h.tipo) ? <ArrowUpCircle size={20} color="var(--success)" /> : <ArrowDownCircle size={20} color="var(--danger)" />}
@@ -1040,9 +1040,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <span className="activity-title">{formatarTipo(h.tipo, h.detalhes)}</span>
                                         <span className="activity-date">{new Date(h.data).toLocaleDateString()}</span>
                                     </div>
-                                    <span className="activity-value" style={{ color: corValor(h.tipo) }}>
-                                        {prefixoValor(h.tipo)} R$ {h.valor.toLocaleString('pt-BR')}
-                                    </span>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span className="activity-value" style={{ color: corValor(h.tipo) }}>
+                                            {prefixoValor(h.tipo)} R$ {h.valor.toLocaleString('pt-BR')}
+                                        </span>
+                                        <div style={{ fontSize: '0.6rem', fontWeight: 600, marginTop: '2px', color: h.status === 'concluido' ? 'var(--success)' : h.status === 'pendente' ? 'var(--warning)' : h.status === 'cancelado' ? 'var(--text-muted)' : 'var(--danger)' }}>
+                                            {h.status === 'concluido' ? 'Sucesso' : h.status === 'pendente' ? 'Pendente' : h.status === 'cancelado' ? 'Cancelado' : h.status === 'falhou' ? 'Falhou' : h.status || ''}
+                                        </div>
+                                    </div>
                                 </div>
                             ))
                         )}
@@ -1438,8 +1443,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                     </p>
                                                     {/* Badge de status apenas para entradas ou pendentes */}
                                                     {(!TIPOS_NEGATIVO.has(h.tipo) || h.status !== 'concluido') && (
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'falhou' ? 'var(--danger)' : 'var(--warning)' }}>
-                                                            {h.status?.toUpperCase() || '-'}
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: h.status === 'concluido' ? 'var(--success)' : h.status === 'pendente' ? 'var(--warning)' : h.status === 'cancelado' ? 'var(--text-muted)' : 'var(--danger)' }}>
+                                                            {h.status === 'concluido' ? 'Sucesso' : h.status === 'pendente' ? 'Pendente' : h.status === 'cancelado' ? 'Cancelado' : h.status === 'falhou' ? 'Falhou' : (h.status?.toUpperCase() || '-')}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1465,8 +1470,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                 </div>
                                             )}
 
-                                            {/* BOTÃO CANCELAR (Depósitos Virtuais e Taxas Pendentes) */}
-                                            {h.status === 'pendente' && (h.tipo === 'taxa_deposito_virtual' || h.tipo === 'taxa_solicitacao') && (
+                                            {/* BOTÃO CANCELAR (Taxas Pendentes) */}
+                                            {h.status === 'pendente' && (h.tipo === 'taxa_solicitacao' || h.tipo === 'desbloqueio_dados' || h.tipo === 'assinatura') && (
                                                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                                                     <button 
                                                         className="btn btn-outline" 

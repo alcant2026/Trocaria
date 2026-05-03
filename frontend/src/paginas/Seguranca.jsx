@@ -92,7 +92,7 @@ const Seguranca = () => {
         <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
             <div className="text-center mb-1">
                 <h1>Segurança da Conta</h1>
-                <p>Proteja seus saques com a Autenticação de Dois Fatores (2FA)</p>
+                <p>Proteja seu acesso com a Autenticação de Dois Fatores (2FA)</p>
             </div>
 
             <div className="card">
@@ -112,14 +112,14 @@ const Seguranca = () => {
                     <div>
                         <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Autenticação 2FA (TOTP)</h3>
                         <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-                            {status2fa ? "Proteção ATIVA" : "Configuração pendente (Obrigatório para saques)"}
+                            {status2fa ? "Proteção ATIVA" : "Configuração pendente (Recomendado para sua segurança)"}
                         </p>
                     </div>
                 </div>
 
                 {!status2fa && !secretData && (
                     <div className="text-center">
-                        <p>Ative o 2FA para garantir que apenas você possa retirar fundos da sua conta.</p>
+                        <p>Ative o 2FA para proteger sua conta contra acessos não autorizados.</p>
                         <button className="btn btn-primary" onClick={gerar2fa} disabled={loading}>
                             {loading ? "Processando..." : "Configurar 2FA Agora"}
                         </button>
@@ -189,7 +189,7 @@ const Seguranca = () => {
                                 Se você quiser colocar o 2FA no seu celular depois, você vai precisar dessa mesma chave. Anote-a em um lugar seguro.
                             </p>
                             <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '8px', fontWeight: 600 }}>
-                                * Após ativar o 2FA, saques ficam bloqueados por 48 horas para sua segurança.
+                                * Guarde a chave em local seguro. Sem ela, você não conseguirá recuperar o acesso.
                             </p>
                         </div>
 
@@ -248,8 +248,8 @@ const Seguranca = () => {
                         <div style={{ color: 'var(--success)', marginBottom: '1rem' }}>
                             <Lock size={48} style={{ margin: '0 auto' }} />
                         </div>
-                        <p style={{ color: '#fff', fontWeight: 600 }}>Sua conta está totalmente protegida.</p>
-                        <p style={{ fontSize: '0.85rem', marginBottom: '2rem' }}>O código 2FA será solicitado em cada pedido de saque junto com sua senha.</p>
+                        <p style={{ color: '#fff', fontWeight: 600 }}>Sua conta está protegida com 2FA.</p>
+                        <p style={{ fontSize: '0.85rem', marginBottom: '2rem' }}>O codigo 2FA sera solicitado em acoes sensiveis da conta.</p>
                         
                         {!showDesativarForm ? (
                             <button 
@@ -263,7 +263,7 @@ const Seguranca = () => {
                             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'left' }}>
                                 <h4 style={{ marginBottom: '1rem', color: 'var(--danger)' }}>Confirmar Desativação</h4>
                                 <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginBottom: '1rem' }}>
-                                    Atenção: Ao desativar ou reativar o 2FA, os saques serão bloqueados por mais 48 horas.
+                                    Atencao: A desativacao do 2FA reduz a seguranca da sua conta.
                                 </p>
                                 <div className="input-group">
                                     <div style={{ position: 'relative' }}>

@@ -115,6 +115,9 @@ class Usuario(Base):
     mp_user_id = Column(String(100), nullable=True)
     mp_token_expires_at = Column(DateTime, nullable=True)
 
+    # Foto de Perfil
+    foto_perfil = Column(String(500), nullable=True)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario", foreign_keys="SolicitacaoEmprestimo.usuario_id")
     transacoes = relationship("Transacao", back_populates="usuario")
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import api, { BASE_URL } from '../api';
 import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft } from 'lucide-react';
 
 const Perfil = () => {
@@ -18,6 +18,8 @@ const Perfil = () => {
     const [editTelefone, setEditTelefone] = useState('');
     const [editChavePix, setEditChavePix] = useState('');
     const [salvando, setSalvando] = useState(false);
+    const [uploadingFoto, setUploadingFoto] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         carregarStatus();
@@ -133,9 +135,28 @@ const Perfil = () => {
             {/* DADOS DO PERFIL */}
             <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(var(--primary-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <User size={24} color="var(--primary)" />
+                    <div onClick={() => fileInputRef.current?.click()} style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(var(--primary-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
+                        {usuario?.foto_url ? (
+                            <img src={`${BASE_URL}${usuario.foto_url}`} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <User size={28} color="var(--primary)" />
+                        )}
+                        {uploadingFoto && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spinner" /></div>}
                     </div>
+                    <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" hidden onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) { setMensagem('Arquivo muito grande. Maximo 2MB.'); return; }
+                        const form = new FormData();
+                        form.append('foto', file);
+                        setUploadingFoto(true);
+                        try {
+                            const res = await api.post('/auth/upload-foto', form, { isMultipart: true });
+                            setMensagem(res.message);
+                            carregarPerfil();
+                        } catch (e) { setMensagem(e.message || 'Erro ao enviar foto.'); }
+                        setUploadingFoto(false);
+                    }} />
                     <div>
                         <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{usuario?.nome || 'Carregando...'}</h2>
                         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{usuario?.cpf || ''}</p>

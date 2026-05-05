@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
@@ -13,6 +14,7 @@ import base64
 import random
 import string
 import hashlib
+import os
 from utils_email import enviar_email_recuperacao, mascarar_email, mascarar_cpf
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -328,7 +330,8 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "is_subscriber": usuario.is_subscriber,
         "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
         "pontos_marketplace": usuario.pontos_marketplace,
-        "mp_access_token": bool(usuario.mp_access_token)
+        "mp_access_token": bool(usuario.mp_access_token),
+        "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None
     }
 
 class AtualizarPerfil(BaseModel):
@@ -363,6 +366,43 @@ async def atualizar_perfil(dados: AtualizarPerfil, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail="Nenhum campo enviado.")
     db.commit()
     return {"message": f"Campos atualizados: {', '.join(alterado)}.", "chave_pix": u.chave_pix, "telefone": u.telefone, "email": u.email}
+
+import secrets as _secrets
+
+ALLOWED_FOTO_TYPES = {"image/png", "image/jpeg", "image/jpg"}
+FOTO_MAGIC = {b'\x89PNG\r\n\x1a\n': 'image/png', b'\xff\xd8\xff': 'image/jpeg'}
+MAX_FOTO_SIZE = 2 * 1024 * 1024
+
+@router.post("/upload-foto")
+async def upload_foto_perfil(foto: UploadFile = File(...), db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    if foto.content_type not in ALLOWED_FOTO_TYPES:
+        raise HTTPException(status_code=400, detail="Formato nao permitido. Use PNG ou JPG.")
+    conteudo = await foto.read()
+    if len(conteudo) > MAX_FOTO_SIZE:
+        raise HTTPException(status_code=413, detail="Arquivo muito grande. Maximo 2MB.")
+    valido = any(conteudo.startswith(m) for m in FOTO_MAGIC)
+    if not valido:
+        raise HTTPException(status_code=400, detail="Arquivo invalido ou corrompido.")
+    ext = "png" if conteudo.startswith(b'\x89PNG') else "jpg"
+    nome = f"foto_{usuario.id}_{_secrets.token_hex(8)}.{ext}"
+    caminho = os.path.join("uploads", nome)
+    with open(caminho, "wb") as f:
+        f.write(conteudo)
+    if usuario.foto_perfil:
+        try:
+            if os.path.exists(usuario.foto_perfil):
+                os.remove(usuario.foto_perfil)
+        except: pass
+    usuario.foto_perfil = caminho
+    db.commit()
+    return {"message": "Foto atualizada!", "url": f"/auth/view-foto/{usuario.id}"}
+
+@router.get("/view-foto/{usuario_id}")
+async def view_foto_perfil(usuario_id: str, db: Session = Depends(get_db)):
+    u = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not u or not u.foto_perfil or not os.path.exists(u.foto_perfil):
+        raise HTTPException(status_code=404, detail="Foto nao encontrada.")
+    return FileResponse(u.foto_perfil)
 
 @router.post("/aceitar-cookies")
 async def aceitar_cookies(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):

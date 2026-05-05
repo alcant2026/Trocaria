@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import pyotp
-from modelos.modelos_db import Usuario, RegistroAuditoria
+from modelos.modelos_db import Usuario, RegistroAuditoria, Transacao, TipoTransacao
 from database import get_db
 import qrcode
 import io
@@ -29,6 +29,7 @@ class RegistroUsuario(BaseModel):
     cidade: str | None = None
     estado: str | None = None
     aceite_termos: bool = False
+    codigo_indicacao: str | None = None
 
 def get_password_hash(password):
     # Bcrypt tem um limite de 72 bytes.
@@ -58,16 +59,6 @@ EMAILS_TEMPORARIOS = {'mailinator.com', 'yopmail.com', 'tempmail.com', 'guerrill
 @limiter.limit("3/minute")
 async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Session = Depends(get_db)):
     
-    # >>> TRAVA BETA: Limite de 100 usuários (remova este bloco para escalar) <<<
-    LIMITE_BETA = 100
-    total_usuarios = db.query(Usuario).count()
-    if total_usuarios >= LIMITE_BETA:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Plataforma em fase beta. Limite de {LIMITE_BETA} usuários atingido. Em breve abriremos mais vagas!"
-        )
-    # >>> FIM TRAVA BETA <<<
-
     # Validação 1: Nome Completo (rigorosa — sem empresa por trás, precisamos confiar no nome)
     nome_limpo = " ".join(dados.nome.strip().split())  # Remove espaços duplos
     partes_nome = nome_limpo.split()
@@ -160,6 +151,29 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
     while db.query(Usuario).filter(Usuario.id == novo_id).first():
         novo_id = gerar_id_customizado()
 
+    # Gerar codigo de indicacao unico (8 caracteres)
+    import secrets as _sec, string as _str
+    codigo_indicacao = ''.join(_sec.choice(_str.ascii_uppercase + _str.digits) for _ in range(8))
+    while db.query(Usuario).filter(Usuario.codigo_indicacao == codigo_indicacao).first():
+        codigo_indicacao = ''.join(_sec.choice(_str.ascii_uppercase + _str.digits) for _ in range(8))
+
+    # Processar indicacao (se informou codigo de quem convidou)
+    indicado_por_id = None
+    bonus_indicacao = 0
+    if dados.codigo_indicacao:
+        convidador = db.query(Usuario).filter(Usuario.codigo_indicacao == dados.codigo_indicacao.strip().upper()).first()
+        if convidador:
+            indicado_por_id = convidador.id
+            # Premiar convidador com 10 pontos
+            bonus_indicacao = 10
+            convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + bonus_indicacao
+            convidador.pontos_semanais = (convidador.pontos_semanais or 0) + bonus_indicacao
+            db.add(Transacao(
+                usuario_id=convidador.id, valor=Decimal(str(bonus_indicacao)),
+                tipo=TipoTransacao.BONUS, status="concluido",
+                detalhes=f"{bonus_indicacao} pontos por indicar {dados.nome.split()[0]}"
+            ))
+
     novo_usuario = Usuario(
         id=novo_id,
         nome=dados.nome,
@@ -173,14 +187,16 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         aceite_termos=dados.aceite_termos,
         auditoria_id=auditoria.id,
         saldo=0,
-        score=0
+        score=0,
+        codigo_indicacao=codigo_indicacao,
+        indicado_por=indicado_por_id
     )
 
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
 
-    return {"message": "Usuário registrado com sucesso!", "usuario_id": novo_usuario.id}
+    return {"message": "Usuário registrado com sucesso!", "usuario_id": novo_usuario.id, "bonus_indicacao": bonus_indicacao}
 
 import os
 from dotenv import load_dotenv
@@ -331,7 +347,8 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
         "pontos_marketplace": usuario.pontos_marketplace,
         "mp_access_token": bool(usuario.mp_access_token),
-        "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None
+        "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None,
+        "codigo_indicacao": usuario.codigo_indicacao
     }
 
 class AtualizarPerfil(BaseModel):

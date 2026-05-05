@@ -118,6 +118,10 @@ class Usuario(Base):
     # Foto de Perfil
     foto_perfil = Column(String(500), nullable=True)
 
+    # Indicacao (Referral)
+    codigo_indicacao = Column(String(10), unique=True, index=True, nullable=True)
+    indicado_por = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario", foreign_keys="SolicitacaoEmprestimo.usuario_id")
     transacoes = relationship("Transacao", back_populates="usuario")
 

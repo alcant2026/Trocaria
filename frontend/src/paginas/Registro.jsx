@@ -13,8 +13,15 @@ const Registro = () => {
         senha: '',
         telefone: '',
         cidade: '',
-        estado: ''
+        estado: '',
+        codigo_indicacao: ''
     });
+    // Capturar codigo de indicacao da URL (ex: ?ref=ABC123)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref');
+        if (ref) setFormData(prev => ({ ...prev, codigo_indicacao: ref.toUpperCase() }));
+    }, []);
     const [estados, setEstados] = useState([]);
     const [cidades, setCidades] = useState([]);
     const [aceiteTermos, setAceiteTermos] = useState(false);
@@ -131,6 +138,11 @@ const Registro = () => {
                                 className="input-field" 
                                 required 
                             />
+                        </div>
+
+                        <div className="input-group">
+                            <label>Codigo de Convite (opcional)</label>
+                            <input name="codigo_indicacao" placeholder="Ex: ABC12345" value={formData.codigo_indicacao} onChange={handleChange} className="input-field" style={{ textTransform: 'uppercase' }} maxLength={8} />
                         </div>
 
                         <div className="input-row input-row-state-city">

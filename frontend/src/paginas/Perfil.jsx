@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api, { BASE_URL } from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft, Gift } from 'lucide-react';
 
 const Perfil = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -181,6 +181,27 @@ const Perfil = () => {
                     </button>
                 </div>
             </div>
+
+            {/* CODIGO DE CONVITE */}
+            {usuario?.codigo_indicacao && (
+                <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>Convide um Amigo</h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                        Compartilhe seu codigo e ganhe <strong style={{ color: 'var(--success)' }}>10 pontos</strong> por cada amigo que se cadastrar!
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '8px' }}>
+                        <code style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '2px' }}>{usuario.codigo_indicacao}</code>
+                        <button onClick={() => { navigator.clipboard.writeText(usuario.codigo_indicacao); setMensagem('Codigo copiado!'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
+                            <Copy size={18} />
+                        </button>
+                    </div>
+                    <button className="btn btn-outline btn-sm" onClick={() => {
+                        const url = `${window.location.origin}${window.location.pathname}?ref=${usuario.codigo_indicacao}`;
+                        navigator.clipboard.writeText(url);
+                        setMensagem('Link de convite copiado!');
+                    }} style={{ fontSize: '0.75rem' }}>Copiar Link de Convite</button>
+                </div>
+            )}
 
             {/* SEGURANCA 2FA */}
             <div className="card">

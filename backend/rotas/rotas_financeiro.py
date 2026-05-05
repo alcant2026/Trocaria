@@ -736,6 +736,36 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             except Exception as e:
                                 logger.error(f"BOOST: Erro ao processar boost: {e}")
                             cache_snapshot_data.pop(usuario.id, None)
+                        elif transacao.detalhes and "COBRANCA:" in (transacao.detalhes or ""):
+                            try:
+                                from utils_email import enviar_email_recuperacao
+                                from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao
+                                sc_id = int(transacao.detalhes.split(":")[1])
+                                sc = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.id == sc_id).first()
+                                tomador = db.query(Usuario).filter(Usuario.id == sc.usuario_id).first() if sc else None
+                                credor = db.query(Usuario).filter(Usuario.id == sc.credor_id).first() if sc else None
+                                if tomador and credor:
+                                    import urllib.parse
+                                    debito = sc.valor
+                                    if tomador.email:
+                                        try:
+                                            enviar_email_recuperacao(tomador.email, tomador.nome, f"COBRANCA - Contrato #{sc.id}")
+                                        except: pass
+                                    if tomador.telefone:
+                                        num = "".join(filter(str.isdigit, tomador.telefone))
+                                        if not num.startswith("55"): num = "55" + num
+                                        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito):.2f} do contrato #{sc.id} com {credor.nome}. - Psy Pay"
+                                        wa = f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
+                                        print(f"COBRANCA: WhatsApp link para cobranca: {wa}")
+                                transacao.status = "concluido"
+                                if not transacao.payment_id:
+                                    transacao.payment_id = str(payment_id)
+                                plataforma.saldo += Decimal(str(valor_mp))
+                                db.commit()
+                                logger.info(f"COBRANCA: Contrato #{sc_id} - email enviado + receita R${valor_mp}")
+                            except Exception as e:
+                                logger.error(f"COBRANCA: Erro: {e}")
+                            cache_snapshot_data.pop(usuario.id, None)
                         else:
                             usuario.saldo += valor_mp
                             transacao.status = "concluido"

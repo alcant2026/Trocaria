@@ -181,38 +181,27 @@ async def cobrar_devedor(id: int, db: Session = Depends(get_db), usuario: Usuari
     tem_calote = tomador.score == 0 or solicitacao.status == StatusSolicitacao.CANCELADO
     if not tem_calote:
         raise HTTPException(status_code=400, detail="Este contrato nao esta em situacao de cobranca.")
-    if usuario.saldo < TAXA_COBRANCA:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobranca. R$ {TAXA_COBRANCA:.2f} necessario.")
     debito_total = calcular_divida_total(solicitacao)
-    usuario.saldo -= TAXA_COBRANCA
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-    if plataforma:
-        plataforma.saldo += TAXA_COBRANCA
-    tx = Transacao(usuario_id=usuario.id, valor=TAXA_COBRANCA, tipo=TipoTransacao.TAXA_SOLICITACAO, status="concluido", detalhes=f"Cobranca do contrato #{solicitacao.id}")
-    db.add(tx)
+    pendente = db.query(Transacao).filter(Transacao.detalhes == f"COBRANCA:{solicitacao.id}", Transacao.status == "pendente").first()
+    if pendente:
+        raise HTTPException(status_code=400, detail="Voce ja tem uma cobranca pendente para este contrato. Aguarde o pagamento.")
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
+    if not sdk:
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+    result = sdk.payment().create({"transaction_amount": float(TAXA_COBRANCA), "description": f"Cobranca Contrato #{solicitacao.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    if result.get("status") not in (200, 201):
+        raise HTTPException(status_code=502, detail=f"Erro MP: {result.get('response', {}).get('message', 'erro')}")
+    payment = result["response"]
+    t = Transacao(usuario_id=usuario.id, valor=TAXA_COBRANCA, tipo=TipoTransacao.TAXA_SOLICITACAO, status="pendente", payment_id=str(payment["id"]), metodo="pix", detalhes=f"COBRANCA:{solicitacao.id}")
+    db.add(t)
     db.commit()
-    from utils_email import enviar_email_recuperacao
-    email_enviado = False
-    if tomador.email:
-        try:
-            enviar_email_recuperacao(tomador.email, tomador.nome, f"VC TEM UMA COBRANCA PENDENTE - CONTRATO #{solicitacao.id}")
-            email_enviado = True
-        except Exception as e:
-            print(f"Erro ao enviar email de cobranca: {e}")
-    whatsapp_link = None
-    if tomador.telefone:
-        apenas_num = "".join(filter(str.isdigit, tomador.telefone))
-        if not apenas_num.startswith("55"):
-            apenas_num = "55" + apenas_num
-        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito_total):.2f} referente ao contrato #{solicitacao.id} com {usuario.nome}. Entre em contato para regularizar. - Psy Pay"
-        import urllib.parse
-        whatsapp_link = f"https://wa.me/{apenas_num}?text={urllib.parse.quote(msg)}"
+    qr = payment.get("point_of_interaction", {}).get("transaction_data", {})
     return {
-        "message": f"Cobranca enviada para {tomador.nome}. Taxa de R$ {TAXA_COBRANCA:.2f} cobrada.",
-        "email_enviado": email_enviado,
-        "whatsapp_link": whatsapp_link,
-        "telefone_tomador": tomador.telefone,
-        "email_tomador": tomador.email,
+        "payment_id": payment["id"], "transacao_id": t.id,
+        "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"),
+        "valor": float(TAXA_COBRANCA),
+        "tomador_nome": tomador.nome, "tomador_email": tomador.email, "tomador_telefone": tomador.telefone,
         "debito": float(debito_total)
     }
 

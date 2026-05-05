@@ -252,6 +252,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [boostTarget, setBoostTarget] = useState(null);
     const [pixDestaque, setPixDestaque] = useState(null);
     const [pixBoost, setPixBoost] = useState(null);
+    const [pixCobranca, setPixCobranca] = useState(null);
     const [pixAssinatura, setPixAssinatura] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
@@ -1776,8 +1777,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                                                             <button className="btn btn-primary btn-sm" style={{ marginTop: '8px', fontSize: '0.7rem', padding: '4px 10px' }} onClick={async () => {
                                                                                 try {
                                                                                     const r = await api.post('/emprestimos/cobrar/' + emp.id);
-                                                                                    setMensagem({ tipo: 'sucesso', texto: r.message });
-                                                                                    if (r.whatsapp_link) window.open(r.whatsapp_link, '_blank');
+                                                                                    if (r.payment_id && r.qr_code) {
+                                                                                        setPixCobranca({ payment_id: r.payment_id, transacao_id: r.transacao_id, qr_code: r.qr_code, qr_code_base64: r.qr_code_base64, valor: r.valor, tomador_nome: r.tomador_nome, tomador_telefone: r.tomador_telefone, tomador_email: r.tomador_email, debito: r.debito });
+                                                                                    } else {
+                                                                                        setMensagem({ tipo: 'erro', texto: 'Erro ao gerar PIX para cobranca.' });
+                                                                                    }
                                                                                 } catch (e) { setMensagem({ tipo: 'erro', texto: e.message }); }
                                                                             }}>Cobrar Devedor (R$ 2,00)</button>
                                                                         )}
@@ -2274,6 +2278,38 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             }} />
                         )}
                         <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixBoost(null)}>Fechar</button>
+                    </div>
+                </div>
+            )}
+
+            {pixCobranca && (
+                <div className="modal-overlay" onClick={() => setPixCobranca(null)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
+                        <h3 style={{ marginBottom: '10px' }}>Cobranca do Devedor</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ 2,00 via PIX para enviar cobranca a {pixCobranca.tomador_nome} (debito: R$ {pixCobranca.debito?.toFixed(2)}).</p>
+                        {pixCobranca.qr_code_base64 && (
+                            <img src={`data:image/png;base64,${pixCobranca.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
+                        )}
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, flex: 1, wordBreak: 'break-all', margin: 0 }}>{pixCobranca.qr_code}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(pixCobranca.qr_code); setMensagem({ tipo: 'sucesso', texto: 'Codigo PIX copiado!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                                <Copy size={16} />
+                            </button>
+                        </div>
+                        {pixCobranca.transacao_id && (
+                            <PagamentoPolling transacaoId={pixCobranca.transacao_id} onConcluido={() => {
+                                setPixCobranca(null);
+                                carregarSnapshot();
+                                showModal({ title: 'Cobranca Enviada!', message: `Email e WhatsApp enviados para ${pixCobranca.tomador_nome}.`, type: 'success' });
+                                if (pixCobranca.tomador_telefone) {
+                                    const num = pixCobranca.tomador_telefone.replace(/\D/g, '');
+                                    const tel = num.startsWith('55') ? num : '55' + num;
+                                    const msg = encodeURIComponent(`Ola ${pixCobranca.tomador_nome.split(' ')[0]}, voce tem um debito de R$ ${pixCobranca.debito?.toFixed(2)}. Entre em contato para regularizar. - Psy Pay`);
+                                    window.open(`https://wa.me/${tel}?text=${msg}`, '_blank');
+                                }
+                            }} />
+                        )}
+                        <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixCobranca(null)}>Fechar</button>
                     </div>
                 </div>
             )}

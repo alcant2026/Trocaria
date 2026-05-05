@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 import uvicorn
 import os
 from database import engine, SessionLocal, Base
@@ -219,6 +218,16 @@ async def root():
 @app.get("/api")
 async def api_root():
     return {"status": "online", "message": "Psy Pay API Gateway"}
+
+@app.get("/robots.txt")
+async def robots():
+    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://peer-5gq5.onrender.com/sitemap.xml\n")
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    from fastapi.responses import Response
+    xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://peer-5gq5.onrender.com/</loc><lastmod>2026-05-03</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url></urlset>'
+    return Response(content=xml, media_type="application/xml")
 
 # Pasta de uploads servida apenas via rota /api/admin/view-doc (protegida por auth)
 # NÃO usar StaticFiles para evitar acesso público a documentos de usuários

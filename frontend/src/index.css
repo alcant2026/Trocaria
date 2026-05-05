@@ -546,11 +546,150 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 }
 
 @media (max-width: 400px) {
-  .main-content { padding-left: 0.75rem; padding-right: 0.75rem; padding-top: 4.5rem; }
-  .card { padding: 1rem; border-radius: var(--radius-md); }
-  h1 { font-size: 1.5rem; }
-  h2 { font-size: 1.25rem; }
-  .action-grid { gap: 0.5rem; }
+    .market-empty { padding: 2rem 1rem; }
+    .modal-card { width: 95%; padding: 16px !important; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+
+/* ============ MOBILE RESPONSIVE ============ */
+
+/* Inputs e botoes tocam facil no mobile */
+@media (max-width: 600px) {
+    .input-field, .input, .btn, select, textarea {
+        font-size: 16px !important; /* Evita zoom automatico no iOS */
+    }
+    button, .btn, .clickable {
+        min-height: 44px;
+    }
+    /* Cards com padding reduzido */
+    .card, .card-minimal {
+        padding: 12px !important;
+    }
+    .glass-panel {
+        padding: 12px !important;
+    }
+    /* Stats grid em 2 colunas */
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 12px !important;
+    }
+    .stat-value {
+        font-size: 1.1rem !important;
+    }
+    /* Modais ocupam quase toda tela */
+    .modal-card {
+        width: 94%;
+        max-width: 94% !important;
+        padding: 16px !important;
+        margin: 10px auto;
+        max-height: 85vh !important;
+    }
+    .modal-overlay {
+        padding: 10px;
+        align-items: flex-end;
+    }
+    .modal-card:first-of-type {
+        border-radius: 20px 20px 0 0;
+    }
+    /* Marketplace cards */
+    .market-img-wrapper {
+        width: 100px;
+        min-width: 100px;
+        height: 100px;
+    }
+    .market-title {
+        font-size: 0.7rem;
+    }
+    .marketplace-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .marketplace-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+    .m-tab {
+        white-space: nowrap;
+        padding: 8px 12px;
+        font-size: 0.7rem;
+    }
+    .market-cta {
+        font-size: 0.65rem !important;
+        padding: 4px 8px !important;
+    }
+    .m-filter-select {
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    /* Ranking sidebar some em mobile */
+    .ranking-sidebar {
+        display: none !important;
+    }
+    /* Grid de acoes na home */
+    .action-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px;
+    }
+    .action-btn {
+        padding: 12px !important;
+        min-height: 70px;
+    }
+    .action-btn span {
+        font-size: 0.65rem !important;
+    }
+    /* Upgrade cards */
+    .card-minimal.clickable {
+        padding: 12px !important;
+    }
+    /* Admin */
+    .nav-item {
+        font-size: 0.7rem;
+        padding: 8px 10px;
+    }
+    .data-table {
+        font-size: 0.65rem;
+    }
+    .data-table td, .data-table th {
+        padding: 6px 4px;
+    }
+    /* Contratos */
+    .flex-between {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .text-right {
+        text-align: left;
+    }
+}
+
+/* Telas muito pequenas (ate 400px) */
+@media (max-width: 400px) {
+    .market-img-wrapper {
+        width: 80px;
+        min-width: 80px;
+        height: 80px;
+    }
+    .market-info {
+        padding: 4px 6px !important;
+    }
+    .market-title {
+        font-size: 0.65rem;
+    }
+    .market-cta {
+        font-size: 0.6rem !important;
+        padding: 3px 6px !important;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .action-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
 }
 
 /* Navbar Responsividade */

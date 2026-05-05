@@ -32,7 +32,7 @@ const RankingSemanal = ({ usuario, sidebar }) => {
 
     if (sidebar) {
         return (
-            <div style={{ width: '240px', flexShrink: 0, background: 'linear-gradient(180deg, rgba(255,214,0,0.04) 0%, rgba(0,0,0,0.3) 100%)', borderRadius: '16px', border: '1px solid rgba(255,214,0,0.12)', padding: '12px', position: 'sticky', top: '10px', alignSelf: 'flex-start', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+            <div className="ranking-sidebar" style={{ width: '240px', flexShrink: 0, background: 'linear-gradient(180deg, rgba(255,214,0,0.04) 0%, rgba(0,0,0,0.3) 100%)', borderRadius: '16px', border: '1px solid rgba(255,214,0,0.12)', padding: '12px', position: 'sticky', top: '10px', alignSelf: 'flex-start', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <TrendingUp size={16} color="#FFD600" />

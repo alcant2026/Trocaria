@@ -95,7 +95,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 .main-content {
   flex: 1;
-  padding: calc(6rem + env(safe-area-inset-top)) 0.75rem 2rem 0.75rem;
+  padding: calc(6rem + env(safe-area-inset-top)) 0.5rem 2rem 0.5rem;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
@@ -562,7 +562,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     }
     /* Cards com padding reduzido */
     .card, .card-minimal {
-        padding: 8px !important;
+        padding: 12px !important;
     }
     .glass-panel {
         padding: 12px !important;

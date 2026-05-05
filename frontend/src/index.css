@@ -1569,6 +1569,64 @@ select.input-field option {
     color: #ffffff !important;
 }
 
+/* Activity list */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    min-width: 0;
+    overflow: hidden;
+}
+.activity-icon {
+    flex-shrink: 0;
+    width: 32px;
+    display: flex;
+    justify-content: center;
+}
+.activity-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.activity-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.activity-date {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+.activity-value {
+    flex-shrink: 0;
+    font-weight: 800;
+    font-size: 0.85rem;
+    text-align: right;
+    margin-left: auto;
+    min-width: 60px;
+}
+
+@media (max-width: 600px) {
+    .activity-item {
+        gap: 6px;
+        padding: 8px 0;
+    }
+    .activity-icon {
+        width: 24px;
+    }
+    .activity-value {
+        font-size: 0.85rem;
+        min-width: 50px;
+    }
+}
+
 /* ============ PREVENIR OVERFLOW MOBILE ============ */
 @media (max-width: 600px) {
     /* Forcar tudo a respeitar os limites */

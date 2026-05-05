@@ -13,5 +13,15 @@ export default defineConfig({
                 changeOrigin: true
             }
         }
+    },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-react': ['react', 'react-dom'],
+                    'vendor-icons': ['lucide-react'],
+                }
+            }
+        }
     }
 })

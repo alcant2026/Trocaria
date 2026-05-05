@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { 
@@ -12,18 +12,20 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import api, { BASE_URL } from './api';
-import DashboardCliente from './paginas/DashboardCliente';
-import AdminDashboard from './paginas/AdminDashboard';
 import Login from './paginas/Login';
 import Registro from './paginas/Registro';
 import Perfil from './paginas/Perfil';
-import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
-import ComoFunciona from './paginas/ComoFunciona';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 import LoadingScreen from './componentes/LoadingScreen';
+
+// Lazy load paginas pesadas (code splitting)
+const DashboardCliente = lazy(() => import('./paginas/DashboardCliente'));
+const AdminDashboard = lazy(() => import('./paginas/AdminDashboard'));
+const PoliticaPrivacidade = lazy(() => import('./paginas/PoliticaPrivacidade'));
+const ComoFunciona = lazy(() => import('./paginas/ComoFunciona'));
 import MarketplaceCallback from './paginas/MarketplaceCallback';
 
 const App = () => {
@@ -203,6 +205,8 @@ const App = () => {
                         <button className="btn btn-primary" onClick={() => window.location.hash = 'cliente'}>Ir para o Início</button>
                     </div>
                 )}
+            </main>
+            <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>}>
                 {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
                 {page === 'pool' && <DashboardCliente initialView="pool" />}
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
@@ -212,7 +216,7 @@ const App = () => {
                 {page === 'comofunciona' && <ComoFunciona />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
                 {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
-            </main>
+            </Suspense>
 
             {!user && (
                 <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>

@@ -1576,11 +1576,12 @@ select.input-field option {
     padding: 10px 0;
     border-bottom: 1px solid rgba(255,255,255,0.04);
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
 }
 .activity-icon {
     flex-shrink: 0;
-    width: 32px;
+    width: 28px;
     display: flex;
     justify-content: center;
 }
@@ -1604,24 +1605,25 @@ select.input-field option {
     margin-top: 1px;
 }
 .activity-value {
-    flex-shrink: 0;
     font-weight: 800;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     text-align: right;
+    white-space: nowrap;
 }
 .activity-status {
     font-size: 0.55rem;
     font-weight: 700;
     text-align: right;
     letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 .activity-right {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     flex-shrink: 0;
-    min-width: 0;
-    gap: 0;
+    margin-left: auto;
+    padding-left: 8px;
 }
 
 @media (max-width: 600px) {
@@ -1630,10 +1632,17 @@ select.input-field option {
         padding: 8px 0;
     }
     .activity-icon {
-        width: 24px;
+        width: 20px;
+    }
+    .activity-icon svg {
+        width: 16px !important;
+        height: 16px !important;
     }
     .activity-value {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+    }
+    .activity-right {
+        padding-left: 4px;
     }
 }
 

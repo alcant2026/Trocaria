@@ -18,6 +18,7 @@ import Login from './paginas/Login';
 import Registro from './paginas/Registro';
 import Perfil from './paginas/Perfil';
 import PoliticaPrivacidade from './paginas/PoliticaPrivacidade';
+import ComoFunciona from './paginas/ComoFunciona';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
 import BannerCookies from './componentes/BannerCookies';
@@ -124,6 +125,7 @@ const App = () => {
     if (!isAuthenticated) {
         if (page === 'registro') return <Registro />;
         if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
+        if (page === 'comofunciona') return <ComoFunciona />;
         if (page === 'recuperar-senha') return <RecuperarSenha />;
         return (
             <>
@@ -207,9 +209,18 @@ const App = () => {
                 {page === 'vincular-mp' && <MarketplaceCallback />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'perfil' && <Perfil />}
+                {page === 'comofunciona' && <ComoFunciona />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
-                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
+                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
             </main>
+
+            {!user && (
+                <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
+                    <a href="#comofunciona" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Como Funciona</a>
+                    <a href="#privacidade" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Politica de Privacidade</a>
+                    <span>© 2026 Psy Pay</span>
+                </div>
+            )}
 
             {modalExcluir && (
                 <div className="modal-overlay">

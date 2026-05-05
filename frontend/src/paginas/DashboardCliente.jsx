@@ -1937,7 +1937,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                     {marketplaceLinks.map(l => (
                                         <div key={l.id} className={`market-card ${l.patrocinado ? 'market-card--boosted' : 'market-card--free'}`}>
                                             <div className="market-img-wrapper">
-                                                <img src={l.url_imagem} alt={l.nome_produto} loading="lazy" />
+                                                <img src={l.url_imagem} alt={l.nome_produto} loading="lazy" width="180" height="180" />
                                                 {l.patrocinado ? (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '10px', left: '10px', zIndex: 2 }}>
                                                         <div className="market-badge market-badge--gold" style={{ position: 'static' }}><Zap size={10} /> DESTAQUE</div>
@@ -2038,7 +2038,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         return (
                                             <div key={l.id} className={`market-card ${inativo ? 'market-card--inactive' : ''}`} style={{ borderColor: inativo ? 'rgba(255,61,0,0.2)' : 'rgba(var(--primary-rgb), 0.2)' }}>
                                                 <div className="market-img-wrapper">
-                                                    <img src={l.url_imagem} alt={l.nome_produto} style={{ opacity: inativo ? 0.4 : 1 }} />
+                                                    <img src={l.url_imagem} alt={l.nome_produto} width="180" height="180" style={{ opacity: inativo ? 0.4 : 1 }} />
                                                     {l.is_boosted ? (
                                                         <div className="market-badge market-badge--gold"><Zap size={10} /> PAGO</div>
                                                     ) : (

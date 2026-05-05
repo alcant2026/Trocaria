@@ -1607,7 +1607,6 @@ select.input-field option {
 .activity-value {
     font-weight: 800;
     font-size: 0.8rem;
-    text-align: right;
     white-space: nowrap;
 }
 .activity-status {
@@ -1619,11 +1618,21 @@ select.input-field option {
 }
 .activity-right {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
     flex-shrink: 0;
     margin-left: auto;
     padding-left: 8px;
+}
+.activity-status {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
 }
 
 @media (max-width: 600px) {

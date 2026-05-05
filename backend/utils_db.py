@@ -163,9 +163,9 @@ def executar_limpeza_banco(engine):
             DELETE FROM solicitacoes_emprestimo WHERE status = 'pendente'
             AND data_criacao < NOW() - INTERVAL '7 days'
         """)
-        # 4. Links de afiliados inativos ha mais de 30 dias
+        # 4. Links de afiliados inativos ha mais de 30 dias (apenas marca como inativo)
         queries.append("""
-            DELETE FROM links_afiliados WHERE is_active = FALSE
+            UPDATE links_afiliados SET is_active = FALSE WHERE is_active = FALSE
             AND data_criacao < NOW() - INTERVAL '30 days'
         """)
         # 5. Historico de cliques antigo (mais de 60 dias)
@@ -187,7 +187,7 @@ def executar_limpeza_banco(engine):
         queries.append("DELETE FROM transacoes WHERE status = 'pendente' AND tipo IN ('taxa_solicitacao', 'taxa_match', 'desbloqueio_dados', 'assinatura') AND data_criacao < datetime('now', '-7 days')")
         queries.append("DELETE FROM transacoes WHERE status IN ('expirado', 'cancelado') AND tipo IN ('deposito', 'saque') AND data_criacao < datetime('now', '-15 days')")
         queries.append("DELETE FROM solicitacoes_emprestimo WHERE status = 'pendente' AND data_criacao < datetime('now', '-7 days')")
-        queries.append("DELETE FROM links_afiliados WHERE is_active = 0 AND data_criacao < datetime('now', '-30 days')")
+        queries.append("UPDATE links_afiliados SET is_active = 0 WHERE is_active = 0 AND data_criacao < datetime('now', '-30 days')")
         queries.append("DELETE FROM historico_cliques_marketplace WHERE data_clique < datetime('now', '-60 days')")
         queries.append("DELETE FROM acoes_admin WHERE data_acao < datetime('now', '-90 days')")
         queries.append("DELETE FROM documentos_verificacao WHERE status = 'pendente' AND data_envio < datetime('now', '-30 days')")

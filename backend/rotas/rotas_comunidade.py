@@ -387,7 +387,7 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
     # Se views acabaram, aplicar regra
     if link.visualizacoes_restantes <= 0:
         if not link.is_boosted:
-            db.delete(link)
+            link.is_active = False
         else:
             link.is_active = False
     

@@ -1,38 +1,86 @@
-# 🚀 Psy Pay | Guia Oficial de Deploy (Render & Neon DB)
+# Guia de Deploy · Psy Pay
 
-Este guia cobre todos os passos para hospedar a **psy pay** usando infraestruturas modernas: **Render** (Node + Python Hosting) e **Neon.tech** (PostgreSQL Serverless).
+Deploy via [Render](https://render.com) — gratuito para começar.
 
-## 1️⃣ Configurando Banco de Dados no Neon.tech
-Como o aplicativo está programado nativamente com SQLAlchemy, sua migração banco é praticamente autônoma.
-1. Crie uma conta no [Neon.tech](https://neon.tech/) e crie um novo projeto.
-2. Copie a `Connection String` (URL). 
-   - Exemplo: `postgresql://seu_usuario:sua_senha@ep-bold-surf-12345.sa-east-1.aws.neon.tech/neondb`
-3. Seu arquivo `database.py` já conta com filtros de "Limites de Conexões" para o Neon e bloqueio inteligente de `sslmode`. **Nenhuma alteração de código é necessária.**
+---
 
-## 2️⃣ Variáveis de Ambiente (.env) Global
-Você deve adicionar no seu painel da Render, tanto para o Frontend quanto para o Backend.
-- `DATABASE_URL=postgresql://sua...string...do...neon`
-- `VITE_API_URL=https://api.suaurlrender.com` (apenas para frontend)
+## 1. Banco de Dados
 
-## 3️⃣ Subindo o Backend (Render)
-1. Crie um **Web Service** no [Render](https://dashboard.render.com).
-2. Conecte com seu GitHub (`krkn12/peer`).
-3. Defina as configurações:
-   - **Environment**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app`
-     *(Usar 2 workers impede que as conexões saturem o Neon Database).*
-4. Insira a `DATABASE_URL` no menu "Environment".
-5. O sistema criará sozinho as 8 tabelas financeiras ao processar o primeiro ping. Após isso, registre a conta principal da plataforma via App Frontend e marque-a como Administrador (com a ajuda de seu painel do DB e do script criado, se necessário).
+### Produção: Neon (PostgreSQL Serverless)
+1. Criar conta em [Neon.tech](https://neon.tech)
+2. Copiar a Connection String
+3. Adicionar como variável de ambiente no Render: `DATABASE_URL`
+4. O SQLAlchemy cria as tabelas automaticamente no primeiro ping
 
-## 4️⃣ Subindo o Frontend (Render)
-1. Crie um **Static Site** no [Render](https://dashboard.render.com).
-2. Conecte com o GitHub e selecione a pasta frontend do seu repositório *(configure Root Directory = `frontend`)*.
-3. Defina as configurações:
-   - **Build Command**: `npm install && npm run build`
-   - **Publish Directory**: `dist`
-4. Na aba "Environment", defina a `VITE_API_URL` apontando para o link do backend web service criado no Passo 3.
+### Desenvolvimento: SQLite
+- Usa `cred_plus.db` local automaticamente
+- Nenhuma configuração necessária
 
-## ✅ Tratamento de Erros Comuns
-- **CORS Bloqueado no Frontend**: Caso seu link do frontend seja novo (ex: `app.psypay.com`), ele deve ser incluído na lista de `CORS_ORIGINS` no `main.py` do Backend.
-- **Neon fechando Conexão**: Não use mais de 2 `workers` web. O Free Tier permite máximo 10 conexões. Nossa lógica no `database.py` segura esse teto nativamente se `"neon.tech"` constar na `DATABASE_URL`.
+---
+
+## 2. Backend (Render Web Service)
+
+| Campo | Valor |
+|-------|-------|
+| **Root Directory** | `backend` |
+| **Runtime** | Python 3 |
+| **Build Command** | `pip install -r requirements.txt` |
+| **Start Command** | `gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT` |
+
+### Variáveis de Ambiente necessárias:
+```
+DATABASE_URL=postgresql://...
+SECRET_KEY=sua_chave_secreta
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
+FRONTEND_URL=https://seu-frontend.onrender.com
+```
+
+---
+
+## 3. Frontend (Render Static Site)
+
+| Campo | Valor |
+|-------|-------|
+| **Root Directory** | `frontend` |
+| **Build Command** | `npm install && npm run build` |
+| **Publish Directory** | `dist` |
+
+### Variável de Ambiente:
+```
+VITE_API_URL=https://seu-backend.onrender.com/api
+```
+
+---
+
+## 4. Configurar CORS
+
+No `backend/main.py`, adicionar a URL do frontend:
+
+```python
+CORS_ORIGINS = [
+    "http://localhost:5173",        # dev
+    "https://seu-frontend.onrender.com"  # prod
+]
+```
+
+---
+
+## 5. Primeiro Admin
+
+Após o deploy:
+1. Cadastre-se pelo frontend (registro normal)
+2. Conecte no banco Neon e execute:
+```sql
+UPDATE usuarios SET is_admin = true WHERE cpf = 'SEU_CPF';
+```
+
+---
+
+## 6. Troubleshooting
+
+| Erro | Solução |
+|------|---------|
+| CORS bloqueado | Adicionar domínio em `CORS_ORIGINS` no `main.py` |
+| Neon fechando conexão | Usar no máximo 2 workers (free tier = 10 conexões) |
+| 404 nas rotas novas | Reiniciar o serviço no Render |
+| Banco não criou tabelas | Verificar se `DATABASE_URL` está correta |

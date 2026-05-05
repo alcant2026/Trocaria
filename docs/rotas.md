@@ -1,45 +1,84 @@
-# 🚀 Arquitetura de Rotas - Psy Pay Backend
+# Rotas da API · Psy Pay
 
-Este documento fornece um mapeamento completo de todos os arquivos que compõem o motor (backend) do Psy Pay, divididos por responsabilidade.
+Mapeamento completo dos endpoints do backend.
+
+---
+
+## Autenticação (`/auth`)
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| POST | `/auth/registrar` | Criar conta | ❌ |
+| POST | `/auth/login` | Login com CPF + senha | ❌ |
+| POST | `/auth/recuperar-senha` | Enviar código por e-mail | ❌ |
+| POST | `/auth/redefinir-senha` | Redefinir com código | ❌ |
+| GET | `/auth/perfil` | Dados do usuário logado | ✅ |
+| PUT | `/auth/perfil` | Atualizar e-mail, telefone, PIX | ✅ |
+| POST | `/auth/2fa/gerar` | Gerar segredo 2FA | ✅ |
+| POST | `/auth/2fa/ativar` | Ativar 2FA | ✅ |
+| POST | `/auth/2fa/desativar` | Desativar 2FA | ✅ |
+| POST | `/auth/gerar-codigo-indicacao` | Gerar código de indicação | ✅ |
+| POST | `/auth/usar-codigo-indicacao` | Usar código de amigo (ganha 5 pts) | ✅ |
+| DELETE | `/auth/excluir-conta` | Excluir conta (LGPD) | ✅ |
+
+## Comunidade & Marketplace (`/comunidade`)
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| GET | `/comunidade/explorar` | Listar anúncios públicos | ❌ |
+| GET | `/comunidade/meus-links` | Meus anúncios | ✅ |
+| POST | `/comunidade/postar-link` | Criar anúncio grátis | ✅ |
+| POST | `/comunidade/abrir-link` | Registrar clique + ganhar pontos | ✅ |
+| POST | `/comunidade/gerar-pix-destaque` | Pagar destaque R$5 (PIX) | ✅ |
+| POST | `/comunidade/gerar-pix-boost` | Pagar turbinar (PIX) | ✅ |
+| POST | `/comunidade/comprar-views` | Turbinar com saldo da conta | ✅ |
+| POST | `/comunidade/denunciar-link` | Denunciar anúncio | ✅ |
+| POST | `/comunidade/avaliar-link` | Avaliar anúncio (1-5) | ✅ |
+
+## Resgate de Pontos (`/marketplace`)
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| POST | `/marketplace/solicitar-resgate` | Converter pontos em PIX | ✅ |
+| GET | `/marketplace/auth-url` | Vincular conta MercadoPago | ✅ |
+| GET | `/marketplace/callback` | Callback de autorização MP | ❌ |
+
+## Financeiro & Admin (`/financeiro`)
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| POST | `/financeiro/deposito-pix` | Gerar PIX de depósito | ✅ |
+| GET | `/financeiro/extrato` | Extrato de transações | ✅ |
+| GET | `/financeiro/transacoes-pendentes` | Transações pendentes | ✅ |
+| POST | `/financeiro/webhook-mercadopago` | Webhook de pagamentos | ❌ |
+
+## Empréstimos P2P
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| POST | `/emprestimo/solicitar` | Criar solicitação P2P | ✅ |
+| GET | `/emprestimo/disponiveis` | Listar solicitações | ✅ |
+| POST | `/emprestimo/match` | Aceitar solicitação | ✅ |
+| GET | `/emprestimo/meus` | Meus empréstimos | ✅ |
+
+## Snapshot & Score
+
+| Método | Rota | Descrição | Auth |
+|--------|------|-----------|------|
+| GET | `/snapshot/dashboard` | Dados do dashboard | ✅ |
+| GET | `/score/calcular` | Ver score e limite | ✅ |
+| POST | `/score/upgrade` | Solicitar upgrade de score | ✅ |
 
 ---
 
-## 🏗️ 1. Orquestração e Deploy
-Arquivos que iniciam e configuram o servidor.
-*   `main.py`: Ponto de entrada do FastAPI. Onde as rotas são acopladas.
-*   `start.sh`: Script de inicialização automática (Uvicorn + Gunicorn).
-*   `render.yaml`: Configuração de infraestrutura para hospedagem na nuvem (Render/Neon).
-*   `.env`: Variáveis de ambiente sensíveis (Chaves MP, DB_URL, JWT_SECRET).
+## Regras de Negócio
 
-## 🗄️ 2. Camada de Dados (`backend/modelos/`)
-Definição de como os dados são salvos.
-*   `database.py`: Gerenciador de conexão com o banco de dados (Engine/Session).
-*   `modelos/modelos_db.py`: Tabelas do sistema (Usuário, Transação, Empréstimo, Ads).
+### Anúncios (Marketplace)
+- **Grátis:** 24h + views limitadas. Desativado quando views = 0.
+- **Destaque (R$5):** 7 dias + 1000 views. NÃO desativa quando views zeram.
+- **Turbinar:** Adiciona views extras. NÃO desativa por falta de views.
 
-## 🧠 3. Lógica de Negócio & Motores (`backend/utils_*.py`)
-A inteligência por trás dos cálculos e regras de dinheiro.
-*   `utils_fintech.py`: Motor do Fundo Coletivo (Pool), Liquidez e Reserva de 30%.
-*   `utils_score.py`: Algoritmo que calcula o Score (0-1000) baseado no comportamento.
-*   `utils_emprestimo.py`: Cálculos de juros, parcelas e projeções financeiras.
-*   `auditoria_saldo.py`: Sistema que verifica se o saldo dos usuários é real ou manipulado.
-
-## 🛡️ 4. Segurança e Filtros
-*   `limitador.py`: Controle de taxa (Rate Limiting) para evitar ataques de spam e brute force.
-
-## 🚀 5. Rotas de API (`backend/rotas/`)
-Os arquivos que respondem às requisições do Frontend:
-*   `rotas_auth.py`: Login, Registro e Segurança (2FA).
-*   `rotas_financeiro.py`: Depósitos PIX, Saques e Gestão Admin.
-*   `rotas_comunidade.py`: Marketplace, Ads, Pontos e Gamificação.
-*   `rotas_emprestimo.py`: Simulações e tomadas de crédito institucional.
-*   `rotas_snapshot.py`: Dashboard e Relatórios Fiscais (Fiscal Hub).
-*   `rotas_score.py`: Análise de risco e limites de crédito.
-*   `rotas_parceiros_caixa.py`: Gestão de depósitos em dinheiro físico.
-
----
-> [!NOTE]
-> Todos os arquivos acima são essenciais para o funcionamento do ecossistema Psy Pay. Qualquer alteração em `utils_*.py` impacta diretamente os cálculos de lucro e risco.
-
----
-> [!NOTE]
-> Todas as rotas críticas (saques e transferências) exigem **2FA ativo** e as rotas administrativas exigem permissão de **Superusuário (Admin)**.
+### Pontos
+- **Ganho:** 3x o valor gasto em compras, 1x por clique, 10 por indicação
+- **Resgate:** 1000 pts = R$ 1,00 (mínimo 1000 pts)
+- **Indicação:** Cada indicador ganha 1 pt/R$ quando você compra

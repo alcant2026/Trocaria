@@ -1,40 +1,80 @@
-# 🚀 Psy Pay | Rede de Apoio entre Pares
+# Psy Pay · Rede de Apoio entre Pares
 
-O **Psy Pay** é uma plataforma que conecta pessoas que querem apoiar financeiramente outras pessoas, combinada com uma rede social e ferramentas de afiliados. Utilizamos um sistema de matching baseado em reputação (Score e KYC) para facilitar acordos diretos entre Particulares.
-
-## 🌟 Principais Funcionalidades
-
-### 1. Sistema de Reputação (Score)
-- **Pontuação baseada em histórico**: Seu score aumenta conforme você cumpre seus acordos.
-- **KYC (Verificação de Identidade)**: Usuários verificados têm mais credibilidade na rede.
-- **Match Inteligente**: Nosso algoritmo ajuda a conectar pessoas com base em reputação.
-
-### 2. Painel Administrativo
-- Monitoramento de atividades e auditoria.
-- **Receita Operacional**: Taxa de serviço sobre acordos realizados na plataforma.
-
-### 3. Comunidade & Marketplace
-- Rede social integrada estilo "Twitter/X", focada no ecossistema interno.
-- **Loja de Afiliados (Marketplace)**: Sistema onde os usuários podem impulsionar produtos e publicações pagando por *Views* dinâmicas.
-
-### 4. Caixas Físicos Parceiros
-- Facilidade para transações presenciais via rede de lojistas autorizados.
+Plataforma P2P que combina **empréstimos**, **marketplace de afiliados** e **rede de indicação** em um só lugar. Qualquer pessoa pode anunciar produtos, pedir ou oferecer crédito, e ganhar pontos convertíveis em dinheiro real.
 
 ---
-## 🛠️ Stack Tecnológica
 
-### Frontend
-- **React + Vite** (JavaScript)
-- Context API & Custom Hooks.
-- Vanilla CSS.
+## Funcionalidades
 
-### Backend
-- **Python + FastAPI** (Alta performance assíncrona).
-- **SQLAlchemy** (ORM).
-- **PostgreSQL / Neon DB** (Produção) e **SQLite** (Dev).
-- Autenticação via Token + MFA (2FA).
+### Marketplace (estilo OLX)
+- Landing page pública com categorias, busca e anúncios
+- Anúncios gratuitos (24h) ou destacados por R$5 (7 dias)
+- Turbinar anúncios com views extras (R$1 a R$35)
+- Sistema de avaliações e denúncias
 
-## 📊 Modelo de Negócio
-- **Taxa de Serviço**: Cobramos uma taxa fixa por cada acordo firmado entre as partes.
-- **Assinatura Premium**: Plano mensal para usuários que desejam benefícios adicionais.
-- **Marketplace**: Receita de impulsionamento de anúncios.
+### Empréstimos P2P
+- Criação de solicitações com parcelas e taxa
+- Match entre credores e tomadores
+- Score de reputação (0-1000) e verificação KYC
+- Cobrança e contratos via plataforma
+
+### Rede de Indicação (Multi-nível)
+- Cada usuário gera seu código de indicação único
+- Indicado ganha **5 pontos** ao usar código de amigo
+- Indicador ganha **10 pontos** por cada novo cadastro
+- Efeito rede: ao comprar, **3x pontos** pra você, **1x** pra cada indicador
+- Múltiplas indicações permitidas (pessoas diferentes)
+
+### Conversão de Pontos
+- 1000 pontos = R$ 1,00 (resgate via PIX)
+- Mínimo de 1000 pontos para solicitar
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React 18 + Vite (JavaScript) |
+| Backend | Python + FastAPI |
+| Banco | PostgreSQL (prod) / SQLite (dev) |
+| Pagamentos | MercadoPago PIX |
+| Deploy | Render (free tier) |
+
+---
+
+## Estrutura
+
+```
+psy-pay/
+├── frontend/src/
+│   ├── paginas/          # Dashboard, Login, Registro, Perfil
+│   ├── componentes/      # LandingPage, MarketplaceView, Footer, etc.
+│   └── index.css         # CSS global com design system
+├── backend/
+│   ├── rotas/            # auth, financeiro, comunidade, marketplace
+│   ├── modelos/          # modelos_db.py (todas as tabelas)
+│   ├── scripts/          # Simulações financeiras
+│   └── main.py           # Ponto de entrada FastAPI
+├── docs/                 # Documentação
+├── scripts/              # Scripts auxiliares
+└── render.yaml           # Deploy config
+```
+
+---
+
+## Rodar Local
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Acesse `http://localhost:5173` para a landing page pública.

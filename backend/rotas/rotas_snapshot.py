@@ -175,7 +175,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 LinkAfiliado.data_expiracao < agora,
                 LinkAfiliado.visualizacoes_restantes <= 0
             )
-        ).delete()
+        ).update({"is_active": False})
         
         # PAGO: views acabaram → apenas desativa (pode recomprar)
         db.query(LinkAfiliado).filter(

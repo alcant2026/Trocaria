@@ -1862,8 +1862,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                         )}
 
-                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', whiteSpace: 'nowrap' }}>
-                            <Plus size={16} /> Novo Anúncio
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', whiteSpace: 'nowrap', height: '32px', minHeight: 'unset', fontSize: '0.75rem', padding: '0 10px', flexShrink: 0 }}>
+                            <Plus size={14} /> Novo Anúncio
                         </button>
                     </div>
 

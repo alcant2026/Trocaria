@@ -6,7 +6,6 @@ import PagamentoPolling from './PagamentoPolling';
 
 const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [oportunidades, setOportunidades] = useState([]);
-    const [poolTotal, setPoolTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
@@ -33,7 +32,6 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                 setOportunidades(prev => [...prev, ...novos]);
             }
             setHasMore(data.has_more || false);
-            setPoolTotal(data.pool_disponivel || 0);
         } catch (e) {
             console.error('Erro ao carregar oportunidades:', e);
         }
@@ -84,7 +82,6 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                     </button>
                     <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>Pedidos de Apoio</h2>
                 </div>
-                <span className="badge badge-primary">Pool: R$ {poolTotal.toFixed(2)}</span>
             </div>
 
             {loading && <p className="text-muted">Carregando...</p>}

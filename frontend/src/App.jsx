@@ -77,21 +77,9 @@ const App = () => {
                 return;
             }
 
-            const maxRetries = 3;
-            for (let attempt = 0; attempt < maxRetries; attempt++) {
-                try {
-                    if (attempt > 0) setLoading(true);
-                    const resp = await fetch(`${BASE_URL}/__warmup`, { signal: AbortSignal.timeout(15000) });
-                    if (resp.ok) break;
-                } catch {
-                    if (attempt < maxRetries - 1) {
-                        await new Promise(r => setTimeout(r, (attempt + 1) * 3000));
-                    }
-                }
-            }
-
             const token = localStorage.getItem('token');
             if (token) {
+                await fetch(`${BASE_URL}/__warmup`, { signal: AbortSignal.timeout(8000) }).catch(() => {});
                 try {
                     const data = await api.get('/auth/perfil');
                     if (data && data.nome) {

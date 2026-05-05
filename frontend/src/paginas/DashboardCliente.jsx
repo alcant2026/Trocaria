@@ -162,11 +162,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         const cached = localStorage.getItem('full_snapshot');
         return cached ? JSON.parse(cached) : {};
     });
-    const [meusEmprestimos, setMeusEmprestimos] = useState(() => {
-        const cached = localStorage.getItem('meus_emprestimos_snapshot');
-        return cached ? JSON.parse(cached) : [];
-    });
-    const [activeView, setActiveView] = useState(initialView); 
+    const savedView = sessionStorage.getItem('psypay_activeView') || initialView;
+    const [activeView, setActiveView] = useState(savedView);
     const [verSaldo, setVerSaldo] = useState(true);
     const [aceiteTermos, setAceiteTermos] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
@@ -257,7 +254,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
-    const [marketplaceTab, setMarketplaceTab] = useState('explorar'); // 'explorar' ou 'meus'
+    const [marketplaceTab, setMarketplaceTab] = useState(sessionStorage.getItem('psypay_marketTab') || 'explorar');
     const [pageExplorar, setPageExplorar] = useState(1);
     const [hasMoreExplorar, setHasMoreExplorar] = useState(false);
     const [pageMeusLinks, setPageMeusLinks] = useState(1);
@@ -278,6 +275,25 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             return () => clearTimeout(timer);
         }
     }, [mensagem]);
+
+    // Persistir activeView ao mudar
+    useEffect(() => {
+        if (activeView && activeView !== 'home') {
+            sessionStorage.setItem('psypay_activeView', activeView);
+        } else {
+            sessionStorage.removeItem('psypay_activeView');
+        }
+        if (activeView !== 'marketplace') {
+            sessionStorage.removeItem('psypay_marketTab');
+        }
+    }, [activeView]);
+
+    // Persistir marketplaceTab
+    useEffect(() => {
+        if (activeView === 'marketplace') {
+            sessionStorage.setItem('psypay_marketTab', marketplaceTab);
+        }
+    }, [marketplaceTab, activeView]);
 
 
     const [kycDetails, setKycDetails] = useState('');

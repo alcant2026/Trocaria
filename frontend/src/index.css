@@ -43,10 +43,9 @@ body {
   line-height: 1.5;
   font-size: 16px;
   overflow-x: hidden;
+  overflow-y: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Evita o fundo preto/branco ao puxar a tela no mobile (bounce) */
-  overscroll-behavior: none;
 }
 
 html {
@@ -1609,8 +1608,20 @@ select.input-field option {
     font-weight: 800;
     font-size: 0.85rem;
     text-align: right;
-    margin-left: auto;
-    min-width: 60px;
+}
+.activity-status {
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-align: right;
+    letter-spacing: 0.3px;
+}
+.activity-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    min-width: 0;
+    gap: 0;
 }
 
 @media (max-width: 600px) {
@@ -1622,8 +1633,7 @@ select.input-field option {
         width: 24px;
     }
     .activity-value {
-        font-size: 0.85rem;
-        min-width: 50px;
+        font-size: 0.8rem;
     }
 }
 

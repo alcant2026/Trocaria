@@ -1043,13 +1043,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                         <span className="activity-title">{formatarTipo(h.tipo, h.detalhes)}</span>
                                         <span className="activity-date">{new Date(h.data).toLocaleDateString()}</span>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
+                                    <div className="activity-right">
                                         <span className="activity-value" style={{ color: corValor(h.tipo) }}>
                                             {prefixoValor(h.tipo)} {h.tipo === 'bonus' ? `${h.valor} pts` : `R$ ${h.valor.toLocaleString('pt-BR')}`}
                                         </span>
-                                        <div style={{ fontSize: '0.6rem', fontWeight: 600, marginTop: '2px', color: h.status === 'concluido' ? 'var(--success)' : h.status === 'pendente' ? 'var(--warning)' : h.status === 'cancelado' ? 'var(--text-muted)' : 'var(--danger)' }}>
-                                            {h.status === 'concluido' ? 'Sucesso' : h.status === 'pendente' ? 'Pendente' : h.status === 'cancelado' ? 'Cancelado' : h.status === 'falhou' ? 'Falhou' : h.status || ''}
-                                        </div>
+                                        <span className="activity-status" style={{ color: h.status === 'concluido' ? 'var(--success)' : h.status === 'pendente' ? 'var(--warning)' : h.status === 'cancelado' ? 'var(--text-muted)' : 'var(--danger)' }}>
+                                            {h.status === 'concluido' ? 'OK' : h.status === 'pendente' ? 'Pend' : h.status === 'cancelado' ? 'Canc' : h.status === 'falhou' ? 'Falhou' : h.status || ''}
+                                        </span>
                                     </div>
                                 </div>
                             ))

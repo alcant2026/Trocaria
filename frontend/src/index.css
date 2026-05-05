@@ -562,7 +562,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     }
     /* Cards com padding reduzido */
     .card, .card-minimal {
-        padding: 12px !important;
+        padding: 8px !important;
     }
     .glass-panel {
         padding: 12px !important;

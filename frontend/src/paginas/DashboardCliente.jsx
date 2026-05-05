@@ -1862,7 +1862,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             </div>
                         )}
 
-                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', height: '38px' }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', whiteSpace: 'nowrap' }}>
                             <Plus size={16} /> Novo Anúncio
                         </button>
                     </div>
@@ -2198,7 +2198,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         </p>
                     </div>
 
-                    <button className="btn btn-primary w-full mt-1" disabled={!dadosNovoLink.nome_produto || !dadosNovoLink.url_afiliado} onClick={async () => {
+                    <button className="btn btn-primary mt-1" style={{ width: 'auto', padding: '8px 20px', fontSize: '0.85rem' }} disabled={!dadosNovoLink.nome_produto || !dadosNovoLink.url_afiliado} onClick={async () => {
                         try {
                             await api.post('/comunidade/postar-link', dadosNovoLink);
                             setShowPostarLink(false);

@@ -268,6 +268,11 @@ class LinkAfiliado(Base):
 
     usuario = relationship("Usuario")
 
+    from sqlalchemy import Index
+    __table_args__ = (
+        Index('idx_link_is_active', 'is_active'),
+    )
+
 class AcaoAdmin(Base):
     __tablename__ = "acoes_admin"
 

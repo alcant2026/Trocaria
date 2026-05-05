@@ -17,7 +17,7 @@ TZ_BRASILIA = timezone(timedelta(hours=-3))
 # Cache Level 1 (Em Memória) para reduzir carga no DB Neon
 # Estrutura: {usuario_id: (timestamp_validade, dados_json)}
 cache_snapshot_data = {}
-CACHE_TTL_SEG = 15 # 15 segundos de "paz" para o banco de dados
+CACHE_TTL_SEG = 30 # 30 segundos de cache para reduzir carga no banco
 
 # Versão do cache — incrementar aqui força invalidação de todos os snapshots cacheados
 # quando o servidor reinicia com novos campos no perfil
@@ -41,24 +41,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         try:
             usuarios_afetados = processar_expiracoes_interna(db)
             if usuarios_afetados:
-                print(f"[LAZY-CLEANING] Snapshot limpou solicitações expiradas para {len(usuarios_afetados)} usuários.")
                 for uid in usuarios_afetados:
                     cache_snapshot_data.pop(uid, None)
                 cache_snapshot_data.pop("000PL", None)
         except Exception as e:
-            print(f"[LAZY-CLEANING] Falha silenciosa ignorada: {e}")
-    
-    
-    # Verificar Cache
+            pass
     if usuario.id in cache_snapshot_data:
         validade, dados = cache_snapshot_data[usuario.id]
         if agora_ts < validade:
             return dados
 
     try:
-        # 1. Perfil Básico (Sempre retorna)
-        print(f"[DEBUG SNAPSHOT] Iniciando perfil para usuario {usuario.id}")
-        # Verificar se o usuário é Parceiro
         from modelos.modelos_db import Parceiro
         parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id, Parceiro.is_active == True).first()
         is_parceiro = parceiro is not None
@@ -149,7 +142,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         }
 
         # 2. Histórico (Top 10) - Filtrando taxas administrativas que o usuário não quer ver (KYC/Score)
-        print(f"[DEBUG SNAPSHOT] Buscando histórico")
         transacoes = db.query(Transacao).filter(
             Transacao.usuario_id == usuario.id,
             Transacao.tipo != TipoTransacao.DESBLOQUEIO_DADOS,
@@ -172,7 +164,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             })
 
         # --- NOVO: MARKETPLACE DA COMUNIDADE (CPM ADS) ---
-        print(f"[DEBUG SNAPSHOT] Buscando anúncios da comunidade")
         from modelos.modelos_db import LinkAfiliado
         agora = datetime.now(timezone.utc).replace(tzinfo=None)
         
@@ -244,8 +235,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             from datetime import timedelta
             agora_br = datetime.now(TZ_BRASILIA).replace(tzinfo=None)
             data_30_dias_atras = agora_br - timedelta(days=30)
-            
-            print(f"[DEBUG SNAPSHOT] Iniciando bloco ADMIN")
             # Pendências
             pendentes_raw = db.query(Transacao).join(Usuario).filter(
                 Transacao.status == "pendente",
@@ -398,8 +387,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             # Receita Bruta Real (Dedução imediata de bônus)
             lucro_mensal_plataforma = max(Decimal("0.00"), lucro_mensal_plataforma_bruto - premios_mensais)
 
-            # Histórico Mensal
-            print(f"[DEBUG SNAPSHOT] Buscando histórico mensal (GROUP BY)")
+            # Histórico Mensal")
             if "sqlite" in str(engine.url):
                 trunc_fn = func.strftime('%Y-%m', Transacao.data_criacao)
             else:
@@ -576,7 +564,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             all_loans = db.query(SolicitacaoEmprestimo).filter(
                 SolicitacaoEmprestimo.usuario_id.in_(user_ids),
                 SolicitacaoEmprestimo.status.in_([StatusSolicitacao.APROVADO, StatusSolicitacao.CONCLUIDO])
-            ).all()
+            ).limit(200).all()
 
             # Mapeamento de fidelidade por usuário
             agora_utc = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -619,7 +607,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             # 7. Gestão de Parceiros (Apenas ativos para o HUB)
             from modelos.modelos_db import Parceiro
-            parceiros_query = db.query(Parceiro).filter(Parceiro.is_active == True).all()
+            parceiros_query = db.query(Parceiro).filter(Parceiro.is_active == True).limit(50).all()
             for p in parceiros_query:
                 snapshot["admin"]["gestao_parceiros"].append({
                     "id": p.id,
@@ -650,7 +638,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 })
 
         # --- MEUS CONTRATOS ---
-        print(f"[DEBUG SNAPSHOT] Iniciando bloco CONTRATOS")
         solicitacoes_tomador = db.query(SolicitacaoEmprestimo).filter(
             SolicitacaoEmprestimo.usuario_id == usuario.id
         ).all()
@@ -705,8 +692,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         snapshot["cliente_emprestimos"] = meus_emp_list # Unificado
 
         # --- INVESTIDOR DATA ---
-        print(f"[DEBUG SNAPSHOT] Iniciando bloco INVESTIDOR")
-        solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE).all()
+        solicitacoes_raw = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE).limit(50).all()
         
         solic_list = []
         for s in solicitacoes_raw:
@@ -731,7 +717,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         snapshot["investidor"] = {"solicitacoes_disponiveis": solic_list, "carteira": []}
 
         # Salvar no Cache antes de retornar
-        print(f"[DEBUG SNAPSHOT] Finalizado com sucesso para {usuario.id}")
         cache_snapshot_data[usuario.id] = (agora_ts + CACHE_TTL_SEG, snapshot)
         
         return snapshot

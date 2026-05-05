@@ -62,8 +62,8 @@ pool_args = {
 engine_args = {}
 
 if not is_sqlite:
-    pool_args["pool_size"] = 2
-    pool_args["max_overflow"] = 3
+    pool_args["pool_size"] = 1
+    pool_args["max_overflow"] = 2
 else:
     engine_args["connect_args"] = {"check_same_thread": False}
 

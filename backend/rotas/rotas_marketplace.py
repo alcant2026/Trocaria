@@ -220,7 +220,7 @@ async def rejeitar_resgate(transacao_id: int, db: Session = Depends(get_db), adm
 @router.get("/ranking-semanal")
 async def ranking_semanal(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     from modelos.modelos_db import Usuario
-    top20 = db.query(Usuario).filter(Usuario.pontos_semanais > 0).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
+    top20 = db.query(Usuario.id, Usuario.nome, Usuario.pontos_semanais).filter(Usuario.pontos_semanais > 0).order_by(Usuario.pontos_semanais.desc()).limit(20).all()
     ranking = []
     for i, u in enumerate(top20, 1):
         ranking.append({"posicao": i, "id": u.id, "nome": u.nome, "pontos": u.pontos_semanais or 0,

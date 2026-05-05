@@ -552,6 +552,13 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 /* ============ MOBILE RESPONSIVE ============ */
 
+/* Telas ate 900px: sidebar do ranking some */
+@media (max-width: 900px) {
+    .ranking-sidebar {
+        display: none !important;
+    }
+}
+
 /* Inputs e botoes tocam facil no mobile */
 @media (max-width: 600px) {
     .input-field, .input, .btn, select, textarea {
@@ -625,8 +632,8 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
         min-width: unset !important;
     }
     /* Ranking sidebar some em mobile */
-    .ranking-sidebar {
-        display: none !important;
+    .marketplace-grid {
+        grid-template-columns: 1fr !important;
     }
     /* Grid de acoes na home */
     .action-grid {

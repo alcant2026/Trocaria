@@ -4,6 +4,27 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, text, or_
 import logging
 
+# Bonus de indicacao: quando um usuario paga uma taxa, o convidador ganha pontos
+PONTOS_POR_REAL = 1  # 1 ponto por R$ 1 gasto em taxas
+
+def conceder_pontos_indicacao(db: Session, usuario: Usuario, valor_pago: Decimal, descricao: str):
+    """Se o usuario foi indicado por alguem, concede pontos ao convidador."""
+    if not usuario.indicado_por:
+        return
+    convidador = db.query(Usuario).filter(Usuario.id == usuario.indicado_por).with_for_update().first()
+    if not convidador:
+        return
+    pontos = int(valor_pago * PONTOS_POR_REAL)
+    if pontos <= 0:
+        return
+    convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + pontos
+    convidador.pontos_semanais = (convidador.pontos_semanais or 0) + pontos
+    db.add(Transacao(
+        usuario_id=convidador.id, valor=Decimal(str(pontos)),
+        tipo=TipoTransacao.BONUS, status="concluido",
+        detalhes=f"{pontos} pontos por indicacao - {descricao}"
+    ))
+
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 import os
@@ -636,6 +657,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes += f" | Premium ativado - {dias} dias"
                             plataforma.saldo += Decimal(str(valor_mp))
+                            conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"assinatura de {usuario.nome}")
                             db.commit()
                             logger.info(f"ASSINATURA: Premium ativado para {usuario.nome} por {dias} dias")
                             cache_snapshot_data.pop(usuario.id, None)
@@ -658,6 +680,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     if not transacao.payment_id:
                                         transacao.payment_id = str(payment_id)
                                     plataforma.saldo += Decimal(str(valor_mp))
+                                    conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"publicacao de {usuario.nome}")
                                     db.commit()
                                     logger.info(f"SOLICITACAO: Pedido #{solic.id} criado + R$ {valor_mp} receita")
                                     cache_snapshot_data.pop(usuario.id, None)
@@ -666,12 +689,14 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     transacao.status = "concluido"
                                     transacao.detalhes += f" | Pago mas erro ao criar: {e}"
                                     plataforma.saldo += Decimal(str(valor_mp))
+                                    conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"publicacao de {usuario.nome}")
                                     db.commit()
                         elif transacao.tipo == TipoTransacao.TAXA_MATCH:
                             try:
                                 from utils_fintech import confirmar_match
                                 result = confirmar_match(db, transacao.id)
                                 plataforma.saldo += Decimal(str(valor_mp))
+                                conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"match de {usuario.nome}")
                                 logger.info(f"MATCH: {result['message']}")
                             except Exception as e:
                                 logger.error(f"MATCH: Erro ao confirmar match: {e}")
@@ -691,6 +716,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes = "Conta verificada apos pagamento KYC"
                             plataforma.saldo += Decimal(str(valor_mp))
+                            conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"KYC de {usuario.nome}")
                             db.commit()
                             logger.info(f"KYC: Conta de {usuario.nome} verificada apos pagamento de R$14,99")
                             cache_snapshot_data.pop(usuario.id, None)
@@ -709,6 +735,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
                                 plataforma.saldo += Decimal(str(valor_mp))
+                                conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"destaque de {usuario.nome}")
                                 db.commit()
                                 logger.info(f"DESTAQUE: Link #{link_id} destacado por 7 dias (R${valor_mp})")
                             except Exception as e:
@@ -731,6 +758,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
                                 plataforma.saldo += Decimal(str(valor_mp))
+                                conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"boost de {usuario.nome}")
                                 db.commit()
                                 logger.info(f"BOOST: Link #{link_id} +{pacote['views'] if pacote else '?'} views (R${valor_mp})")
                             except Exception as e:
@@ -761,6 +789,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
                                 plataforma.saldo += Decimal(str(valor_mp))
+                                conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"cobranca")
                                 db.commit()
                                 logger.info(f"COBRANCA: Contrato #{sc_id} - email enviado + receita R${valor_mp}")
                             except Exception as e:

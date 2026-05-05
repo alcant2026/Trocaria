@@ -254,6 +254,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
+    const [meusEmprestimos, setMeusEmprestimos] = useState([]);
     const [marketplaceTab, setMarketplaceTab] = useState(sessionStorage.getItem('psypay_marketTab') || 'explorar');
     const [pageExplorar, setPageExplorar] = useState(1);
     const [hasMoreExplorar, setHasMoreExplorar] = useState(false);

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink, HistoricoClique
@@ -12,6 +13,16 @@ import random
 from limitador import limiter
 
 router = APIRouter(prefix="/comunidade", tags=["Comunidade"])
+
+def _desativar_expirados(db: Session):
+    """Desativa links grátis e destacados que passaram do prazo de expiração."""
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    db.query(LinkAfiliado).filter(
+        LinkAfiliado.is_active == True,
+        LinkAfiliado.data_expiracao != None,
+        LinkAfiliado.data_expiracao < agora
+    ).update({LinkAfiliado.is_active: False}, synchronize_session=False)
+    db.commit()
 
 class LinkCreate(BaseModel):
     nome_produto: str
@@ -226,6 +237,7 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
     """
     Retorna os links postados pelo usuário logado com suas estatísticas e paginação.
     """
+    _desativar_expirados(db)
     offset = (page - 1) * limit
     query = db.query(LinkAfiliado).filter(LinkAfiliado.usuario_id == usuario.id)
     total = query.count()
@@ -257,14 +269,16 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
 @router.get("/explorar")
 async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
     """
-    Retorna links ativos da comunidade com paginação. 
+    Retorna links ativos da comunidade com paginação.
     Boosted links aparecem primeiro, misturados com os grátis (24h).
+    Destaques continuam visíveis mesmo sem views até expirar o tempo (regra OLX).
     Filtra por categoria se fornecido.
     """
+    _desativar_expirados(db)
     offset = (page - 1) * limit
     query = db.query(LinkAfiliado).options(joinedload(LinkAfiliado.usuario)).filter(
         LinkAfiliado.is_active == True,
-        LinkAfiliado.visualizacoes_restantes > 0
+        or_(LinkAfiliado.visualizacoes_restantes > 0, LinkAfiliado.is_boosted == True)
     )
     
     if categoria and categoria != "Geral":
@@ -379,17 +393,18 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
     else:
         pontos_info = 0
 
-    # Consumir 1 view
+    # Consumir 1 view (destaques/turbinados não perdem visibilidade quando views zeram)
     if link.visualizacoes_restantes > 0:
         link.visualizacoes_restantes -= 1
         link.visualizacoes_totais = (link.visualizacoes_totais or 0) + 1
-    
-    # Se views acabaram, aplicar regra
-    if link.visualizacoes_restantes <= 0:
-        if not link.is_boosted:
-            link.is_active = False
-        else:
-            link.is_active = False
+
+    # Se views acabaram, desativar SOMENTE anúncios GRÁTIS (não boosted/destacados)
+    if link.visualizacoes_restantes <= 0 and not link.is_boosted:
+        link.is_active = False
+
+    # Verificar expiração por tempo (regra OLX: destaque dura 7 dias, grátis 24h)
+    if link.data_expiracao and link.data_expiracao < datetime.datetime.now(datetime.timezone.utc):
+        link.is_active = False
     
     db.commit()
     return {"ok": True, "views_restantes": link.visualizacoes_restantes, "pontos_ganhos": pontos_info}

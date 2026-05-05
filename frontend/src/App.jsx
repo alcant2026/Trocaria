@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense, startTransition } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { 
@@ -17,6 +17,8 @@ import Registro from './paginas/Registro';
 import Perfil from './paginas/Perfil';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import Logo from './componentes/Logo';
+import LandingPage from './componentes/LandingPage';
+import Footer from './componentes/Footer';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 import LoadingScreen from './componentes/LoadingScreen';
@@ -60,8 +62,10 @@ const App = () => {
 
     useEffect(() => {
         const handleHashChange = () => {
-            const hash = window.location.hash.replace('#', '') || 'login';
-            setPage(hash);
+            const hash = window.location.hash.replace('#', '') || '';
+            startTransition(() => {
+                setPage(hash);
+            });
         };
         window.addEventListener('hashchange', handleHashChange);
         handleHashChange();
@@ -113,13 +117,19 @@ const App = () => {
 
 
     if (!isAuthenticated) {
+        if (page === 'login') return (
+            <>
+                <Login onLogin={onLogin} />
+                <BannerCookies usuario={null} />
+            </>
+        );
         if (page === 'registro') return <Registro />;
-        if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = 'login'} />;
+        if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = ''} />;
         if (page === 'comofunciona') return <ComoFunciona />;
         if (page === 'recuperar-senha') return <RecuperarSenha />;
         return (
             <>
-                <Login onLogin={onLogin} />
+                <LandingPage />
                 <BannerCookies usuario={null} />
             </>
         );
@@ -240,9 +250,7 @@ const App = () => {
                     </div>
                 </div>
             )}
-            <footer className="api-footer">
-                <p>PSY PAY - Rede de Apoio entre Pares. Conectamos pessoas que querem apoiar umas às outras. O uso do serviço implica no aceite total dos Termos de Uso e Política de Privacidade. © 2024-2026 PSY PAY.</p>
-            </footer>
+            <Footer />
             <TemporizadorInatividade aoDeslogar={logout} />
             <BannerCookies usuario={user} onUpdate={atualizarPerfil} />
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { ArrowLeft, Send, CheckCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import Footer from '../componentes/Footer';
 
 const RecuperarSenha = () => {
     const [passo, setPasso] = useState(1); // 1: CPF, 2: Código e Nova Senha
@@ -221,6 +222,7 @@ const RecuperarSenha = () => {
                 <p className="text-center mt-1" style={{ fontSize: '0.9rem', color: '#fff' }}>
                     Lembrou a senha? <a href="#" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.location.hash = 'login'; }}>Fazer Login</a>
                 </p>
+                <Footer />
             </div>
         </div>
     );

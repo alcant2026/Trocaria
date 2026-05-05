@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import pyotp
-from modelos.modelos_db import Usuario, RegistroAuditoria, Transacao, TipoTransacao
+from modelos.modelos_db import Usuario, RegistroAuditoria, Transacao, TipoTransacao, Indicacao
 from database import get_db
 import qrcode
 import io
@@ -159,20 +159,23 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
 
     # Processar indicacao (se informou codigo de quem convidou)
     indicado_por_id = None
-    bonus_indicacao = 0
+    bonus_convidador = 0
+    bonus_indicado = 0
     if dados.codigo_indicacao:
         convidador = db.query(Usuario).filter(Usuario.codigo_indicacao == dados.codigo_indicacao.strip().upper()).first()
         if convidador:
             indicado_por_id = convidador.id
             # Premiar convidador com 10 pontos
-            bonus_indicacao = 10
-            convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + bonus_indicacao
-            convidador.pontos_semanais = (convidador.pontos_semanais or 0) + bonus_indicacao
+            bonus_convidador = 10
+            convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + bonus_convidador
+            convidador.pontos_semanais = (convidador.pontos_semanais or 0) + bonus_convidador
             db.add(Transacao(
-                usuario_id=convidador.id, valor=Decimal(str(bonus_indicacao)),
+                usuario_id=convidador.id, valor=Decimal(str(bonus_convidador)),
                 tipo=TipoTransacao.BONUS, status="concluido",
-                detalhes=f"{bonus_indicacao} pontos por indicar {dados.nome.split()[0]}"
+                detalhes=f"{bonus_convidador} pontos por indicar {dados.nome.split()[0]}"
             ))
+            # Quem usou o codigo tambem ganha 5 pontos de boas-vindas
+            bonus_indicado = 5
 
     novo_usuario = Usuario(
         id=novo_id,
@@ -188,6 +191,8 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         auditoria_id=auditoria.id,
         saldo=0,
         score=0,
+        pontos_marketplace=bonus_indicado,
+        pontos_semanais=bonus_indicado,
         codigo_indicacao=codigo_indicacao,
         indicado_por=indicado_por_id
     )
@@ -195,8 +200,27 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
+    
+    # Registrar transacao de bonus do indicado e criar vinculo na rede
+    if indicado_por_id:
+        db.add(Indicacao(
+            indicador_id=indicado_por_id,
+            indicado_id=novo_usuario.id
+        ))
+        if bonus_indicado > 0:
+            db.add(Transacao(
+                usuario_id=novo_usuario.id, valor=Decimal(str(bonus_indicado)),
+                tipo=TipoTransacao.BONUS, status="concluido",
+                detalhes=f"{bonus_indicado} pontos de boas-vindas por usar codigo de indicacao"
+            ))
+        db.commit()
 
-    return {"message": "Usuário registrado com sucesso!", "usuario_id": novo_usuario.id, "bonus_indicacao": bonus_indicacao}
+    return {
+        "message": "Usuário registrado com sucesso!", 
+        "usuario_id": novo_usuario.id, 
+        "bonus_convidador": bonus_convidador,
+        "bonus_indicado": bonus_indicado
+    }
 
 import os
 from dotenv import load_dotenv
@@ -348,7 +372,118 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "pontos_marketplace": usuario.pontos_marketplace,
         "mp_access_token": bool(usuario.mp_access_token),
         "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None,
-        "codigo_indicacao": usuario.codigo_indicacao
+        "codigo_indicacao": usuario.codigo_indicacao,
+        "indicado_por": usuario.indicado_por,
+        "nome_indicado_por": None
+    }
+    # Buscar nome do indicador principal se existir
+    if usuario.indicado_por:
+        indicador = db.query(Usuario).filter(Usuario.id == usuario.indicado_por).first()
+        if indicador:
+            perfil["nome_indicado_por"] = indicador.nome.split()[0]
+    
+    # Buscar TODOS os indicadores (rede de indicações)
+    indicacoes = db.query(Indicacao).filter(Indicacao.indicado_id == usuario.id).all()
+    perfil["total_indicacoes"] = len(indicacoes)
+    perfil["indicadores"] = [
+        {
+            "nome": ind.indicador.nome.split()[0],
+            "data": ind.data_criacao.isoformat() if ind.data_criacao else None
+        }
+        for ind in indicacoes
+    ]
+    
+    # Buscar quantas pessoas esse usuario indicou
+    indicados_count = db.query(Indicacao).filter(Indicacao.indicador_id == usuario.id).count()
+    perfil["total_indicados"] = indicados_count
+    
+    return perfil
+
+@router.post("/gerar-codigo-indicacao")
+async def gerar_codigo_indicacao(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Gera um codigo de indicacao unico para o usuario se nao tiver."""
+    if usuario.codigo_indicacao:
+        return {"codigo_indicacao": usuario.codigo_indicacao}
+    
+    import secrets as _sec, string as _str
+    codigo = ''.join(_sec.choice(_str.ascii_uppercase + _str.digits) for _ in range(8))
+    while db.query(Usuario).filter(Usuario.codigo_indicacao == codigo).first():
+        codigo = ''.join(_sec.choice(_str.ascii_uppercase + _str.digits) for _ in range(8))
+    
+    usuario.codigo_indicacao = codigo
+    db.commit()
+    return {"codigo_indicacao": codigo}
+
+class UsarCodigoIndicacaoRequest(BaseModel):
+    codigo_indicacao: str
+
+@router.post("/usar-codigo-indicacao")
+async def usar_codigo_indicacao(dados: UsarCodigoIndicacaoRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Permite um usuario ja cadastrado usar um codigo de indicacao e ganhar pontos."""
+    if not dados.codigo_indicacao:
+        raise HTTPException(status_code=400, detail="Codigo de indicacao obrigatorio.")
+    
+    codigo = dados.codigo_indicacao.strip().upper()
+    
+    if usuario.codigo_indicacao == codigo:
+        raise HTTPException(status_code=400, detail="Voce nao pode usar seu proprio codigo.")
+    
+    convidador = db.query(Usuario).filter(Usuario.codigo_indicacao == codigo).first()
+    if not convidador:
+        raise HTTPException(status_code=404, detail="Codigo de indicacao invalido.")
+    
+    # Verificar se ja foi indicado por essa pessoa
+    ja_indicado = db.query(Indicacao).filter(
+        Indicacao.indicador_id == convidador.id,
+        Indicacao.indicado_id == usuario.id
+    ).first()
+    if ja_indicado:
+        raise HTTPException(status_code=400, detail="Voce ja foi indicado por essa pessoa.")
+    
+    # Verificar se nao esta tentando criar loop (A indicou B, B tenta indicar A)
+    loop = db.query(Indicacao).filter(
+        Indicacao.indicador_id == usuario.id,
+        Indicacao.indicado_id == convidador.id
+    ).first()
+    if loop:
+        raise HTTPException(status_code=400, detail="Voce nao pode ser indicado por alguem que voce ja indicou.")
+    
+    # Registrar indicacao na rede
+    db.add(Indicacao(
+        indicador_id=convidador.id,
+        indicado_id=usuario.id
+    ))
+    
+    # Atualizar indicado_por (mantemos o primeiro indicador como referencia principal)
+    if not usuario.indicado_por:
+        usuario.indicado_por = convidador.id
+    
+    # Pontos para quem foi indicado (5 pts)
+    bonus_indicado = 5
+    usuario.pontos_marketplace = (usuario.pontos_marketplace or 0) + bonus_indicado
+    usuario.pontos_semanais = (usuario.pontos_semanais or 0) + bonus_indicado
+    db.add(Transacao(
+        usuario_id=usuario.id, valor=Decimal(str(bonus_indicado)),
+        tipo=TipoTransacao.BONUS, status="concluido",
+        detalhes=f"{bonus_indicado} pontos por usar codigo de indicacao de {convidador.nome.split()[0]}"
+    ))
+    
+    # Pontos para quem indicou (10 pts)
+    bonus_convidador = 10
+    convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + bonus_convidador
+    convidador.pontos_semanais = (convidador.pontos_semanais or 0) + bonus_convidador
+    db.add(Transacao(
+        usuario_id=convidador.id, valor=Decimal(str(bonus_convidador)),
+        tipo=TipoTransacao.BONUS, status="concluido",
+        detalhes=f"{bonus_convidador} pontos por indicar {usuario.nome.split()[0]}"
+    ))
+    
+    db.commit()
+    return {
+        "message": f"Codigo aplicado! Voce ganhou {bonus_indicado} pontos e {convidador.nome.split()[0]} ganhou {bonus_convidador} pontos!",
+        "bonus_indicado": bonus_indicado,
+        "bonus_convidador": bonus_convidador,
+        "nome_convidador": convidador.nome.split()[0]
     }
 
 class AtualizarPerfil(BaseModel):

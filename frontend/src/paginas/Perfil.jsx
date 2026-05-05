@@ -13,6 +13,7 @@ const Perfil = () => {
     const [codigoParaDesativar, setCodigoParaDesativar] = useState('');
     const [showDesativarForm, setShowDesativarForm] = useState(false);
     const [showSenha, setShowSenha] = useState(false);
+    const [codigoIndicacao, setCodigoIndicacao] = useState('');
     const [usuario, setUsuario] = useState(null);
     const [editEmail, setEditEmail] = useState('');
     const [editTelefone, setEditTelefone] = useState('');
@@ -182,26 +183,78 @@ const Perfil = () => {
                 </div>
             </div>
 
-            {/* CODIGO DE CONVITE */}
-            {usuario?.codigo_indicacao && (
-                <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>Convide um Amigo</h4>
+            {/* USAR CODIGO DE INDICACAO */}
+            {!usuario?.indicado_por && (
+                <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center', borderColor: 'rgba(var(--success-rgb), 0.3)' }}>
+                    <h4 style={{ fontSize: '0.75rem', color: 'var(--success)', textTransform: 'uppercase', marginBottom: '10px' }}>Tem um codigo de amigo?</h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
-                        Compartilhe seu codigo e ganhe <strong style={{ color: 'var(--success)' }}>10 pontos</strong> por cada amigo que se cadastrar!
+                        Digite o codigo e ganhe <strong style={{ color: 'var(--success)' }}>5 pontos</strong> de boas-vindas!
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '8px' }}>
-                        <code style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '2px' }}>{usuario.codigo_indicacao}</code>
-                        <button onClick={() => { navigator.clipboard.writeText(usuario.codigo_indicacao); setMensagem('Codigo copiado!'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
-                            <Copy size={18} />
-                        </button>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        <input
+                            type="text"
+                            placeholder="Ex: ABC12345"
+                            value={codigoIndicacao}
+                            onChange={(e) => setCodigoIndicacao(e.target.value.toUpperCase())}
+                            className="input-field"
+                            style={{ textTransform: 'uppercase', maxWidth: '150px', textAlign: 'center' }}
+                            maxLength={8}
+                        />
+                        <button className="btn btn-success btn-sm" onClick={async () => {
+                            if (!codigoIndicacao.trim()) return;
+                            try {
+                                const res = await api.post('/auth/usar-codigo-indicacao', { codigo_indicacao: codigoIndicacao });
+                                setUsuario({ ...usuario, indicado_por: true, pontos_marketplace: (usuario.pontos_marketplace || 0) + res.bonus_indicado });
+                                setMensagem(res.message);
+                                setCodigoIndicacao('');
+                            } catch (err) {
+                                setMensagem(err.message || 'Codigo invalido ou ja utilizado.');
+                            }
+                        }}>Aplicar</button>
                     </div>
-                    <button className="btn btn-outline btn-sm" onClick={() => {
-                        const url = `${window.location.origin}${window.location.pathname}?ref=${usuario.codigo_indicacao}`;
-                        navigator.clipboard.writeText(url);
-                        setMensagem('Link de convite copiado!');
-                    }} style={{ fontSize: '0.75rem' }}>Copiar Link de Convite</button>
                 </div>
             )}
+
+            {usuario?.indicado_por && (
+                <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center', background: 'rgba(var(--success-rgb), 0.05)' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--success)', margin: 0 }}>
+                        Voce foi indicado por <strong>{usuario.nome_indicado_por || 'um amigo'}</strong>!
+                    </p>
+                </div>
+            )}
+
+            {/* CODIGO DE CONVITE */}
+            <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>Convide um Amigo</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                    Compartilhe seu codigo e ganhe <strong style={{ color: 'var(--success)' }}>10 pontos</strong> por cada amigo que se cadastrar!
+                </p>
+                {usuario?.codigo_indicacao ? (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '8px' }}>
+                            <code style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '2px' }}>{usuario.codigo_indicacao}</code>
+                            <button onClick={() => { navigator.clipboard.writeText(usuario.codigo_indicacao); setMensagem('Codigo copiado!'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
+                                <Copy size={18} />
+                            </button>
+                        </div>
+                        <button className="btn btn-outline btn-sm" onClick={() => {
+                            const url = `${window.location.origin}${window.location.pathname}?ref=${usuario.codigo_indicacao}`;
+                            navigator.clipboard.writeText(url);
+                            setMensagem('Link de convite copiado!');
+                        }} style={{ fontSize: '0.75rem' }}>Copiar Link de Convite</button>
+                    </>
+                ) : (
+                    <button className="btn btn-primary btn-sm" onClick={async () => {
+                        try {
+                            const res = await api.post('/auth/gerar-codigo-indicacao');
+                            setUsuario({ ...usuario, codigo_indicacao: res.codigo_indicacao });
+                            setMensagem('Codigo gerado com sucesso!');
+                        } catch (err) {
+                            setMensagem('Erro ao gerar codigo.');
+                        }
+                    }}>Gerar Meu Codigo de Indicacao</button>
+                )}
+            </div>
 
             {/* SEGURANCA 2FA */}
             <div className="card">

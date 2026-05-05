@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-import { Wallet, Eye, EyeOff, User, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { Wallet, Eye, EyeOff, User, Lock, AlertCircle, LogIn, ArrowLeft } from 'lucide-react';
 import Logo from '../componentes/Logo';
+import Footer from '../componentes/Footer';
 
 const Login = ({ onLogin }) => {
     const [cpf, setCpf] = useState('');
@@ -32,16 +33,33 @@ const Login = ({ onLogin }) => {
     };
 
     return (
-        <div className="auth-page">
-            <div className="auth-overlay"></div>
-            <div className="auth-content">
-                <div className="text-center mb-1">
-                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 204, 0, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', color: 'var(--primary)', boxShadow: '0 0 40px rgba(255, 204, 0, 0.15)' }}>
-                        <Logo size={56} showText={false} />
-</div>
-                    <h1 style={{ fontSize: '2rem', letterSpacing: '-1px', marginBottom: '0.25rem' }}>Entrar no Psy Pay</h1>
-                    <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>Rede de Apoio entre Pares</p>
+        <div className="landing-page">
+            {/* Header igual a landing page */}
+            <header className="landing-header">
+                <div className="landing-header-container">
+                    <a href="#" className="landing-brand" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }}>
+                        <Logo size={32} />
+                    </a>
+                    <div className="landing-auth-btns">
+                        <a href="#registro" className="btn btn-primary btn-sm" onClick={(e) => { e.preventDefault(); window.location.hash = 'registro'; }}>
+                            Criar Conta
+                        </a>
+                    </div>
                 </div>
+            </header>
+
+            <div className="auth-page" style={{ minHeight: 'calc(100vh - 64px)', marginTop: '64px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+                <div className="auth-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.92), rgba(0,0,0,0.6))', zIndex: 1 }}></div>
+                <div style={{ width: '100%', maxWidth: '420px', position: 'relative', zIndex: 2 }}>
+                    <div style={{ textAlign: 'left', marginBottom: '1rem' }}>
+                        <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <ArrowLeft size={14} /> Voltar para o início
+                        </a>
+                    </div>
+                    <div className="text-center mb-1">
+                        <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px', marginBottom: '0.25rem' }}>Entrar no Psy Pay</h1>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Rede de Apoio entre Pares</p>
+                    </div>
 
                 <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
                     <form onSubmit={handleSubmit}>
@@ -145,6 +163,8 @@ const Login = ({ onLogin }) => {
                     Não tem uma conta? <a href="#" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.location.hash = 'registro'; }}>Cadastre-se agora</a>
                 </p>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 };

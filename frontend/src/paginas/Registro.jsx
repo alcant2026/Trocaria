@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 import TermosUso from '../componentes/TermosUso';
+import Footer from '../componentes/Footer';
+import Logo from '../componentes/Logo';
 import SeletorCustom from '../componentes/SeletorCustom';
-import { Eye, EyeOff, X } from 'lucide-react';
+import { Eye, EyeOff, X, ArrowLeft } from 'lucide-react';
 
 const Registro = () => {
     const [formData, setFormData] = useState({
@@ -87,23 +89,47 @@ const Registro = () => {
             return;
         }
         try {
-            await api.post('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
-            setMensagem('Conta criada com sucesso! Redirecionando...');
+            const res = await api.post('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
+            let msg = 'Conta criada com sucesso!';
+            if (res.bonus_indicado > 0) {
+                msg += ` Você ganhou ${res.bonus_indicado} pontos de boas-vindas!`;
+            }
+            setMensagem(msg + ' Redirecionando...');
             setSucesso(true);
-            setTimeout(() => window.location.hash = 'login', 2000);
+            setTimeout(() => window.location.hash = 'login', 2500);
         } catch (err) {
             setMensagem(err.response?.data?.detail || err.message || 'Erro ao criar conta. Verifique os dados.');
         }
     };
 
     return (
-        <div className="auth-page">
-            <div className="auth-overlay"></div>
-            <div className="auth-content" style={{ maxWidth: '450px' }}>
-                <div className="text-center mb-1">
-                    <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px' }}>Criar Conta</h1>
-                    <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>Rede de Apoio entre Pares</p>
+        <div className="landing-page">
+            {/* Header igual a landing page */}
+            <header className="landing-header">
+                <div className="landing-header-container">
+                    <a href="#" className="landing-brand" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }}>
+                        <Logo size={32} />
+                    </a>
+                    <div className="landing-auth-btns">
+                        <a href="#login" className="btn btn-secondary btn-sm" onClick={(e) => { e.preventDefault(); window.location.hash = 'login'; }}>
+                            Entrar
+                        </a>
+                    </div>
                 </div>
+            </header>
+
+            <div className="auth-page" style={{ minHeight: 'calc(100vh - 64px)', marginTop: '64px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+                <div className="auth-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.92), rgba(0,0,0,0.6))', zIndex: 1 }}></div>
+                <div style={{ width: '100%', maxWidth: '450px', position: 'relative', zIndex: 2 }}>
+                    <div style={{ textAlign: 'left', marginBottom: '1rem' }}>
+                        <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <ArrowLeft size={14} /> Voltar para o início
+                        </a>
+                    </div>
+                    <div className="text-center mb-1">
+                        <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px' }}>Criar Conta</h1>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Rede de Apoio entre Pares</p>
+                    </div>
 
                 <div className="card" style={{ width: '100%' }}>
                     <form onSubmit={handleSubmit}>
@@ -141,8 +167,12 @@ const Registro = () => {
                         </div>
 
                         <div className="input-group">
-                            <label>Codigo de Convite (opcional)</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                Codigo de Convite (opcional)
+                                <span style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 600 }}>+5 pts</span>
+                            </label>
                             <input name="codigo_indicacao" placeholder="Ex: ABC12345" value={formData.codigo_indicacao} onChange={handleChange} className="input-field" style={{ textTransform: 'uppercase' }} maxLength={8} />
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use um codigo de amigo e ganhe 5 pontos de boas-vindas!</p>
                         </div>
 
                         <div className="input-row input-row-state-city">
@@ -235,6 +265,8 @@ const Registro = () => {
                     Já tem conta? <a href="#" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.location.hash = 'login'; }}>Fazer login</a>
                 </p>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 };

@@ -336,3 +336,20 @@ class HistoricoClique(Base):
     
     usuario = relationship("Usuario")
     link = relationship("LinkAfiliado")
+
+class Indicacao(Base):
+    """Tabela de rede de indicacoes. Um usuario pode ser indicado por varias pessoas diferentes."""
+    __tablename__ = "indicacoes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    indicador_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    indicado_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    
+    indicador = relationship("Usuario", foreign_keys=[indicador_id])
+    indicado = relationship("Usuario", foreign_keys=[indicado_id])
+    
+    __table_args__ = (
+        # Garante que a mesma pessoa nao pode indicar o mesmo usuario 2x
+        {'sqlite_autoincrement': True},
+    )

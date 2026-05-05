@@ -61,14 +61,30 @@ async def solicitar_verificacao_com_docs(
         
     MAX_UPLOAD_SIZE = 5 * 1024 * 1024
     ALLOWED_TYPES = {"image/png", "image/jpeg", "image/jpg", "application/pdf"}
+    MAGIC_BYTES = {
+        b'\x89PNG\r\n\x1a\n': 'image/png',
+        b'\xff\xd8\xff': 'image/jpeg',
+        b'%PDF': 'application/pdf',
+    }
+
+    def validar_magic_bytes(conteudo: bytes, content_type: str) -> bool:
+        for magic, tipo in MAGIC_BYTES.items():
+            if conteudo.startswith(magic):
+                expected = {'image/png', 'image/jpeg', 'image/jpg'}.union({'application/pdf'})
+                if content_type in {'image/png'} and tipo == 'image/png': return True
+                if content_type in {'image/jpeg', 'image/jpg'} and tipo == 'image/jpeg': return True
+                if content_type in {'application/pdf'} and tipo == 'application/pdf': return True
+        return False
 
     def salvar_arquivo(arquivo: UploadFile, tipo_doc: str) -> str:
         if not arquivo or not arquivo.filename: return None
         if arquivo.content_type not in ALLOWED_TYPES:
-            raise HTTPException(status_code=400, detail=f"Formato não permitido: {arquivo.content_type}. Use PNG, JPG ou PDF.")
+            raise HTTPException(status_code=400, detail=f"Formato nao permitido: {arquivo.content_type}. Use PNG, JPG ou PDF.")
         conteudo = arquivo.file.read()
         if len(conteudo) > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=413, detail="Arquivo muito grande. Máximo de 5MB por arquivo.")
+            raise HTTPException(status_code=413, detail="Arquivo muito grande. Maximo de 5MB por arquivo.")
+        if not validar_magic_bytes(conteudo, arquivo.content_type):
+            raise HTTPException(status_code=400, detail="Arquivo invalido ou corrompido.")
         token = secrets.token_hex(8)
         extensao = arquivo.filename.split('.')[-1][:5]
         nome_seguro = f"{usuario.id}_{tipo_doc}_{token}.{extensao}"

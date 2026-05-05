@@ -186,7 +186,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurações JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "mudar_em_producao_123456")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    import secrets
+    SECRET_KEY = secrets.token_hex(32)
+    print("⚠️ SECRET_KEY nao configurada. Usando chave aleatoria temporaria. Sessoes serao invalidadas ao reiniciar.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)) # 24 horas default
 

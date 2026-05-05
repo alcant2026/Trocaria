@@ -68,6 +68,16 @@ RATE_LIMIT_WINDOW = 60
 mutex_count = defaultdict(list)
 
 @app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if not request.url.path.startswith("/api/"):
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://peer-5gq5.onrender.com http://localhost:*"
+    return response
+
+@app.middleware("http")
 async def rate_limit_mutation(request: Request, call_next):
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         client_ip = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for") or request.client.host or "unknown"

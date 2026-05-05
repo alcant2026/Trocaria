@@ -50,6 +50,9 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
     Postagem gratuita por 24 horas (Carência inicial).
     Exige 2FA (Google Authenticator) para prevenir spam.
     """
+    import re as _re
+    if dados.url_imagem and not _re.match(r'^https?://', dados.url_imagem):
+        raise HTTPException(status_code=400, detail="URL da imagem deve comecar com http:// ou https://")
     url_final = dados.url_afiliado.strip()
     
     # Lógica de WhatsApp Inteligente

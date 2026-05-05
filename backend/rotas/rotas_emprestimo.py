@@ -167,7 +167,7 @@ TAXA_COBRANCA = Decimal("2.00")
 
 @router.post("/cobrar/{id}")
 @limiter.limit("2/minute")
-async def cobrar_devedor(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+async def cobrar_devedor(request: Request, id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     solicitacao = db.query(SolicitacaoEmprestimo).filter(
         SolicitacaoEmprestimo.id == id,
         SolicitacaoEmprestimo.credor_id == usuario.id,

@@ -13,7 +13,6 @@ const VerificacaoConta = ({ onVerificado }) => {
     const [enviado, setEnviado] = useState(false);
     const [userData, setUserData] = useState(null);
     const [contador, setContador] = useState(0);
-    const [codigoMostrado, setCodigoMostrado] = useState(''); // <-- código quando WhatsApp falha
 
     useEffect(() => {
         const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
@@ -85,20 +84,13 @@ const VerificacaoConta = ({ onVerificado }) => {
     const solicitarCodigoTelefone = async () => {
         setLoading(true);
         limparMsgs();
-        setCodigoMostrado('');
         try {
             const res = await api.post('/auth/verificar-telefone/solicitar');
-            if (res.whatsapp_enviado) {
-                setMensagem('Código enviado para seu WhatsApp!');
-            } else if (res.codigo) {
-                // WhatsApp falhou, mostra o código na tela
-                setCodigoMostrado(res.codigo);
-                setMensagem(res.message);
-            }
+            setMensagem(res.message || 'Código enviado para seu WhatsApp!');
             setEnviado(true);
             setContador(60);
         } catch (err) {
-            setErro(err.response?.data?.detail || 'Erro ao gerar código.');
+            setErro(err.response?.data?.detail || 'Erro ao enviar código. Verifique se autorizou o CallMeBot no WhatsApp (+34 603 21 43 25).');
         }
         setLoading(false);
     };
@@ -245,44 +237,6 @@ const VerificacaoConta = ({ onVerificado }) => {
                                 </p>
 
                                 {/* Mostra código quando WhatsApp falha */}
-                                {codigoMostrado && (
-                                    <div style={{ 
-                                        background: 'rgba(255, 204, 0, 0.1)', 
-                                        border: '2px dashed var(--primary)', 
-                                        borderRadius: '12px', 
-                                        padding: '16px', 
-                                        marginBottom: '1rem',
-                                        textAlign: 'center'
-                                    }}>
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 8px 0' }}>
-                                            Seu código de verificação:
-                                        </p>
-                                        <div style={{ 
-                                            fontSize: '2rem', 
-                                            fontWeight: 'bold', 
-                                            color: 'var(--primary)',
-                                            letterSpacing: '8px',
-                                            marginBottom: '8px'
-                                        }}>
-                                            {codigoMostrado}
-                                        </div>
-                                        <button
-                                            onClick={() => { navigator.clipboard.writeText(codigoMostrado); setMensagem('Código copiado!'); }}
-                                            style={{ 
-                                                background: 'none', 
-                                                border: '1px solid var(--primary)', 
-                                                color: 'var(--primary)', 
-                                                padding: '4px 12px',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                fontSize: '0.75rem'
-                                            }}
-                                        >
-                                            Copiar Código
-                                        </button>
-                                    </div>
-                                )}
-
                                 <div className="input-group">
                                     <input
                                         type="text"
@@ -316,9 +270,11 @@ const VerificacaoConta = ({ onVerificado }) => {
                                         : 'Gerar Código'
                                     }
                                 </button>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
-                                    O código aparece no terminal do servidor
-                                </p>
+                                {!enviado && (
+                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
+                                        Primeira vez? Envie "I allow callmebot to send me messages" para +34 603 21 43 25 no WhatsApp
+                                    </p>
+                                )}
                             </>
                         )}
 

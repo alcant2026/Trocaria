@@ -872,17 +872,18 @@ async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = De
     if enviado:
         return {
             "message": "Código enviado para seu WhatsApp!",
-            "telefone_mascarado": mascarar_cpf(usuario.telefone),
-            "whatsapp_enviado": True
+            "telefone_mascarado": mascarar_cpf(usuario.telefone)
         }
     else:
-        # Se WhatsApp falhar, retorna o código na resposta para o frontend mostrar
-        return {
-            "message": "Digite o código abaixo:",
-            "telefone_mascarado": mascarar_cpf(usuario.telefone),
-            "whatsapp_enviado": False,
-            "codigo": codigo  # <-- mostra pro usuário quando WhatsApp falha
-        }
+        # Se WhatsApp falhar, NUNCA retorna o código (segurança)
+        # Remove o hash para não deixar código pendente no banco
+        usuario.codigo_verificacao_telefone = None
+        usuario.expiracao_codigo_telefone = None
+        db.commit()
+        raise HTTPException(
+            status_code=500, 
+            detail="Não foi possível enviar o código. Verifique se você autorizou o CallMeBot no WhatsApp (+34 603 21 43 25) e tente novamente."
+        )
 
 @router.post("/verificar-telefone/confirmar")
 @limiter.limit("5/minute")

@@ -166,11 +166,33 @@ const Perfil = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Mail size={12} /> Email</label>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={12} /> Email
+                            {usuario?.email_verificado ? (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--success)', background: 'rgba(var(--success-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <ShieldCheck size={10} /> Verificado
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--warning)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }} onClick={() => window.location.hash = 'verificar-conta'}>
+                                    <ShieldAlert size={10} /> Não verificado
+                                </span>
+                            )}
+                        </label>
                         <input type="email" className="input-field" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Seu email" />
                     </div>
                     <div>
-                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Phone size={12} /> Telefone</label>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Phone size={12} /> WhatsApp
+                            {usuario?.telefone_verificado ? (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--success)', background: 'rgba(var(--success-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <ShieldCheck size={10} /> Verificado
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--warning)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }} onClick={() => window.location.hash = 'verificar-conta'}>
+                                    <ShieldAlert size={10} /> Não verificado
+                                </span>
+                            )}
+                        </label>
                         <input type="tel" className="input-field" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder="(DDD) 9xxxx-xxxx" />
                     </div>
                     <div>

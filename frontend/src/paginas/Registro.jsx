@@ -94,9 +94,9 @@ const Registro = () => {
             if (res.bonus_indicado > 0) {
                 msg += ` Você ganhou ${res.bonus_indicado} pontos de boas-vindas!`;
             }
-            setMensagem(msg + ' Redirecionando...');
+            setMensagem(msg + ' Faça login para verificar sua conta.');
             setSucesso(true);
-            setTimeout(() => window.location.hash = 'login', 2500);
+            setTimeout(() => window.location.hash = 'login', 2000);
         } catch (err) {
             setMensagem(err.response?.data?.detail || err.message || 'Erro ao criar conta. Verifique os dados.');
         }

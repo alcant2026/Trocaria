@@ -98,6 +98,15 @@ class Usuario(Base):
     codigo_recuperacao_hash = Column(String(200), nullable=True)
     expiracao_recuperacao = Column(DateTime, nullable=True)
 
+    # Verificação de Email e Telefone (OTP)
+    email_verificado = Column(Boolean, default=False)
+    codigo_verificacao_email = Column(String(200), nullable=True)
+    expiracao_codigo_email = Column(DateTime, nullable=True)
+    
+    telefone_verificado = Column(Boolean, default=False)
+    codigo_verificacao_telefone = Column(String(200), nullable=True)
+    expiracao_codigo_telefone = Column(DateTime, nullable=True)
+
     # NOVO: Assinatura Premium Marketplace
     is_subscriber = Column(Boolean, default=False)
     assinatura_expira_em = Column(DateTime, nullable=True)

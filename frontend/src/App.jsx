@@ -16,6 +16,7 @@ import Login from './paginas/Login';
 import Registro from './paginas/Registro';
 import Perfil from './paginas/Perfil';
 import RecuperarSenha from './paginas/RecuperarSenha';
+import VerificacaoConta from './paginas/VerificacaoConta';
 import Logo from './componentes/Logo';
 import LandingPage from './componentes/LandingPage';
 import Footer from './componentes/Footer';
@@ -37,6 +38,7 @@ const App = () => {
     const [menuAberto, setMenuAberto] = useState(false);
     const [page, setPage] = useState('login');
     const [modalExcluir, setModalExcluir] = useState(false);
+    const [needsVerification, setNeedsVerification] = useState(false);
 
     const atualizarPerfil = useCallback(async () => {
         try {
@@ -49,7 +51,20 @@ const App = () => {
 
     const onLogin = (userData) => {
         setUser(userData);
-        setIsAuthenticated(true);
+        localStorage.setItem('usuario', JSON.stringify(userData));
+        const precisaVerificar = !userData.email_verificado || !userData.telefone_verificado;
+        setNeedsVerification(precisaVerificar);
+        if (precisaVerificar) {
+            setIsAuthenticated(true);
+            window.location.hash = 'verificar-conta';
+        } else {
+            setIsAuthenticated(true);
+            window.location.hash = 'cliente';
+        }
+    };
+
+    const onVerificado = () => {
+        setNeedsVerification(false);
         window.location.hash = 'cliente';
     };
 
@@ -63,6 +78,11 @@ const App = () => {
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#', '') || '';
+            // Se precisa verificar e tentou sair da página de verificação, redireciona de volta
+            if (needsVerification && hash !== 'verificar-conta' && isAuthenticated) {
+                window.location.hash = 'verificar-conta';
+                return;
+            }
             startTransition(() => {
                 setPage(hash);
             });
@@ -70,7 +90,7 @@ const App = () => {
         window.addEventListener('hashchange', handleHashChange);
         handleHashChange();
         return () => window.removeEventListener('hashchange', handleHashChange);
-    }, []);
+    }, [needsVerification, isAuthenticated]);
 
     useEffect(() => {
         const init = async () => {
@@ -88,12 +108,22 @@ const App = () => {
                     const data = await api.get('/auth/perfil');
                     if (data && data.nome) {
                         setUser(data);
-                        setIsAuthenticated(true);
+                        localStorage.setItem('usuario', JSON.stringify(data));
+                        const precisaVerificar = !data.email_verificado || !data.telefone_verificado;
+                        setNeedsVerification(precisaVerificar);
+                        if (precisaVerificar) {
+                            setIsAuthenticated(true);
+                            window.location.hash = 'verificar-conta';
+                        } else {
+                            setIsAuthenticated(true);
+                        }
                     } else {
                         localStorage.removeItem('token');
+                        localStorage.removeItem('usuario');
                     }
                 } catch (err) {
                     localStorage.removeItem('token');
+                    localStorage.removeItem('usuario');
                 }
             }
             const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
@@ -127,12 +157,17 @@ const App = () => {
         if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = ''} />;
         if (page === 'comofunciona') return <ComoFunciona />;
         if (page === 'recuperar-senha') return <RecuperarSenha />;
+        if (page === 'verificar-conta') return <VerificacaoConta onVerificado={() => {}} />;
         return (
             <>
                 <LandingPage />
                 <BannerCookies usuario={null} />
             </>
         );
+    }
+
+    if (needsVerification && page === 'verificar-conta') {
+        return <VerificacaoConta onVerificado={onVerificado} />;
     }
 
     return (

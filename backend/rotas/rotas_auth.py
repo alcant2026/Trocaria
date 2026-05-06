@@ -15,7 +15,7 @@ import random
 import string
 import hashlib
 import os
-from utils_email import enviar_email_recuperacao, mascarar_email, mascarar_cpf
+from utils_email import enviar_email_recuperacao, enviar_email_verificacao, enviar_whatsapp_gratis, mascarar_email, mascarar_cpf
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -197,6 +197,13 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         indicado_por=indicado_por_id
     )
 
+    # Gerar código de verificação de e-mail (6 dígitos)
+    codigo_email = "".join(random.choices(string.digits, k=6))
+    novo_usuario.codigo_verificacao_email = hashlib.sha256(codigo_email.encode()).hexdigest()
+    novo_usuario.expiracao_codigo_email = datetime.now(timezone.utc) + timedelta(minutes=15)
+    novo_usuario.email_verificado = False
+    novo_usuario.telefone_verificado = False
+
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
@@ -215,11 +222,22 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             ))
         db.commit()
 
+    # Enviar código de verificação por e-mail em segundo plano
+    background_tasks = None
+    from fastapi import BackgroundTasks
+    # Não temos background_tasks aqui, vamos enviar diretamente (é rápido)
+    try:
+        enviar_email_verificacao(novo_usuario.email, novo_usuario.nome, codigo_email)
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de verificação: {e}")
+
     return {
-        "message": "Usuário registrado com sucesso!", 
+        "message": "Usuário registrado com sucesso! Verifique seu e-mail e telefone.", 
         "usuario_id": novo_usuario.id, 
         "bonus_convidador": bonus_convidador,
-        "bonus_indicado": bonus_indicado
+        "bonus_indicado": bonus_indicado,
+        "email_verificado": False,
+        "telefone_verificado": False
     }
 
 import os
@@ -345,13 +363,17 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
             "is_subscriber": usuario.is_subscriber,
             "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
             "pontos_marketplace": usuario.pontos_marketplace,
-            "mp_access_token": bool(usuario.mp_access_token)
+            "mp_access_token": bool(usuario.mp_access_token),
+            "email_verificado": usuario.email_verificado,
+            "telefone_verificado": usuario.telefone_verificado,
+            "email": usuario.email,
+            "telefone": usuario.telefone
         }
     }
 
 @router.get("/perfil")
-async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
-    return {
+async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    perfil = {
         "id": usuario.id,
         "nome": usuario.nome,
         "saldo": float(usuario.saldo),
@@ -374,7 +396,9 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
         "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None,
         "codigo_indicacao": usuario.codigo_indicacao,
         "indicado_por": usuario.indicado_por,
-        "nome_indicado_por": None
+        "nome_indicado_por": None,
+        "email_verificado": usuario.email_verificado,
+        "telefone_verificado": usuario.telefone_verificado
     }
     # Buscar nome do indicador principal se existir
     if usuario.indicado_por:
@@ -769,4 +793,107 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
     db.commit()
     
     return {"message": "Sua senha foi redefinida com sucesso! Você já pode fazer login."}
+
+# --- ROTAS DE VERIFICAÇÃO DE EMAIL E TELEFONE ---
+
+class VerificarCodigoRequest(BaseModel):
+    codigo: str
+
+@router.post("/verificar-email/solicitar")
+@limiter.limit("3/minute")
+async def solicitar_verificacao_email(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Gera e envia um novo código de verificação por e-mail."""
+    codigo = "".join(random.choices(string.digits, k=6))
+    usuario.codigo_verificacao_email = hashlib.sha256(codigo.encode()).hexdigest()
+    usuario.expiracao_codigo_email = datetime.now(timezone.utc) + timedelta(minutes=15)
+    db.commit()
+    
+    try:
+        enviar_email_verificacao(usuario.email, usuario.nome, codigo)
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de verificação: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao enviar e-mail. Tente novamente.")
+    
+    return {
+        "message": "Código enviado com sucesso.",
+        "email_mascarado": mascarar_email(usuario.email)
+    }
+
+@router.post("/verificar-email/confirmar")
+@limiter.limit("5/minute")
+async def confirmar_verificacao_email(request: Request, dados: VerificarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Valida o código e marca o e-mail como verificado."""
+    if not usuario.codigo_verificacao_email:
+        raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
+    
+    if datetime.now(timezone.utc) > usuario.expiracao_codigo_email:
+        usuario.codigo_verificacao_email = None
+        usuario.expiracao_codigo_email = None
+        db.commit()
+        raise HTTPException(status_code=400, detail="O código expirou. Solicite um novo.")
+    
+    hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
+    if hash_enviado != usuario.codigo_verificacao_email:
+        raise HTTPException(status_code=400, detail="Código inválido.")
+    
+    usuario.email_verificado = True
+    usuario.codigo_verificacao_email = None
+    usuario.expiracao_codigo_email = None
+    db.commit()
+    
+    return {"message": "E-mail verificado com sucesso!", "email_verificado": True}
+
+@router.post("/verificar-telefone/solicitar")
+@limiter.limit("3/minute")
+async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Gera um código de verificação para o telefone. (SMS futuro)"""
+    if not usuario.telefone:
+        raise HTTPException(status_code=400, detail="Nenhum telefone cadastrado.")
+    
+    codigo = "".join(random.choices(string.digits, k=6))
+    usuario.codigo_verificacao_telefone = hashlib.sha256(codigo.encode()).hexdigest()
+    usuario.expiracao_codigo_telefone = datetime.now(timezone.utc) + timedelta(minutes=15)
+    db.commit()
+    
+    # Enviar código GRÁTIS via WhatsApp (CallMeBot API)
+    mensagem_whatsapp = f"🛡️ PSY PAY App\n\nSeu código de verificação é: *{codigo}*\n\nVálido por 15 minutos. Não compartilhe com ninguém."
+    
+    enviado = enviar_whatsapp_gratis(usuario.telefone, mensagem_whatsapp)
+    
+    if not enviado:
+        # Se WhatsApp falhar, mostra no console como fallback
+        print(f"\n{'='*50}")
+        print(f"FALLBACK - CÓDIGO NO CONSOLE")
+        print(f"Para: {usuario.telefone}")
+        print(f"Código: {codigo}")
+        print(f"{'='*50}\n")
+    
+    return {
+        "message": "Código enviado com sucesso." if enviado else "Código gerado. Verifique seu WhatsApp ou console do servidor.",
+        "telefone_mascarado": mascarar_cpf(usuario.telefone)  # reaproveitando mascaramento
+    }
+
+@router.post("/verificar-telefone/confirmar")
+@limiter.limit("5/minute")
+async def confirmar_verificacao_telefone(request: Request, dados: VerificarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Valida o código e marca o telefone como verificado."""
+    if not usuario.codigo_verificacao_telefone:
+        raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
+    
+    if datetime.now(timezone.utc) > usuario.expiracao_codigo_telefone:
+        usuario.codigo_verificacao_telefone = None
+        usuario.expiracao_codigo_telefone = None
+        db.commit()
+        raise HTTPException(status_code=400, detail="O código expirou. Solicite um novo.")
+    
+    hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
+    if hash_enviado != usuario.codigo_verificacao_telefone:
+        raise HTTPException(status_code=400, detail="Código inválido.")
+    
+    usuario.telefone_verificado = True
+    usuario.codigo_verificacao_telefone = None
+    usuario.expiracao_codigo_telefone = None
+    db.commit()
+    
+    return {"message": "Telefone verificado com sucesso!", "telefone_verificado": True}
 

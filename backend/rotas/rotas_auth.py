@@ -760,8 +760,12 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
     if not usuario or not usuario.codigo_recuperacao_hash:
         raise HTTPException(status_code=400, detail="Solicitação de recuperação não encontrada ou expirada.")
 
-    # Verificar expiração
-    if datetime.now(timezone.utc) > usuario.expiracao_recuperacao:
+    # Verificar expiração (normalizar timezone para SQLite)
+    expiracao = usuario.expiracao_recuperacao
+    if expiracao and expiracao.tzinfo is None:
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    
+    if expiracao and datetime.now(timezone.utc) > expiracao:
         usuario.codigo_recuperacao_hash = None # Limpa por segurança
         db.commit()
         raise HTTPException(status_code=400, detail="O código de recuperação expirou (limite de 15 min).")
@@ -826,7 +830,12 @@ async def confirmar_verificacao_email(request: Request, dados: VerificarCodigoRe
     if not usuario.codigo_verificacao_email:
         raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
     
-    if datetime.now(timezone.utc) > usuario.expiracao_codigo_email:
+    # Normalizar timezone para comparação (SQLite pode retornar offset-naive)
+    expiracao = usuario.expiracao_codigo_email
+    if expiracao and expiracao.tzinfo is None:
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    
+    if expiracao and datetime.now(timezone.utc) > expiracao:
         usuario.codigo_verificacao_email = None
         usuario.expiracao_codigo_email = None
         db.commit()
@@ -860,18 +869,20 @@ async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = De
     
     enviado = enviar_whatsapp_gratis(usuario.telefone, mensagem_whatsapp)
     
-    if not enviado:
-        # Se WhatsApp falhar, mostra no console como fallback
-        print(f"\n{'='*50}")
-        print(f"FALLBACK - CÓDIGO NO CONSOLE")
-        print(f"Para: {usuario.telefone}")
-        print(f"Código: {codigo}")
-        print(f"{'='*50}\n")
-    
-    return {
-        "message": "Código enviado com sucesso." if enviado else "Código gerado. Verifique seu WhatsApp ou console do servidor.",
-        "telefone_mascarado": mascarar_cpf(usuario.telefone)  # reaproveitando mascaramento
-    }
+    if enviado:
+        return {
+            "message": "Código enviado para seu WhatsApp!",
+            "telefone_mascarado": mascarar_cpf(usuario.telefone),
+            "whatsapp_enviado": True
+        }
+    else:
+        # Se WhatsApp falhar, retorna o código na resposta para o frontend mostrar
+        return {
+            "message": "Digite o código abaixo:",
+            "telefone_mascarado": mascarar_cpf(usuario.telefone),
+            "whatsapp_enviado": False,
+            "codigo": codigo  # <-- mostra pro usuário quando WhatsApp falha
+        }
 
 @router.post("/verificar-telefone/confirmar")
 @limiter.limit("5/minute")
@@ -880,7 +891,12 @@ async def confirmar_verificacao_telefone(request: Request, dados: VerificarCodig
     if not usuario.codigo_verificacao_telefone:
         raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
     
-    if datetime.now(timezone.utc) > usuario.expiracao_codigo_telefone:
+    # Normalizar timezone para comparação (SQLite pode retornar offset-naive)
+    expiracao = usuario.expiracao_codigo_telefone
+    if expiracao and expiracao.tzinfo is None:
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    
+    if expiracao and datetime.now(timezone.utc) > expiracao:
         usuario.codigo_verificacao_telefone = None
         usuario.expiracao_codigo_telefone = None
         db.commit()

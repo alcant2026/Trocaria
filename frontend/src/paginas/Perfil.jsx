@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api, { BASE_URL } from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft, Gift, Database, Trash2, Crown } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft, Gift } from 'lucide-react';
 
 const Perfil = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -20,7 +20,6 @@ const Perfil = () => {
     const [editChavePix, setEditChavePix] = useState('');
     const [salvando, setSalvando] = useState(false);
     const [uploadingFoto, setUploadingFoto] = useState(false);
-    const [storageInfo, setStorageInfo] = useState(null);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -45,9 +44,6 @@ const Perfil = () => {
             setEditEmail(res.email || '');
             setEditTelefone(res.telefone || '');
             setEditChavePix(res.chave_pix || '');
-            // Carregar info de storage
-            const storageRes = await api.get('/storage/meu-uso');
-            setStorageInfo(storageRes);
         } catch (err) {
             console.error("Erro ao carregar perfil:", err);
         }
@@ -208,97 +204,6 @@ const Perfil = () => {
                     </button>
                 </div>
             </div>
-
-            {/* STORAGE USAGE - FREE TIER */}
-            {storageInfo && (
-                <div className="card" style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Database size={18} color="var(--primary)" />
-                            <h3 style={{ fontSize: '1rem', margin: 0 }}>Meu Storage</h3>
-                        </div>
-                        {storageInfo.is_premium ? (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--success)', background: 'rgba(var(--success-rgb), 0.1)', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Crown size={12} /> Premium
-                            </span>
-                        ) : (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--warning)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '4px 10px', borderRadius: '20px' }}>
-                                Free Tier
-                            </span>
-                        )}
-                    </div>
-
-                    {!storageInfo.is_premium && (
-                        <>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
-                                    <span style={{ color: 'var(--text-muted)' }}>Usado: {storageInfo.storage_usado_mb} MB</span>
-                                    <span style={{ color: storageInfo.alerta ? 'var(--danger)' : 'var(--text-muted)' }}>Limite: {storageInfo.storage_limite_mb} MB</span>
-                                </div>
-                                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{
-                                        width: `${Math.min(storageInfo.percentual_usado, 100)}%`,
-                                        height: '100%',
-                                        background: storageInfo.percentual_usado > 90 ? 'var(--danger)' : storageInfo.percentual_usado > 70 ? 'var(--warning)' : 'var(--success)',
-                                        borderRadius: '4px',
-                                        transition: 'width 0.3s'
-                                    }} />
-                                </div>
-                                {storageInfo.alerta && (
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '6px', marginBottom: 0 }}>
-                                        ⚠️ Você está usando {storageInfo.percentual_usado}% do seu storage!
-                                    </p>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
-                                    className="btn btn-outline btn-sm"
-                                    onClick={async () => {
-                                        try {
-                                            const res = await api.post('/storage/limpar-meu-storage');
-                                            setMensagem(`Storage limpo! Economia: ${res.economizado_mb} MB`);
-                                            carregarPerfil();
-                                        } catch (err) {
-                                            setMensagem(err.message || 'Erro ao limpar storage.');
-                                        }
-                                    }}
-                                    style={{ fontSize: '0.75rem', flex: 1 }}
-                                >
-                                    <Trash2 size={12} /> Limpar Storage
-                                </button>
-                                <button
-                                    className="btn btn-success btn-sm"
-                                    onClick={async () => {
-                                        try {
-                                            const res = await api.post('/storage/upgrade-premium', { duracao_dias: 30 });
-                                            setMensagem(res.message);
-                                            carregarPerfil();
-                                        } catch (err) {
-                                            setMensagem(err.message || 'Erro ao fazer upgrade.');
-                                        }
-                                    }}
-                                    style={{ fontSize: '0.75rem', flex: 1 }}
-                                >
-                                    <Crown size={12} /> Virar Premium
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {storageInfo.is_premium && (
-                        <div style={{ textAlign: 'center', padding: '0.5rem' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--success)', margin: 0 }}>
-                                <Crown size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                                Você tem storage ilimitado!
-                            </p>
-                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                Premium ativo até {new Date(storageInfo.premium_expira_em).toLocaleDateString('pt-BR')}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* USAR CODIGO DE INDICACAO */}
             {!usuario?.indicado_por && (

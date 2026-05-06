@@ -369,3 +369,21 @@ class Indicacao(Base):
         # Garante que a mesma pessoa nao pode indicar o mesmo usuario 2x
         {'sqlite_autoincrement': True},
     )
+
+class CodigoOTPLog(Base):
+    """Tabela de auditoria para rastrear todos os códigos OTP enviados."""
+    __tablename__ = "codigos_otp_log"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    tipo = Column(String(20), nullable=False)  # 'email' ou 'telefone'
+    codigo_hash = Column(String(200), nullable=False)  # Hash SHA256 do código (nunca o código limpo)
+    destino = Column(String(255), nullable=False)  # Email ou telefone mascarado
+    enviado_com_sucesso = Column(Boolean, default=False)
+    metodo = Column(String(50), nullable=False)  # 'resend', 'callmebot', 'console'
+    ip_origem = Column(String(45), nullable=True)
+    user_agent = Column(String(200), nullable=True)
+    data_envio = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_expiracao = Column(DateTime, nullable=False)
+    
+    usuario = relationship("Usuario")

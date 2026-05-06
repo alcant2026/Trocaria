@@ -8,6 +8,7 @@ from utils_storage import (
     limpar_storage_global, verificar_limite_storage,
     LIMITES_FREE, LIMITES_PREMIUM
 )
+from utils_otp_log import buscar_logs_otp, limpar_logs_otp_antigos
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 from datetime import datetime, timezone, timedelta
 import os
@@ -109,6 +110,65 @@ async def admin_status_banco(
             "free": LIMITES_FREE,
             "premium": LIMITES_PREMIUM
         }
+    }
+
+@router.get("/admin/logs-otp")
+async def admin_logs_otp(
+    usuario_id: str = None,
+    tipo: str = None,
+    limite: int = 100,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    [ADMIN] Lista todos os códigos OTP enviados (auditoria).
+    Mostra hash do código, destino, status de envio, método e data.
+    """
+    from modelos.modelos_db import CodigoOTPLog
+    
+    query = db.query(CodigoOTPLog).order_by(CodigoOTPLog.data_envio.desc())
+    
+    if usuario_id:
+        query = query.filter(CodigoOTPLog.usuario_id == usuario_id)
+    if tipo:
+        query = query.filter(CodigoOTPLog.tipo == tipo)
+    
+    logs = query.limit(limite).all()
+    
+    return {
+        "total": len(logs),
+        "logs": [
+            {
+                "id": log.id,
+                "usuario_id": log.usuario_id,
+                "usuario_nome": log.usuario.nome if log.usuario else None,
+                "tipo": log.tipo,
+                "codigo_hash": log.codigo_hash[:20] + "...",  # truncado para não poluir
+                "destino": log.destino,
+                "enviado_com_sucesso": log.enviado_com_sucesso,
+                "metodo": log.metodo,
+                "ip_origem": log.ip_origem,
+                "data_envio": log.data_envio.isoformat() if log.data_envio else None,
+                "data_expiracao": log.data_expiracao.isoformat() if log.data_expiracao else None
+            }
+            for log in logs
+        ]
+    }
+
+@router.delete("/admin/logs-otp/limpar")
+async def admin_limpar_logs_otp(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """
+    [ADMIN] Limpa logs de OTP antigos para economizar espaço.
+    """
+    deletados = limpar_logs_otp_antigos(db, dias=dias)
+    return {
+        "message": f"{deletados} logs de OTP antigos removidos.",
+        "dias_limite": dias,
+        "executado_por": admin.nome
     }
 
 # ========================================================================

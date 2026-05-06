@@ -16,6 +16,7 @@ import string
 import hashlib
 import os
 from utils_email import enviar_email_recuperacao, enviar_email_verificacao, enviar_whatsapp_gratis, mascarar_email, mascarar_cpf
+from utils_otp_log import registrar_codigo_otp
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -812,11 +813,27 @@ async def solicitar_verificacao_email(request: Request, usuario: Usuario = Depen
     usuario.expiracao_codigo_email = datetime.now(timezone.utc) + timedelta(minutes=15)
     db.commit()
     
+    enviado = False
+    metodo = 'console'
     try:
-        enviar_email_verificacao(usuario.email, usuario.nome, codigo)
+        enviado = enviar_email_verificacao(usuario.email, usuario.nome, codigo)
+        metodo = 'resend' if os.getenv("MODO_EMAIL") != "CONSOLE" else 'console'
     except Exception as e:
         print(f"Erro ao enviar e-mail de verificação: {e}")
         raise HTTPException(status_code=500, detail="Erro ao enviar e-mail. Tente novamente.")
+    
+    # Registrar log de auditoria
+    registrar_codigo_otp(
+        db=db,
+        usuario_id=usuario.id,
+        tipo='email',
+        codigo=codigo,
+        destino=mascarar_email(usuario.email),
+        enviado_com_sucesso=enviado,
+        metodo=metodo,
+        ip_origem=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
     
     return {
         "message": "Código enviado com sucesso.",
@@ -868,6 +885,20 @@ async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = De
     mensagem_whatsapp = f"🛡️ PSY PAY App\n\nSeu código de verificação é: *{codigo}*\n\nVálido por 15 minutos. Não compartilhe com ninguém."
     
     enviado = enviar_whatsapp_gratis(usuario.telefone, mensagem_whatsapp)
+    metodo = 'callmebot' if enviado else 'console'
+    
+    # Registrar log de auditoria
+    registrar_codigo_otp(
+        db=db,
+        usuario_id=usuario.id,
+        tipo='telefone',
+        codigo=codigo,
+        destino=mascarar_cpf(usuario.telefone),
+        enviado_com_sucesso=enviado,
+        metodo=metodo,
+        ip_origem=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
     
     if enviado:
         return {

@@ -8,7 +8,7 @@ from sqlalchemy import func, case, and_, or_, text
 from datetime import timezone, timedelta, datetime
 from decimal import Decimal
 from utils_emprestimo import calcular_divida_total
-import psutil
+# psutil importado lazy (só quando admin chama métricas) para economizar memória no Render Free
 
 router = APIRouter(tags=["Snapshot"])
 
@@ -464,6 +464,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             ).scalar() or Decimal("0.00")
             # --- MÉTRICAS DE HARDWARE (REAL-TIME) ---
             try:
+                import psutil  # lazy import - só carrega quando admin acessa
                 # Detecção de Limites de Plano (Render Free Tier)
                 is_render = os.getenv("RENDER") == "true"
                 

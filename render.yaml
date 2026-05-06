@@ -3,14 +3,27 @@ services:
     name: psy-pay-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 30 --max-requests 500 --max-requests-jitter 50 --log-level warning --keep-alive 2
+    healthCheckPath: /__warmup
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
+      - key: PYTHONUNBUFFERED
+        value: "true"
+      - key: WEB_CONCURRENCY
+        value: "1"
       - key: DATABASE_URL
         sync: false
       - key: MERCADOPAGO_ACCESS_TOKEN
         sync: false
       - key: SECRET_KEY
         sync: false
+      - key: RENDER
+        value: "true"
+      - key: ENVIRONMENT
+        value: "production"
+    disk:
+      name: tmp
+      mountPath: /tmp
+      sizeGB: 0.5

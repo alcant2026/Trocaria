@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 import uvicorn
 import os
@@ -41,6 +42,9 @@ if frontend_url:
 
 origins = list(dict.fromkeys(origins))
 print(f"🚀 CORS ORIGINS: {origins}")
+
+# Compressão GZIP - reduz banda de rede no Render (essencial para free tier)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 # Configuração de CORS - Deve vir DEPOIS de outros middlewares para executar PRIMEIRO na requisição
 app.add_middleware(
@@ -149,16 +153,15 @@ def get_db():
 @app.on_event("startup")
 async def startup_db_setup():
     from database import SQLALCHEMY_DATABASE_URL
-    db_type = "SQLite Local" if "sqlite" in SQLALCHEMY_DATABASE_URL else "Postgres Nuvem (Neon)"
-    print(f"🚀 SISTEMA: Iniciando processo de boot... [DB: {db_type}]")
+    db_type = "SQLite" if "sqlite" in SQLALCHEMY_DATABASE_URL else "Postgres"
+    is_render = os.getenv("RENDER") == "true"
+    
+    # No Render Free, logs consomem recursos - manter apenas essenciais
+    print(f"🚀 Boot [{db_type}] {'[Render]' if is_render else '[Local]'}")
     os.makedirs("uploads", exist_ok=True)
     
     try:
         Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"ESTRUTURA DB: Aviso na criação de tabelas (race condition): {e}")
-
-    try:
         sincronizar_esquema(Base, engine)
         executar_limpeza_banco(engine)
         
@@ -183,29 +186,21 @@ async def startup_db_setup():
                 )
                 db.add(plataforma)
                 db.commit()
-                print("✅ Conta plataforma 000PL criada")
+                print("✅ Conta plataforma criada")
             if not db.query(Usuario).filter(Usuario.is_admin == True).first():
                 import secrets
-                admin_id = "ADM01"
                 admin = Usuario(
-                    id=admin_id, nome="Admin Psy Pay", email="admin@psypay.com.br",
+                    id="ADM01", nome="Admin Psy Pay", email="admin@psypay.com.br",
                     cpf="00000000001", senha_hash=secrets.token_hex(16), chave_pix="admin@psypay.com.br",
                     is_admin=True, is_active=True
                 )
                 db.add(admin)
                 db.commit()
-                print("✅ Conta admin criada (ID: ADM01)")
+                print("✅ Conta admin criada")
     except Exception as e:
-        print(f"⚠️ ERRO no startup_db_setup: {e}")
+        print(f"⚠️ Boot erro: {e}")
 
-    # Criar pasta de uploads se não existir
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
-        print("📁 Pasta 'uploads' criada com sucesso!")
-        
-    print("✅ SISTEMA: Pronto para receber tráfego!")
-
-    # Iniciar rotina de limpeza de storage automática (a cada 24 horas)
+    # Rotina de limpeza automática (a cada 24h) - background task
     import asyncio
     async def rotina_limpeza_storage():
         while True:
@@ -215,14 +210,14 @@ async def startup_db_setup():
                 db = SessionLocal()
                 economia = limpar_storage_global(db)
                 db.close()
-                print(f"🧹 Limpeza automática de storage executada. Economia: {economia:.2f} MB")
-            except Exception as e:
-                print(f"⚠️ Erro na limpeza automática: {e}")
-            # Esperar 24 horas
+                if economia > 0:
+                    print(f"🧹 Limpeza: {economia:.2f} MB liberados")
+            except Exception:
+                pass
             await asyncio.sleep(86400)
     
     asyncio.create_task(rotina_limpeza_storage())
-    print("⏰ Rotina de limpeza de storage agendada (a cada 24h)")
+    print("✅ Online")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
 ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage]

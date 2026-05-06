@@ -28,11 +28,18 @@
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="apple-touch-icon" href="/logo.png" />
 
+  <!-- Preconnect ao backend (Render) para acelerar requests -->
+  <link rel="preconnect" href="https://peer-5gq5.onrender.com">
+  <link rel="dns-prefetch" href="https://peer-5gq5.onrender.com">
+  
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+  
+  <!-- Cache manifest para Service Worker -->
+  <meta name="cache-control" content="max-age=86400">
 
   <title>Psy Pay | Rede de Apoio entre Pares</title>
 

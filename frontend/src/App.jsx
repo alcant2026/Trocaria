@@ -18,7 +18,6 @@ import Perfil from './paginas/Perfil';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import VerificacaoConta from './paginas/VerificacaoConta';
 import Logo from './componentes/Logo';
-import LandingPage from './componentes/LandingPage';
 import Footer from './componentes/Footer';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
@@ -29,7 +28,7 @@ const DashboardCliente = lazy(() => import('./paginas/DashboardCliente'));
 const AdminDashboard = lazy(() => import('./paginas/AdminDashboard'));
 const PoliticaPrivacidade = lazy(() => import('./paginas/PoliticaPrivacidade'));
 const ComoFunciona = lazy(() => import('./paginas/ComoFunciona'));
-import MarketplaceCallback from './paginas/MarketplaceCallback';
+const MarketplaceCallback = lazy(() => import('./paginas/MarketplaceCallback'));
 
 const App = () => {
     const [loading, setLoading] = useState(true);
@@ -143,7 +142,7 @@ const App = () => {
         return () => window.removeEventListener('psypay_unauthorized', handleUnauthorized);
     }, [logout]);
 
-    if (loading) return <LoadingScreen message="Inicializando Psy Pay..." />;
+    if (loading) return <LoadingScreen message="Carregando..." />;
 
 
     if (!isAuthenticated) {

@@ -49,8 +49,8 @@ class RegistroAuditoria(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ip = Column(String(45), nullable=False)
-    municipio = Column(String(255), nullable=True)
-    user_agent = Column(Text, nullable=True)
+    municipio = Column(String(100), nullable=True)
+    user_agent = Column(String(200), nullable=True)  # truncado para economizar
     data_registro = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 class Usuario(Base):
@@ -107,6 +107,13 @@ class Usuario(Base):
     codigo_verificacao_telefone = Column(String(200), nullable=True)
     expiracao_codigo_telefone = Column(DateTime, nullable=True)
 
+    # FREE TIER STORAGE CONTROL
+    storage_tier = Column(String(20), default="free")  # free, premium
+    is_premium = Column(Boolean, default=False)
+    premium_expira_em = Column(DateTime, nullable=True)
+    storage_used_mb = Column(Numeric(10, 2), default=0)
+    storage_limit_mb = Column(Integer, default=10)  # free = 10MB, premium = ilimitado
+
     # NOVO: Assinatura Premium Marketplace
     is_subscriber = Column(Boolean, default=False)
     assinatura_expira_em = Column(DateTime, nullable=True)
@@ -155,7 +162,7 @@ class SolicitacaoEmprestimo(Base):
     confirmacao_recebimento_data = Column(DateTime, nullable=True)
     data_quitacao = Column(DateTime, nullable=True)
     tipo_garantia = Column(String(50), default="p2p")
-    garantia_descricao = Column(Text, nullable=True)
+    garantia_descricao = Column(String(500), nullable=True)  # limitado para free tier
     
     data_expiracao_4h = Column(DateTime, nullable=True) # Janela para entrega física
     data_expiracao_5d = Column(DateTime, nullable=True) # Prazo total para captação (se houver)
@@ -193,7 +200,7 @@ class Transacao(Base):
     status = Column(String(50), default="pendente", index=True)
     data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
-    detalhes = Column(Text, nullable=True)
+    detalhes = Column(String(500), nullable=True)  # limitado para economizar storage
     metodo = Column(String, default="pix", index=True)
     parceiro_id = Column(Integer, ForeignKey("parceiros.id"), nullable=True, index=True)
     

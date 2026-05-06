@@ -6,7 +6,7 @@ import os
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema, executar_limpeza_banco
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace
+from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage
 
 app = FastAPI(title="PSY PAY API P2P")
 
@@ -205,8 +205,27 @@ async def startup_db_setup():
         
     print("✅ SISTEMA: Pronto para receber tráfego!")
 
+    # Iniciar rotina de limpeza de storage automática (a cada 24 horas)
+    import asyncio
+    async def rotina_limpeza_storage():
+        while True:
+            try:
+                from database import SessionLocal
+                from utils_storage import limpar_storage_global
+                db = SessionLocal()
+                economia = limpar_storage_global(db)
+                db.close()
+                print(f"🧹 Limpeza automática de storage executada. Economia: {economia:.2f} MB")
+            except Exception as e:
+                print(f"⚠️ Erro na limpeza automática: {e}")
+            # Esperar 24 horas
+            await asyncio.sleep(86400)
+    
+    asyncio.create_task(rotina_limpeza_storage())
+    print("⏰ Rotina de limpeza de storage agendada (a cada 24h)")
+
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
-ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace]
+ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage]
 for module in ROUTER_MODULES:
     app.include_router(module.router, prefix="/api")
 for module in ROUTER_MODULES:

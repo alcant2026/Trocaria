@@ -199,8 +199,12 @@ def enviar_email_verificacao(email_destino: str, nome_usuario: str, codigo: str)
 def enviar_whatsapp_gratis(numero_telefone: str, mensagem: str) -> bool:
     """
     Envia mensagem WhatsApp GRÁTIS via CallMeBot API.
-    O usuário precisa ter iniciado o chat com o bot primeiro (enviar 'I allow callmebot to send me messages'
-    para o número +34 603 21 43 25 no WhatsApp).
+    
+    PARA PEGAR APIKEY GRÁTIS:
+    1. Adicione o número +34 644 71 81 99 nos contatos do WhatsApp
+    2. Envie a mensagem: "I allow callmebot to send me messages"
+    3. O bot responde com sua APIKEY (ex: 123123)
+    4. Configure no .env: CALLMEBOT_APIKEY=sua_apikey
     
     Documentação: https://www.callmebot.com/blog/free-api-whatsapp-messages/
     """
@@ -211,24 +215,28 @@ def enviar_whatsapp_gratis(numero_telefone: str, mensagem: str) -> bool:
     if not numero_limpo.startswith("55"):
         numero_limpo = "55" + numero_limpo
     
+    # Pegar apikey do .env
+    CALLMEBOT_API_KEY = os.getenv("CALLMEBOT_APIKEY", "")
+    
     # No modo CONSOLE, só imprime
-    if MODO_EMAIL == "CONSOLE":
+    if MODO_EMAIL == "CONSOLE" or not CALLMEBOT_API_KEY:
         print("\n" + "="*60)
         print(f"SIMULAÇÃO DE WHATSAPP (MODO CONSOLE)")
         print(f"Para: +{numero_limpo}")
         print(f"Mensagem: {mensagem}")
         print("="*60 + "\n")
         print("⚠️  Para enviar de verdade no WhatsApp:")
-        print("   1. Envie 'I allow callmebot to send me messages'")
-        print("      para +34 603 21 43 25 no WhatsApp")
-        print("   2. Defina MODO_EMAIL=API no .env")
+        print("   1. Adicione +34 644 71 81 99 nos contatos")
+        print("   2. Envie: 'I allow callmebot to send me messages'")
+        print("   3. Receba a APIKEY do bot")
+        print("   4. Configure CALLMEBOT_APIKEY no .env")
         print("="*60 + "\n")
         return True
     
     # Tentar CallMeBot API (grátis)
     try:
         texto_codificado = urllib.parse.quote(mensagem)
-        url = f"https://api.callmebot.com/whatsapp.php?phone={numero_limpo}&text={texto_codificado}&apikey=123456"  # apikey é opcional/free
+        url = f"https://api.callmebot.com/whatsapp.php?phone={numero_limpo}&text={texto_codificado}&apikey={CALLMEBOT_API_KEY}"
         
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=15) as response:

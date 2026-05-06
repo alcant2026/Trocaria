@@ -271,9 +271,20 @@ const VerificacaoConta = ({ onVerificado }) => {
                                     }
                                 </button>
                                 {!enviado && (
-                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
-                                        Primeira vez? Envie "I allow callmebot to send me messages" para +34 603 21 43 25 no WhatsApp
-                                    </p>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '12px', padding: '12px', background: 'rgba(37, 211, 102, 0.05)', borderRadius: '8px', border: '1px solid rgba(37, 211, 102, 0.2)' }}>
+                                        <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#25D366' }}>
+                                            📱 Como receber código no WhatsApp:
+                                        </p>
+                                        <ol style={{ margin: 0, paddingLeft: '16px', lineHeight: '1.6' }}>
+                                            <li>Salve o número <strong>+34 644 71 81 99</strong> nos contatos</li>
+                                            <li>Envie no WhatsApp: <strong>"I allow callmebot to send me messages"</strong></li>
+                                            <li>Aguarde a resposta com sua <strong>APIKEY</strong></li>
+                                            <li>Volte aqui e clique "Gerar Código"</li>
+                                        </ol>
+                                        <p style={{ margin: '8px 0 0 0', fontSize: '0.65rem' }}>
+                                            Obs: Só precisa fazer isso uma vez. Depois os códigos chegam automaticamente!
+                                        </p>
+                                    </div>
                                 )}
                             </>
                         )}

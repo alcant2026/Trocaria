@@ -29,6 +29,7 @@ const AdminDashboard = lazy(() => import('./paginas/AdminDashboard'));
 const PoliticaPrivacidade = lazy(() => import('./paginas/PoliticaPrivacidade'));
 const ComoFunciona = lazy(() => import('./paginas/ComoFunciona'));
 const MarketplaceCallback = lazy(() => import('./paginas/MarketplaceCallback'));
+const LandingPage = lazy(() => import('./componentes/LandingPage'));
 
 const App = () => {
     const [loading, setLoading] = useState(true);
@@ -158,10 +159,10 @@ const App = () => {
         if (page === 'recuperar-senha') return <RecuperarSenha />;
         if (page === 'verificar-conta') return <VerificacaoConta onVerificado={() => {}} />;
         return (
-            <>
+            <Suspense fallback={<LoadingScreen message="Carregando..." />}>
                 <LandingPage />
                 <BannerCookies usuario={null} />
-            </>
+            </Suspense>
         );
     }
 

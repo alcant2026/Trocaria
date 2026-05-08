@@ -64,6 +64,7 @@ class Usuario(Base):
     chave_pix = Column(String(255), nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
+    credito_virtual = Column(Numeric(precision=20, scale=2), default=0)  # inativo, mantido compatibilidade
     valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)
     inadimplente = Column(Boolean, default=False)
     qtd_calotes = Column(Integer, default=0)
@@ -116,7 +117,9 @@ class Usuario(Base):
     pontos_marketplace = Column(Integer, default=0)
     pontos_semanais = Column(Integer, default=0)
 
-    # NOVO: Regra de Dividendos Participativos
+    # Regra de Dividendos (inativo, mantido compatibilidade)
+    gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)
+    total_dividendos_ganhos = Column(Numeric(precision=20, scale=2), default=0)
     vendas_completadas = Column(Integer, default=0)
 
     # Mercado Pago Marketplace (OAuth)

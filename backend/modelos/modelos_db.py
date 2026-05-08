@@ -20,6 +20,7 @@ class TipoTransacao(enum.Enum):
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
     TAXA_SAQUE = "taxa_saque"
     TAXA_INTERMEDIACAO = "taxa_intermediacao"
+    TAXA_ESPECIE = "taxa_especie"  # deprecated - mantido para compatibilidade
     APORTE_CAPITAL = "aporte_capital"
     PAGAMENTO_PARCELA = "pagamento_parcela"
     TAXA_POSTAGEM = "taxa_postagem"
@@ -32,6 +33,7 @@ class TipoTransacao(enum.Enum):
     FECHAMENTO_GAVETA = "fechamento_gaveta"
     BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
     RETORNO_POOL = "retorno_pool"
+    COMISSAO_PARCEIRO = "comissao_parceiro"  # deprecated - mantido para compatibilidade
     TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
     TAXA_DEPOSITO_VIRTUAL = "taxa_deposito_virtual"
     TAXA_SOLICITACAO = "taxa_solicitacao"

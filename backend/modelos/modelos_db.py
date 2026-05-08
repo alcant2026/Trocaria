@@ -123,6 +123,7 @@ class Usuario(Base):
     mp_access_token = Column(String(255), nullable=True)
     mp_refresh_token = Column(String(255), nullable=True)
     mp_user_id = Column(String(100), nullable=True)
+    mp_token_expires_at = Column(DateTime, nullable=True)
 
     # Foto de Perfil
     foto_perfil = Column(String(500), nullable=True)

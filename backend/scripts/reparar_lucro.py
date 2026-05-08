@@ -22,9 +22,7 @@ def reparar_saldo_plataforma():
         tipos_receita = [
             TipoTransacao.COMPRA_SCORE, 
             TipoTransacao.DESBLOQUEIO_DADOS, 
-            TipoTransacao.TAXA_SAQUE,
             TipoTransacao.TAXA_INTERMEDIACAO,
-            TipoTransacao.TAXA_ESPECIE,
             TipoTransacao.APORTE_CAPITAL,
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.RETORNO_INVESTIMENTO

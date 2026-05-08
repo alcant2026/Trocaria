@@ -15,10 +15,48 @@ import random
 import string
 import hashlib
 import os
-from utils_email import enviar_email_recuperacao, enviar_email_verificacao, enviar_whatsapp_gratis, mascarar_email, mascarar_cpf
 from utils_otp_log import registrar_codigo_otp
+from utils_firebase import garantir_usuario_firebase, gerar_link_verificacao_email, verificar_status_email
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+
+def mascarar_email(email: str) -> str:
+    """Retorna o e-mail mascarado (ex: jo***@gm***.com) conforme LGPD."""
+    try:
+        usuario, dominio = email.split('@')
+        if len(usuario) <= 2:
+            usuario_m = usuario + "***"
+        else:
+            usuario_m = usuario[:2] + "***"
+        partes_dominio = dominio.split('.')
+        nome_dominio = partes_dominio[0]
+        if len(nome_dominio) <= 2:
+            dominio_m = nome_dominio + "***"
+        else:
+            dominio_m = nome_dominio[:2] + "***"
+        return f"{usuario_m}@{dominio_m}.{'.'.join(partes_dominio[1:])}"
+    except:
+        return "****@****.com"
+
+def mascarar_cpf(cpf: str) -> str:
+    """Retorna o CPF mascarado (ex: 123.***.***-99) conforme LGPD."""
+    try:
+        cpf_limpo = "".join(filter(str.isdigit, cpf))
+        if len(cpf_limpo) != 11:
+            return "***.***.***-**"
+        return f"{cpf_limpo[:3]}.***.***-{cpf_limpo[-2:]}"
+    except:
+        return "***.***.***-**"
+
+def mascarar_telefone(telefone: str) -> str:
+    """Retorna o telefone mascarado (ex: (11) 9****-****)."""
+    try:
+        numeros = "".join(filter(str.isdigit, telefone))
+        if len(numeros) < 8:
+            return "****-****"
+        return f"({numeros[0:2]}) {numeros[2]}{'*' * (len(numeros) - 7)}-{numeros[-4:]}"
+    except:
+        return "****-****"
 
 class RegistroUsuario(BaseModel):
     nome: str
@@ -26,7 +64,7 @@ class RegistroUsuario(BaseModel):
     cpf: str
     senha: str 
     chave_pix: str
-    telefone: str | None = None
+    telefone: str
     cidade: str | None = None
     estado: str | None = None
     aceite_termos: bool = False
@@ -111,7 +149,12 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             detail="CPF inválido. Verifique o número digitado."
         )
 
-    # NOVO: Normalizar CPF (remover pontos e traços) ANTES de salvar no Banco
+    # Validação 4: Telefone obrigatório (formato DDD+Número)
+    telefone_digitos = re.sub(r'\D', '', dados.telefone)
+    if len(telefone_digitos) not in (10, 11):
+        raise HTTPException(status_code=400, detail="Telefone inválido. Use DDD + número (10 ou 11 dígitos).")
+
+    # Normalizar CPF (remover pontos e traços) ANTES de salvar no Banco
     dados.cpf = re.sub(r'[^0-9]', '', dados.cpf)
 
     # Validação 4: Verificar se email ou CPF já existem no Banco
@@ -198,10 +241,6 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         indicado_por=indicado_por_id
     )
 
-    # Gerar código de verificação de e-mail (6 dígitos)
-    codigo_email = "".join(random.choices(string.digits, k=6))
-    novo_usuario.codigo_verificacao_email = hashlib.sha256(codigo_email.encode()).hexdigest()
-    novo_usuario.expiracao_codigo_email = datetime.now(timezone.utc) + timedelta(minutes=15)
     novo_usuario.email_verificado = False
     novo_usuario.telefone_verificado = False
 
@@ -223,14 +262,26 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             ))
         db.commit()
 
-    # Enviar código de verificação por e-mail em segundo plano
-    background_tasks = None
-    from fastapi import BackgroundTasks
-    # Não temos background_tasks aqui, vamos enviar diretamente (é rápido)
+    # Criar usuário no Firebase Auth e gerar link de verificação
     try:
-        enviar_email_verificacao(novo_usuario.email, novo_usuario.nome, codigo_email)
+        garantir_usuario_firebase(novo_usuario.email, display_name=novo_usuario.nome)
+        is_render = os.getenv("RENDER") == "true"
+        frontend_url = os.getenv("FRONTEND_URL") if is_render else os.getenv("FRONTEND_URL_LOCAL", "http://localhost:3000")
+        link = gerar_link_verificacao_email(novo_usuario.email, frontend_url=frontend_url)
+        if link:
+            registrar_codigo_otp(
+                db=db,
+                usuario_id=novo_usuario.id,
+                tipo='email',
+                codigo=link[:50],
+                destino=mascarar_email(novo_usuario.email),
+                enviado_com_sucesso=True,
+                metodo='firebase-email',
+                ip_origem=request.client.host,
+                user_agent=request.headers.get("user-agent")
+            )
     except Exception as e:
-        print(f"Erro ao enviar e-mail de verificação: {e}")
+        print(f"Erro ao criar link de verificação Firebase: {e}")
 
     return {
         "message": "Usuário registrado com sucesso! Verifique seu e-mail e telefone.", 
@@ -716,11 +767,9 @@ class RedefinirSenha(BaseModel):
     codigo: str
     nova_senha: str
 
-from fastapi import BackgroundTasks
-
 @router.post("/recuperar-senha/solicitar")
 @limiter.limit("3/minute")
-async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, db: Session = Depends(get_db)):
     """Inicia o fluxo de recuperação validando o CPF e enviando o código."""
     cpf_limpo = re.sub(r'[^0-9]', '', dados.cpf)
     
@@ -742,12 +791,10 @@ async def solicitar_recuperacao(request: Request, dados: SolicitarRecuperacao, b
     
     db.commit()
 
-    # Enviar e-mail em SEGUNDO PLANO (Não bloqueia o worker do Render)
-    background_tasks.add_task(enviar_email_recuperacao, usuario.email, usuario.nome, codigo)
-    
     return {
-        "message": "Código enviado com sucesso.",
-        "email_mascarado": mascarar_email(usuario.email)
+        "message": "Código de recuperação gerado.",
+        "codigo": codigo,
+        "expira_em_minutos": 15
     }
 
 @router.post("/recuperar-senha/redefinir")
@@ -799,80 +846,78 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
     
     return {"message": "Sua senha foi redefinida com sucesso! Você já pode fazer login."}
 
+@router.get("/firebase-config")
+async def firebase_config():
+    """Retorna a configuração pública do Firebase para o frontend."""
+    return {
+        "apiKey": os.getenv("FIREBASE_API_KEY", ""),
+        "authDomain": "psy-pay.firebaseapp.com",
+        "projectId": "psy-pay"
+    }
+
 # --- ROTAS DE VERIFICAÇÃO DE EMAIL E TELEFONE ---
 
-class VerificarCodigoRequest(BaseModel):
+class ConfirmarCodigoRequest(BaseModel):
     codigo: str
 
 @router.post("/verificar-email/solicitar")
 @limiter.limit("3/minute")
 async def solicitar_verificacao_email(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
-    """Gera e envia um novo código de verificação por e-mail."""
-    codigo = "".join(random.choices(string.digits, k=6))
-    usuario.codigo_verificacao_email = hashlib.sha256(codigo.encode()).hexdigest()
-    usuario.expiracao_codigo_email = datetime.now(timezone.utc) + timedelta(minutes=15)
-    db.commit()
-    
-    enviado = False
-    metodo = 'console'
+    """Gera e envia um link de verificação de e-mail via Firebase."""
     try:
-        enviado = enviar_email_verificacao(usuario.email, usuario.nome, codigo)
-        metodo = 'resend' if os.getenv("MODO_EMAIL") != "CONSOLE" else 'console'
+        garantir_usuario_firebase(usuario.email, display_name=usuario.nome)
+        is_render = os.getenv("RENDER") == "true"
+        frontend_url = os.getenv("FRONTEND_URL") if is_render else os.getenv("FRONTEND_URL_LOCAL", "http://localhost:3000")
+        link = gerar_link_verificacao_email(usuario.email, frontend_url=frontend_url)
+        if not link:
+            raise HTTPException(status_code=500, detail="Erro ao gerar link de verificação.")
+        
+        # Registrar log de auditoria
+        registrar_codigo_otp(
+            db=db,
+            usuario_id=usuario.id,
+            tipo='email',
+            codigo=link[:50],
+            destino=mascarar_email(usuario.email),
+            enviado_com_sucesso=True,
+            metodo='firebase-email',
+            ip_origem=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        
+        return {
+            "message": "Link de verificação gerado! Acesse o link para verificar seu e-mail.",
+            "link": link,
+            "email_mascarado": mascarar_email(usuario.email)
+        }
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Erro ao enviar e-mail de verificação: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao enviar e-mail. Tente novamente.")
-    
-    # Registrar log de auditoria
-    registrar_codigo_otp(
-        db=db,
-        usuario_id=usuario.id,
-        tipo='email',
-        codigo=codigo,
-        destino=mascarar_email(usuario.email),
-        enviado_com_sucesso=enviado,
-        metodo=metodo,
-        ip_origem=request.client.host,
-        user_agent=request.headers.get("user-agent")
-    )
-    
-    return {
-        "message": "Código enviado com sucesso.",
-        "email_mascarado": mascarar_email(usuario.email)
-    }
+        print(f"Erro ao enviar link de verificação: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao enviar e-mail de verificação. Tente novamente.")
 
 @router.post("/verificar-email/confirmar")
 @limiter.limit("5/minute")
-async def confirmar_verificacao_email(request: Request, dados: VerificarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
-    """Valida o código e marca o e-mail como verificado."""
-    if not usuario.codigo_verificacao_email:
-        raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
-    
-    # Normalizar timezone para comparação (SQLite pode retornar offset-naive)
-    expiracao = usuario.expiracao_codigo_email
-    if expiracao and expiracao.tzinfo is None:
-        expiracao = expiracao.replace(tzinfo=timezone.utc)
-    
-    if expiracao and datetime.now(timezone.utc) > expiracao:
-        usuario.codigo_verificacao_email = None
-        usuario.expiracao_codigo_email = None
-        db.commit()
-        raise HTTPException(status_code=400, detail="O código expirou. Solicite um novo.")
-    
-    hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
-    if hash_enviado != usuario.codigo_verificacao_email:
-        raise HTTPException(status_code=400, detail="Código inválido.")
-    
-    usuario.email_verificado = True
-    usuario.codigo_verificacao_email = None
-    usuario.expiracao_codigo_email = None
-    db.commit()
-    
-    return {"message": "E-mail verificado com sucesso!", "email_verificado": True}
+async def confirmar_verificacao_email(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Verifica no Firebase se o e-mail foi confirmado."""
+    try:
+        is_verified = verificar_status_email(usuario.email)
+        if is_verified:
+            usuario.email_verificado = True
+            db.commit()
+            return {"message": "E-mail verificado com sucesso!", "email_verificado": True}
+        else:
+            raise HTTPException(status_code=400, detail="E-mail ainda não verificado. Clique no link enviado para seu e-mail.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erro ao verificar e-mail: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao verificar status do e-mail.")
 
 @router.post("/verificar-telefone/solicitar")
 @limiter.limit("3/minute")
 async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
-    """Gera um código de verificação para o telefone. (SMS futuro)"""
+    """Gera código de verificação para o telefone (código na tela)."""
     if not usuario.telefone:
         raise HTTPException(status_code=400, detail="Nenhum telefone cadastrado.")
     
@@ -881,49 +926,26 @@ async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = De
     usuario.expiracao_codigo_telefone = datetime.now(timezone.utc) + timedelta(minutes=15)
     db.commit()
     
-    # Enviar código GRÁTIS via WhatsApp (CallMeBot API)
-    mensagem_whatsapp = f"🛡️ PSY PAY App\n\nSeu código de verificação é: *{codigo}*\n\nVálido por 15 minutos. Não compartilhe com ninguém."
-    
-    enviado = enviar_whatsapp_gratis(usuario.telefone, mensagem_whatsapp)
-    metodo = 'callmebot' if enviado else 'console'
-    
-    # Registrar log de auditoria
     registrar_codigo_otp(
-        db=db,
-        usuario_id=usuario.id,
-        tipo='telefone',
-        codigo=codigo,
-        destino=mascarar_cpf(usuario.telefone),
-        enviado_com_sucesso=enviado,
-        metodo=metodo,
-        ip_origem=request.client.host,
+        db=db, usuario_id=usuario.id, tipo='telefone', codigo=codigo,
+        destino=mascarar_telefone(usuario.telefone), enviado_com_sucesso=True,
+        metodo='tela', ip_origem=request.client.host,
         user_agent=request.headers.get("user-agent")
     )
     
-    if enviado:
-        return {
-            "message": "Código enviado para seu WhatsApp!",
-            "telefone_mascarado": mascarar_cpf(usuario.telefone)
-        }
-    else:
-        # Se WhatsApp falhar, NUNCA retorna o código (segurança)
-        # Remove o hash para não deixar código pendente no banco
-        usuario.codigo_verificacao_telefone = None
-        usuario.expiracao_codigo_telefone = None
-        db.commit()
-        raise HTTPException(
-            status_code=500, 
-            detail="Não foi possível enviar o código. Verifique se você autorizou o CallMeBot no WhatsApp (+34 603 21 43 25) e tente novamente."
-        )
+    return {
+        "message": "Código gerado.",
+        "codigo": codigo,
+        "expira_em_minutos": 15
+    }
 
 @router.post("/verificar-telefone/confirmar")
 @limiter.limit("5/minute")
-async def confirmar_verificacao_telefone(request: Request, dados: VerificarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+async def confirmar_verificacao_telefone(request: Request, dados: ConfirmarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
     """Valida o código e marca o telefone como verificado."""
     if not usuario.codigo_verificacao_telefone:
-        raise HTTPException(status_code=400, detail="Nenhum código de verificação pendente.")
+        raise HTTPException(status_code=400, detail="Nenhum código pendente. Solicite um novo.")
     
-    # Normalizar timezone para comparação (SQLite pode retornar offset-naive)
     expiracao = usuario.expiracao_codigo_telefone
     if expiracao and expiracao.tzinfo is None:
         expiracao = expiracao.replace(tzinfo=timezone.utc)
@@ -932,7 +954,7 @@ async def confirmar_verificacao_telefone(request: Request, dados: VerificarCodig
         usuario.codigo_verificacao_telefone = None
         usuario.expiracao_codigo_telefone = None
         db.commit()
-        raise HTTPException(status_code=400, detail="O código expirou. Solicite um novo.")
+        raise HTTPException(status_code=400, detail="Código expirado. Solicite um novo.")
     
     hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
     if hash_enviado != usuario.codigo_verificacao_telefone:

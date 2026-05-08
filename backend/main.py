@@ -217,6 +217,9 @@ async def startup_db_setup():
             await asyncio.sleep(86400)
     
     asyncio.create_task(rotina_limpeza_storage())
+    
+    from utils_ranking import rotina_reset_ranking
+    asyncio.create_task(rotina_reset_ranking())
     print("✅ Online")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade

@@ -1,64 +1,88 @@
-# Psy Pay · Rede de Apoio entre Pares
+# Psy Pay · Plataforma de Crédito Colaborativo P2P
 
-Plataforma P2P que combina **empréstimos**, **marketplace de afiliados** e **rede de indicação** em um só lugar. Qualquer pessoa pode anunciar produtos, pedir ou oferecer crédito, e ganhar pontos convertíveis em dinheiro real.
+Plataforma financeira descentralizada que conecta pessoas para empréstimos entre pares, com marketplace de afiliados, rede de indicação multi-nível e sistema de gamificação com prêmios em dinheiro real.
 
 ---
 
-## Funcionalidades
-
-### Marketplace (estilo OLX)
-- Landing page pública com categorias, busca e anúncios
-- Anúncios gratuitos (24h) ou destacados por R$5 (7 dias)
-- Turbinar anúncios com views extras (R$1 a R$35)
-- Sistema de avaliações e denúncias
+## Funcionalidades Principais
 
 ### Empréstimos P2P
-- Criação de solicitações com parcelas e taxa
-- Match entre credores e tomadores
-- Score de reputação (0-1000) e verificação KYC
-- Cobrança e contratos via plataforma
+- Solicitações de crédito com valor, taxa de juros e parcelas
+- Match entre credores e tomadores com score de reputação (0-1000)
+- Verificação de identidade (KYC) via documentos
+- Cobrança automatizada e contratos digitais
 
-### Rede de Indicação (Multi-nível)
-- Cada usuário gera seu código de indicação único
+### Marketplace de Afiliados
+- Landing page pública com categorias, busca e anúncios
+- Anúncios gratuitos (24h) ou **destaque por R$ 5,00** (7 dias)
+- Turbinar anúncios com views extras (pacotes de R$ 1 a R$ 35)
+- Sistema de avaliações (1-5 estrelas) e denúncias
+
+### Rede de Indicação Multi-nível
+- Código de indicação único por usuário
 - Indicado ganha **5 pontos** ao usar código de amigo
 - Indicador ganha **10 pontos** por cada novo cadastro
-- Efeito rede: ao comprar, **3x pontos** pra você, **1x** pra cada indicador
-- Múltiplas indicações permitidas (pessoas diferentes)
+- Efeito rede: ao pagar taxas, **3x pontos** para você, **1x** para cada indicador
 
-### Conversão de Pontos
-- 1000 pontos = R$ 1,00 (resgate via PIX)
-- Mínimo de 1000 pontos para solicitar
+### Campeonato Semanal
+- Ranking com top 20 usuários por `pontos_semanais`
+- **Reset automático todo sábado às 18:00 (BRT)**
+- Prêmio: **1000 pontos = R$ 1,00** creditado automaticamente no saldo
+- Histórico de pagamentos disponível para auditoria
+
+### Assinatura Premium
+- **Mensal: R$ 19,99** | **Anual: R$ 199,99**
+- Benefícios: 1-5 pontos aleatórios por clique (vs 1 fixo), prioridade nos anúncios, badge VIP
 
 ---
 
-## Stack
+## Stack Tecnológica
 
 | Camada | Tecnologia |
 |--------|-----------|
 | Frontend | React 18 + Vite (JavaScript) |
 | Backend | Python + FastAPI |
-| Banco | PostgreSQL (prod) / SQLite (dev) |
-| Pagamentos | MercadoPago PIX |
+| Banco | PostgreSQL via Neon (prod) / SQLite (dev) |
+| Pagamentos | Mercado Pago (PIX) |
+| Autenticação | JWT (CPF + senha) + 2FA (TOTP) |
+| Verificação Email | Firebase Auth (grátis, link de verificação) |
+| Verificação Telefone | Código na tela (hash SHA256 no banco) |
 | Deploy | Render (free tier) |
 
 ---
 
-## Estrutura
+## Fontes de Receita
+
+| Fonte | Valor |
+|-------|-------|
+| Taxa de solicitação P2P | R$ 2,00 |
+| Taxa de match (intermediação) | 2% (mín R$ 2, máx R$ 20) |
+| Assinatura Premium mensal | R$ 19,99 |
+| Assinatura Premium anual | R$ 199,99 |
+| Verificação KYC | R$ 14,99 |
+| Destaque de anúncio (7 dias) | R$ 5,00 |
+| Boost de views (4 tiers) | R$ 1 / 5 / 12 / 35 |
+| Cobrança de dívida | R$ 2,00 |
+
+---
+
+## Estrutura do Projeto
 
 ```
 psy-pay/
 ├── frontend/src/
-│   ├── paginas/          # Dashboard, Login, Registro, Perfil
-│   ├── componentes/      # LandingPage, MarketplaceView, Footer, etc.
-│   └── index.css         # CSS global com design system
+│   ├── paginas/          # Dashboard, Login, Registro, Admin, Verificação
+│   ├── componentes/      # LandingPage, Marketplace, RankingSemanal, Footer
+│   ├── api.js            # Cliente HTTP com cache e retry
+│   └── firebase.js       # Inicialização Firebase (email verification)
 ├── backend/
-│   ├── rotas/            # auth, financeiro, comunidade, marketplace
-│   ├── modelos/          # modelos_db.py (todas as tabelas)
-│   ├── scripts/          # Simulações financeiras
-│   └── main.py           # Ponto de entrada FastAPI
+│   ├── rotas/            # auth, emprestimo, financeiro, comunidade, marketplace, score, snapshot, storage
+│   ├── modelos/          # modelos_db.py (todas as tabelas SQLAlchemy)
+│   ├── utils_*.py        # Firebase, Telegram, Ranking, Storage, OTP log
+│   ├── scripts/          # Simulações financeiras e manutenção
+│   └── main.py           # Ponto de entrada FastAPI com middlewares
 ├── docs/                 # Documentação
-├── scripts/              # Scripts auxiliares
-└── render.yaml           # Deploy config
+└── render.yaml           # Config de deploy Render (backend + frontend)
 ```
 
 ---
@@ -69,7 +93,7 @@ psy-pay/
 # Backend
 cd backend
 pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --port 8000
 
 # Frontend
 cd frontend
@@ -77,4 +101,30 @@ npm install
 npm run dev
 ```
 
-Acesse `http://localhost:5173` para a landing page pública.
+Backend: `http://localhost:8000` | Frontend: `http://localhost:3000`
+
+---
+
+## Variáveis de Ambiente (.env)
+
+```env
+# Banco de dados
+DATABASE_URL_LOCAL=sqlite:///./cred_plus.db
+DATABASE_URL=postgresql://...       # Produção (Neon)
+
+# Segurança
+SECRET_KEY=sua_chave_secreta
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+# Firebase (verificação de email)
+FIREBASE_API_KEY=AIzaSy...
+FIREBASE_SERVICE_ACCOUNT_PATH=/caminho/service-account.json
+
+# Mercado Pago
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
+MERCADOPAGO_PUBLIC_KEY=APP_USR-...
+
+# Frontend
+FRONTEND_URL=https://seu-frontend.onrender.com
+FRONTEND_URL_LOCAL=http://localhost:3000
+```

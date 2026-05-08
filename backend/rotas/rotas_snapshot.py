@@ -124,13 +124,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "parceiro_cnpj": parceiro.cnpj if parceiro else None,
                 "parceiro_razao_social": parceiro.razao_social if parceiro else None,
                 "parceiro_cnpj_status": parceiro.cnpj_status if parceiro else None,
-                "caixa_aberto": parceiro.caixa_aberto if parceiro else False,
-                "prazo": parceiro.prazo_liquidacao if parceiro else 0,
-                "taxa_loja": float(parceiro.taxa_comissao or 0) if parceiro else 0.0,
-                "comissoes_acumuladas": float(parceiro.comissoes_acumuladas or 0) if parceiro else 0.0,
-                "comissoes_pendentes": float(parceiro.comissoes_pendentes or 0) if parceiro else 0.0,
-                "saldo_caixa_inicial": float(parceiro.saldo_caixa_inicial or 0) if parceiro else 0.0,
-                "saldo_caixa_atual": float(parceiro.saldo_caixa_atual or 0) if parceiro else 0.0,
                 "is_subscriber": usuario.is_subscriber,
                 "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
                 "pontos_marketplace": usuario.pontos_marketplace,
@@ -219,9 +212,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         tipos_receita = [
             TipoTransacao.COMPRA_SCORE, 
             TipoTransacao.DESBLOQUEIO_DADOS, 
-            TipoTransacao.TAXA_SAQUE, 
             TipoTransacao.TAXA_INTERMEDIACAO,
-            TipoTransacao.TAXA_ESPECIE,
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.RETORNO_INVESTIMENTO,
             TipoTransacao.TAXA_ADM_EMPRESTIMO,
@@ -320,13 +311,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
-            # 3. Comissões pendentes (Passivo com parceiros)
-            total_comissoes_pendentes = db.query(func.sum(Parceiro.comissoes_acumuladas)).filter(
-                Parceiro.is_active == True
-            ).scalar() or Decimal("0.00")
-
-            # 4. Lucro Disponível (Cálculo Virtual para consistência com rotas_financeiro)
-            lucro_disponivel_virtual = max(Decimal("0.00"), total_lucro_historico - total_sacado_admin - total_investido_institucional - total_comissoes_pendentes)
+            # 3. Lucro Disponível
+            lucro_disponivel_virtual = max(Decimal("0.00"), total_lucro_historico - total_sacado_admin - total_investido_institucional)
 
             # 4.1 Cálculo de Taxas Operacionais (1% de cada PIX no Checkout Pro)
             total_pix_recebido = db.query(func.sum(Transacao.valor)).filter(
@@ -615,12 +601,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "nome": p.nome,
                     "endereco": p.endereco,
                     "usuario_id": p.usuario_id,
-                    "prazo_liquidacao": p.prazo_liquidacao,
-                    "taxa_comissao": float(p.taxa_comissao),
                     "is_active": p.is_active,
-                    "caixa_aberto": p.caixa_aberto,
-                    "saldo_atual": float(p.saldo_caixa_atual),
-                    "comissao": float(p.comissoes_acumuladas),
                     "mp_conectado": bool(p.mp_access_token)
                 })
 

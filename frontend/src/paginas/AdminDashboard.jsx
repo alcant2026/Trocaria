@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api, { BASE_URL } from '../api';
+import PagamentosRanking from '../componentes/PagamentosRanking';
 import './AdminDashboard.css';
 import {
     LayoutDashboard,
@@ -31,6 +32,7 @@ import {
     Sparkles,
     Star,
     Eye,
+    Trophy,
     Trash2,
     CheckCircle2,
     Timer,
@@ -556,6 +558,9 @@ const AdminDashboard = () => {
                     <div className={`nav-item ${activeTab === 'resgates' ? 'active' : ''}`} onClick={() => { setActiveTab('resgates'); carregarResgates(); }}>
                         <Sparkles size={20} /> <span>Resgates</span>
                     </div>
+                    <div className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`} onClick={() => setActiveTab('ranking')}>
+                        <Trophy size={20} /> <span>Ranking</span>
+                    </div>
                 </nav>
 
                 <div className="sidebar-footer">
@@ -858,6 +863,8 @@ const AdminDashboard = () => {
                         )}
                     </div>
                 )}
+
+                {activeTab === 'ranking' && <PagamentosRanking />}
 
                 {activeTab === 'usuarios' && (
                     <div className="glass-panel animate-fade-in">

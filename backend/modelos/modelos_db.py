@@ -20,7 +20,6 @@ class TipoTransacao(enum.Enum):
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
     TAXA_SAQUE = "taxa_saque"
     TAXA_INTERMEDIACAO = "taxa_intermediacao"
-    TAXA_ESPECIE = "taxa_especie"
     APORTE_CAPITAL = "aporte_capital"
     PAGAMENTO_PARCELA = "pagamento_parcela"
     TAXA_POSTAGEM = "taxa_postagem"
@@ -33,7 +32,6 @@ class TipoTransacao(enum.Enum):
     FECHAMENTO_GAVETA = "fechamento_gaveta"
     BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
     RETORNO_POOL = "retorno_pool"
-    COMISSAO_PARCEIRO = "comissao_parceiro"
     TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
     TAXA_DEPOSITO_VIRTUAL = "taxa_deposito_virtual"
     TAXA_SOLICITACAO = "taxa_solicitacao"
@@ -98,11 +96,8 @@ class Usuario(Base):
     codigo_recuperacao_hash = Column(String(200), nullable=True)
     expiracao_recuperacao = Column(DateTime, nullable=True)
 
-    # Verificação de Email e Telefone (OTP)
+    # Verificação de Email e Telefone (Firebase Email + Código Tela)
     email_verificado = Column(Boolean, default=False)
-    codigo_verificacao_email = Column(String(200), nullable=True)
-    expiracao_codigo_email = Column(DateTime, nullable=True)
-    
     telefone_verificado = Column(Boolean, default=False)
     codigo_verificacao_telefone = Column(String(200), nullable=True)
     expiracao_codigo_telefone = Column(DateTime, nullable=True)
@@ -236,16 +231,7 @@ class Parceiro(Base):
     data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
-    caixa_aberto = Column(Boolean, default=False)
-    saldo_caixa_inicial = Column(Numeric(precision=20, scale=2), default=0)
-    saldo_caixa_atual = Column(Numeric(precision=20, scale=2), default=0)
-    comissoes_acumuladas = Column(Numeric(precision=20, scale=2), default=0)
-    comissoes_pendentes = Column(Numeric(precision=20, scale=2), default=0) # D+14 / D+35
-    
-    # NOVOS: Regras de Recebíveis
-    prazo_liquidacao = Column(Integer, default=0) # 0, 14, 35 dias
-    taxa_comissao = Column(Numeric(precision=5, scale=2), default=0.00) # Porcentagem
-    
+
     # Mercado Pago Marketplace (Custódia Descentralizada)
     mp_access_token = Column(String(255), nullable=True)
     mp_refresh_token = Column(String(255), nullable=True)
@@ -387,3 +373,16 @@ class CodigoOTPLog(Base):
     data_expiracao = Column(DateTime, nullable=False)
     
     usuario = relationship("Usuario")
+
+class RankingHistorico(Base):
+    """Armazena snapshots dos rankings semanais antes do reset sabado 18h."""
+    __tablename__ = "ranking_historico"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    data_reset = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), index=True)
+    dados_json = Column(Text, nullable=False)
+    total_pontos = Column(Integer, default=0)
+    total_premio = Column(Numeric(10, 2), default=0)
+    status = Column(String(20), default="pago")  # pago, conferido
+    conferido_por = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+    data_conferido = Column(DateTime, nullable=True)

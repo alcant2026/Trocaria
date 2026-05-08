@@ -51,9 +51,11 @@ total_emp = q(db, "SELECT COUNT(*), SUM(valor) FROM solicitacoes_emprestimo WHER
 print(f"\n→ Aprovados/Concluídos: {total_emp[0][0]} | Volume: R$ {float(total_emp[0][1] or 0):.2f}")
 
 separador("🏪 PARCEIROS")
-parceiros = q(db, "SELECT id, nome, is_active, caixa_aberto, saldo_caixa_atual, comissoes_acumuladas FROM parceiros")
-print(f"{'ID':<5} {'Nome':<20} {'Ativo':<6} {'Caixa':<6} {'Saldo':>10} {'Comissão':>10}")
+parceiros = q(db, "SELECT id, nome, is_active FROM parceiros")
+print(f"{'ID':<5} {'Nome':<20} {'Ativo':<6}")
 print("-"*60)
+for p in parceiros:
+    print(f"{p[0]:<5} {p[1][:20]:<20} {'Sim' if p[2] else 'Nao':<6}")
 for p in parceiros:
     print(f"{p[0]:<5} {str(p[1]):<20} {str(p[2]):<6} {str(p[3]):<6} {float(p[4] or 0):>10.2f} {float(p[5] or 0):>10.2f}")
 

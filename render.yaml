@@ -24,6 +24,10 @@ services:
         value: "true"
       - key: ENVIRONMENT
         value: "production"
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
     disk:
       name: tmp
       mountPath: /tmp

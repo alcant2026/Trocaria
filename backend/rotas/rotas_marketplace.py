@@ -7,12 +7,13 @@ import httpx
 import datetime
 from decimal import Decimal
 from database import get_db
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, RankingHistorico
 from rotas.rotas_auth import obter_usuario_logado, exigir_admin
 import mercadopago
 import logging
 
 logger = logging.getLogger(__name__)
+PONTOS_POR_REAL = 1000
 
 router = APIRouter(prefix="/marketplace", tags=["Marketplace"])
 
@@ -255,5 +256,82 @@ async def ranking_completo(db: Session = Depends(get_db), admin: Usuario = Depen
             "premio": round((u.pontos_semanais or 0) / 1000, 2)
         })
     return {"ranking": resultado}
+
+
+@router.get("/ranking/historico")
+async def ranking_historico(db: Session = Depends(get_db)):
+    """Retorna os últimos 10 rankings semanais resetados (público)."""
+    import json
+    historicos = db.query(RankingHistorico).order_by(
+        RankingHistorico.data_reset.desc()
+    ).limit(10).all()
+    
+    return [{
+        "id": h.id,
+        "data_reset": h.data_reset.isoformat(),
+        "total_pontos": h.total_pontos,
+        "total_premio": float(h.total_premio or 0),
+        "status": h.status or "pago",
+        "top20": json.loads(h.dados_json)
+    } for h in historicos]
+
+
+@router.get("/admin/ranking/historico")
+async def admin_ranking_historico(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Admin: histórico completo de pagamentos do ranking com CPF e chave PIX."""
+    import json
+    historicos = db.query(RankingHistorico).order_by(
+        RankingHistorico.data_reset.desc()
+    ).limit(20).all()
+
+    resultado = []
+    for h in historicos:
+        dados = json.loads(h.dados_json)
+
+        # Enriquecer com CPF e chave PIX
+        ids = [d["id"] for d in dados]
+        usuarios = {u.id: u for u in db.query(Usuario).filter(Usuario.id.in_(ids)).all()}
+
+        vencedores = []
+        for d in dados:
+            u = usuarios.get(d["id"])
+            vencedores.append({
+                **d,
+                "cpf": u.cpf if u else "***",
+                "chave_pix": u.chave_pix if u else "***"
+            })
+
+        resultado.append({
+            "id": h.id,
+            "data_reset": h.data_reset.strftime("%d/%m/%Y %H:%M"),
+            "data_reset_iso": h.data_reset.isoformat(),
+            "total_pontos": h.total_pontos,
+            "total_premio": float(h.total_premio or 0),
+            "status": h.status or "pago",
+            "conferido_por": h.conferido_por,
+            "data_conferido": h.data_conferido.isoformat() if h.data_conferido else None,
+            "vencedores": vencedores
+        })
+
+    return {"pagamentos": resultado}
+
+
+@router.post("/admin/ranking/conferir/{historico_id}")
+async def conferir_pagamento_ranking(
+    historico_id: int,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(exigir_admin)
+):
+    """Admin: marca um pagamento do ranking como conferido."""
+    historico = db.query(RankingHistorico).filter(RankingHistorico.id == historico_id).first()
+    if not historico:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado.")
+
+    historico.status = "conferido"
+    historico.conferido_por = admin.id
+    historico.data_conferido = datetime.datetime.now(datetime.timezone.utc)
+    db.commit()
+
+    return {"message": "Pagamento conferido com sucesso!", "id": historico.id, "status": "conferido"}
 
 

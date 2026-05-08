@@ -311,64 +311,29 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
                 detail=f"Saque Bloqueado: Por medida de segurança, após alterar o 2FA, os saques ficam suspensos por 48 horas. Tente novamente em aproximadamente {int(horas_restantes)} horas."
             )
 
-    # REGRAS DE TAXA DE SAQUE (PIX)
-    # 1. Se valor <= Pool (saldo da plataforma 000PL): Taxa R$ 0,01
-    # 2. Se valor > Pool: Taxa 2%
-    
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-    pool_liquidez = plataforma.saldo if plataforma else Decimal("0.00")
-    
-    if valor <= pool_liquidez:
-        taxa = Decimal("0.01")
-    else:
-        taxa = valor * Decimal("0.02")
+    # Saque gratuito
+    taxa = Decimal("0.00")
 
     total_debito = valor + taxa
     if usuario.saldo < total_debito:
         raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobrir o saque e a taxa de R$ {taxa:.2f}.")
 
-    # Deduzir saldo + taxa
+    # Deduzir saldo
     usuario.saldo -= total_debito
-    
-    # Creditar taxa para a plataforma
-    if plataforma:
-        plataforma.saldo += taxa
     
     # Valor que será efetivamente sacado (líquido)
     valor_liquido = valor
-    
-    # NOVO: Acumular no gasto total de taxas para dividendos
-    if taxa > 0:
-        if usuario.gasto_total_taxas is None: usuario.gasto_total_taxas = Decimal("0.00")
-        usuario.gasto_total_taxas += taxa
 
-    # Criar transação de saque pendente (com o valor LÍQUIDO que o admin deve pagar)
+    # Criar transação de saque pendente
     nova_transacao = Transacao(
         usuario_id=usuario.id,
         valor=valor_liquido,
         tipo=TipoTransacao.SAQUE,
         status="pendente",
         metodo=dados.metodo,
-        parceiro_id=dados.parceiro_id if dados.metodo == "especie" else None,
-        detalhes=f"Saque via {dados.metodo.upper()} para PIX: {chave_pix} | Bruto: R$ {valor} | Taxa: R$ {taxa} (Dedução)"
+        detalhes=f"Saque via {dados.metodo.upper()} para PIX: {chave_pix} | Valor: R$ {valor}"
     )
     db.add(nova_transacao)
-
-    # Se houver taxa, registrar como lucro da plataforma
-    if taxa > 0:
-        # Creditar lucro à plataforma (000PL)
-        plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-        if plataforma:
-            plataforma.saldo += taxa
-
-        transacao_taxa = Transacao(
-            usuario_id=usuario.id,
-            valor=taxa,
-            tipo=TipoTransacao.TAXA_SAQUE,
-            status="concluido",
-            detalhes="Taxa de saque (valor solicitado superior ao saldo do Pool)"
-        )
-        db.add(transacao_taxa)
 
     db.commit()
     cache_snapshot_data.pop(usuario.id, None)
@@ -383,21 +348,18 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
     # 3. 2FA Ativo
     # 4. Método PIX
     if dados.metodo == "pix" and valor_liquido <= VALOR_MAX_SAQUE_AUTO and usuario.is_verified and usuario.two_factor_enabled:
-        # DESCENTRALIZAÇÃO: Buscar um parceiro que tenha MP conectado e saldo suficiente para honrar o saque
         parceiro_pagador = db.query(Parceiro).filter(
             Parceiro.mp_access_token != None,
             Parceiro.is_active == True,
             Parceiro.cnpj != None,
-            Parceiro.cnpj_status == "ativa",
-            Parceiro.saldo_caixa_atual >= valor_liquido
+            Parceiro.cnpj_status == "ativa"
         ).first()
 
         token_para_payout = None
         if parceiro_pagador:
             token_para_payout = parceiro_pagador.mp_access_token
-            logger.info(f"🏦 SAQUE DESCENTRALIZADO: Usando saldo do Parceiro {parceiro_pagador.nome}")
+            logger.info(f"🏦 SAQUE DESCENTRALIZADO: Usando Parceiro {parceiro_pagador.nome}")
         
-        # Tenta processar o PIX imediatamente via API
         sucesso_payout, detalhe_payout = await processar_payout_pix_mp(nova_transacao, usuario, token_custom=token_para_payout)
         
         if sucesso_payout:
@@ -405,7 +367,6 @@ async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session
             nova_transacao.detalhes += f" | ✅ AUTO-PIX: {detalhe_payout}"
             if parceiro_pagador:
                 nova_transacao.parceiro_id = parceiro_pagador.id
-                parceiro_pagador.saldo_caixa_atual -= valor_liquido
             db.commit()
             msg_final = f"Saque de R$ {valor_liquido:.2f} realizado com sucesso via PIX Instantâneo!"
         else:
@@ -466,93 +427,9 @@ async def notificar_deposito(request: Request, dados: NotificacaoDeposito, db: S
 @router.post("/saque/reservar")
 @limiter.limit("2/minute")
 async def reservar_saque_especie(dados: ReservaSaqueRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
-    """Reserva um valor para saque em espécie em um parceiro específico."""
-    # from utils_score import verificar_2fa # Se houver utilitário de 2FA
-    
-    # 1. Lock no usuário para evitar race conditions
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_logado.id).with_for_update().first()
-    
-    # 2. Verificações de Segurança 🛡️
-    if not usuario.is_verified:
-        raise HTTPException(status_code=403, detail="Sua conta precisa estar VERIFICADA para realizar saques.")
-    
-    if not usuario.two_factor_enabled:
-        raise HTTPException(status_code=403, detail="O 2FA é obrigatório para realizar saques em espécie.")
-    
-    if not verify_password(dados.senha_saque, usuario.senha_hash):
-        raise HTTPException(status_code=403, detail="Senha de segurança incorreta.")
+    """[DEPRECATED] Saque em espécie removido."""
+    raise HTTPException(status_code=410, detail="Saque em espécie não está mais disponível. Use PIX.")
 
-    if not dados.codigo_2fa or not pyotp.TOTP(usuario.totp_secret).verify(dados.codigo_2fa):
-        raise HTTPException(status_code=403, detail="Código 2FA inválido ou expirado.")
-
-    # 3. Validar Parceiro
-    parceiro = db.query(Parceiro).filter(Parceiro.id == dados.parceiro_id, Parceiro.is_active == True).first()
-    exigir_parceiro_apto(parceiro)
-
-    # 4. Validar Saldo e Reservar
-    if usuario.saldo < dados.valor:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente para reservar este saque.")
-    
-    # Evitar Múltiplas Reservas Pendentes (Opcional, mas recomendado)
-    saque_existente = db.query(Transacao).filter(
-        Transacao.usuario_id == usuario.id,
-        Transacao.tipo == TipoTransacao.SAQUE,
-        Transacao.metodo == "especie",
-        Transacao.status == "pendente"
-    ).first()
-    if saque_existente:
-        raise HTTPException(status_code=400, detail="Você já possui um saque em espécie reservado. Cancele-o antes de criar um novo.")
-
-    # 4. Cálculo de Taxas (2% total: 1% Plataforma, 1% Parceiro)
-    taxa_total = dados.valor * Decimal("0.02")
-    comissao_parceiro = dados.valor * Decimal("0.01")
-    lucro_plataforma = dados.valor * Decimal("0.01")
-    
-    if usuario.saldo < (dados.valor + taxa_total):
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente para cobrir o saque e a taxa de R$ {taxa_total:.2f}.")
-
-    # DEBITAR SALDO (Valor + Taxa) 🛡️
-    usuario.saldo -= (dados.valor + taxa_total)
-    
-    # Credita lucro imediato da plataforma (1%)
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-    if plataforma:
-        plataforma.saldo += lucro_plataforma
-
-    # 5. Criar Transações
-    nova_transacao = Transacao(
-        usuario_id=usuario.id,
-        valor=dados.valor, # Valor que o cliente recebe em mãos
-        tipo=TipoTransacao.SAQUE,
-        status="pendente",
-        metodo="especie",
-        parceiro_id=parceiro.id,
-        detalhes=f"Saque Reservado (Aguardando Retirada: {parceiro.nome}) | Taxa Total: R$ {taxa_total}"
-    )
-    db.add(nova_transacao)
-    
-    # Registro de Taxa
-    db.add(Transacao(
-        usuario_id=usuario.id,
-        valor=taxa_total,
-        tipo=TipoTransacao.TAXA_ESPECIE,
-        status="concluido",
-        detalhes=f"Taxa de Saque em Espécie (1% Plataforma, 1% Parceiro)"
-    ))
-    db.commit()
-    
-    # Limpar Cache
-    from rotas.rotas_snapshot import cache_snapshot_data
-    cache_snapshot_data.pop(usuario.id, None)
-    
-    return {
-        "message": f"Saque de R$ {dados.valor:.2f} reservado com sucesso! Vá até a loja {parceiro.nome} com seu ID {usuario.id} para retirar o dinheiro.",
-        "transacao_id": nova_transacao.id
-    }
-
-class DepositoPixRequest(BaseModel):
-    valor: Decimal = Field(gt=0)
-    parceiro_id: Optional[int] = None
 
 @router.get("/deposito/pix-detalhes/{transacao_id}")
 async def obter_detalhes_pix(transacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -793,7 +670,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             cache_snapshot_data.pop(usuario.id, None)
                         elif transacao.detalhes and "COBRANCA:" in (transacao.detalhes or ""):
                             try:
-                                from utils_email import enviar_email_recuperacao
                                 from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao
                                 sc_id = int(transacao.detalhes.split(":")[1])
                                 sc = db.query(SolicitacaoEmprestimo).filter(SolicitacaoEmprestimo.id == sc_id).first()
@@ -802,10 +678,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 if tomador and credor:
                                     import urllib.parse
                                     debito = sc.valor
-                                    if tomador.email:
-                                        try:
-                                            enviar_email_recuperacao(tomador.email, tomador.nome, f"COBRANCA - Contrato #{sc.id}")
-                                        except: pass
                                     if tomador.telefone:
                                         num = "".join(filter(str.isdigit, tomador.telefone))
                                         if not num.startswith("55"): num = "55" + num
@@ -844,7 +716,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             if transacao.parceiro_id:
                                 parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
                                 if parceiro:
-                                    parceiro.saldo_caixa_atual += valor_mp
+                                    plataforma.saldo += valor_mp  # (was parceiro.saldo_caixa_atual)
                                     transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
 
                             if plataforma:
@@ -927,7 +799,7 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
         if transacao.parceiro_id:
             parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
             if parceiro:
-                parceiro.saldo_caixa_atual += valor_mp
+                plataforma.saldo += valor_mp  # (was parceiro.saldo_caixa_atual)
                 transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
         
         # Subtrai taxas do admin
@@ -985,7 +857,7 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
             if transacao.parceiro_id:
                 parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
                 if parceiro:
-                    parceiro.saldo_caixa_atual += valor_mp
+                    plataforma.saldo += valor_mp  # (was parceiro.saldo_caixa_atual)
                     transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
             
             # Subtrai taxas do admin
@@ -1052,46 +924,6 @@ async def confirmar_recebimento_saque(id: int, request: Request, db: Session = D
     return {"message": "Recebimento confirmado com sucesso! Obrigado pelo feedback."}
 
 # @router.post("/parceiro/sacar-comissoes")
-async def sacar_comissoes_parceiro(db: Session = Depends(get_db), parceiro_user: Usuario = Depends(obter_usuario_logado)):
-    """Transfere as comissões acumuladas do parceiro para o saldo da carteira."""
-    # Lock no registro do parceiro para garantir integridade do saque de comissão
-    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == parceiro_user.id, Parceiro.is_active == True).with_for_update().first()
-    if not parceiro:
-        raise HTTPException(status_code=403, detail="Acesso exclusivo para Lojistas Parceiros autorizados.")
-
-    # Lock no usuário para o crédito
-    usuario = db.query(Usuario).filter(Usuario.id == parceiro_user.id).with_for_update().first()
-
-    saldo_comissoes = parceiro.comissoes_acumuladas or Decimal("0.00")
-    if saldo_comissoes <= Decimal("0.00"):
-        raise HTTPException(status_code=400, detail="Você não possui comissões acumuladas para sacar.")
-
-    # Transferir para o saldo da carteira
-    usuario.saldo = (usuario.saldo or Decimal("0.00")) + saldo_comissoes
-    parceiro.comissoes_acumuladas = Decimal("0.00")
-
-    # Registrar no histórico
-    db.add(Transacao(
-        usuario_id=parceiro_user.id,
-        valor=saldo_comissoes,
-        tipo=TipoTransacao.COMISSAO_PARCEIRO,
-        status="concluido",
-        detalhes=f"Resgate de comissões acumuladas do Caixa Físico"
-    ))
-
-    db.commit()
-
-    # Invalida cache do snapshot
-    try:
-        from rotas.rotas_snapshot import cache_snapshot_data
-        cache_snapshot_data.pop(parceiro_user.id, None)
-    except Exception:
-        pass
-
-    return {"message": f"R$ {saldo_comissoes:.2f} transferidos para sua carteira com sucesso!"}
-
-# --- Gestão de Parceiros (Admin) ---
-
 @router.get("/admin/parceiros")
 async def listar_parceiros(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     return db.query(Parceiro).order_by(Parceiro.nome).all()
@@ -1209,13 +1041,8 @@ async def deletar_parceiro(id: int, db: Session = Depends(get_db), admin: Usuari
     # REGRA DE NEGÓCIO: Sempre inativar (Soft Delete) para preservar histórico financeiro
     parceiro.is_active = False
     
-    # SEGURANÇA: Se o caixa estiver aberto, fechar automaticamente para evitar saldos "órfãos"
-    if parceiro.caixa_aberto:
-        parceiro.caixa_aberto = False
-        # O saldo_caixa_atual permanece registrado no parceiro inativo para fins de auditoria
-    
     db.commit()
-    return {"message": "Parceiro desativado e caixa encerrado com sucesso!"}
+    return {"message": "Parceiro desativado com sucesso!"}
 
 @router.post("/admin/confirmar/{transacao_id}")
 async def confirmar_transacao(transacao_id: int, request: Request, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
@@ -1436,7 +1263,7 @@ async def sacar_lucro_plataforma(
     # Calcula o lucro total disponível (histórico de taxas)
     # IMPORTANTE: APORTE_CAPITAL não entra aqui, pois agora vai para o Pool, não para o caixa livre.
     todas_receitas = db.query(Transacao).filter(
-        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_SAQUE, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.TAXA_ESPECIE, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO, TipoTransacao.TAXA_ADM_EMPRESTIMO]),
+        Transacao.tipo.in_([TipoTransacao.COMPRA_SCORE, TipoTransacao.DESBLOQUEIO_DADOS, TipoTransacao.TAXA_INTERMEDIACAO, TipoTransacao.TAXA_POSTAGEM, TipoTransacao.RETORNO_INVESTIMENTO, TipoTransacao.TAXA_ADM_EMPRESTIMO]),
         Transacao.status == "concluido"
     ).all()
     lucro_disponivel = sum(t.valor for t in todas_receitas)
@@ -1589,12 +1416,9 @@ async def criar_parceiro(
         cnpj_validado_em=datetime.datetime.now(datetime.timezone.utc),
         endereco=dados.endereco,
         usuario_id=dados.usuario_id,
-        prazo_liquidacao=dados.prazo_liquidacao,
-        taxa_comissao=dados.taxa_comissao,
+
         is_active=True,
-        caixa_aberto=False,
-        saldo_caixa_atual=Decimal("0.00"),
-        comissoes_acumuladas=Decimal("0.00")
+
     )
     db.add(novo_parceiro)
     db.commit()

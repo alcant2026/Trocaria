@@ -81,7 +81,6 @@ from rotas.rotas_auth import obter_usuario_logado, exigir_admin, verify_password
 from limitador import limiter
 from utils_seguranca import registrar_acao_admin
 from rotas.rotas_snapshot import cache_snapshot_data
-from utils_score import atualizar_score
 
 class NotificacaoDeposito(BaseModel):
     valor: Decimal = Field(gt=0)
@@ -544,10 +543,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             else:
                                 usuario.is_subscriber = True
                                 usuario.assinatura_expira_em = agora + datetime.timedelta(days=dias)
-                            bonus = Decimal("100") if dias == 365 else Decimal("20")
-                            usuario.score = (usuario.score or Decimal("0")) + bonus
-                            if usuario.score > Decimal("1000"):
-                                usuario.score = Decimal("1000")
                             transacao.status = "concluido"
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
@@ -707,9 +702,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
 
                             if transacao.tipo == TipoTransacao.RECEBIMENTO:
                                 usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
-                                usuario.score += Decimal("5.0")
-                                if usuario.score > Decimal("1000.0"):
-                                    usuario.score = Decimal("1000.0")
                                 logger.info(f"REPUTACAO: {usuario.nome} completou uma venda!")
 
                             if transacao.parceiro_id:
@@ -723,7 +715,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 logger.info(f"TAXA ABSORVIDA: R$ {total_fee_mp} descontados.")
 
                             if usuario.id != "000PL":
-                                atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
+                                pass  # score via depósito removido
 
                             db.commit()
                             logger.info(f"WEBHOOK MP: Saldo de R$ {transacao.valor} creditado para {usuario.nome}")
@@ -807,7 +799,7 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
             plataforma.saldo -= total_fee_mp
 
         if usuario.id != "000PL":
-            atualizar_score(db, usuario.id, valor_mp, "DEPOSITO")
+            pass  # score via depósito removido
         
         db.commit()
         
@@ -864,7 +856,7 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
             if plataforma:
                 plataforma.saldo -= total_fee_mp
 
-            atualizar_score(db, usuario_db.id, valor_mp, "DEPOSITO")
+            pass  # score via depósito removido
             db.commit()
             
             from rotas.rotas_snapshot import cache_snapshot_data
@@ -1055,14 +1047,9 @@ async def confirmar_transacao(transacao_id: int, request: Request, db: Session =
     if transacao.tipo == TipoTransacao.DEPOSITO:
         usuario.saldo += transacao.valor
         msg = f"Saldo de R$ {transacao.valor} creditado para {usuario.nome}!"
-        # NOVO: Ganho de score por Depósito
-        atualizar_score(db, usuario.id, transacao.valor, "DEPOSITO")
     elif transacao.tipo == TipoTransacao.SAQUE:
         # No saque, o saldo já foi deduzido (bloqueado) na solicitação.
-        # Aqui o admin apenas confirma que enviou o Pix.
         msg = f"Saque de R$ {transacao.valor} para {usuario.nome} marcado como enviado!"
-        # NOVO: Perda de score por Saque (Penalidade)
-        atualizar_score(db, usuario.id, transacao.valor, "SAQUE")
     elif transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
         # Lógica de Verificação de Conta (KYC)
         usuario.is_verified = True

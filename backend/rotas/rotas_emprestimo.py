@@ -8,7 +8,6 @@ from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from utils_fintech import criar_solicitacao_p2p, aceitar_oferta
-from utils_score import atualizar_score
 from utils_emprestimo import confirmar_pagamento_externo, confirmar_recebimento_externo, aplicar_calote
 from fastapi.responses import StreamingResponse
 import io
@@ -143,8 +142,6 @@ async def confirmar_pagamento(id: int, dados: PagamentoRequest, db: Session = De
 async def confirmar_recebimento(id: int, dados: ConfirmacaoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     try:
         result = confirmar_recebimento_externo(db, id, usuario_logado.id, tipo_pagamento=dados.tipo)
-        if result.get("quitado"):
-            atualizar_score(db, usuario_logado.id, Decimal("5.0"), "PAGAMENTO_EM_DIA")
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

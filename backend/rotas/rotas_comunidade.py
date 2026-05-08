@@ -225,8 +225,6 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
     db.add(transacao)
 
     # NOVO: Acumular no gasto total de taxas para dividendos
-    if usuario.gasto_total_taxas is None: usuario.gasto_total_taxas = Decimal("0.00")
-    usuario.gasto_total_taxas += custo
     
     db.commit()
     

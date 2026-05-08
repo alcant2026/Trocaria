@@ -429,7 +429,6 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado), db: Ses
         "id": usuario.id,
         "nome": usuario.nome,
         "saldo": float(usuario.saldo),
-        "credito_virtual": float(usuario.credito_virtual or 0),
         "score": float(usuario.score),
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,
@@ -846,14 +845,6 @@ async def redefinir_senha(request: Request, dados: RedefinirSenha, db: Session =
     
     return {"message": "Sua senha foi redefinida com sucesso! Você já pode fazer login."}
 
-@router.get("/firebase-config")
-async def firebase_config():
-    """Retorna a configuração pública do Firebase para o frontend."""
-    return {
-        "apiKey": os.getenv("FIREBASE_API_KEY", ""),
-        "authDomain": "psy-pay.firebaseapp.com",
-        "projectId": "psy-pay"
-    }
 
 # --- ROTAS DE VERIFICAÇÃO DE EMAIL E TELEFONE ---
 
@@ -913,57 +904,4 @@ async def confirmar_verificacao_email(request: Request, usuario: Usuario = Depen
     except Exception as e:
         print(f"Erro ao verificar e-mail: {e}")
         raise HTTPException(status_code=500, detail="Erro ao verificar status do e-mail.")
-
-@router.post("/verificar-telefone/solicitar")
-@limiter.limit("3/minute")
-async def solicitar_verificacao_telefone(request: Request, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
-    """Gera código de verificação para o telefone (código na tela)."""
-    if not usuario.telefone:
-        raise HTTPException(status_code=400, detail="Nenhum telefone cadastrado.")
-    
-    codigo = "".join(random.choices(string.digits, k=6))
-    usuario.codigo_verificacao_telefone = hashlib.sha256(codigo.encode()).hexdigest()
-    usuario.expiracao_codigo_telefone = datetime.now(timezone.utc) + timedelta(minutes=15)
-    db.commit()
-    
-    registrar_codigo_otp(
-        db=db, usuario_id=usuario.id, tipo='telefone', codigo=codigo,
-        destino=mascarar_telefone(usuario.telefone), enviado_com_sucesso=True,
-        metodo='tela', ip_origem=request.client.host,
-        user_agent=request.headers.get("user-agent")
-    )
-    
-    return {
-        "message": "Código gerado.",
-        "codigo": codigo,
-        "expira_em_minutos": 15
-    }
-
-@router.post("/verificar-telefone/confirmar")
-@limiter.limit("5/minute")
-async def confirmar_verificacao_telefone(request: Request, dados: ConfirmarCodigoRequest, usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
-    """Valida o código e marca o telefone como verificado."""
-    if not usuario.codigo_verificacao_telefone:
-        raise HTTPException(status_code=400, detail="Nenhum código pendente. Solicite um novo.")
-    
-    expiracao = usuario.expiracao_codigo_telefone
-    if expiracao and expiracao.tzinfo is None:
-        expiracao = expiracao.replace(tzinfo=timezone.utc)
-    
-    if expiracao and datetime.now(timezone.utc) > expiracao:
-        usuario.codigo_verificacao_telefone = None
-        usuario.expiracao_codigo_telefone = None
-        db.commit()
-        raise HTTPException(status_code=400, detail="Código expirado. Solicite um novo.")
-    
-    hash_enviado = hashlib.sha256(dados.codigo.encode()).hexdigest()
-    if hash_enviado != usuario.codigo_verificacao_telefone:
-        raise HTTPException(status_code=400, detail="Código inválido.")
-    
-    usuario.telefone_verificado = True
-    usuario.codigo_verificacao_telefone = None
-    usuario.expiracao_codigo_telefone = None
-    db.commit()
-    
-    return {"message": "Telefone verificado com sucesso!", "telefone_verificado": True}
 

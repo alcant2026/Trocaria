@@ -99,7 +99,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "id": usuario.id,
                 "nome": usuario.nome,
                 "saldo": float(usuario.saldo),
-                "credito_virtual": float(usuario.credito_virtual or 0),
                 "score": float(usuario.score),
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,
@@ -128,8 +127,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "assinatura_expira_em": usuario.assinatura_expira_em.isoformat() if usuario.assinatura_expira_em else None,
                 "pontos_marketplace": usuario.pontos_marketplace,
                 # Dividendos
-                "gasto_total_taxas": float(usuario.gasto_total_taxas or 0),
-                "total_dividendos_ganhos": float(usuario.total_dividendos_ganhos or 0),
             },
             "historico": []
         }

@@ -529,7 +529,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
 
                         if transacao.tipo == TipoTransacao.TAXA_DEPOSITO_VIRTUAL:
-                            usuario.credito_virtual = (usuario.credito_virtual or Decimal("0.00")) + transacao.valor
                             transacao.status = "concluido"
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
@@ -1191,12 +1190,13 @@ class AssinarPlanoRequest(BaseModel):
 
 @router.post("/admin/adicionar-saldo")
 async def admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Form(gt=0), db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    from utils_fintech import adicionar_credito_virtual
-    try:
-        result = adicionar_credito_virtual(usuario_id, valor, db)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": result["credito_virtual"]}
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    usuario.saldo = (usuario.saldo or Decimal("0.00")) + valor
+    db.add(Transacao(usuario_id=usuario.id, valor=valor, tipo=TipoTransacao.DEPOSITO, status="concluido", metodo="admin", detalhes=f"Adicionado pelo admin {admin.id}"))
+    db.commit()
+    return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": float(usuario.saldo)}
 
 @router.post("/assinar-plano")
 async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):

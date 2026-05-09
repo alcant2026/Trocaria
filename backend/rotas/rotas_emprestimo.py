@@ -45,14 +45,24 @@ async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Dep
     solicitacoes = query.order_by(SolicitacaoEmprestimo.data_criacao.desc()).offset(offset).limit(limit).all()
     resultado = []
     for s in solicitacoes:
+        valor_emprestimo = float(s.valor or 0)
+        taxa_juros = float(s.taxa_juros or 0)
+        juros = valor_emprestimo * (taxa_juros / 100)
+        valor_total = valor_emprestimo + juros
+        valor_parcela = valor_total / s.prazo_meses if s.prazo_meses > 0 else valor_total
+        
         resultado.append({
             "id": s.id,
             "tomador_nome": s.usuario.nome,
             "chave_pix_tomador": s.usuario.chave_pix,
-            "valor": float(s.valor or 0),
-            "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
+            "valor": valor_emprestimo,
+            "taxa_juros": taxa_juros,
+            "juros": round(juros, 2),
+            "valor_total": round(valor_total, 2),
+            "valor_parcela": round(valor_parcela, 2),
             "parcelas": s.prazo_meses,
-            "taxa_compensacao": float(s.taxa_juros or 0),
+            "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
+            "taxa_compensacao": taxa_juros,
             "score_tomador": float(s.usuario.score or 0),
             "verificado": s.usuario.is_verified,
             "inadimplente": s.usuario.inadimplente,

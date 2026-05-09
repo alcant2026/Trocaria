@@ -165,6 +165,17 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                                     </span>
                                 )}
                             </div>
+                            <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', marginTop: '4px' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                    Juros: {op.taxa_juros}% (+R$ {op.juros.toFixed(2)})
+                                </span>
+                                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                    Total: R$ {op.valor_total.toFixed(2)}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                    {op.parcelas}x de R$ {op.valor_parcela.toFixed(2)}
+                                </span>
+                            </div>
                             <p style={{ fontSize: '0.7rem', color: 'var(--success)', margin: '4px 0 0' }}>
                                 PIX: {op.chave_pix_tomador}
                             </p>

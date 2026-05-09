@@ -21,16 +21,13 @@ const SolicitarEmprestimo = ({
             {passoSolicitar === 1 && (
                 <div className="animate-fade-in">
                     {!usuario.is_verified ? (
-                        <div className="info-block mb-1" style={{ background: 'rgba(255, 61, 0, 0.08)', border: '1px solid rgba(255, 61, 0, 0.2)', padding: '15px', borderRadius: '16px', textAlign: 'center' }}>
-                            <ShieldAlert size={32} color="var(--danger)" style={{ marginBottom: '10px' }} />
-                            <h4 style={{ color: 'var(--danger)', fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px' }}>
-                                Verificação Necessária
-                            </h4>
-                            <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '15px' }}>
-                                Para segurança de todos, é preciso verificar sua conta antes de pedir um apoio.
+                        <div className="info-block mb-1" style={{ background: 'rgba(255, 204, 0, 0.05)', border: '1px solid rgba(255, 204, 0, 0.15)', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
+                            <ShieldAlert size={24} color="var(--primary)" style={{ marginBottom: '6px' }} />
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: 0 }}>
+                                <strong style={{ color: 'var(--primary)' }}>Dica:</strong> Contas verificadas têm <strong style={{ color: 'var(--success)' }}>mais chances</strong> de conseguir apoio.
                             </p>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--warning)' }}>
-                                Vá em <strong>Perfil → Verificação</strong> para enviar seus documentos.
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                Vá em Perfil → Verificação para enviar seus documentos.
                             </p>
                         </div>
                     ) : null}

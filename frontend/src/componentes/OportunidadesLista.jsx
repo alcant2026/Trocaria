@@ -95,6 +95,18 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                     {aceito.qr_code_base64 && (
                         <img src={`data:image/jpeg;base64,${aceito.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto 15px', borderRadius: '12px' }} />
                     )}
+                    {aceito.qr_code && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', marginBottom: '10px' }}>
+                            <code style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '8px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {aceito.qr_code}
+                            </code>
+                            <button onClick={() => copiarPix(aceito.qr_code)}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'var(--primary)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                                {copiado ? <Check size={14} /> : <Copy size={14} />}
+                                {copiado ? 'Copiado' : 'Copiar PIX'}
+                            </button>
+                        </div>
+                    )}
                     <PagamentoPolling transacaoId={aceito.transacao_id} onConfirmado={() => {
                         setAceito(prev => ({ ...prev, aguardando_pagamento: false }));
                         carregar();

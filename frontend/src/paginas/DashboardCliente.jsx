@@ -70,6 +70,7 @@ import ScoreView from '../componentes/ScoreView';
 import HistoricoView from '../componentes/HistoricoView';
 import ContratosView from '../componentes/ContratosView';
 import MarketplaceView from '../componentes/MarketplaceView';
+import NovoAnuncioPage from '../componentes/NovoAnuncioPage';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -1143,7 +1144,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     carregarMeusLinksMarketplace={carregarMeusLinksMarketplace}
                     handleDenunciar={handleDenunciar}
                     handleAvaliar={handleAvaliar}
-                    setShowPostarLink={setShowPostarLink}
+                    setActiveView={setActiveView}
                     setShowAssinarModal={setShowAssinarModal}
                     handleSolicitarResgate={handleSolicitarResgate}
                     setBoostTarget={setBoostTarget}
@@ -1154,90 +1155,21 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setMensagem={setMensagem}
                 />
             )}
+            
+            {activeView === 'novo-anuncio' && (
+                <NovoAnuncioPage
+                    usuario={usuario}
+                    api={api}
+                    showModal={showModal}
+                    CATEGORIAS_MARKETPLACE={CATEGORIAS_MARKETPLACE}
+                    onVoltar={() => setActiveView('marketplace')}
+                    onSucesso={() => {
+                        carregarMeusLinksMarketplace();
+                        setTimeout(() => setActiveView('marketplace'), 1500);
+                    }}
+                />
+            )}
 <ModalPremium
-                isOpen={showPostarLink}
-                onClose={() => { 
-                    setShowPostarLink(false); 
-                    setDadosNovoLink({ nome_produto: '', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' }); 
-                }}
-                title="Novo Anúncio"
-                type="info"
-            >
-                <div style={{ textAlign: 'left' }}>
-                    <p className="text-muted mb-1" style={{ fontSize: '0.8rem' }}>Anuncie gratuitamente por 24h. Preencha os dados do seu produto ou servico.</p>
-
-                    <div className="input-group mb-1">
-                        <label>Nome do Produto / Servico</label>
-                        <input className="input-field" placeholder="Ex: Curso de Marketing Digital" value={dadosNovoLink.nome_produto} onChange={(e) => setDadosNovoLink({...dadosNovoLink, nome_produto: e.target.value})} />
-                    </div>
-
-                    <div className="input-group mb-1">
-                        <label>Descricao</label>
-                        <textarea className="input-field" rows="3" placeholder="Descreva seu produto ou servico..." style={{ width: '100%', resize: 'none' }}
-                            value={dadosNovoLink.descricao} onChange={(e) => setDadosNovoLink({...dadosNovoLink, descricao: e.target.value})} />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="input-group mb-1">
-                            <label>Valor (R$)</label>
-                            <input type="number" className="input-field" placeholder="0,00" value={dadosNovoLink.valor} onChange={(e) => setDadosNovoLink({...dadosNovoLink, valor: e.target.value})} />
-                        </div>
-                        <div className="input-group mb-1">
-                            <label>Categoria</label>
-                            <select className="input-field m-filter-select" style={{ width: '100%' }}
-                                value={dadosNovoLink.categoria} onChange={(e) => setDadosNovoLink({...dadosNovoLink, categoria: e.target.value})}>
-                                {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Selecione uma categoria' : cat}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="input-group mb-1">
-                        <label>URL da Imagem</label>
-                        <input className="input-field" placeholder="https://..." value={dadosNovoLink.url_imagem} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_imagem: e.target.value})} />
-                    </div>
-
-                    <div className="input-group mb-1">
-                        <label>Link de Afiliado / WhatsApp</label>
-                        <input className="input-field" placeholder="https://seu-link.com ou 5511999999999"
-                            value={dadosNovoLink.url_afiliado} onChange={(e) => setDadosNovoLink({...dadosNovoLink, url_afiliado: e.target.value})} />
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            <Info size={14} /> Se inserir so o numero do WhatsApp, criamos o link automaticamente.
-                        </p>
-                    </div>
-
-                    <div className="input-group mb-1" style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.15)' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: 700 }}>
-                            <Lock size={14} /> Codigo 2FA (anti-spam)
-                        </label>
-                        <input className="input-field" type="text" inputMode="numeric" maxLength={6}
-                            placeholder="000000"
-                            style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '8px', fontWeight: 800 }}
-                            value={dadosNovoLink.codigo_2fa || ''}
-                            onChange={(e) => setDadosNovoLink({...dadosNovoLink, codigo_2fa: e.target.value.replace(/\D/g, '')})} />
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>Para evitar spam, ative o 2FA no menu Perfil e informe o codigo do Google Authenticator.</p>
-                    </div>
-
-                    <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                            <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, voce declara ser o unico responsavel pelo produto/servico. A Psy Pay atua apenas como plataforma de classificados e nao se responsabiliza por vicios, defeitos ou falta de entrega.
-                        </p>
-                    </div>
-
-                    <button className="btn btn-primary mt-1" style={{ width: 'auto', padding: '8px 20px', fontSize: '0.85rem' }} disabled={!dadosNovoLink.nome_produto || !dadosNovoLink.url_afiliado} onClick={async () => {
-                        try {
-                            await api.post('/comunidade/postar-link', dadosNovoLink);
-                            setShowPostarLink(false);
-                            setDadosNovoLink({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', url_imagem: '', valor: '', vendas_texto: '', codigo_2fa: '' });
-                            carregarMeusLinksMarketplace();
-                            showModal({ title: 'Sucesso!', message: 'Anuncio publicado!', type: 'success' });
-                        } catch (err) { 
-                            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao publicar', type: 'danger' }); 
-                        }
-                    }}>Publicar Anuncio</button>
-                </div>
-            </ModalPremium>
-
-            <ModalPremium
                 isOpen={showBoostModal}
                 onClose={() => setShowBoostModal(false)}
                 title="Turbinar Produto"

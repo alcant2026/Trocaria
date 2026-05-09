@@ -52,7 +52,7 @@ const App = () => {
     const onLogin = (userData) => {
         setUser(userData);
         localStorage.setItem('usuario', JSON.stringify(userData));
-        const precisaVerificar = !userData.email_verificado || !userData.telefone_verificado;
+        const precisaVerificar = !userData.email_verificado;
         setNeedsVerification(precisaVerificar);
         if (precisaVerificar) {
             setIsAuthenticated(true);

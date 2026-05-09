@@ -21,7 +21,8 @@ const MarketplaceView = ({
     usuario, marketplaceTab, setMarketplaceTab, selectedCategory, setSelectedCategory,
     marketplaceLinks, meusLinksMarketplace, loadingMarket, hasMoreExplorar, hasMoreMeusLinks,
     carregarExplorar, carregarMeusLinksMarketplace, handleDenunciar, handleAvaliar,
-    setShowPostarLink, setShowAssinarModal, handleSolicitarResgate,
+    setShowAssinarModal, handleSolicitarResgate,
+    setActiveView,
     setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
 }) => {
     return (
@@ -48,7 +49,7 @@ const MarketplaceView = ({
                     </div>
                 )}
 
-                <button className="btn btn-primary btn-sm" onClick={() => setShowPostarLink(true)} style={{ gap: '5px', whiteSpace: 'nowrap', height: '32px', minHeight: 'unset', fontSize: '0.75rem', padding: '0 10px', flexShrink: 0 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => setActiveView('novo-anuncio')} style={{ gap: '5px', whiteSpace: 'nowrap', height: '32px', minHeight: 'unset', fontSize: '0.75rem', padding: '0 10px', flexShrink: 0 }}>
                     <Plus size={14} /> Novo Anúncio
                 </button>
             </div>
@@ -217,7 +218,7 @@ const MarketplaceView = ({
                             <div className="market-empty">
                                 <ShoppingBag size={48} />
                                 <p>Nenhum produto em destaque no momento.</p>
-                                <button className="btn btn-link" onClick={() => setShowPostarLink(true)}>Seja o primeiro a anunciar!</button>
+                                <button className="btn btn-link" onClick={() => setActiveView('novo-anuncio')}>Seja o primeiro a anunciar!</button>
                             </div>
                         )}
                     </div>
@@ -308,7 +309,7 @@ const MarketplaceView = ({
                     <div className="market-empty">
                         <PlusCircle size={48} />
                         <p>Você ainda não tem anúncios.</p>
-                        <button className="btn btn-link" onClick={() => setShowPostarLink(true)}>Postar meu primeiro link</button>
+                        <button className="btn btn-link" onClick={() => setActiveView('novo-anuncio')}>Postar meu primeiro link</button>
                     </div>
                 )
             )}

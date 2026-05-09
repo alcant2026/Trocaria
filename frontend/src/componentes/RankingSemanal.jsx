@@ -43,11 +43,11 @@ const RankingSemanal = ({ usuario, sidebar }) => {
                     </button>
                 </div>
 
-                {data && data.minha_posicao && (
+                {data && data.minha_posicao ? (
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                         <div style={{ flex: 1, padding: '8px', background: 'rgba(255,214,0,0.08)', borderRadius: '8px', textAlign: 'center' }}>
                             <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sua Pos</div>
-                            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#FFD600' }}>#{data.minha_posicao}</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 900, color: data.minha_posicao <= 20 ? '#FFD600' : 'var(--text-muted)' }}>#{data.minha_posicao}</div>
                         </div>
                         <div style={{ flex: 1, padding: '8px', background: 'rgba(var(--success-rgb), 0.05)', borderRadius: '8px', textAlign: 'center' }}>
                             <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pontos</div>
@@ -57,6 +57,11 @@ const RankingSemanal = ({ usuario, sidebar }) => {
                             <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Premio</div>
                             <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--primary)' }}>R$ {((data.meus_pontos || 0) / 1000).toFixed(2)}</div>
                         </div>
+                    </div>
+                ) : null}
+                {data && data.meus_pontos > 0 && !data.minha_posicao && (
+                    <div style={{ padding: '8px', background: 'rgba(255,214,0,0.05)', borderRadius: '8px', textAlign: 'center', marginBottom: '10px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{data.meus_pontos} pts</span> · R$ {((data.meus_pontos || 0) / 1000).toFixed(2)} · Fora do Top 20
                     </div>
                 )}
 

@@ -226,8 +226,13 @@ async def ranking_semanal(db: Session = Depends(get_db), usuario: Usuario = Depe
     for i, u in enumerate(top20, 1):
         ranking.append({"posicao": i, "id": u.id, "nome": u.nome, "pontos": u.pontos_semanais or 0,
             "premio": round((u.pontos_semanais or 0) / 1000, 2), "destaque": u.id == usuario.id})
-    minha_pos = next((i for i, u in enumerate(top20, 1) if u.id == usuario.id), None)
+    
     meus_pontos = usuario.pontos_semanais or 0
+    minha_pos = next((i for i, u in enumerate(top20, 1) if u.id == usuario.id), None)
+    if minha_pos is None and meus_pontos > 0:
+        # Contar quantos tem mais pontos que o usuario (mesmo fora do top 20)
+        acima = db.query(Usuario).filter(Usuario.pontos_semanais > meus_pontos).count()
+        minha_pos = acima + 1
     agora = datetime.datetime.now()
     dias_ate_sabado = (5 - agora.weekday()) % 7
     if dias_ate_sabado == 0 and agora.hour >= 18:

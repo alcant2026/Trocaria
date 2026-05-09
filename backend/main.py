@@ -6,7 +6,7 @@ import uvicorn
 import os
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
-from utils_db import sincronizar_esquema, executar_limpeza_banco
+from utils_db import sincronizar_esquema
 from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage
 
 app = FastAPI(title="PSY PAY API P2P")
@@ -163,15 +163,7 @@ async def startup_db_setup():
     try:
         Base.metadata.create_all(bind=engine)
         sincronizar_esquema(Base, engine)
-        # Executar limpeza em background pra não travar o startup no Render
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-        executor = ThreadPoolExecutor(max_workers=1)
-        def _limpeza_bg():
-            try: executar_limpeza_banco(engine)
-            except: pass
-        executor.submit(_limpeza_bg)
-        
+
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao
             with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
@@ -221,7 +213,7 @@ async def startup_db_setup():
                     print(f"🧹 Limpeza: {economia:.2f} MB liberados")
             except Exception:
                 pass
-            await asyncio.sleep(86400)
+            await asyncio.sleep(604800)  # 7 dias
     
     asyncio.create_task(rotina_limpeza_storage())
     

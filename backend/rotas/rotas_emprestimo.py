@@ -49,11 +49,11 @@ async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Dep
             "id": s.id,
             "tomador_nome": s.usuario.nome,
             "chave_pix_tomador": s.usuario.chave_pix_publica or s.usuario.chave_pix,
-            "valor": float(s.valor),
+            "valor": float(s.valor or 0),
             "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
             "parcelas": s.prazo_meses,
-            "taxa_compensacao": float(s.taxa_juros),
-            "score_tomador": float(s.usuario.score),
+            "taxa_compensacao": float(s.taxa_juros or 0),
+            "score_tomador": float(s.usuario.score or 0),
             "verificado": s.usuario.is_verified,
             "inadimplente": s.usuario.inadimplente,
             "data_criacao": s.data_criacao.isoformat()
@@ -72,7 +72,7 @@ async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db
 
     if sdk:
         payment_data = {
-            "transaction_amount": float(valor_taxa),
+            "transaction_amount": float(valor_taxa or 0),
             "description": f"Taxa de publicacao - {usuario_logado.nome}",
             "payment_method_id": "pix",
             "payer": {"email": usuario_logado.email}
@@ -86,9 +86,9 @@ async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db
 
     import json as _json
     dados_solicitacao = _json.dumps({
-        "valor": float(dados.valor),
+        "valor": float(dados.valor or 0),
         "parcelas": dados.parcelas,
-        "taxa": float(dados.taxa_compensacao)
+        "taxa": float(dados.taxa_compensacao or 0)
     })
 
     transacao = Transacao(
@@ -105,7 +105,7 @@ async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db
 
     return {
         "message": "Pague R$ 2,00 via PIX para publicar seu pedido.",
-        "valor": float(valor_taxa),
+        "valor": float(valor_taxa or 0),
         "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
         "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
         "payment_id": payment.get("id"),
@@ -186,7 +186,7 @@ async def cobrar_devedor(request: Request, id: int, db: Session = Depends(get_db
     sdk = get_sdk()
     if not sdk:
         raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
-    result = sdk.payment().create({"transaction_amount": float(TAXA_COBRANCA), "description": f"Cobranca Contrato #{solicitacao.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    result = sdk.payment().create({"transaction_amount": float(TAXA_COBRANCA or 0), "description": f"Cobranca Contrato #{solicitacao.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
     if result.get("status") not in (200, 201):
         raise HTTPException(status_code=502, detail=f"Erro MP: {result.get('response', {}).get('message', 'erro')}")
     payment = result["response"]
@@ -197,9 +197,9 @@ async def cobrar_devedor(request: Request, id: int, db: Session = Depends(get_db
     return {
         "payment_id": payment["id"], "transacao_id": t.id,
         "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"),
-        "valor": float(TAXA_COBRANCA),
+        "valor": float(TAXA_COBRANCA or 0),
         "tomador_nome": tomador.nome, "tomador_email": tomador.email, "tomador_telefone": tomador.telefone,
-        "debito": float(debito_total)
+        "debito": float(debito_total or 0)
     }
 
 

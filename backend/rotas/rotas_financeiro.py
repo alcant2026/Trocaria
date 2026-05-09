@@ -136,7 +136,7 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Opt
 
     idempotency_key = str(uuid.uuid4())
     payload = {
-        "transaction_amount": float(transacao.valor),
+        "transaction_amount": float(transacao.valor or 0),
         "description": f"Saque Psy Pay - {usuario.nome} (ID:{transacao.id})",
         "payment_method_id": "pix",
         "point_of_interaction": {
@@ -468,7 +468,7 @@ async def obter_detalhes_pix(transacao_id: int, db: Session = Depends(get_db), u
             "qr_code_base64": qr_code_base64,
             "payment_id": transacao.payment_id,
             "expires_at": expires_at,
-            "valor": float(transacao.valor)
+            "valor": float(transacao.valor or 0)
         }
     except Exception as e:
         logger.error(f"Erro ao recuperar PIX: {str(e)}")
@@ -675,7 +675,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     if tomador.telefone:
                                         num = "".join(filter(str.isdigit, tomador.telefone))
                                         if not num.startswith("55"): num = "55" + num
-                                        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito):.2f} do contrato #{sc.id} com {credor.nome}. - Psy Pay"
+                                        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito or 0):.2f} do contrato #{sc.id} com {credor.nome}. - Psy Pay"
                                         wa = f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
                                         print(f"COBRANCA: WhatsApp link para cobranca: {wa}")
                                 transacao.status = "concluido"
@@ -1183,7 +1183,7 @@ async def admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Fo
     usuario.saldo = (usuario.saldo or Decimal("0.00")) + valor
     db.add(Transacao(usuario_id=usuario.id, valor=valor, tipo=TipoTransacao.DEPOSITO, status="concluido", metodo="admin", detalhes=f"Adicionado pelo admin {admin.id}"))
     db.commit()
-    return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": float(usuario.saldo)}
+    return {"message": f"R$ {valor} adicionado para {usuario_id}!", "novo_saldo": float(usuario.saldo or 0)}
 
 @router.post("/assinar-plano")
 async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
@@ -1202,10 +1202,10 @@ async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
-        return {"message": "MP nao configurado", "simulacao": True, "preco": float(preco)}
+        return {"message": "MP nao configurado", "simulacao": True, "preco": float(preco or 0)}
 
     payment_data = {
-        "transaction_amount": float(preco),
+        "transaction_amount": float(preco or 0),
         "description": f"Assinatura Premium {nome_plano} - {usuario.nome}",
         "payment_method_id": "pix",
         "payer": {"email": usuario.email}
@@ -1225,7 +1225,7 @@ async def assinar_plano_premium(dados: AssinarPlanoRequest, request: Request, db
 
     return {
         "message": f"Pague R$ {preco} via PIX para ativar o plano {nome_plano}.",
-        "preco": float(preco), "plano": nome_plano,
+        "preco": float(preco or 0), "plano": nome_plano,
         "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code"),
         "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64"),
         "payment_id": payment.get("id"),
@@ -1272,7 +1272,7 @@ async def sacar_lucro_plataforma(
     if dados.valor > saldo_lucro_liquido:
         raise HTTPException(
             status_code=400,
-            detail=f"Saldo de lucro insuficiente. Disponível: R$ {float(saldo_lucro_liquido):.2f}"
+            detail=f"Saldo de lucro insuficiente. Disponível: R$ {float(saldo_lucro_liquido or 0):.2f}"
         )
 
     if not dados.motivo or len(dados.motivo.strip()) < 5:
@@ -1306,7 +1306,7 @@ async def sacar_lucro_plataforma(
     db.commit()
 
     return {
-        "message": f"Saque de R$ {float(dados.valor):.2f} registrado! Realize o PIX para a chave: {dados.chave_pix}",
+        "message": f"Saque de R$ {float(dados.valor or 0):.2f} registrado! Realize o PIX para a chave: {dados.chave_pix}",
         "lucro_disponivel_restante": float(saldo_lucro_liquido - dados.valor)
     }
 
@@ -1323,7 +1323,7 @@ async def gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Session = Depend
     expiracao_iso = expiracao.isoformat(timespec='milliseconds')
     
     payment_data = {
-        "transaction_amount": float(dados.valor),
+        "transaction_amount": float(dados.valor or 0),
         "description": f"Aporte Institucional Psy Pay - Admin {admin.id}",
         "payment_method_id": "pix",
         "date_of_expiration": expiracao_iso,

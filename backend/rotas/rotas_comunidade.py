@@ -130,20 +130,20 @@ async def gerar_pix_destaque(dados: PixDestaqueRequest, db: Session = Depends(ge
     pendente = db.query(Transacao).filter(Transacao.detalhes == f"DESTAQUE_LINK:{link.id}", Transacao.status == "pendente").first()
     if pendente:
         if pendente.payment_id:
-            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(DESTAQUE_PRECO), "ja_existente": True}
+            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(DESTAQUE_PRECO or 0), "ja_existente": True}
         pendente.status = "cancelado"
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
         raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel. Configure MERCADOPAGO_ACCESS_TOKEN.")
-    result = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    result = sdk.payment().create({"transaction_amount": float(DESTAQUE_PRECO or 0), "description": f"Destaque Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
     if result.get("status") not in (200, 201):
         raise HTTPException(status_code=502, detail=f"Erro MP: {result.get('response', {}).get('message', 'erro desconhecido')}")
     payment = result["response"]
     t = Transacao(usuario_id=usuario.id, valor=DESTAQUE_PRECO, tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(payment["id"]), metodo="pix", detalhes=f"DESTAQUE_LINK:{link.id}")
     db.add(t); db.commit()
     qr = payment.get("point_of_interaction", {}).get("transaction_data", {})
-    return {"payment_id": payment["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO)}
+    return {"payment_id": payment["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(DESTAQUE_PRECO or 0)}
 
 
 class PixBoostRequest(BaseModel):
@@ -161,20 +161,20 @@ async def gerar_pix_boost(dados: PixBoostRequest, db: Session = Depends(get_db),
     pendente = db.query(Transacao).filter(Transacao.detalhes == f"BOOST_LINK:{link.id}:{dados.pacote_id}", Transacao.status == "pendente").first()
     if pendente:
         if pendente.payment_id:
-            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(pacote["preco"]), "views": pacote["views"], "ja_existente": True}
+            return {"payment_id": pendente.payment_id, "transacao_id": pendente.id, "qr_code": None, "qr_code_base64": None, "valor": float(pacote["preco"] or 0), "views": pacote["views"], "ja_existente": True}
         pendente.status = "cancelado"
     from rotas.rotas_financeiro import get_sdk
     sdk = get_sdk()
     if not sdk:
         raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel. Configure MERCADOPAGO_ACCESS_TOKEN.")
-    result = sdk.payment().create({"transaction_amount": float(pacote["preco"]), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
+    result = sdk.payment().create({"transaction_amount": float(pacote["preco"] or 0), "description": f"{pacote['views']} views - Link #{link.id}", "payment_method_id": "pix", "payer": {"email": usuario.email}})
     if result.get("status") not in (200, 201):
         raise HTTPException(status_code=502, detail=f"Erro MP: {result.get('response', {}).get('message', 'erro desconhecido')}")
     payment = result["response"]
     t = Transacao(usuario_id=usuario.id, valor=pacote["preco"], tipo=TipoTransacao.TAXA_POSTAGEM, status="pendente", payment_id=str(payment["id"]), metodo="pix", detalhes=f"BOOST_LINK:{link.id}:{dados.pacote_id}")
     db.add(t); db.commit()
     qr = payment.get("point_of_interaction", {}).get("transaction_data", {})
-    return {"payment_id": payment["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"]), "views": pacote["views"]}
+    return {"payment_id": payment["id"], "transacao_id": t.id, "qr_code": qr.get("qr_code"), "qr_code_base64": qr.get("qr_code_base64"), "valor": float(pacote["preco"] or 0), "views": pacote["views"]}
 
 @router.post("/comprar-views")
 async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
@@ -228,7 +228,7 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
     
     db.commit()
     
-    return {"message": f"Sucesso! {views} visualizações adicionadas ao seu link.", "saldo_restante": float(usuario.saldo)}
+    return {"message": f"Sucesso! {views} visualizações adicionadas ao seu link.", "saldo_restante": float(usuario.saldo or 0)}
 
 @router.get("/meus-links")
 async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -247,14 +247,14 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
             "nome_produto": l.nome_produto,
             "descricao": l.descricao or "",
             "categoria": l.categoria or "Geral",
-            "valor": float(l.valor) if l.valor else 0.00,
+            "valor": float(l.valor or 0) if l.valor else 0.00,
             "url_imagem": l.url_imagem,
             "url_afiliado": l.url_afiliado,
             "views_restantes": l.visualizacoes_restantes,
             "views_totais": l.visualizacoes_totais,
             "is_boosted": l.is_boosted,
             "ponto_max": int(l.ponto_max or 1),
-            "nota": float(l.nota) if l.nota else 0.0,
+            "nota": float(l.nota or 0) if l.nota else 0.0,
             "vendas_texto": l.vendas_texto or "",
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None,
             "is_active": l.is_active
@@ -293,11 +293,11 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
             "nome_produto": l.nome_produto,
             "descricao": l.descricao or "",
             "categoria": l.categoria or "Geral",
-            "valor": float(l.valor) if l.valor else 0.00,
+            "valor": float(l.valor or 0) if l.valor else 0.00,
             "url_afiliado": l.url_afiliado,
             "url_imagem": l.url_imagem,
             "patrocinado": l.is_boosted,
-            "nota": float(l.nota) if l.nota else 0.0,
+            "nota": float(l.nota or 0) if l.nota else 0.0,
             "total_avaliacoes": l.total_avaliacoes or 0,
             "vendas_texto": l.vendas_texto or "",
             "views_totais": l.visualizacoes_totais,
@@ -491,6 +491,6 @@ async def avaliar_link(dados: AvaliarRequest, db: Session = Depends(get_db), usu
 
     return {
         "message": "Avaliação registrada!", 
-        "nova_media": float(link.nota), 
+        "nova_media": float(link.nota or 0), 
         "total_avaliacoes": link.total_avaliacoes
     }

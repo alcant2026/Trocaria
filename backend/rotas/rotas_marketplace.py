@@ -156,7 +156,7 @@ async def solicitar_resgate(db: Session = Depends(get_db), usuario: Usuario = De
     db.add(transacao)
     usuario.pontos_marketplace = 0
     db.commit()
-    return {"message": f"Solicitacao de resgate de R$ {valor} criada!", "valor": float(valor)}
+    return {"message": f"Solicitacao de resgate de R$ {valor} criada!", "valor": float(valor or 0)}
 
 
 @router.get("/admin/resgates-pendentes")
@@ -173,7 +173,7 @@ async def listar_resgates_pendentes(db: Session = Depends(get_db), admin: Usuari
             "usuario_nome": user.nome if user else "—",
             "usuario_cpf": user.cpf if user else "—",
             "chave_pix": user.chave_pix_publica or user.chave_pix if user else "—",
-            "valor": float(r.valor),
+            "valor": float(r.valor or 0),
             "data": r.data_criacao.isoformat() if r.data_criacao else None
         })
     return resultado

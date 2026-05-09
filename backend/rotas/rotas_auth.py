@@ -387,8 +387,8 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
         "usuario": {
             "id": usuario.id,
             "nome": usuario.nome,
-            "saldo": float(usuario.saldo),
-            "score": float(usuario.score),
+            "saldo": float(usuario.saldo or 0),
+            "score": float(usuario.score or 0),
             "is_admin": usuario.is_admin,
             "is_verified": usuario.is_verified,
             "two_factor_enabled": usuario.two_factor_enabled,
@@ -408,8 +408,8 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado), db: Ses
     perfil = {
         "id": usuario.id,
         "nome": usuario.nome,
-        "saldo": float(usuario.saldo),
-        "score": float(usuario.score),
+        "saldo": float(usuario.saldo or 0),
+        "score": float(usuario.score or 0),
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,
         "cpf": usuario.cpf,

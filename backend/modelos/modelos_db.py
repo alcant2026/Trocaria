@@ -20,6 +20,7 @@ class TipoTransacao(enum.Enum):
     DESBLOQUEIO_DADOS = "desbloqueio_dados"
     TAXA_SAQUE = "taxa_saque"
     TAXA_INTERMEDIACAO = "taxa_intermediacao"
+    TAXA_MATCH = "taxa_match"
     TAXA_ESPECIE = "taxa_especie"  # deprecated - mantido para compatibilidade
     APORTE_CAPITAL = "aporte_capital"
     PAGAMENTO_PARCELA = "pagamento_parcela"

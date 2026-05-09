@@ -48,7 +48,7 @@ async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Dep
         resultado.append({
             "id": s.id,
             "tomador_nome": s.usuario.nome,
-            "chave_pix_tomador": s.usuario.chave_pix_publica or s.usuario.chave_pix,
+            "chave_pix_tomador": s.usuario.chave_pix,
             "valor": float(s.valor or 0),
             "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
             "parcelas": s.prazo_meses,

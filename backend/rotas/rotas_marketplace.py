@@ -172,7 +172,7 @@ async def listar_resgates_pendentes(db: Session = Depends(get_db), admin: Usuari
             "id": r.id,
             "usuario_nome": user.nome if user else "—",
             "usuario_cpf": user.cpf if user else "—",
-            "chave_pix": user.chave_pix_publica or user.chave_pix if user else "—",
+            "chave_pix": user.chave_pix if user else "—",
             "valor": float(r.valor or 0),
             "data": r.data_criacao.isoformat() if r.data_criacao else None
         })
@@ -251,7 +251,7 @@ async def ranking_completo(db: Session = Depends(get_db), admin: Usuario = Depen
             "id": u.id,
             "nome": u.nome,
             "cpf": u.cpf,
-            "chave_pix": u.chave_pix_publica or u.chave_pix,
+            "chave_pix": u.chave_pix,
             "pontos": u.pontos_semanais or 0,
             "premio": round((u.pontos_semanais or 0) / 1000, 2)
         })

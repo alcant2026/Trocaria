@@ -648,7 +648,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "id": s.id,
                 "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
                 "contraparte_nome": s.credor.nome if s.credor and s.usuario_id == usuario.id else (s.usuario.nome if s.usuario else "—"),
-                "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
+                "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else s.usuario.chave_pix,
                 "valor": float(s.valor or 0),
                 "valor_arrecadado": float(s.valor_arrecadado or 0),
                 "taxa_juros": float(s.taxa_juros),

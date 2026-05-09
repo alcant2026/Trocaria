@@ -103,7 +103,7 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session, ip_cliente:
     return {
         "message": "Pague a taxa de match via PIX para confirmar o apoio.",
         "tomador_nome": tomador.nome,
-        "chave_pix_tomador": tomador.chave_pix_publica or tomador.chave_pix,
+        "chave_pix_tomador": tomador.chave_pix,
         "valor": float(solicitacao.valor),
         "taxa_match": float(taxa_match),
         "parcelas": solicitacao.prazo_meses,
@@ -143,7 +143,7 @@ def confirmar_match(db: Session, transacao_id: int) -> dict:
     solicitacao.taxas_adicionais = (solicitacao.taxas_adicionais or Decimal("0.00")) + taxa_match
     solicitacao.status = StatusSolicitacao.APROVADO
     solicitacao.credor_id = credor.id
-    solicitacao.chave_pix_credor = credor.chave_pix_publica or credor.chave_pix
+    solicitacao.chave_pix_credor = credor.chave_pix
     solicitacao.proximo_vencimento = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
     solicitacao.aceite_termos_plataforma = True
     solicitacao.ip_aceite_plataforma = transacao.id
@@ -156,7 +156,7 @@ def confirmar_match(db: Session, transacao_id: int) -> dict:
     return {
         "message": "Match confirmado! Envie o valor via PIX para o tomador.",
         "tomador_nome": tomador.nome,
-        "chave_pix_tomador": tomador.chave_pix_publica or tomador.chave_pix,
+        "chave_pix_tomador": tomador.chave_pix,
         "valor": float(solicitacao.valor),
         "taxa_match": float(taxa_match),
         "parcelas": solicitacao.prazo_meses

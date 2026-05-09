@@ -199,23 +199,31 @@ async def startup_db_setup():
     except Exception as e:
         print(f"⚠️ Boot erro: {e}")
 
-    # Rotina de limpeza automática (a cada 24h) - background task
+    # Rotina de limpeza automática (a cada 7 dias, em background)
     import asyncio
     async def rotina_limpeza_storage():
+        await asyncio.sleep(120)  # Espera o servidor estabilizar
         while True:
             try:
                 from database import SessionLocal
                 from utils_storage import limpar_storage_global
-                db = SessionLocal()
-                economia = limpar_storage_global(db)
-                db.close()
-                if economia > 0:
-                    print(f"🧹 Limpeza: {economia:.2f} MB liberados")
+                from concurrent.futures import ThreadPoolExecutor
+                def _cleanup():
+                    db = SessionLocal()
+                    try:
+                        economia = limpar_storage_global(db)
+                        if economia > 0:
+                            print(f"🧹 Limpeza: {economia:.2f} MB liberados")
+                    finally:
+                        db.close()
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, _cleanup)
             except Exception:
                 pass
             await asyncio.sleep(604800)  # 7 dias
     
-    asyncio.create_task(rotina_limpeza_storage())
+    if is_render:
+        asyncio.create_task(rotina_limpeza_storage())
     
     from utils_ranking import rotina_reset_ranking
     asyncio.create_task(rotina_reset_ranking())

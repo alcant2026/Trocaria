@@ -112,9 +112,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "cidade": usuario.cidade,
                 "estado": usuario.estado,
                 "two_factor_enabled": usuario.two_factor_enabled,
-                "saldo_caixa": float(saldo_caixa_total),
-                "saldo_pool": float(saldo_caixa_total), # Alias para o frontend
-                "saldo_caixa_disponivel": float(saldo_caixa_disponivel),
+                "saldo_caixa": float(saldo_caixa_total or 0),
+                "saldo_pool": float(saldo_caixa_total or 0), # Alias para o frontend
+                "saldo_caixa_disponivel": float(saldo_caixa_disponivel or 0),
                 "rendimento_pool_abs": float(rendimento_abs),
                 "rendimento_pool_pct": float(rendimento_pct),
                 "divida_total_pool": float(divida_total_pendente),
@@ -199,7 +199,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "nome": ad.nome_produto,
                 "url": ad.url_afiliado,
                 "img": ad.url_imagem,
-                "valor": float(ad.valor) if ad.valor else 0.00,
+                "valor": float(ad.valor or 0) if ad.valor else 0.00,
                 "patrocinado": ad.is_boosted,
                 "views_restantes": ad.visualizacoes_restantes
             })
@@ -392,7 +392,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "mes": h.mes,
                     "total_entrada": float(h.depositos or 0),
                     "total_saida": float(h.saques or 0),
-                    "lucro": float(lucro_liquido_mensal),
+                    "lucro": float(lucro_liquido_mensal or 0),
                     "lucro_sacado": float(h.lucro_sacado or 0)
                 })
 
@@ -461,7 +461,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     cpu_threads = 1
                     ram_total_gb = 0.5
                     # Ajustamos o uso proporcionalmente ao limite do plano se psutil reportar o host
-                    ram_uso = min(100.0, (float(ram_host.used) / (0.5 * 1024**3)) * 100) if ram_host.used else 0.0
+                    ram_uso = min(100.0, (float(ram_host.used or 0) / (0.5 * 1024**3)) * 100) if ram_host.used else 0.0
                 else:
                     cpu_threads = cpu_threads_host
                     ram_total_gb = ram_total_gb_host
@@ -490,7 +490,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 concluidos_list.append({
                     "transacao_id": c.id,
                     "usuario_nome": c.usuario.nome,
-                    "valor": float(c.valor),
+                    "valor": float(c.valor or 0),
                     "data": data_c.astimezone(TZ_BRASILIA).isoformat(),
                     "confirmado_cliente": c.confirmado_cliente,
                     "data_confirmacao_cliente": c.data_confirmacao_cliente.replace(tzinfo=timezone.utc).isoformat() if c.data_confirmacao_cliente else None,
@@ -502,16 +502,16 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "concluidos_recentes": concluidos_list,
                 "fiscal": {
                         "custodia_total": float(custodia_total_estimada),
-                        "saldo_usuarios_gerenciado": float(saldo_usuarios),
-                        "lucro_plataforma_total": float(lucro_mensal_plataforma),
-                        "lucro_plataforma_historico": float(total_lucro_historico),
-                        "lucro_disponivel": float(lucro_disponivel_virtual),
-                        "lucro_real_liquido": float(lucro_real_liquido),
+                        "saldo_usuarios_gerenciado": float(saldo_usuarios or 0),
+                        "lucro_plataforma_total": float(lucro_mensal_plataforma or 0),
+                        "lucro_plataforma_historico": float(total_lucro_historico or 0),
+                        "lucro_disponivel": float(lucro_disponivel_virtual or 0),
+                        "lucro_real_liquido": float(lucro_real_liquido or 0),
                         "total_taxas_mp": float(total_taxas_mp),
                         "custos_infra_estimados": float(total_infra),
-                        "saldo_pool_caixa": float(saldo_pool_caixa),
+                        "saldo_pool_caixa": float(saldo_pool_caixa or 0),
                         "saldo_plataforma": float(p_saldo),
-                        "meu_saldo_pool": float(p_saldo_caixa), # Capital da empresa no Pool
+                        "meu_saldo_pool": float(p_saldo_caixa or 0), # Capital da empresa no Pool
                         "lucro_acumulado_pool": float(juros_acumulados_pool),
                         "total_credito_ativo": float(total_credito_ativo),
                         "cpu_uso": cpu_uso,
@@ -612,8 +612,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 snapshot["admin"]["emprestimos_para_liberar"].append({
                     "id": sl.id,
                     "tomador": sl.usuario.nome,
-                    "valor": float(sl.valor),
-                    "arrecadado": float(sl.valor_arrecadado)
+                    "valor": float(sl.valor or 0),
+                    "arrecadado": float(sl.valor_arrecadado or 0)
                 })
 
         # --- MEUS CONTRATOS ---
@@ -649,8 +649,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "tipo": "tomador" if s.usuario_id == usuario.id else "credor",
                 "contraparte_nome": s.credor.nome if s.credor and s.usuario_id == usuario.id else (s.usuario.nome if s.usuario else "—"),
                 "chave_pix_pagamento": s.chave_pix_credor if s.usuario_id == usuario.id else (s.usuario.chave_pix_publica or s.usuario.chave_pix),
-                "valor": float(s.valor),
-                "valor_arrecadado": float(s.valor_arrecadado),
+                "valor": float(s.valor or 0),
+                "valor_arrecadado": float(s.valor_arrecadado or 0),
                 "taxa_juros": float(s.taxa_juros),
                 "parcelas": s.prazo_meses,
                 "parcelas_pagas": s.parcelas_pagas,
@@ -677,8 +677,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         for s in solicitacoes_raw:
             solic_list.append({
                 "id": s.id,
-                "valor": float(s.valor),
-                "valor_arrecadado": float(s.valor_arrecadado),
+                "valor": float(s.valor or 0),
+                "valor_arrecadado": float(s.valor_arrecadado or 0),
                 "taxa": float(s.taxa_juros),
                 "parcelas": s.prazo_meses,
                 "nome": s.usuario.nome,

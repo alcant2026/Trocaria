@@ -100,6 +100,7 @@ def aplicar_calote(solicitacao_id: int, db: Session) -> dict:
         raise ValueError("Emprestimo nao encontrado.")
     tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
     tomador.score = Decimal("0.00")
+    tomador.inadimplente = True
     solicitacao.status = StatusSolicitacao.CANCELADO
     db.commit()
-    return {"message": f"Calote registrado para {tomador.nome}.", "score_perdido": -200}
+    return {"message": f"Calote registrado para {tomador.nome}. Score zerado e marcado como inadimplente."}

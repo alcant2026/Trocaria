@@ -64,17 +64,11 @@ class Usuario(Base):
     chave_pix = Column(String(255), nullable=False)
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
-    credito_virtual = Column(Numeric(precision=20, scale=2), default=0)  # inativo, mantido compatibilidade
     valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)
     inadimplente = Column(Boolean, default=False)
-    qtd_calotes = Column(Integer, default=0)
     emprestimos_ativos = Column(Integer, default=0)
     emprestimos_concluidos = Column(Integer, default=0)
     score = Column(Numeric(precision=6, scale=1), default=0)
-    score_anterior = Column(Numeric(precision=6, scale=1), default=0)
-    ultima_solicitacao = Column(DateTime, nullable=True)
-    solicitacoes_hoje = Column(Integer, default=0)
-    ultima_atualizacao_score = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     is_admin = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
@@ -98,11 +92,9 @@ class Usuario(Base):
     codigo_recuperacao_hash = Column(String(200), nullable=True)
     expiracao_recuperacao = Column(DateTime, nullable=True)
 
-    # Verificação de Email e Telefone (Firebase Email + Código Tela)
+    # Verificação de Email (Firebase)
     email_verificado = Column(Boolean, default=False)
     telefone_verificado = Column(Boolean, default=False)
-    codigo_verificacao_telefone = Column(String(200), nullable=True)
-    expiracao_codigo_telefone = Column(DateTime, nullable=True)
 
     # FREE TIER STORAGE CONTROL
     storage_tier = Column(String(20), default="free")  # free, premium
@@ -117,16 +109,13 @@ class Usuario(Base):
     pontos_marketplace = Column(Integer, default=0)
     pontos_semanais = Column(Integer, default=0)
 
-    # Regra de Dividendos (inativo, mantido compatibilidade)
-    gasto_total_taxas = Column(Numeric(precision=20, scale=2), default=0)
-    total_dividendos_ganhos = Column(Numeric(precision=20, scale=2), default=0)
-    vendas_completadas = Column(Integer, default=0)
-
     # Mercado Pago Marketplace (OAuth)
     mp_access_token = Column(String(255), nullable=True)
     mp_refresh_token = Column(String(255), nullable=True)
     mp_user_id = Column(String(100), nullable=True)
     mp_token_expires_at = Column(DateTime, nullable=True)
+
+    vendas_completadas = Column(Integer, default=0)
 
     # Foto de Perfil
     foto_perfil = Column(String(500), nullable=True)

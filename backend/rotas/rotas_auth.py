@@ -38,26 +38,6 @@ def mascarar_email(email: str) -> str:
     except:
         return "****@****.com"
 
-def mascarar_cpf(cpf: str) -> str:
-    """Retorna o CPF mascarado (ex: 123.***.***-99) conforme LGPD."""
-    try:
-        cpf_limpo = "".join(filter(str.isdigit, cpf))
-        if len(cpf_limpo) != 11:
-            return "***.***.***-**"
-        return f"{cpf_limpo[:3]}.***.***-{cpf_limpo[-2:]}"
-    except:
-        return "***.***.***-**"
-
-def mascarar_telefone(telefone: str) -> str:
-    """Retorna o telefone mascarado (ex: (11) 9****-****)."""
-    try:
-        numeros = "".join(filter(str.isdigit, telefone))
-        if len(numeros) < 8:
-            return "****-****"
-        return f"({numeros[0:2]}) {numeros[2]}{'*' * (len(numeros) - 7)}-{numeros[-4:]}"
-    except:
-        return "****-****"
-
 class RegistroUsuario(BaseModel):
     nome: str
     email: EmailStr

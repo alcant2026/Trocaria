@@ -38,7 +38,6 @@ const App = () => {
     const [menuAberto, setMenuAberto] = useState(false);
     const [page, setPage] = useState('login');
     const [modalExcluir, setModalExcluir] = useState(false);
-    const [needsVerification, setNeedsVerification] = useState(false);
 
     const atualizarPerfil = useCallback(async () => {
         try {
@@ -52,19 +51,13 @@ const App = () => {
     const onLogin = (userData) => {
         setUser(userData);
         localStorage.setItem('usuario', JSON.stringify(userData));
-        const precisaVerificar = !userData.email_verificado;
-        setNeedsVerification(precisaVerificar);
-        if (precisaVerificar) {
-            setIsAuthenticated(true);
-            window.location.hash = 'verificar-conta';
-        } else {
-            setIsAuthenticated(true);
-            window.location.hash = 'cliente';
-        }
+        setIsAuthenticated(true);
+        window.location.hash = 'cliente';
     };
 
     const onVerificado = () => {
-        setNeedsVerification(false);
+        setUser(prev => prev ? { ...prev, email_verificado: true } : prev);
+        localStorage.setItem('usuario', JSON.stringify({ ...user, email_verificado: true }));
         window.location.hash = 'cliente';
     };
 
@@ -78,11 +71,6 @@ const App = () => {
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#', '') || '';
-            // Se precisa verificar e tentou sair da página de verificação, redireciona de volta
-            if (needsVerification && hash !== 'verificar-conta' && isAuthenticated) {
-                window.location.hash = 'verificar-conta';
-                return;
-            }
             startTransition(() => {
                 setPage(hash);
             });
@@ -90,7 +78,7 @@ const App = () => {
         window.addEventListener('hashchange', handleHashChange);
         handleHashChange();
         return () => window.removeEventListener('hashchange', handleHashChange);
-    }, [needsVerification, isAuthenticated]);
+    }, []);
 
     useEffect(() => {
         const init = async () => {
@@ -109,14 +97,7 @@ const App = () => {
                     if (data && data.nome) {
                         setUser(data);
                         localStorage.setItem('usuario', JSON.stringify(data));
-                        const precisaVerificar = !data.email_verificado || !data.telefone_verificado;
-                        setNeedsVerification(precisaVerificar);
-                        if (precisaVerificar) {
-                            setIsAuthenticated(true);
-                            window.location.hash = 'verificar-conta';
-                        } else {
-                            setIsAuthenticated(true);
-                        }
+                        setIsAuthenticated(true);
                     } else {
                         localStorage.removeItem('token');
                         localStorage.removeItem('usuario');
@@ -157,17 +138,12 @@ const App = () => {
         if (page === 'privacidade') return <PoliticaPrivacidade onVoltar={() => window.location.hash = ''} />;
         if (page === 'comofunciona') return <ComoFunciona />;
         if (page === 'recuperar-senha') return <RecuperarSenha />;
-        if (page === 'verificar-conta') return <VerificacaoConta onVerificado={() => {}} />;
         return (
             <Suspense fallback={<LoadingScreen message="Carregando..." />}>
                 <LandingPage />
                 <BannerCookies usuario={null} />
             </Suspense>
         );
-    }
-
-    if (needsVerification && page === 'verificar-conta') {
-        return <VerificacaoConta onVerificado={onVerificado} />;
     }
 
     return (
@@ -246,6 +222,7 @@ const App = () => {
                 {page === 'vincular-mp' && <MarketplaceCallback />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'perfil' && <Perfil />}
+                {page === 'verificar-conta' && <VerificacaoConta onVerificado={onVerificado} />}
                 {page === 'comofunciona' && <ComoFunciona />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
                 {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}

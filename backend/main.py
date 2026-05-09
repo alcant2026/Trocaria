@@ -163,7 +163,14 @@ async def startup_db_setup():
     try:
         Base.metadata.create_all(bind=engine)
         sincronizar_esquema(Base, engine)
-        executar_limpeza_banco(engine)
+        # Executar limpeza em background pra não travar o startup no Render
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1)
+        def _limpeza_bg():
+            try: executar_limpeza_banco(engine)
+            except: pass
+        executor.submit(_limpeza_bg)
         
         if "sqlite" not in str(engine.url):
             from modelos.modelos_db import TipoTransacao, StatusSolicitacao

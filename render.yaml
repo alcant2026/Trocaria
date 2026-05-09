@@ -5,7 +5,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 30 --max-requests 500 --max-requests-jitter 50 --log-level warning --keep-alive 2
+    startCommand: gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 120 --max-requests 500 --max-requests-jitter 50 --log-level warning --keep-alive 2
     healthCheckPath: /__warmup
     envVars:
       - key: PYTHON_VERSION

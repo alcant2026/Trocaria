@@ -96,6 +96,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         <img src={`data:image/jpeg;base64,${aceito.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', display: 'block', margin: '0 auto 15px', borderRadius: '12px' }} />
                     )}
                     <PagamentoPolling transacaoId={aceito.transacao_id} onConfirmado={() => {
+                        setAceito(prev => ({ ...prev, aguardando_pagamento: false }));
                         carregar();
                     }} />
                 </div>

@@ -48,10 +48,10 @@ class CompraViewsRequest(BaseModel):
     pacote_id: int # 1: 100 views (R$ 1), 2: 500 views (R$ 5), 3: 1500 views (R$ 12), 4: 5000 views (R$ 35)
 
 PRECO_VIEWS = {
-    1: {"views": 100, "preco": Decimal("1.00"), "label": "Basico"},
-    2: {"views": 500, "preco": Decimal("5.00"), "label": "Popular"},
-    3: {"views": 1500, "preco": Decimal("12.00"), "label": "Intermediario"},
-    4: {"views": 5000, "preco": Decimal("35.00"), "label": "Avancado"},
+    1: {"views": 100, "preco": Decimal("1.00"), "label": "Basico", "ponto_min": 1, "ponto_max": 1},
+    2: {"views": 500, "preco": Decimal("5.00"), "label": "Popular", "ponto_min": 1, "ponto_max": 2},
+    3: {"views": 1500, "preco": Decimal("12.00"), "label": "Intermediario", "ponto_min": 1, "ponto_max": 3},
+    4: {"views": 5000, "preco": Decimal("35.00"), "label": "Avancado", "ponto_min": 2, "ponto_max": 5},
 }
 
 @router.post("/postar-link")

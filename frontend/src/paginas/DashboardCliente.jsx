@@ -625,7 +625,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (!val || val <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor válido para o pagamento mensal.', type: 'error' });
 
         try {
-            const res = await api.post(`/emprestimos/pagamento-avulso/${id}`, { valor_pagamento: val });
+            const res = await api.post(`/emprestimos/confirmar-pagamento/${id}`, { valor_pagamento: val });
             setMensagem(res.message);
             setValorAvulsoPorId(prev => ({ ...prev, [id]: '' }));
             setShowAvulsoPorId(prev => ({ ...prev, [id]: false }));
@@ -643,7 +643,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 closeModal();
                 setLoadingAction(true);
                 try {
-                    await api.post(`/emprestimos/quitar-total/${emprestimoId}`);
+                    await api.post(`/emprestimos/confirmar-recebimento/${emprestimoId}`, { tipo: 'quitacao' });
                     showModal({ title: 'Sucesso!', message: 'Crédito liquidado com sucesso!', type: 'success' });
                     carregarSnapshot();
                 } catch (err) {
@@ -668,7 +668,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
         setLoadingAction(true);
         try {
-            const res = await api.post('/emprestimos/depositar-virtual', { valor_pagamento: v });
+            const res = await api.post('/financeiro/deposito-pix', { valor: v });
             if (res.qr_code) {
                 setQrCodeData({ qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, payment_id: res.payment_id || 'virtual' });
                 setPassoDeposito(2);

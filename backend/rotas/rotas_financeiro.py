@@ -111,6 +111,17 @@ router = APIRouter(prefix="/financeiro", tags=["Movimentação"])
 TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 
+
+def normalizar_cnpj(cnpj: str) -> str:
+    return "".join(filter(str.isdigit, cnpj))
+
+def validar_cnpj(cnpj: str) -> bool:
+    cnpj = normalizar_cnpj(cnpj)
+    return len(cnpj) == 14
+
+def normalizar_status_cadastral(status: str) -> str:
+    return status.lower() if status else "pendente"
+
 def exigir_parceiro_apto(parceiro: Parceiro):
     if not parceiro:
         raise HTTPException(status_code=404, detail="Parceiro não encontrado.")
@@ -122,6 +133,27 @@ def exigir_parceiro_apto(parceiro: Parceiro):
         raise HTTPException(status_code=403, detail="Parceiro precisa estar com CNPJ em situacao ATIVA para operar.")
     return parceiro
 
+
+class ParceiroCreate(BaseModel):
+    nome: str
+    razao_social: str | None = None
+    cnpj: str
+    cnpj_status: str = "ativa"
+    endereco: str
+    usuario_id: str | None = None
+
+class ParceiroUpdate(BaseModel):
+    nome: str | None = None
+    endereco: str | None = None
+    is_active: bool | None = None
+
+class SaqueAdminRequest(BaseModel):
+    valor: Decimal
+    motivo: str = "Resgate de lucro"
+
+class DepositoPixRequest(BaseModel):
+    valor: Decimal = Field(gt=0)
+
 # --- CONFIGURAÇÕES DE RISCO (BaaS AUTO-PAYOUT) ---
 VALOR_MAX_SAQUE_AUTO = Decimal("100.00")
 SAQUES_AUTO_POR_DIA = 1
@@ -130,7 +162,7 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Opt
     """
     Integração com a API de Transaction Intents do Mercado Pago para envio de PIX (BaaS).
     """
-    if not mp_access_token:
+    if not os.environ.get("MERCADOPAGO_ACCESS_TOKEN"):
         logger.error("❌ PAYOUT: Token do Mercado Pago não configurado.")
         return False, "Token de acesso não configurado no servidor."
 
@@ -156,7 +188,7 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Opt
     # Nota: Em alguns países/contas o endpoint principal de BaaS é o transaction-intents
     # Porém, para contas padrão com Payout habilitado, o v1/payouts é o mais estável.
     url = "https://api.mercadopago.com/v1/payouts"
-    token_final = (token_custom or mp_access_token).strip()
+    token_final = (token_custom or os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")).strip()
     
     headers = {
         "Authorization": f"Bearer {token_final}",

@@ -104,3 +104,13 @@ def aplicar_calote(solicitacao_id: int, db: Session) -> dict:
     solicitacao.status = StatusSolicitacao.CANCELADO
     db.commit()
     return {"message": f"Calote registrado para {tomador.nome}. Score zerado e marcado como inadimplente."}
+
+
+def processar_inadimplencia_coletiva_automatica(db: Session):
+    """[STUB] Processa inadimplência coletiva. Implementação futura."""
+    return {"processados": 0, "calotes": 0}
+
+
+def processar_expiracoes_interna(db: Session):
+    """[STUB] Processa expirações de empréstimos. Implementação futura."""
+    return {"expirados": 0}

@@ -98,8 +98,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             "perfil": {
                 "id": usuario.id,
                 "nome": usuario.nome,
-                "saldo": float(usuario.saldo),
-                "score": float(usuario.score),
+                "saldo": float(usuario.saldo or 0),
+                "score": float(usuario.score or 0),
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,
                 "kyc_status": kyc_status,
@@ -143,7 +143,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 data_t = data_t.replace(tzinfo=timezone.utc)
             snapshot["historico"].append({
                 "id": t.id,
-                "valor": float(t.valor),
+                    "valor": float(t.valor or 0),
                 "tipo": t.tipo.value,
                 "status": t.status,
                 "metodo": t.metodo,
@@ -242,7 +242,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "usuario_cpf": p.usuario.cpf,
                     "usuario_verificado": p.usuario.is_verified,
                     "usuario_chave_pix": p.usuario.chave_pix,
-                    "valor": float(p.valor),
+                    "valor": float(p.valor or 0),
                     "tipo": p.tipo.value,
                     "status": p.status,
                     "detalhes": p.detalhes,
@@ -583,9 +583,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 snapshot["admin"]["solicitacoes_ativas"].append({
                     "id": sa.id,
                     "tomador": sa.usuario.nome,
-                    "valor": float(sa.valor),
-                    "valor_arrecadado": float(sa.valor_arrecadado),
-                    "score": float(sa.usuario.score),
+                    "valor": float(sa.valor or 0),
+                    "valor_arrecadado": float(sa.valor_arrecadado or 0),
+                    "score": float(sa.usuario.score or 0) if sa.usuario else 0,
                     "taxa": float(sa.taxa_juros)
                 })
 
@@ -682,7 +682,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 "taxa": float(s.taxa_juros),
                 "parcelas": s.prazo_meses,
                 "nome": s.usuario.nome,
-                "score": float(s.usuario.score),
+                "score": float(s.usuario.score or 0) if s.usuario else 0,
                 "verified": s.usuario.is_verified,
                 "unlocked": True, # Acesso agora é livre
                 "tipo_garantia": s.tipo_garantia,
@@ -702,6 +702,5 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
     except Exception as e:
         import traceback
-        tb = traceback.format_exc()
-        print(f"Erro no Snapshot: {e}\n{tb}")
-        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Erro interno ao gerar snapshot.")

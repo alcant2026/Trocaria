@@ -702,6 +702,6 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
     except Exception as e:
         import traceback
-        print(f"Erro no Snapshot: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Erro interno ao gerar snapshot.")
+        tb = traceback.format_exc()
+        print(f"Erro no Snapshot: {e}\n{tb}")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")

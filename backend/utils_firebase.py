@@ -66,13 +66,7 @@ def gerar_link_verificacao_email(email: str, frontend_url: str = None):
     if not _FIREBASE_INITIALIZED:
         return None
     try:
-        action_code_settings = None
-        if frontend_url:
-            action_code_settings = {
-                'url': f"{frontend_url.rstrip('/')}/verificar-email?mode=verifyEmail",
-                'handle_code_in_app': False
-            }
-        link = auth.generate_email_verification_link(email, action_code_settings=action_code_settings)
+        link = auth.generate_email_verification_link(email)
         return link
     except Exception as e:
         print(f"⚠️ Erro ao gerar link de verificação: {e}")

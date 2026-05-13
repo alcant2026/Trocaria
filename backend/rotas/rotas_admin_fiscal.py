@@ -16,7 +16,7 @@ class FiscalPDF(FPDF):
     def header(self):
         # Logo Oficial
         try:
-            logo_path = "/home/josias/Área de trabalho/projetos/psy pay/frontend/public/logo.png"
+            logo_path = "frontend/public/logo.png"
             self.image(logo_path, x=85, y=10, w=40)
             self.ln(35)
         except:

@@ -216,7 +216,7 @@ async def cobrar_devedor(request: Request, id: int, db: Session = Depends(get_db
 class ContratoPDF(FPDF):
     def header(self):
         try:
-            self.image("/home/josias/Área de trabalho/projetos/psy pay/frontend/public/logo.png", x=85, y=10, w=40)
+            self.image("frontend/public/logo.png", x=85, y=10, w=40)
             self.ln(30)
         except:
             self.set_font('Helvetica', 'B', 22)

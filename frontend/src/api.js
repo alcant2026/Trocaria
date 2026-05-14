@@ -186,6 +186,23 @@ const api = {
             ...options 
         }); 
     },
+
+    // Posts com warmup silencioso (evita timeout no Render cold start)
+    async postWithWarmup(endpoint, body, options = {}) {
+        try {
+            await fetch(`${BASE_URL}/__warmup`, { 
+                signal: AbortSignal.timeout(15000) 
+            });
+        } catch {}
+        const isFormData = body instanceof FormData;
+        return this.request(endpoint, { 
+            method: 'POST', 
+            body: isFormData ? body : JSON.stringify(body),
+            isMultipart: isFormData,
+            noRetry: true,
+            ...options 
+        }); 
+    },
 };
 
 export default api;

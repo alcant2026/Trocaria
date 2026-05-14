@@ -89,7 +89,7 @@ const Registro = () => {
             return;
         }
         try {
-            const res = await api.post('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
+            const res = await api.postWithWarmup('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
             let msg = 'Conta criada com sucesso!';
             if (res.bonus_indicado > 0) {
                 msg += ` Você ganhou ${res.bonus_indicado} pontos de boas-vindas!`;

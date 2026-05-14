@@ -18,7 +18,7 @@ from limitador import limiter
 router = APIRouter(prefix="/emprestimos", tags=["Pedidos de Apoio"])
 
 class SolicitacaoRequest(BaseModel):
-    valor: Decimal = Field(gt=0, le=10000)
+    valor: Decimal = Field(gt=0, le=5000)  # limite R$ 5.000 por operação
     parcelas: int = Field(ge=1, le=12)
     taxa_compensacao: Decimal = Field(ge=0, le=100)
     aceite_termos: bool

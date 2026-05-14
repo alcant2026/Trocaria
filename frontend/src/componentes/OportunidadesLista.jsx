@@ -84,6 +84,12 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                 </div>
             </div>
 
+            <div style={{ background: 'rgba(255,61,0,0.06)', border: '1px solid rgba(255,61,0,0.12)', padding: '8px 12px', borderRadius: '8px', marginBottom: '10px' }}>
+                <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3', textAlign: 'center' }}>
+                    ⚠️ <strong style={{ color: 'var(--danger)' }}>Risco:</strong> Apoiar via P2P envolve risco de perda total do valor. O Psy Pay não garante pagamentos e não se responsabiliza por inadimplência. Acordo direto entre as partes.
+                </p>
+            </div>
+
             {loading && <p className="text-muted">Carregando...</p>}
 
             {aceito && aceito.aguardando_pagamento && (

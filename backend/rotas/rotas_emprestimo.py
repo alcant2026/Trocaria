@@ -129,6 +129,24 @@ async def verificar_transacao(transacao_id: int, db: Session = Depends(get_db), 
     ).first()
     if not transacao:
         raise HTTPException(status_code=404, detail="Transacao nao encontrada.")
+    
+    # Se ainda pendente, tenta consultar o Mercado Pago diretamente
+    if transacao.status == "pendente" and transacao.payment_id and transacao.payment_id != "pendente":
+        from rotas.rotas_financeiro import get_sdk
+        sdk = get_sdk()
+        if sdk:
+            try:
+                payment_info = sdk.payment().get(int(transacao.payment_id))
+                if payment_info.get("status") == 200:
+                    mp_status = payment_info.get("response", {}).get("status")
+                    if mp_status == "approved":
+                        # Dispara o processamento manual (igual ao webhook faria)
+                        from rotas.rotas_financeiro import processar_pagamento_aprovado
+                        processar_pagamento_aprovado(db, transacao, payment_info["response"])
+                        db.refresh(transacao)
+            except Exception:
+                pass
+    
     return {"status": transacao.status, "tipo": transacao.tipo.value}
 
 @router.post("/aceitar-oferta/{id}")

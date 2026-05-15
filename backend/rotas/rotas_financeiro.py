@@ -506,6 +506,91 @@ async def obter_detalhes_pix(transacao_id: int, db: Session = Depends(get_db), u
         logger.error(f"Erro ao recuperar PIX: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o provedor de pagamento: {str(e)}")
 
+
+def processar_pagamento_aprovado(db, transacao, payment_data):
+    """Processa uma transação aprovada (chamado pelo webhook ou polling manual)."""
+    from modelos.modelos_db import Usuario as U, LinkAfiliado, SolicitacaoEmprestimo, DocumentoVerificacao
+    from decimal import Decimal as D
+    import datetime as dt, json as _json, logging
+    log = logging.getLogger(__name__)
+    
+    usuario = db.query(U).filter(U.id == transacao.usuario_id).with_for_update().first()
+    if not usuario:
+        return
+    payment_id = payment_data.get("id")
+    valor_mp = D(str(payment_data.get("transaction_amount", 0)))
+    fee_details = payment_data.get("fee_details", [])
+    total_fee_mp = sum(D(str(fee.get("amount", 0))) for fee in fee_details)
+    plataforma = db.query(U).filter(U.id == "000PL").with_for_update().first()
+    agora = dt.datetime.now(dt.timezone.utc)
+    
+    if transacao.tipo == TipoTransacao.ASSINATURA:
+        dias = 365 if "ANUAL" in (transacao.detalhes or "") else 30
+        if usuario.is_subscriber and usuario.assinatura_expira_em and usuario.assinatura_expira_em > agora:
+            usuario.assinatura_expira_em += dt.timedelta(days=dias)
+        else:
+            usuario.is_subscriber = True
+            usuario.assinatura_expira_em = agora + dt.timedelta(days=dias)
+        transacao.status = "concluido"
+        if not transacao.payment_id: transacao.payment_id = str(payment_id)
+        transacao.detalhes += f" | Premium ativado - {dias} dias"
+        if plataforma: plataforma.saldo += D(str(valor_mp))
+        db.commit()
+        log.info(f"ASSINATURA: Premium ativado para {usuario.nome}")
+    elif transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
+        usuario.is_verified = True
+        usuario.score = min((usuario.score or D("0")) + D("10"), D("1000"))
+        transacao.status = "concluido"
+        if not transacao.payment_id: transacao.payment_id = str(payment_id)
+        if plataforma: plataforma.saldo += D(str(valor_mp))
+        db.commit()
+        log.info(f"KYC: {usuario.nome} verificado")
+    elif transacao.tipo == TipoTransacao.TAXA_SOLICITACAO:
+        dados_str = transacao.detalhes.replace("PENDENTE_SOLICITACAO:", "") if transacao.detalhes else None
+        if dados_str:
+            dados = _json.loads(dados_str)
+            from utils_fintech import criar_solicitacao_p2p
+            solic = criar_solicitacao_p2p(usuario.id, D(str(dados["valor"])), dados["parcelas"], D(str(dados["taxa"])), db)
+            transacao.status = "concluido"
+            transacao.detalhes = f"Taxa paga - Pedido #{solic.id} criado"
+            if not transacao.payment_id: transacao.payment_id = str(payment_id)
+            if plataforma: plataforma.saldo += D(str(valor_mp))
+        db.commit()
+    elif transacao.tipo == TipoTransacao.TAXA_MATCH:
+        from utils_fintech import confirmar_match
+        confirmar_match(db, transacao.id)
+        if plataforma: plataforma.saldo += D(str(valor_mp))
+    elif transacao.tipo == TipoTransacao.TAXA_POSTAGEM:
+        if transacao.detalhes and "DESTAQUE_LINK:" in transacao.detalhes:
+            link_id = int(transacao.detalhes.split(":")[1])
+            link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
+            if link:
+                link.is_boosted = True
+                link.visualizacoes_restantes += 1000
+                link.data_expiracao = agora + dt.timedelta(days=7)
+            transacao.status = "concluido"
+            if not transacao.payment_id: transacao.payment_id = str(payment_id)
+            if plataforma: plataforma.saldo += D(str(valor_mp))
+            db.commit()
+            log.info(f"DESTAQUE: Link #{link_id}")
+        elif transacao.detalhes and "BOOST_LINK:" in transacao.detalhes:
+            partes = transacao.detalhes.split(":")
+            link_id = int(partes[1])
+            pacote_id = int(partes[2])
+            from rotas.rotas_comunidade import PRECO_VIEWS
+            link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
+            pacote = PRECO_VIEWS.get(pacote_id)
+            if link and pacote:
+                link.is_boosted = True
+                link.visualizacoes_restantes += pacote["views"]
+                link.data_expiracao = agora + dt.timedelta(days=30)
+            transacao.status = "concluido"
+            if not transacao.payment_id: transacao.payment_id = str(payment_id)
+            if plataforma: plataforma.saldo += D(str(valor_mp))
+            db.commit()
+            log.info(f"BOOST: Link #{link_id} +{pacote['views'] if pacote else '?'} views")
+
+
 @router.post("/webhook/mercadopago")
 @limiter.limit("10/minute")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):

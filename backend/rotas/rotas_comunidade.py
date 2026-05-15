@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
-from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink, HistoricoClique
+from modelos.modelos_db import Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, AvaliacaoLink, HistoricoClique, DenunciaUsuario
 from pydantic import BaseModel, Field
 from decimal import Decimal
 import datetime
@@ -454,6 +454,55 @@ async def denunciar_link(dados: DenunciaRequest, db: Session = Depends(get_db), 
     db.commit()
     
     return {"message": "Denúncia registrada com sucesso. Nossa equipe irá analisar.", "analise_imediata": link.denuncias_count >= 5}
+
+
+class DenunciarUsuarioRequest(BaseModel):
+    denunciado_id: str
+    motivo: str | None = None
+
+@router.post("/denunciar-usuario")
+@limiter.limit("3/minute")
+async def denunciar_usuario(request: Request, dados: DenunciarUsuarioRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Denuncia um usuário por mau comportamento (calote, golpe, etc)."""
+    if dados.denunciado_id == usuario.id:
+        raise HTTPException(status_code=400, detail="Você não pode denunciar a si mesmo.")
+    
+    denunciado = db.query(Usuario).filter(Usuario.id == dados.denunciado_id, Usuario.is_active == True).first()
+    if not denunciado:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    
+    # Evitar duplicata
+    existente = db.query(DenunciaUsuario).filter(
+        DenunciaUsuario.denunciante_id == usuario.id,
+        DenunciaUsuario.denunciado_id == dados.denunciado_id,
+        DenunciaUsuario.status == "pendente"
+    ).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Você já denunciou este usuário. Aguarde a revisão.")
+    
+    denuncia = DenunciaUsuario(
+        denunciante_id=usuario.id,
+        denunciado_id=dados.denunciado_id,
+        motivo=dados.motivo
+    )
+    db.add(denuncia)
+    db.commit()
+    
+    # Auto-suspensão se 3+ denúncias de pessoas diferentes
+    total_denuncias = db.query(DenunciaUsuario).filter(
+        DenunciaUsuario.denunciado_id == dados.denunciado_id,
+        DenunciaUsuario.status == "pendente"
+    ).count()
+    
+    if total_denuncias >= 3:
+        denunciado.is_active = False
+        denunciado.motivo_suspensao = f"Suspensão automática: {total_denuncias} denúncias de usuários diferentes"
+        denunciado.data_suspensao = datetime.datetime.now(datetime.timezone.utc)
+        db.commit()
+        return {"message": "Denúncia registrada. Usuário suspenso automaticamente por múltiplas denúncias.", "suspenso": True}
+    
+    return {"message": "Denúncia registrada. Nossa equipe irá analisar.", "suspenso": False}
+
 
 @router.post("/avaliar-link")
 async def avaliar_link(dados: AvaliarRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):

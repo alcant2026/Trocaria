@@ -1458,3 +1458,75 @@ async def excluir_parceiro(
     parceiro.is_active = False
     db.commit()
     return {"message": "Parceiro removido com sucesso."}
+
+
+class SuspenderRequest(BaseModel):
+    motivo: str
+
+@router.post("/admin/suspender/{usuario_id}")
+async def suspender_usuario(usuario_id: str, dados: SuspenderRequest, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Admin: suspende um usuário (bloqueia login). Dados preservados (LGPD)."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    if usuario.is_admin:
+        raise HTTPException(status_code=403, detail="Não é possível suspender administradores.")
+    
+    usuario.is_active = False
+    usuario.motivo_suspensao = dados.motivo
+    usuario.data_suspensao = datetime.datetime.now(datetime.timezone.utc)
+    
+    registrar_acao_admin(db, admin.id, "SUSPENDER_USUARIO", alvo_id=usuario.id, 
+                         detalhes=f"Motivo: {dados.motivo}", ip="admin")
+    db.commit()
+    return {"message": f"Usuário {usuario.nome} suspenso.", "is_active": False}
+
+
+@router.post("/admin/reativar/{usuario_id}")
+async def reativar_usuario(usuario_id: str, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Admin: reativa um usuário suspenso."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    
+    usuario.is_active = True
+    usuario.motivo_suspensao = None
+    usuario.data_suspensao = None
+    
+    registrar_acao_admin(db, admin.id, "REATIVAR_USUARIO", alvo_id=usuario.id, 
+                         detalhes="Usuário reativado", ip="admin")
+    db.commit()
+    return {"message": f"Usuário {usuario.nome} reativado.", "is_active": True}
+
+
+@router.get("/admin/denuncias")
+async def listar_denuncias(db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Admin: lista denúncias de usuários pendentes."""
+    from modelos.modelos_db import DenunciaUsuario
+    denuncias = db.query(DenunciaUsuario).filter(
+        DenunciaUsuario.status == "pendente"
+    ).order_by(DenunciaUsuario.data_denuncia.desc()).limit(50).all()
+    
+    return [{
+        "id": d.id,
+        "denunciante_nome": d.denunciante.nome,
+        "denunciante_id": d.denunciante_id,
+        "denunciado_nome": d.denunciado.nome,
+        "denunciado_id": d.denunciado_id,
+        "denunciado_is_active": d.denunciado.is_active,
+        "motivo": d.motivo,
+        "data": d.data_denuncia.isoformat()
+    } for d in denuncias]
+
+
+@router.post("/admin/denuncias/{denuncia_id}/revisar")
+async def revisar_denuncia(denuncia_id: int, db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
+    """Admin: marca denúncia como revisada."""
+    from modelos.modelos_db import DenunciaUsuario
+    denuncia = db.query(DenunciaUsuario).filter(DenunciaUsuario.id == denuncia_id).first()
+    if not denuncia:
+        raise HTTPException(status_code=404, detail="Denúncia não encontrada.")
+    
+    denuncia.status = "revisado"
+    db.commit()
+    return {"message": "Denúncia marcada como revisada."}

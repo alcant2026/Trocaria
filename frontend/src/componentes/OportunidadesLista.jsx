@@ -202,13 +202,30 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                             </p>
                         )}
                     </div>
-                    <button className="btn btn-primary btn-sm"
-                            disabled={aceitando === op.id || op.inadimplente}
-                            onClick={() => aceitar(op.id)}
-                            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                        >
-                            {aceitando === op.id ? '...' : 'Aceitar'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="btn btn-primary btn-sm"
+                                disabled={aceitando === op.id || op.inadimplente}
+                                onClick={() => aceitar(op.id)}
+                                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                            >
+                                {aceitando === op.id ? '...' : 'Aceitar'}
                         </button>
+                        <button className="btn btn-danger btn-sm"
+                                onClick={async () => {
+                                    const motivo = prompt('Motivo da denúncia (opcional):');
+                                    if (motivo === null) return;
+                                    try {
+                                        await api.post('/comunidade/denunciar-usuario', { denunciado_id: op.usuario_id || op.id, motivo });
+                                        alert('Denúncia registrada. Obrigado.');
+                                    } catch (err) {
+                                        alert(err.response?.data?.detail || 'Erro ao denunciar.');
+                                    }
+                                }}
+                                style={{ padding: '4px 8px', fontSize: '0.6rem', background: 'rgba(255,61,0,0.1)', border: '1px solid rgba(255,61,0,0.2)', color: 'var(--danger)', borderRadius: '6px', cursor: 'pointer' }}
+                                title="Denunciar usuário">
+                                🚩 Denunciar
+                        </button>
+                    </div>
                 </div>
             ))}
 

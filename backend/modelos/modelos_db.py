@@ -125,6 +125,10 @@ class Usuario(Base):
     codigo_indicacao = Column(String(10), unique=True, index=True, nullable=True)
     indicado_por = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
 
+    # Admin: suspensão de usuário
+    motivo_suspensao = Column(String(200), nullable=True)
+    data_suspensao = Column(DateTime, nullable=True)
+    
     solicitacoes = relationship("SolicitacaoEmprestimo", back_populates="usuario", foreign_keys="SolicitacaoEmprestimo.usuario_id")
     transacoes = relationship("Transacao", back_populates="usuario")
 
@@ -382,3 +386,17 @@ class RankingHistorico(Base):
     status = Column(String(20), default="pago")  # pago, conferido
     conferido_por = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
     data_conferido = Column(DateTime, nullable=True)
+
+class DenunciaUsuario(Base):
+    """Denúncias de usuários por mau comportamento (calote, golpe, etc)."""
+    __tablename__ = "denuncias_usuarios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    denunciante_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    denunciado_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    motivo = Column(String(200), nullable=True)
+    status = Column(String(20), default="pendente")  # pendente, revisado, suspenso
+    data_denuncia = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    
+    denunciante = relationship("Usuario", foreign_keys=[denunciante_id])
+    denunciado = relationship("Usuario", foreign_keys=[denunciado_id])

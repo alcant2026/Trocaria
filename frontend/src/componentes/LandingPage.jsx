@@ -126,6 +126,14 @@ const LandingPage = () => {
                 </div>
             </section>
 
+            <section style={{ maxWidth: '1100px', margin: '0 auto 2rem', padding: '0 1rem' }}>
+                <div style={{ background: 'rgba(255,152,0,0.06)', border: '1px solid rgba(255,152,0,0.15)', padding: '12px 16px', borderRadius: '12px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
+                        ⚠️ <strong style={{ color: '#FF9800' }}>AVISO:</strong> O Psy Pay é uma plataforma de conexão entre pessoas. <strong>Não somos banco, instituição financeira ou sociedade de crédito.</strong> Não intermediamos valores. Todo apoio é um acordo direto entre as partes via PIX. Apoiar envolve <strong style={{ color: 'var(--danger)' }}>risco de perda total</strong>. Limite de R$ 5.000 por operação. Leia nossos <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso e Privacidade</a>.
+                    </p>
+                </div>
+            </section>
+
             {/* Categorias */}
             <section className="landing-section">
                 <div className="landing-section-header">

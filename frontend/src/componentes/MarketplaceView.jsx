@@ -19,6 +19,7 @@ const MarketTimer = ({ expiresAt }) => {
 
 const MarketplaceView = ({
     usuario, marketplaceTab, setMarketplaceTab, selectedCategory, setSelectedCategory,
+    selectedCity, setSelectedCity,
     marketplaceLinks, meusLinksMarketplace, loadingMarket, hasMoreExplorar, hasMoreMeusLinks,
     carregarExplorar, carregarMeusLinksMarketplace, handleDenunciar, handleAvaliar,
     setShowAssinarModal, handleSolicitarResgate,
@@ -40,11 +41,18 @@ const MarketplaceView = ({
                         <select 
                             className="input-field m-filter-select"
                             value={selectedCategory}
-                            onChange={(e) => {
-                                setSelectedCategory(e.target.value);
-                            }}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
                         >
                             {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Todas as Categorias' : cat}</option>)}
+                        </select>
+                        <select 
+                            className="input-field m-filter-select"
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            style={{ marginLeft: '6px' }}
+                        >
+                            <option value="Todas">Todas as Cidades</option>
+                            {usuario?.cidade && <option value={usuario.cidade}>{usuario.cidade} (sua)</option>}
                         </select>
                     </div>
                 )}
@@ -170,6 +178,11 @@ const MarketplaceView = ({
                                                     <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-muted)' }}>
                                                         {l.categoria || 'Geral'}
                                                     </span>
+                                                    {l.cidade && (
+                                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                            📍 {l.cidade}{l.estado ? `/${l.estado}` : ''}
+                                                        </span>
+                                                    )}
                                                     <span className="market-views"><Eye size={11} /> {l.views_totais || 0}</span>
                                                 </div>
                                                 <h3 className="market-title" style={{ marginBottom: '4px' }}>{l.nome_produto?.length > 60 ? l.nome_produto.substring(0, 60) + '...' : l.nome_produto}</h3>

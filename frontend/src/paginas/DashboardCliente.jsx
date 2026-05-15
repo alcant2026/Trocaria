@@ -269,6 +269,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [mpStatus, setMpStatus] = useState({ conectado: false, mp_user_id: null, expira_em: null });
     const [loadingMP, setLoadingMP] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState('Geral');
+    const [selectedCity, setSelectedCity] = useState('Todas');
     const [selectedAdDetails, setSelectedAdDetails] = useState(null);
 
     const isFirstLoad = !usuario.nome && !isOffline;
@@ -489,7 +490,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setLoadingMarket(true);
         try {
             const catParam = selectedCategory && selectedCategory !== 'Geral' ? `&categoria=${selectedCategory}` : '';
-            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12${catParam}`);
+            const cityParam = selectedCity && selectedCity !== 'Todas' ? `&cidade=${encodeURIComponent(selectedCity)}` : '';
+            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12${catParam}${cityParam}`);
             const novosLinks = resp.links || [];
             if (reset) {
                 setMarketplaceLinks(novosLinks);
@@ -511,7 +513,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         if (activeView === 'marketplace' && marketplaceTab === 'explorar') {
             carregarExplorar(true);
         }
-    }, [selectedCategory, activeView]);
+    }, [selectedCategory, selectedCity, activeView]);
 
     // Smart Polling (30s) + Visibility Update
     useEffect(() => {
@@ -1135,6 +1137,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     setMarketplaceTab={setMarketplaceTab}
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
+                    selectedCity={selectedCity}
+                    setSelectedCity={setSelectedCity}
                     marketplaceLinks={marketplaceLinks}
                     meusLinksMarketplace={meusLinksMarketplace}
                     loadingMarket={loadingMarket}

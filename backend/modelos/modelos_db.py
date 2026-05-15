@@ -256,6 +256,10 @@ class LinkAfiliado(Base):
     vendas_texto = Column(String(50), nullable=True)  # Ex: "8mil+ vendas"
     denuncias_count = Column(Integer, default=0)
     
+    # Localização (herdado do anunciante)
+    cidade = Column(String(100), nullable=True)
+    estado = Column(String(50), nullable=True)
+    
     # Controle de pontos (Gamificação)
     ponto_min = Column(Integer, default=1)
     ponto_max = Column(Integer, default=1)

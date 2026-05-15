@@ -105,6 +105,8 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
         nota=dados.nota,
         vendas_texto=dados.vendas_texto,
         usuario_id=usuario.id,
+        cidade=usuario.cidade,
+        estado=usuario.estado,
         visualizacoes_restantes=50,
         is_boosted=False,
         data_expiracao=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
@@ -265,12 +267,11 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
     }
 
 @router.get("/explorar")
-async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
+async def explorar_comunidade(categoria: Optional[str] = None, cidade: Optional[str] = None, page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
     """
     Retorna links ativos da comunidade com paginação.
-    Boosted links aparecem primeiro, misturados com os grátis (24h).
-    Destaques continuam visíveis mesmo sem views até expirar o tempo (regra OLX).
-    Filtra por categoria se fornecido.
+    Boosted/destacados aparecem primeiro, depois os gratuito (24h).
+    Filtro por categoria e cidade se fornecido.
     """
     _desativar_expirados(db)
     offset = (page - 1) * limit
@@ -281,6 +282,9 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
     
     if categoria and categoria != "Geral":
         query = query.filter(LinkAfiliado.categoria == categoria)
+    
+    if cidade and cidade != "Todas":
+        query = query.filter(LinkAfiliado.cidade == cidade)
         
     total = query.count()
     links = query.order_by(LinkAfiliado.is_boosted.desc(), LinkAfiliado.data_criacao.desc()).offset(offset).limit(limit).all()
@@ -306,6 +310,8 @@ async def explorar_comunidade(categoria: Optional[str] = None, page: int = 1, li
             "anunciante_vendas": anunciante.vendas_completadas if anunciante else 0,
             "anunciante_desde": anunciante.data_aceite.strftime("%m/%Y") if anunciante and anunciante.data_aceite else "N/D",
             "anunciante_verificado": anunciante.is_verified if anunciante else False,
+            "cidade": l.cidade or "",
+            "estado": l.estado or "",
             "usuario_id": l.usuario_id,
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None
         })

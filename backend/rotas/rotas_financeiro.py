@@ -581,7 +581,6 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
             link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
             pacote = PRECO_VIEWS.get(pacote_id)
             if link and pacote:
-                link.is_boosted = True
                 link.visualizacoes_restantes += pacote["views"]
                 link.data_expiracao = agora + dt.timedelta(days=30)
             transacao.status = "concluido"
@@ -765,7 +764,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id).first()
                                 pacote = PRECO_VIEWS.get(pacote_id)
                                 if link and pacote:
-                                    link.is_boosted = True
                                     link.visualizacoes_restantes += pacote["views"]
                                     link.data_expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
                                 transacao.status = "concluido"

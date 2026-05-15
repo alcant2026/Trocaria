@@ -14,6 +14,11 @@ const MarketTimer = ({ expiresAt }) => {
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
+    if (h >= 24) {
+        const d = Math.floor(h / 24);
+        const rh = h % 24;
+        return <span className="market-timer">{d}d{rh > 0 ? ` ${rh}h` : ''}</span>;
+    }
     return <span className="market-timer">{`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}</span>;
 };
 

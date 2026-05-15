@@ -146,6 +146,13 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '5px 0' }}>
                             Score: {aceito.score_tomador} | {aceito.parcelas}x
                         </p>
+                        {aceito.tomador_telefone && (
+                            <a href={`https://wa.me/${aceito.tomador_telefone.replace(/\D/g, '')}?text=Olá! Vi seu pedido no Psy Pay e quero conversar sobre o apoio.`} 
+                                target="_blank" rel="noopener noreferrer"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '8px 14px', background: '#25D366', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '0.8rem' }}>
+                                💬 Conversar no WhatsApp
+                            </a>
+                        )}
                     </div>
                     <button className="btn btn-primary mt-1" onClick={() => { setAceito(null); carregar(); }} style={{ width: '100%' }}>
                         OK, Já Enviei o PIX

@@ -104,6 +104,7 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session, ip_cliente:
         "message": "Pague a taxa de match via PIX para confirmar o apoio.",
         "tomador_nome": tomador.nome,
         "chave_pix_tomador": tomador.chave_pix,
+        "tomador_telefone": tomador.telefone,
         "valor": float(solicitacao.valor),
         "taxa_match": float(taxa_match),
         "parcelas": solicitacao.prazo_meses,
@@ -157,6 +158,7 @@ def confirmar_match(db: Session, transacao_id: int) -> dict:
         "message": "Match confirmado! Envie o valor via PIX para o tomador.",
         "tomador_nome": tomador.nome,
         "chave_pix_tomador": tomador.chave_pix,
+        "tomador_telefone": tomador.telefone,
         "valor": float(solicitacao.valor),
         "taxa_match": float(taxa_match),
         "parcelas": solicitacao.prazo_meses

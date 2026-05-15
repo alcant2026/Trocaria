@@ -30,6 +30,7 @@ const Registro = () => {
     const [showTermos, setShowTermos] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [sucesso, setSucesso] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [showSenha, setShowSenha] = useState(false);
 
     const maskCPF = (value) => {
@@ -88,6 +89,7 @@ const Registro = () => {
             setMensagem('Você precisa aceitar os Termos de Uso.');
             return;
         }
+        setLoading(true);
         try {
             const res = await api.postWithWarmup('/auth/registrar', { ...formData, aceite_termos: aceiteTermos });
             let msg = 'Conta criada com sucesso!';
@@ -99,6 +101,7 @@ const Registro = () => {
             setTimeout(() => window.location.hash = 'login', 2000);
         } catch (err) {
             setMensagem(err.response?.data?.detail || err.message || 'Erro ao criar conta. Verifique os dados.');
+            setLoading(false);
         }
     };
 
@@ -240,8 +243,8 @@ const Registro = () => {
                             </label>
                         </div>
 
-                        <button type="submit" className={`btn ${sucesso ? 'btn-secondary' : 'btn-primary'}`} disabled={sucesso}>
-                            {sucesso ? 'Conta Criada!' : 'Criar minha conta'}
+                        <button type="submit" className={`btn ${sucesso ? 'btn-secondary' : 'btn-primary'}`} disabled={sucesso || loading}>
+                            {loading ? 'Criando conta...' : sucesso ? 'Conta Criada!' : 'Criar minha conta'}
                         </button>
 
                         {mensagem && (

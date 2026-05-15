@@ -8,6 +8,7 @@ import Footer from '../componentes/Footer';
 const Login = ({ onLogin }) => {
     const [cpf, setCpf] = useState('');
     const [senha, setSenha] = useState('');
+    const [loading, setLoading] = useState(false);
     const [showSenha, setShowSenha] = useState(false);
     const [mensagem, setMensagem] = useState('');
 
@@ -22,6 +23,7 @@ const Login = ({ onLogin }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
             const res = await api.postWithWarmup('/auth/login', { cpf, senha });
             api.setToken(res.access_token);
@@ -29,6 +31,7 @@ const Login = ({ onLogin }) => {
             onLogin(res.usuario);
         } catch (err) {
             setMensagem('CPF ou senha incorretos.');
+            setLoading(false);
         }
     };
 
@@ -120,8 +123,8 @@ const Login = ({ onLogin }) => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn btn-primary mt-1" style={{ width: '100%', padding: '1.1rem' }}>
-                            <LogIn size={20} /> Entrar na Conta
+                        <button type="submit" className="btn btn-primary mt-1" style={{ width: '100%', padding: '1.1rem' }} disabled={loading}>
+                            {loading ? 'Conectando...' : <><LogIn size={20} /> Entrar na Conta</>}
                         </button>
 
                         <div className="text-center mt-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

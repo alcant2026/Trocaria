@@ -1149,6 +1149,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     handleDenunciar={handleDenunciar}
                     handleAvaliar={handleAvaliar}
                     setActiveView={setActiveView}
+                    setSelectedAdDetails={setSelectedAdDetails}
                     setShowAssinarModal={setShowAssinarModal}
                     handleSolicitarResgate={handleSolicitarResgate}
                     setBoostTarget={setBoostTarget}
@@ -1467,9 +1468,18 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <button 
                             className="btn btn-primary w-full" 
                             style={{ height: '48px', fontSize: '1rem', flexShrink: 0 }}
-                            onClick={() => window.open(selectedAdDetails.url_afiliado, '_blank')}
+                            onClick={() => {
+                                const link = selectedAdDetails.url_afiliado || '';
+                                const isPhone = /^\d+$/.test(link.replace(/\D/g, ''));
+                                if (isPhone) {
+                                    const num = link.replace(/\D/g, '');
+                                    window.open(`https://wa.me/${num}`, '_blank');
+                                } else {
+                                    window.open(link, '_blank');
+                                }
+                            }}
                         >
-                            Comprar / Chamar no WhatsApp
+                            💬 Falar com Vendedor
                         </button>
                     </div>
                 )}

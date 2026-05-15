@@ -29,6 +29,7 @@ const MarketplaceView = ({
     carregarExplorar, carregarMeusLinksMarketplace, handleDenunciar, handleAvaliar,
     setShowAssinarModal, handleSolicitarResgate,
     setActiveView,
+    setSelectedAdDetails,
     setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
 }) => {
     return (
@@ -213,12 +214,9 @@ const MarketplaceView = ({
                                                 {!l.patrocinado && l.expires_at && <div className="market-timer-row"><Timer size={11} /><MarketTimer expiresAt={l.expires_at} /></div>}
                                                 <button className="btn btn-primary btn-sm market-cta" onClick={async () => {
                                                     try {
-                                                        const res = await api.post('/comunidade/registrar-view', { link_id: l.id });
-                                                        setMensagem({ tipo: 'sucesso', texto: res.pontos_ganhos > 0 ? `+${res.pontos_ganhos} ponto(s)!` : 'Clique registrado.' });
-                                                    } catch(e) {
-                                                        setMensagem({ tipo: 'erro', texto: 'Erro ao registrar clique: ' + e.message });
-                                                    }
-                                                    window.open(l.url_afiliado, '_blank');
+                                                        api.post('/comunidade/registrar-view', { link_id: l.id }).catch(() => {});
+                                                    } catch(e) {}
+                                                    setSelectedAdDetails(l);
                                                 }}>Ver Produto</button>
                                             </div>
                                         </div>

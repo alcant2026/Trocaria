@@ -53,8 +53,7 @@ async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Dep
         
         resultado.append({
             "id": s.id,
-            "tomador_nome": s.usuario.nome,
-            "chave_pix_tomador": s.usuario.chave_pix,
+            "tomador_nome": s.usuario.nome.split(' ')[0] if s.usuario.nome else "Anônimo",
             "valor": valor_emprestimo,
             "taxa_juros": taxa_juros,
             "juros": round(juros, 2),

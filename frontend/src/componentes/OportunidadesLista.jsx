@@ -195,9 +195,6 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                                     {op.parcelas}x de R$ {op.valor_parcela.toFixed(2)}
                                 </span>
                             </div>
-                            <p style={{ fontSize: '0.7rem', color: 'var(--success)', margin: '4px 0 0' }}>
-                                PIX: {op.chave_pix_tomador}
-                            </p>
                         </div>
                         {op.taxa_match_estimada > 0 && (
                             <p style={{ fontSize: '0.65rem', color: 'var(--warning)', margin: '2px 0 0' }}>

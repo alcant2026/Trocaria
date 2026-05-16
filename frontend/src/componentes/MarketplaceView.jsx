@@ -290,7 +290,7 @@ const MarketplaceView = ({
                                             </div>
                                             {inativo && l.is_boosted ? (
                                                 <button className="btn btn-primary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '36px', fontSize: '0.75rem', marginTop: 'auto' }}><Rocket size={14} /> Reativar com Views</button>
-                                            ) : !inativo ? (
+                                            ) : !inativo ? (<>
                                                 <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
                                                     <button className="btn btn-primary w-full gap-1" onClick={async () => {
                                                         try {
@@ -306,7 +306,15 @@ const MarketplaceView = ({
                                                     }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Star size={12} /> Destacar R$5</button>
                                                     <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Zap size={12} /> Turbinar</button>
                                                 </div>
-                                            ) : (
+                                                <button className="btn btn-success w-full" onClick={async () => {
+                                                    if (!window.confirm('Marcar como vendido? Isso desativará o anúncio.')) return;
+                                                    try {
+                                                        await api.post(`/comunidade/marcar-vendido/${l.id}`);
+                                                        showModal({ title: 'Vendido!', message: 'Anúncio marcado como vendido. +1 venda!', type: 'success' });
+                                                        carregarMeusLinksMarketplace();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }} style={{ height: '28px', fontSize: '0.65rem', padding: '0 8px', marginTop: '6px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366' }}>✅ Marcar como Vendido</button>
+                                            </>) : (
                                                 <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anúncio grátis encerrado</p>
                                             )}
                                         </div>

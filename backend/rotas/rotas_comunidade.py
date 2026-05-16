@@ -266,6 +266,24 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
         "has_more": (offset + len(links)) < total
     }
 
+
+@router.post("/marcar-vendido/{link_id}")
+async def marcar_como_vendido(link_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Marca um anúncio como vendido e incrementa o contador de vendas do usuário."""
+    link = db.query(LinkAfiliado).filter(
+        LinkAfiliado.id == link_id,
+        LinkAfiliado.usuario_id == usuario.id
+    ).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Anúncio não encontrado.")
+    
+    link.is_active = False
+    usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
+    db.commit()
+    
+    return {"message": "Anúncio marcado como vendido!", "vendas": usuario.vendas_completadas}
+
+
 @router.get("/explorar")
 async def explorar_comunidade(categoria: Optional[str] = None, cidade: Optional[str] = None, page: int = 1, limit: int = 12, db: Session = Depends(get_db)):
     """

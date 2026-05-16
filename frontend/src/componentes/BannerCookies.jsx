@@ -10,8 +10,8 @@ const BannerCookies = ({ usuario, onUpdate }) => {
         // Mostra o banner se o usuário não aceitou e não tem o aceite salvo localmente
         const aceiteLocal = localStorage.getItem('psy pay_cookies_accepted');
         if (!aceiteLocal && (!usuario || !usuario.aceite_cookies)) {
-            const timer = setTimeout(() => setVisivel(true), 2000);
-            return () => clearTimeout(timer);
+            setVisivel(true);
+            return () => {};
         }
     }, [usuario]);
 

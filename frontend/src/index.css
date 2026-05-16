@@ -432,7 +432,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
   font-size: 0.8rem;
 }
 
-.user-firstname { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+.user-firstname { font-weight: 700; font-size: 0.95rem; letter-spacing: -0.2px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
 
 .nav-brand {
   display: flex;
@@ -511,7 +511,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* Visibility */
 .hide-on-mobile { display: none; }
 @media (min-width: 768px) {
-  .hide-on-mobile { display: flex !important; }
+  .hide-on-mobile { display: flex; }
   .main-content { padding-top: 7rem; max-width: 1200px; }
   .action-grid { grid-template-columns: repeat(6, 1fr); }
 }
@@ -519,20 +519,20 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 /* --- AJUSTES FINAIS WHATSAPP & RESPONSIVIDADE --- */
 
 .whatsapp-float {
-  position: fixed !important;
+  position: fixed; bottom: 24px; right: 24px;
   width: 60px !important;
   height: 60px !important;
   bottom: 25px !important;
   right: 25px !important;
   background-color: #25d366 !important;
   color: white !important;
-  border-radius: 50px !important;
-  display: flex !important;
-  align-items: center !important;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
   justify-content: center !important;
   box-shadow: 2px 4px 15px rgba(0, 0, 0, 0.4);
-  z-index: 9999 !important;
-  text-decoration: none !important;
+  z-index: 9999;
+  text-decoration: none;
   animation: pulse-whatsapp 2s infinite;
 }
 
@@ -682,13 +682,6 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 }
 
 /* Navbar Responsividade */
-.navbar-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-}
-
 .nav-user-preview {
   display: flex;
   align-items: center;
@@ -715,12 +708,6 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
   box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.2);
 }
 
-.user-firstname {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-main);
-  letter-spacing: -0.2px;
-}
 
 /* Footer do Drawer */
 .footer-user-info { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; }
@@ -1683,6 +1670,9 @@ select.input-field option {
     text-align: right;
     letter-spacing: 0.3px;
     white-space: nowrap;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
 }
 .activity-right {
     display: flex;
@@ -1692,15 +1682,6 @@ select.input-field option {
     flex-shrink: 0;
     margin-left: auto;
     padding-left: 8px;
-}
-.activity-status {
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-    padding: 2px 5px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.05);
 }
 
 @media (max-width: 600px) {

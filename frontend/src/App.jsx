@@ -65,7 +65,7 @@ const App = () => {
         localStorage.removeItem('token');
         setIsAuthenticated(false);
         setUser(null);
-        window.location.hash = 'login';
+        window.location.hash = '';
     }, []);
 
     useEffect(() => {

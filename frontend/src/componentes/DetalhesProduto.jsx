@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star } from 'lucide-react';
 
+// Página de detalhes do produto (estilo OLX)
 const DetalhesProduto = ({ ad, onVoltar }) => {
     if (!ad) return null;
 

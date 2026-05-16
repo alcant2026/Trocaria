@@ -44,21 +44,24 @@ const MarketplaceView = ({
                 
                 {marketplaceTab === 'explorar' && (
                     <div className="filter-bar">
-                        <select 
-                            className="input-field m-filter-select"
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                        >
-                            {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Todas as Categorias' : cat}</option>)}
-                        </select>
+                        <div className="m-filter-pills">
+                            {CATEGORIAS_MARKETPLACE.map(cat => (
+                                <button
+                                    key={cat}
+                                    className={`m-filter-pill ${selectedCategory === cat ? 'active' : ''}`}
+                                    onClick={() => setSelectedCategory(cat)}
+                                >
+                                    {cat === 'Geral' ? 'Todas' : cat}
+                                </button>
+                            ))}
+                        </div>
                         <select 
                             className="input-field m-filter-select"
                             value={selectedCity}
                             onChange={(e) => setSelectedCity(e.target.value)}
-                            style={{ marginLeft: '6px' }}
                         >
                             <option value="Todas">Todas as Cidades</option>
-                            {usuario?.cidade && <option value={usuario.cidade}>{usuario.cidade} (sua)</option>}
+                            {usuario?.cidade && <option value={usuario.cidade}>{usuario.cidade}</option>}
                         </select>
                     </div>
                 )}

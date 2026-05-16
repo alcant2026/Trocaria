@@ -71,6 +71,7 @@ import HistoricoView from '../componentes/HistoricoView';
 import ContratosView from '../componentes/ContratosView';
 import MarketplaceView from '../componentes/MarketplaceView';
 import NovoAnuncioPage from '../componentes/NovoAnuncioPage';
+import DetalhesProduto from '../componentes/DetalhesProduto';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -1174,6 +1175,13 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     }}
                 />
             )}
+            
+            {activeView === 'detalhes-produto' && (
+                <DetalhesProduto
+                    ad={selectedAdDetails}
+                    onVoltar={() => { setSelectedAdDetails(null); setActiveView('marketplace'); }}
+                />
+            )}
 <ModalPremium
                 isOpen={showBoostModal}
                 onClose={() => setShowBoostModal(false)}
@@ -1406,84 +1414,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 loading={loadingAction}
             />
 
-            {/* Modal de Detalhes do Anúncio (OLX Style) */}
-            <ModalPremium
-                isOpen={!!selectedAdDetails}
-                onClose={() => setSelectedAdDetails(null)}
-                title={selectedAdDetails?.nome_produto || "Detalhes do Anúncio"}
-                type="info"
-            >
-                {selectedAdDetails && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '70vh' }}>
-                        <img 
-                            src={selectedAdDetails.url_imagem} 
-                            style={{ width: '100%', borderRadius: '12px', maxHeight: '200px', objectFit: 'cover', flexShrink: 0 }} 
-                            alt="Produto"
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <span className="badge badge--primary">{selectedAdDetails.categoria}</span>
-                            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)' }}>
-                                R$ {selectedAdDetails.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ width: '36px', height: '36px', background: 'rgba(var(--primary-rgb), 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <User size={18} color="var(--primary)" />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {selectedAdDetails.anunciante}
-                                        {selectedAdDetails.anunciante_verificado && <ShieldCheck size={14} color="#00CFFF" title="Vendedor Verificado" />}
-                                    </div>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                        Membro desde {selectedAdDetails.anunciante_desde}
-                                    </div>
-                                </div>
-                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)' }}>
-                                        {selectedAdDetails.anunciante_vendas} VENDAS
-                                    </div>
-                                    <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Concluídas</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Dica de Segurança */}
-                        <div style={{ background: 'rgba(255,214,0,0.05)', padding: '10px', borderRadius: '10px', border: '1px dotted rgba(255,214,0,0.3)' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                                <AlertTriangle size={16} color="#FFD600" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                                    <strong>DICA DE SEGURANÇA:</strong> Nunca realize pagamentos fora do Psy Pay. Prefira negociar a entrega em locais públicos.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</h4>
-                            <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                {selectedAdDetails.descricao || "Nenhuma descrição fornecida para este anúncio."}
-                            </p>
-                        </div>
-                        <button 
-                            className="btn btn-primary w-full" 
-                            style={{ height: '48px', fontSize: '1rem', flexShrink: 0 }}
-                            onClick={() => {
-                                const link = selectedAdDetails.url_afiliado || '';
-                                const isPhone = /^\d+$/.test(link.replace(/\D/g, ''));
-                                if (isPhone) {
-                                    const num = link.replace(/\D/g, '');
-                                    window.open(`https://wa.me/${num}`, '_blank');
-                                } else {
-                                    window.open(link, '_blank');
-                                }
-                            }}
-                        >
-                            💬 Falar com Vendedor
-                        </button>
-                    </div>
-                )}
-            </ModalPremium>
             <ModalPremium
                 isOpen={showAssinarModal}
                 onClose={() => setShowAssinarModal(false)}

@@ -30,6 +30,7 @@ const MarketplaceView = ({
     setShowAssinarModal, handleSolicitarResgate,
     setActiveView,
     setSelectedAdDetails,
+    setActiveView,
     setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
 }) => {
     return (
@@ -217,6 +218,7 @@ const MarketplaceView = ({
                                                         api.post('/comunidade/registrar-view', { link_id: l.id }).catch(() => {});
                                                     } catch(e) {}
                                                     setSelectedAdDetails(l);
+                                                    setActiveView('detalhes-produto');
                                                 }}>Ver Produto</button>
                                             </div>
                                         </div>

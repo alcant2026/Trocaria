@@ -815,10 +815,6 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
 
                             transacao.detalhes += f" | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
 
-                            if transacao.tipo == TipoTransacao.RECEBIMENTO:
-                                usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
-                                logger.info(f"REPUTACAO: {usuario.nome} completou uma venda!")
-
                             if transacao.parceiro_id:
                                 parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
                                 if parceiro:

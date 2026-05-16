@@ -632,10 +632,7 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
         width: 100% !important;
         min-width: unset !important;
     }
-    /* Ranking sidebar some em mobile */
-    .marketplace-grid {
-        grid-template-columns: 1fr !important;
-    }
+
     /* Grid de acoes na home */
     .action-grid {
         grid-template-columns: 1fr 1fr !important;
@@ -1278,13 +1275,14 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
 
 /* Informações do Produto - À direita da imagem */
 .market-info {
-    padding: 6px 8px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     flex: 1;
     min-width: 0;
     justify-content: space-between;
     overflow: hidden;
+    gap: 6px;
 }
 
 /* Paginação */
@@ -2198,4 +2196,45 @@ select.input-field option {
         grid-template-columns: 1fr;
         gap: 1.5rem;
     }
+}
+
+
+/* === MISSING CLASSES === */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+@media (min-width: 768px) {
+    .dashboard-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.badge--primary {
+    background: rgba(var(--primary-rgb), 0.15);
+    color: var(--primary);
+}
+
+.card-minimal {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.2s ease;
+}
+.card-minimal.clickable:hover {
+    border-color: rgba(var(--primary-rgb), 0.3);
+    background: rgba(var(--primary-rgb), 0.03);
+}
+
+/* Mobile: DetalhesProduto */
+@media (max-width: 600px) {
+    .detail-image { max-height: 200px !important; }
+    .detail-cta { margin-bottom: 1rem; }
+}
+
+/* Mobile: flex-wrap nas oportunidades */
+@media (max-width: 400px) {
+    .opp-stats-row { flex-wrap: wrap; gap: 6px !important; }
+    .opp-actions-row { flex-direction: column; gap: 6px !important; }
+    .opp-actions-row button { width: 100%; }
 }

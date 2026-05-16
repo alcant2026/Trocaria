@@ -30,7 +30,6 @@ const MarketplaceView = ({
     setShowAssinarModal, handleSolicitarResgate,
     setActiveView,
     setSelectedAdDetails,
-    setActiveView,
     setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
 }) => {
     return (

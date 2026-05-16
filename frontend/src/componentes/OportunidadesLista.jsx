@@ -174,7 +174,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                             <p style={{ fontWeight: 700, margin: '0 0 4px 0' }}>
                                 {op.tomador_nome}
                             </p>
-                            <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <div className="opp-stats-row" style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                 <span>R$ {op.valor.toFixed(2)}</span>
                                 <span>{op.parcelas}x</span>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -209,7 +209,7 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                             </p>
                         )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="opp-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button className="btn btn-primary btn-sm"
                                 disabled={aceitando === op.id || op.inadimplente}
                                 onClick={() => aceitar(op.id)}

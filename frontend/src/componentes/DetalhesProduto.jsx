@@ -26,7 +26,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {ad.url_imagem && (
-                    <img src={ad.url_imagem} style={{ width: '100%', borderRadius: '12px', maxHeight: '300px', objectFit: 'cover' }} alt="Produto" />
+                    <img src={ad.url_imagem} className="detail-image" style={{ width: '100%', borderRadius: '12px', maxHeight: '300px', objectFit: 'cover' }} alt="Produto" />
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -86,7 +86,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                     </p>
                 </div>
 
-                <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1rem' }} onClick={abrirWhatsApp}>
+                <button className="btn btn-primary detail-cta" style={{ width: '100%', padding: '14px', fontSize: '1rem' }} onClick={abrirWhatsApp}>
                     💬 Falar com Vendedor
                 </button>
             </div>

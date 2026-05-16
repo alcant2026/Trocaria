@@ -46,7 +46,7 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
                     value={dados.descricao} onChange={(e) => handleChange('descricao', e.target.value)} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div className="grid-2" style={{ gap: '10px' }}>
                 <div className="input-group mb-1">
                     <label>Valor (R$)</label>
                     <input type="number" className="input-field" placeholder="0,00" value={dados.valor} onChange={(e) => handleChange('valor', e.target.value)} />

@@ -33,7 +33,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {ad.url_imagem && (
-                    <img src={ad.url_imagem} className="detail-image" style={{ width: '100%', borderRadius: '12px', maxHeight: '300px', objectFit: 'cover' }} alt="Produto" />
+                    <img src={ad.url_imagem} className="detail-image" style={{ width: '100%', borderRadius: '12px', maxHeight: '500px', objectFit: 'contain', background: 'rgba(0,0,0,0.3)' }} alt="Produto" />
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -54,7 +54,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                                 {ad.anunciante_verificado && <ShieldCheck size={14} color="#00CFFF" title="Vendedor Verificado" />}
                             </div>
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                Membro desde {ad.anunciante_desde || 'N/D'}
+                                {ad.anunciante_desde && ad.anunciante_desde !== 'N/D' ? `Membro desde ${ad.anunciante_desde}` : 'Novo por aqui'}
                             </div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>

@@ -75,7 +75,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                         <AlertTriangle size={16} color="#FFD600" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                            <strong>DICA DE SEGURANÇA:</strong> Nunca realize pagamentos fora do Psy Pay. Prefira negociar a entrega em locais públicos.
+                                <strong>DICA DE SEGURANÇA:</strong> Combine os detalhes diretamente com o vendedor. Prefira negociar a entrega em locais públicos.
                         </p>
                     </div>
                 </div>

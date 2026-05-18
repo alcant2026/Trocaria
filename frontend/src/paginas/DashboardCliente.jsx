@@ -113,40 +113,37 @@ const ContractTimer = ({ expira4h, expira5d, arrecadado }) => {
 // Mapeamento global de tipos de transação
 const TIPOS_LABEL = {
     deposito: 'Depósito',
+    saque: 'Saque',
     recebimento: 'Recebimento',
-    desbloqueio_dados: 'Verificação',
-    taxa_servico: 'Taxa de Serviço',
-    taxa_plataforma: 'Taxa da Plataforma',
+    desbloqueio_dados: 'Verificação KYC',
+    compra_score: 'Compra de Score',
     taxa_match: 'Taxa de Match',
     taxa_solicitacao: 'Taxa de Publicação',
+    taxa_saque: 'Taxa de Saque',
+    taxa_intermediacao: 'Taxa de Intermediação',
+    taxa_postagem: 'Marketplace',
+    taxa_adm_emprestimo: 'Taxa Admin',
     confirmacao_pagamento: 'Pagamento Pendente',
     confirmacao_recebimento: 'Recebimento Confirmado',
-    pagamento_parcela: 'Pagamento',
-    comissao_parceiro: 'Comissão',
+    pagamento_parcela: 'Pagamento de Parcela',
     assinatura: 'Assinatura Premium',
     bonus: 'Bônus',
+    resgate_pontos: 'Resgate de Pontos',
+    retorno_investimento: 'Retorno Investimento',
+    aporte_capital: 'Aporte de Capital',
 };
 
-const NOMES_SECOES = {
-    home: 'Início',
-    oportunidades: 'Ver Pedidos',
-    solicitar: 'Pedir Apoio',
-    historico: 'Minhas Atividades',
-    contratos: 'Meus Termos',
-    score: 'Upgrade',
-    marketplace: 'Marketplace',
-};
-
-const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento']);
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
+const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_match', 'taxa_solicitacao', 'taxa_saque', 'taxa_intermediacao', 'taxa_postagem', 'taxa_adm_emprestimo', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento', 'resgate_pontos']);
+const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'bonus', 'confirmacao_recebimento', 'retorno_investimento', 'aporte_capital']);
 const TIPOS_NEGATIVO = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura']);
 
 const formatarTipo = (tipo, detalhes) => {
-    if (tipo === 'desbloqueio_dados') {
-        if (detalhes?.toLowerCase().includes('empr')) return 'Taxa de Solicitação';
-        return 'Taxa de Verificação';
+    if (tipo === 'taxa_postagem' && detalhes) {
+        if (detalhes.includes('DESTAQUE_LINK')) return 'Destaque de Anúncio';
+        if (detalhes.includes('BOOST_LINK')) return 'Boost de Views';
+        return 'Marketplace';
     }
-    return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
+    return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Transação';
 };
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_SAIDA.has(tipo) || tipo === 'saque' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';

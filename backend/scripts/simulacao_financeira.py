@@ -25,7 +25,10 @@ PREMISSA = {
     "match_valor_medio": 1500.00,           # valor medio do pedido
     "assinatura_mensal": 19.99,
     "assinatura_anual": 199.99,
-    "taxa_publicacao": 2.00,
+    "taxa_publicacao_pct": 0.02,
+    "taxa_publicacao_min": 2.00,
+    "taxa_publicacao_max": 20.00,
+    "taxa_match": 2.00,
     "taxa_cobranca": 2.00,
     "destaque_preco": 5.00,
     "boost_pct_medio": 6.00,               # media dos pacotes de boost
@@ -40,16 +43,16 @@ print("-" * 65)
 
 receitas = []
 
-# 1. Taxa de Publicacao (R$ 2,00)
+# 1. Taxa de Publicacao (2%, min R$2, max R$20)
 qtd_pedidos = int(USUARIOS * PREMISSA["usuarios_que_pedem_apoio"])
-rec_publicacao = qtd_pedidos * PREMISSA["taxa_publicacao"]
-receitas.append(("Taxa de Publicacao (R$2)", qtd_pedidos, PREMISSA["taxa_publicacao"], rec_publicacao))
+taxa_publicacao_media = max(PREMISSA["taxa_publicacao_min"], min(PREMISSA["taxa_publicacao_max"], PREMISSA["match_valor_medio"] * PREMISSA["taxa_publicacao_pct"]))
+rec_publicacao = qtd_pedidos * taxa_publicacao_media
+receitas.append(("Taxa de Publicacao (2% / R$ {:.2f})".format(taxa_publicacao_media), qtd_pedidos, taxa_publicacao_media, rec_publicacao))
 
-# 2. Taxa de Match (2%, min R$2, max R$20)
+# 2. Taxa de Match (R$ 2,00 fixo)
 qtd_matches = int(qtd_pedidos * PREMISSA["pedidos_que_viran_match"])
-taxa_match_media = max(2.00, min(20.00, PREMISSA["match_valor_medio"] * PREMISSA["match_taxa_pct"]))
-rec_match = qtd_matches * taxa_match_media
-receitas.append(("Taxa de Match (2% / R$ {:.2f})".format(taxa_match_media), qtd_matches, taxa_match_media, rec_match))
+rec_match = qtd_matches * PREMISSA["taxa_match"]
+receitas.append(("Taxa de Match (R$ {:.2f} fixo)".format(PREMISSA["taxa_match"]), qtd_matches, PREMISSA["taxa_match"], rec_match))
 
 # 3. Assinatura Premium
 qtd_assinantes = int(USUARIOS * PREMISSA["usuarios_que_assinam"])

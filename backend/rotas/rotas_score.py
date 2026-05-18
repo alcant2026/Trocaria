@@ -133,7 +133,7 @@ async def solicitar_verificacao_com_docs(
         db.add(novo_doc)
 
     db.commit()
-    return {"message": "Documentos enviados com sucesso! Aguarde a analise do administrador.", "saldo": float(usuario.saldo or 0)}
+    return {"message": "Documentos enviados com sucesso! Aguarde a analise do administrador."}
 
 @router.post("/gerar-taxa-verificacao")
 async def gerar_taxa_verificacao(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):

@@ -1,0 +1,105 @@
+# Psy Pay - Configuração Git Ignore (Produção)
+# ATUALIZADO: Blindado para dados sensíveis e LGPD
+
+# 🐍 Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ambientes Virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# 🔐 Segurança (NUNCA DEVE SER COMITADO)
+.env
+.env.local
+.env.production
+!.env.example
+*service-account*.json
+*firebase-adminsdk*.json
+*.key
+*.pem
+*.crt
+secrets/
+credentials/
+
+# 🗄️ Bancos de Dados (Locais)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.corrupt_bak
+database.db*
+cred_plus.db*
+
+# 📦 Node.js / Frontend (React)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Produção Frontend
+/frontend/dist/
+/frontend/build/
+.parcel-cache
+.cache
+.eslintcache
+
+# 📁 Envios de Usuários (KYC/RG/LGPD)
+# NUNCA commitar documentos de usuários
+backend/uploads/
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.pdf
+!frontend/public/**/*.png
+!frontend/public/**/*.jpg
+!frontend/src/assets/**/*.png
+!frontend/src/assets/**/*.jpg
+
+# 📱 Mobile / Capacitor
+frontend/android/app/build/
+frontend/android/.gradle/
+frontend/android/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# 📝 Logs e Temporários
+*.log
+gunicorn.ctl
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ⚠️ Outros sensíveis
+scratch/
+scripts/diagnosticos/
+scripts/reparos/

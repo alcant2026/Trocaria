@@ -65,45 +65,57 @@ async def rotina_reset_ranking():
                 )
                 db.add(historico)
 
-                # PAGAR os vencedores com saldo da plataforma
-                plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
+                # RECOMPENSAS DE FIDELIDADE (nao e premio de sorteio)
+                # Limite por usuario: R$ 50,00 (abaixo do limite de declaracao)
+                # Limite total: R$ 1.000,00/sem
+                LIMITE_POR_USUARIO = Decimal("50.00")
+                LIMITE_TOTAL = Decimal("1000.00")
+                total_pago = Decimal("0.00")
                 pagos = 0
 
                 for d in dados:
                     premio = Decimal(str(d["premio"]))
                     if premio <= 0:
                         continue
+                    
+                    # Aplica limite por usuario
+                    premio = min(premio, LIMITE_POR_USUARIO)
+                    
+                    # Verifica limite total
+                    if total_pago + premio > LIMITE_TOTAL:
+                        premio = LIMITE_TOTAL - total_pago
+                        if premio <= 0:
+                            break
+                    
+                    total_pago += premio
+                    d["premio"] = float(premio)  # Atualiza no dados
 
                     usuario = db.query(Usuario).filter(Usuario.id == d["id"]).first()
                     if not usuario:
                         continue
 
-                    # Creditar saldo do vencedor
-                    usuario.saldo = (usuario.saldo or Decimal("0")) + premio
-
-                    # Criar transação de premiação
+                    # Recompensa de fidelidade - paga via PIX direto (transacao pendente)
                     db.add(Transacao(
                         usuario_id=usuario.id,
                         valor=premio,
-                        tipo=TipoTransacao.BONUS,
-                        status="concluido",
+                        tipo=TipoTransacao.RESGATE_PONTOS,
+                        status="pendente",
                         metodo="ranking",
-                        detalhes=f"🏆 Prêmio Ranking Semanal — #{d['posicao']} lugar ({d['pontos']} pts)"
+                        detalhes=f"🎁 Recompensa Fidelidade Semanal — #{d['posicao']} lugar ({d['pontos']} pts) | Programa de engajamento. PIX direto."
                     ))
-
-                    # Debitar da plataforma
-                    if plataforma:
-                        plataforma.saldo = (plataforma.saldo or Decimal("0")) - premio
 
                     pagos += 1
 
+                # Atualiza historico com valores reais pagos
+                historico.total_premio = total_pago
+                
                 # Resetar pontos de todos os usuários
                 db.query(Usuario).update({"pontos_semanais": 0})
                 db.commit()
 
-                print(f"✅ Ranking resetado! Top {len(dados)} salvo. "
-                      f"{total_pontos} pts, R$ {float(total_premio):.2f} em prêmios. "
-                      f"{pagos} vencedores pagos.")
+                print(f"✅ Programa Fidelidade resetado! Top {len(dados)} salvo. "
+                      f"{total_pontos} pts, R$ {float(total_pago):.2f} em recompensas. "
+                      f"{pagos} usuarios recompensados.")
             except Exception as e:
                 print(f"⚠️ Erro no reset do ranking: {e}")
                 db.rollback()

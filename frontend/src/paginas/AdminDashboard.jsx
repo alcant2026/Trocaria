@@ -5,7 +5,6 @@ import './AdminDashboard.css';
 import {
     LayoutDashboard,
     ShieldCheck,
-    Banknote,
     Users,
     TrendingUp,
     ListTodo,
@@ -45,17 +44,15 @@ import {
 import ModalPremium from '../componentes/ModalPremium';
 
 // --- CONSTANTES E UTILITÁRIOS ---
+// DEPRECATED: deposito e saque removidos. A Psy Pay nao segura dinheiro de usuarios.
 const TIPOS_LABEL = {
-    deposito: 'Depósito',
-    saque: 'Saque',
     recebimento: 'Recebimento',
     compra_score: 'Compra de Score',
     desbloqueio_dados: 'Verificação KYC',
-    taxa_saque: 'Taxa de Saque',
     taxa_match: 'Taxa de Match',
     taxa_solicitacao: 'Taxa de Publicação',
     taxa_postagem: 'Marketplace',
-    taxa_intermediacao: 'Taxa de Intermediação',
+    taxa_intermediacao: 'Taxa de Serviço (Match)',
     taxa_adm_emprestimo: 'Taxa Admin',
     assinatura: 'Assinatura Premium',
     bonus: 'Bônus',
@@ -112,31 +109,6 @@ const AdminDashboard = () => {
     const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
 
-    // Add Saldo Manual
-    const [showAddSaldo, setShowAddSaldo] = useState(false);
-    const [addSaldoUserId, setAddSaldoUserId] = useState('');
-    const [addSaldoValor, setAddSaldoValor] = useState('');
-    const [loadingAddSaldo, setLoadingAddSaldo] = useState(false);
-
-    const handleAddSaldo = async () => {
-        if (!addSaldoUserId || !addSaldoValor) return;
-        setLoadingAddSaldo(true);
-        try {
-            const formData = new FormData();
-            formData.append('usuario_id', addSaldoUserId);
-            formData.append('valor', addSaldoValor);
-            await api.post('/financeiro/admin/adicionar-saldo', formData, { isMultipart: true });
-            setMensagem(`R$ ${addSaldoValor} adicionado a ${addSaldoUserId}!`);
-            setAddSaldoUserId('');
-            setAddSaldoValor('');
-            setShowAddSaldo(false);
-            carregarSnapshot();
-        } catch (e) {
-            setMensagem('Erro: ' + (e.message || e));
-        }
-        setLoadingAddSaldo(false);
-    };
-
     const handleResolverDisputa = async (id, acao) => {
         if (!confirm('Tem certeza? Isso afetara o score dos usuarios envolvidos.')) return;
         try {
@@ -190,10 +162,6 @@ const AdminDashboard = () => {
         }
     };
 
-    // Ações de Caixa
-    const [showAcaoModal, setShowAcaoModal] = useState(false); 
-    const [acaoTipo, setAcaoTipo] = useState(''); // 'saque' ou 'aporte'
-    const [acaoData, setAcaoData] = useState({ valor: '', chave_pix: '', motivo: '' });
     const [loadingAcao, setLoadingAcao] = useState(false);
     
     // Gestão de Parceiros
@@ -211,7 +179,6 @@ const AdminDashboard = () => {
     const [loadingExclusao, setLoadingExclusao] = useState(false);
 
     const [kycPendentes, setKycPendentes] = useState([]);
-    const [pixData, setPixData] = useState(null); // { qr_code, qr_code_base64, payment_id }
     
     // Filtros Fiscais (Admin)
     const [dataInicio, setDataInicio] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
@@ -233,29 +200,6 @@ const AdminDashboard = () => {
 
         return () => clearInterval(autoRefresh);
     }, []);
-
-    useEffect(() => {
-        let interval;
-        if (pixData && pixData.payment_id) {
-            interval = setInterval(verificarStatusPagamento, 5000);
-        }
-        return () => clearInterval(interval);
-    }, [pixData]);
-
-    const verificarStatusPagamento = async () => {
-        if (!pixData || !pixData.payment_id) return;
-        try {
-            const res = await api.get(`/financeiro/admin/sync-pix/${pixData.payment_id}`);
-            if (res.status === 'success' || res.message?.includes('aprovado')) {
-                setMensagem('Aporte Institucional de R$ ' + acaoData.valor + ' confirmado automaticamente!');
-                setPixData(null);
-                setShowAcaoModal(false);
-                carregarSnapshot();
-            }
-        } catch (e) {
-            console.error("Erro no polling do aporte", e);
-        }
-    };
 
     const carregarSnapshot = async (silent = false) => {
         if (!silent) setLoading(true);
@@ -336,7 +280,7 @@ const AdminDashboard = () => {
     };
 
     const handleExecutarCobranca = async () => {
-        if (!confirm("⚠️ ATENÇÃO: Deseja executar a Cláusula 3.3 agora? O sistema irá varrer inadimplentes com mais de 5 dias e liquidar a dívida usando o saldo do Pool do devedor.")) {
+        if (!confirm("⚠️ ATENÇÃO: Deseja executar a Cláusula 3.3 agora? O sistema irá varrer inadimplentes com mais de 5 dias para registro de inadimplência.")) {
             return;
         }
 
@@ -420,41 +364,6 @@ const AdminDashboard = () => {
             setMensagem('Erro: ' + err.message);
         } finally {
             setLoadingRejeicao(false);
-        }
-    };
-
-    const handleOpenAcao = (tipo) => {
-        setAcaoTipo(tipo);
-        setAcaoData({ valor: '', chave_pix: '', motivo: '' });
-        setShowAcaoModal(true);
-    };
-
-    const confirmarAcaoCaixa = async () => {
-        setLoadingAcao(true);
-        try {
-            if (acaoTipo === 'aporte') {
-                // NOVO FLUXO: Mercado Pago AUTOMÁTICO
-                const res = await api.post('/financeiro/admin/aporte-capital/gerar', {
-                    valor: parseFloat(acaoData.valor.replace(',', '.'))
-                });
-                setPixData(res);
-                return; // Não fecha o modal ainda, espera o PIX
-            }
-
-            // FLUXO ANTIGO: Saque de Lucro (Manual)
-            const endpoint = '/financeiro/admin/sacar-lucro';
-            const res = await api.post(endpoint, {
-                valor: parseFloat(acaoData.valor.replace(',', '.')),
-                chave_pix: acaoData.chave_pix,
-                motivo: acaoData.motivo
-            });
-            setMensagem(res.message || 'Ação concluída com sucesso!');
-            setShowAcaoModal(false);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        } finally {
-            setLoadingAcao(false);
         }
     };
 
@@ -607,7 +516,7 @@ const AdminDashboard = () => {
                             <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
                             <StatCard label="Pedidos Pendentes" value={solicitacoesAtivas.length} icon={Clock} color="var(--warning)" trend={null} />
                             <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
-                            <StatCard label="Saldo Plataforma" value={`R$ ${(snapshot?.admin?.saldo_plataforma || 0).toFixed(2)}`} icon={BarChart3} color="var(--success)" trend={null} />
+                            {/* DEPRECATED: Saldo removido. A Psy Pay nao segura dinheiro de usuarios. */}
                         </div>
                     </div>
                 )}
@@ -683,10 +592,6 @@ const AdminDashboard = () => {
                                         <span className="info-label">Verificações KYC</span>
                                         <span className="font-bold">R$ {fiscal.detalhamento_lucro.kyc_score?.toLocaleString('pt-BR')}</span>
                                     </div>
-                                    <div className="revenue-item">
-                                        <span className="info-label">Taxas de Saque</span>
-                                        <span className="font-bold">R$ {fiscal.detalhamento_lucro.taxas_saque?.toLocaleString('pt-BR')}</span>
-                                    </div>
                                     <div className="revenue-item" style={{ border: '1px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
                                         <span className="info-label text-primary">Taxa de Serviço</span>
                                         <span className="font-bold text-primary">R$ {fiscal.detalhamento_lucro.taxa_adm_emprestimo?.toLocaleString('pt-BR')}</span>
@@ -717,25 +622,10 @@ const AdminDashboard = () => {
                             <section className="glass-panel">
                                  <h3>Ações Administrativas</h3>
                                  <div className="flex-column gap-1 mt-1">
-                                     <button className="btn btn-primary w-full gap-1" onClick={() => handleOpenAcao('saque')}>
-                                         <ArrowUpRight size={18} /> Retirar Saldo Disponível
-                                     </button>
-                                     <button className="btn btn-outline w-full gap-1" onClick={() => handleOpenAcao('aporte')}>
-                                         <PlusCircle size={18} /> Injetar Capital (Aporte)
-                                     </button>
-                                     <button className="btn btn-secondary w-full gap-1" onClick={() => setShowAddSaldo(!showAddSaldo)}>
-                                         <PlusCircle size={18} /> Adicionar Saldo a Usuário
+                                     <button className="btn btn-outline w-full gap-1" disabled>
+                                         <ArrowUpRight size={18} /> Retirar Lucro (Descontinuado)
                                      </button>
                                  </div>
-                                 {showAddSaldo && (
-                                     <div className="mt-1" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px' }}>
-                                         <input className="input-field mb-0-5" placeholder="ID do usuário" value={addSaldoUserId} onChange={e => setAddSaldoUserId(e.target.value)} />
-                                         <input className="input-field mb-0-5" type="number" placeholder="Valor R$" value={addSaldoValor} onChange={e => setAddSaldoValor(e.target.value)} />
-                                         <button className="btn btn-primary btn-sm w-full" disabled={!addSaldoUserId || !addSaldoValor || loadingAddSaldo} onClick={handleAddSaldo}>
-                                             {loadingAddSaldo ? '...' : 'Confirmar'}
-                                         </button>
-                                     </div>
-                                 )}
                             </section>
                         </div>
                     </div>
@@ -932,76 +822,6 @@ const AdminDashboard = () => {
                 />
             </ModalPremium>
 
-            {/* Modal Ações de Caixa */}
-            <ModalPremium
-                isOpen={showAcaoModal}
-                onClose={() => { setShowAcaoModal(false); setPixData(null); }}
-                title={acaoTipo === 'saque' ? 'Resgatar Lucro Líquido' : 'Injetar Capital na Plataforma'}
-                message={acaoTipo === 'saque' ? 'Retirada de lucro disponível direto do caixa livre da Psy Pay.' : 'Aporte de recurso externo para aumentar o patrimônio da plataforma.'}
-                type={acaoTipo === 'saque' ? 'warning' : 'info'}
-                onConfirm={confirmarAcaoCaixa}
-                confirmText={pixData ? null : (acaoTipo === 'saque' ? 'Confirmar Resgate' : 'Gerar PIX de Aporte')}
-                loading={loadingAcao}
-            >
-                {pixData ? (
-                    <div className="pix-container animate-fade-in" style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--primary-low)' }}>
-                        <p className="text-primary font-bold mb-1">Aporte de R$ {acaoData.valor}</p>
-                        <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} alt="QR Code PIX Admin" className="qr-img mb-1" style={{ width: '200px', margin: '0 auto', border: '4px solid white', borderRadius: '8px' }} />
-                        
-                        <div className="input-group">
-                            <label className="text-xs">Código Copia e Cola</label>
-                            <div className="flex-start gap-1">
-                                <input readOnly value={pixData.qr_code} className="input-field text-xs" style={{ background: 'var(--bg-dark)' }} />
-                                <button className="btn btn-primary btn-sm" onClick={() => copiarPix(pixData.qr_code, 'pix-admin')}>
-                                    {pixCopiado === 'pix-admin' ? <Check size={14} /> : <Copy size={14} />}
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div className="mt-2 text-xs text-muted flex-center gap-1">
-                            <RefreshCw size={12} className="animate-spin" />
-                            Aguardando confirmação do pagamento...
-                        </div>
-                    </div>
-                ) : (
-                    <div style={{ textAlign: 'left', marginTop: '1rem' }}>
-                        <div className="input-group mb-1">
-                            <label>Valor (R$)</label>
-                            <input
-                                type="number"
-                                className="input-field"
-                                placeholder="0.00"
-                                value={acaoData.valor}
-                                onChange={(e) => setAcaoData({ ...acaoData, valor: e.target.value })}
-                                min="0.01"
-                                step="0.01"
-                            />
-                        </div>
-                        {acaoTipo === 'saque' && (
-                            <div className="input-group mb-1">
-                                <label>Chave PIX de Destino</label>
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    placeholder="Ex: financeiro@psypay.com"
-                                    value={acaoData.chave_pix}
-                                    onChange={(e) => setAcaoData({ ...acaoData, chave_pix: e.target.value })}
-                                />
-                            </div>
-                        )}
-                        <div className="input-group">
-                            <label>Motivo ou Justificativa</label>
-                            <textarea
-                                className="input-field"
-                                placeholder={acaoTipo === 'saque' ? 'Ex: Distribuição de lucros aos sócios...' : 'Ex: Aporte institucional para liquidez de crédito...'}
-                                value={acaoData.motivo}
-                                onChange={(e) => setAcaoData({ ...acaoData, motivo: e.target.value })}
-                            />
-                        </div>
-                    </div>
-                )}
-            </ModalPremium>
-
             {/* Modal de Customização de Limite */}
             <ModalPremium
                 isOpen={showLimiteModal}
@@ -1033,7 +853,7 @@ const AdminDashboard = () => {
                 isOpen={showNovoParceiroModal}
                 onClose={() => setShowNovoParceiroModal(false)}
                 title="Cadastrar Novo Parceiro (Lojista)"
-                message="Parceiros autorizados realizam depósitos e saques em espécie para os membros da PSY PAY."
+                message="Parceiros autorizados para serviços diversos da PSY PAY."
                 type="info"
                 onConfirm={handleCriarParceiro}
                 confirmText="Salvar Parceiro"

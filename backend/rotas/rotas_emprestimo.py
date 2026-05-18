@@ -20,7 +20,7 @@ router = APIRouter(prefix="/emprestimos", tags=["Pedidos de Apoio"])
 class SolicitacaoRequest(BaseModel):
     valor: Decimal = Field(gt=0, le=5000)  # limite R$ 5.000 por operação
     parcelas: int = Field(ge=1, le=12)
-    taxa_compensacao: Decimal = Field(ge=0, le=100)
+    taxa_compensacao: Decimal = Field(ge=0, le=12)  # limite 12% a.m. (evita usura)
     aceite_termos: bool
     aceite_termos_plataforma: bool = False
 
@@ -60,7 +60,7 @@ async def listar_oportunidades(page: int = 1, limit: int = 10, db: Session = Dep
             "valor_total": round(valor_total, 2),
             "valor_parcela": round(valor_parcela, 2),
             "parcelas": s.prazo_meses,
-            "taxa_match_estimada": round(float(max(Decimal("2.00"), min(Decimal("20.00"), s.valor * Decimal("0.02")))), 2),
+            "taxa_match_estimada": round(float(Decimal("2.00")), 2),
             "taxa_compensacao": taxa_juros,
             "score_tomador": float(s.usuario.score or 0),
             "verificado": s.usuario.is_verified,
@@ -76,13 +76,14 @@ async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db
     if pendente:
         raise HTTPException(status_code=400, detail="Voce ja tem um pagamento pendente. Aguarde ou cancele antes de gerar outro.")
     from rotas.rotas_financeiro import get_sdk
+    from utils_fintech import calcular_taxa_solicitacao
     sdk = get_sdk()
-    valor_taxa = Decimal("2.00")
+    valor_taxa = calcular_taxa_solicitacao(dados.valor)
 
     if sdk:
         payment_data = {
             "transaction_amount": float(valor_taxa or 0),
-            "description": f"Taxa de publicacao - {usuario_logado.nome}",
+            "description": f"Taxa de publicacao (R$ {valor_taxa}) - {usuario_logado.nome}",
             "payment_method_id": "pix",
             "payer": {"email": usuario_logado.email}
         }
@@ -113,7 +114,7 @@ async def gerar_taxa_solicitacao(dados: SolicitacaoRequest, request: Request, db
     db.commit()
 
     return {
-        "message": "Pague R$ 2,00 via PIX para publicar seu pedido.",
+        "message": f"Pague R$ {valor_taxa} via PIX para publicar seu pedido.",
         "valor": float(valor_taxa or 0),
         "qr_code": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code") if sdk else None,
         "qr_code_base64": payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64") if sdk else None,
@@ -152,11 +153,159 @@ async def verificar_transacao(transacao_id: int, db: Session = Depends(get_db), 
 @router.post("/aceitar-oferta/{id}")
 @limiter.limit("5/minute")
 async def aceitar_oferta_endpoint(request: Request, id: int, dados: AceiteRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
+    """
+    Investidor aceita uma oferta de emprestimo.
+    Exige aceite de termos e valida juros.
+    """
+    # 1. Busca a solicitacao
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+    ).first()
+    
+    if not solicitacao:
+        raise HTTPException(status_code=404, detail="Oferta nao encontrada ou ja aceita.")
+    
+    # 2. VALIDACAO DE JUROS (anti-usura)
+    taxa = solicitacao.taxa_juros or Decimal("0")
+    if taxa > Decimal("12"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Taxa de juros de {taxa}% ao mes excede o limite maximo permitido de 12% ao mes. "
+                   f"Operacoes com taxas acima deste limite podem ser consideradas usura."
+        )
+    
+    # 3. ACEITE OBRIGATORIO DE TERMOS
+    if not dados.aceite_termos_plataforma:
+        raise HTTPException(
+            status_code=400,
+            detail="Voce precisa aceitar os termos da plataforma para continuar."
+        )
+    
+    # 4. ACEITE DO TERMO DE CIENCIA DE RISCO (investidor)
+    # Verificar se ja existe termo aceite para este investidor neste pedido
+    from modelos.modelos_db import ContratoMutuo
+    termo_existente = db.query(ContratoMutuo).filter(
+        ContratoMutuo.solicitacao_emprestimo_id == id,
+        ContratoMutuo.investidor_id == usuario_logado.id,
+        ContratoMutuo.termo_risco_aceite == True
+    ).first()
+    
+    if not termo_existente:
+        # Retorna informacoes para o frontend mostrar o termo de risco
+        return {
+            "requer_ciencia_risco": True,
+            "mensagem": "ANTES DE ACEITAR: Voce precisa ler e aceitar o Termo de Ciencia de Risco. "
+                       "Emprestar dinheiro envolve riscos incluindo calote, atraso e perda total do capital.",
+            "aviso_legal": (
+                "ATENCAO: Ao aceitar esta oferta, voce esta realizando um MUTUO direto com outra pessoa fisica. "
+                "A Psy Pay NAO e parte na obrigacao, NAO garante o pagamento e NAO cobre prejuizos. "
+                "O risco do credito e EXCLUSIVAMENTE SEU."
+            ),
+            "riscos": [
+                "Risco de calote (nao pagamento)",
+                "Risco de atraso nas parcelas",
+                "Risco de fraude por parte do tomador",
+                "Risco de insolvencia do tomador",
+                "Perda total do capital emprestado"
+            ],
+            "proximo_passo": "Envie POST /emprestimos/aceitar-oferta/{id} com aceite_termos_plataforma=true E ciencia_risco=true"
+        }
+    
     try:
         result = aceitar_oferta(id, usuario_logado.id, db, ip_cliente=request.client.host, aceite_plataforma=dados.aceite_termos_plataforma)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
+
+@router.post("/aceitar-ciencia-risco/{id}")
+@limiter.limit("3/minute")
+async def aceitar_ciencia_risco(
+    request: Request,
+    id: int,
+    db: Session = Depends(get_db),
+    usuario_logado: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    Investidor aceita o Termo de Ciencia de Risco antes de aceitar uma oferta.
+    Registra o aceite com hash para auditoria.
+    """
+    solicitacao = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.PENDENTE
+    ).first()
+    
+    if not solicitacao:
+        raise HTTPException(status_code=404, detail="Oferta nao encontrada ou ja aceita.")
+    
+    from modelos.modelos_db import ContratoMutuo
+    
+    # Verifica se ja existe contrato para esta operacao
+    contrato = db.query(ContratoMutuo).filter(
+        ContratoMutuo.solicitacao_emprestimo_id == id,
+        ContratoMutuo.investidor_id == usuario_logado.id
+    ).first()
+    
+    if not contrato:
+        # Cria o contrato e o termo de risco
+        from utils_contrato import gerar_contrato_mutuo
+        from utils_termo_risco import gerar_termo_ciencia_risco, registrar_aceite_ciencia_risco
+        
+        tomador = db.query(Usuario).filter(Usuario.id == solicitacao.usuario_id).first()
+        
+        contrato_obj = gerar_contrato_mutuo(
+            pedido_id=id,
+            tomador_nome=tomador.nome,
+            tomador_cpf=tomador.cpf,
+            tomador_email=tomador.email,
+            investidor_nome=usuario_logado.nome,
+            investidor_cpf=usuario_logado.cpf,
+            investidor_email=usuario_logado.email,
+            valor_principal=solicitacao.valor,
+            taxa_juros_mensal=solicitacao.taxa_juros,
+            prazo_meses=solicitacao.prazo_meses
+        )
+        
+        # Gera e registra o termo de ciencia de risco
+        termo = gerar_termo_ciencia_risco(
+            investidor_nome=usuario_logado.nome,
+            investidor_cpf=usuario_logado.cpf,
+            pedido_id=id,
+            valor_emprestimo=float(solicitacao.valor),
+            ip=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        termo = registrar_aceite_ciencia_risco(termo, request.client.host, request.headers.get("user-agent"))
+        
+        # Cria registro no banco
+        contrato = ContratoMutuo(
+            numero_contrato=contrato_obj["numero_contrato"],
+            tomador_id=tomador.id,
+            investidor_id=usuario_logado.id,
+            solicitacao_emprestimo_id=id,
+            valor_principal=solicitacao.valor,
+            taxa_juros_mensal=solicitacao.taxa_juros,
+            prazo_meses=solicitacao.prazo_meses,
+            status="pendente",
+            termo_risco_aceite=True,
+            termo_risco_hash=termo["aceite"]["hash"],
+            hash_integridade=contrato_obj["hash_integridade"],
+            contrato_json=str(contrato_obj)
+        )
+        db.add(contrato)
+        db.commit()
+    else:
+        # Atualiza apenas o termo de risco se ja existe
+        contrato.termo_risco_aceite = True
+        db.commit()
+    
+    return {
+        "message": "Termo de Ciencia de Risco aceito com sucesso!",
+        "contrato_id": contrato.id,
+        "numero_contrato": contrato.numero_contrato,
+        "aviso": "Voce confirmou que entende os riscos do emprestimo P2P. Agora voce pode aceitar a oferta."
+    }
+
 
 @router.post("/confirmar-pagamento/{id}")
 async def confirmar_pagamento(id: int, dados: PagamentoRequest, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
@@ -322,4 +471,143 @@ async def cancelar_transacao_pendente(transacao_id: int, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Transacao pendente nao encontrada.")
     t.status = "cancelado"
     db.commit()
+
+
+# ============================================================================
+# NOVO: FLUXO P2P DIRETO (SEM INTERMEDIACAO FINANCEIRA)
+# ============================================================================
+
+@router.get("/chave-pix/{pedido_id}")
+async def obter_chave_pix_tomador(
+    pedido_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    Retorna a chave PIX do tomador para o investidor realizar a transferencia direta.
+    O dinheiro NUNCA passa pela plataforma.
+    """
+    pedido = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == pedido_id
+    ).first()
+    
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado.")
+    
+    # Apenas o credor (investidor) que aceitou pode ver a chave PIX
+    if pedido.credor_id != usuario.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas o investidor que aceitou o pedido pode ver a chave PIX."
+        )
+    
+    if pedido.status != StatusSolicitacao.APROVADO:
+        raise HTTPException(
+            status_code=400,
+            detail="O pedido precisa estar aprovado para visualizar a chave PIX."
+        )
+    
+    tomador = db.query(Usuario).filter(Usuario.id == pedido.usuario_id).first()
+    if not tomador:
+        raise HTTPException(status_code=404, detail="Tomador nao encontrado.")
+    
+    return {
+        "pedido_id": pedido.id,
+        "chave_pix": tomador.chave_pix,
+        "nome_tomador": tomador.nome,
+        "cpf_tomador_mascarado": f"***.{tomador.cpf[-4:]}" if tomador.cpf and len(tomador.cpf) >= 4 else "***",
+        "valor": float(pedido.valor),
+        "mensagem": (
+            f"Transfira R$ {pedido.valor} diretamente para {tomador.nome} via PIX. "
+            f"A Psy Pay NAO segura esse dinheiro. A transferencia e direta entre voces."
+        ),
+        "aviso_legal": (
+            "ATENCAO: Este e um mútuo entre particulares (art. 586, CC). "
+            "A Psy Pay apenas conectou as partes. A transferencia deve ser feita "
+            "diretamente via PIX para a chave acima. Guarde o comprovante."
+        )
+    }
+
+
+@router.post("/registrar-transferencia/{pedido_id}")
+async def registrar_transferencia_investidor(
+    pedido_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    Investidor registra que realizou a transferencia via PIX para o tomador.
+    Apenas um registro — o dinheiro ja foi transferido diretamente.
+    """
+    pedido = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == pedido_id,
+        SolicitacaoEmprestimo.credor_id == usuario.id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
+    
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado.")
+    
+    # Evita duplicacao
+    ja_registrado = db.query(Transacao).filter(
+        Transacao.detalhes.like(f"%TRANSFERENCIA_REALIZADA:{pedido_id}%"),
+        Transacao.usuario_id == usuario.id
+    ).first()
+    
+    if ja_registrado:
+        return {"message": "Transferencia ja registrada anteriormente."}
+    
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=pedido.valor,
+        tipo=TipoTransacao.CONFIRMACAO_PAGAMENTO,
+        status="concluido",
+        detalhes=f"TRANSFERENCIA_REALIZADA:{pedido_id} | Investidor confirmou envio de R$ {pedido.valor} via PIX direto ao tomador."
+    ))
+    db.commit()
+    
+    return {
+        "message": "Transferencia registrada! Aguarde o tomador confirmar o recebimento."
+    }
+
+
+@router.post("/registrar-recebimento-inicial/{pedido_id}")
+async def registrar_recebimento_tomador(
+    pedido_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    Tomador registra que recebeu o valor do emprestimo via PIX direto do investidor.
+    Apenas um registro — o dinheiro ja foi recebido diretamente.
+    """
+    pedido = db.query(SolicitacaoEmprestimo).filter(
+        SolicitacaoEmprestimo.id == pedido_id,
+        SolicitacaoEmprestimo.usuario_id == usuario.id,
+        SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
+    ).first()
+    
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado.")
+    
+    ja_registrado = db.query(Transacao).filter(
+        Transacao.detalhes.like(f"%RECEBIMENTO_CONFIRMADO:{pedido_id}%"),
+        Transacao.usuario_id == usuario.id
+    ).first()
+    
+    if ja_registrado:
+        return {"message": "Recebimento ja confirmado anteriormente."}
+    
+    db.add(Transacao(
+        usuario_id=usuario.id,
+        valor=pedido.valor,
+        tipo=TipoTransacao.CONFIRMACAO_RECEBIMENTO,
+        status="concluido",
+        detalhes=f"RECEBIMENTO_CONFIRMADO:{pedido_id} | Tomador confirmou recebimento de R$ {pedido.valor} via PIX direto do investidor."
+    ))
+    db.commit()
+    
+    return {
+        "message": "Recebimento confirmado! O contrato esta ativo. Nao se esqueca de pagar as parcelas via PIX diretamente ao investidor."
+    }
     return {"message": "Transacao cancelada."}

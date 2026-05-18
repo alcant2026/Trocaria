@@ -190,11 +190,9 @@ async def aprovar_resgate(transacao_id: int, db: Session = Depends(get_db), admi
         raise HTTPException(status_code=404, detail="Resgate nao encontrado.")
     transacao.status = "concluido"
     transacao.detalhes += f" | Aprovado por admin {admin.id}"
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo -= transacao.valor
+    # DEPRECATED: Nao deduzimos mais de saldo virtual. O admin deve enviar PIX diretamente do banco.
     db.commit()
-    return {"message": "Resgate aprovado! Envie o PIX para o usuario.", "chave_pix": None}
+    return {"message": "Resgate aprovado! Envie o PIX para o usuario diretamente da conta bancaria da empresa.", "chave_pix": None}
 
 
 @router.post("/admin/rejeitar-resgate/{transacao_id}")

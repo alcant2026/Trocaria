@@ -387,7 +387,7 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
         "usuario": {
             "id": usuario.id,
             "nome": usuario.nome,
-            "saldo": float(usuario.saldo or 0),
+            "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
             "score": float(usuario.score or 0),
             "is_admin": usuario.is_admin,
             "is_verified": usuario.is_verified,
@@ -408,7 +408,7 @@ async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado), db: Ses
     perfil = {
         "id": usuario.id,
         "nome": usuario.nome,
-        "saldo": float(usuario.saldo or 0),
+        "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
         "score": float(usuario.score or 0),
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,

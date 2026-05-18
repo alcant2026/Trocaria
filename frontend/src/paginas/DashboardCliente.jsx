@@ -3,18 +3,13 @@ import api from '../api';
 import {
     HandCoins,
     PlusCircle,
-    ArrowUpCircle,
-    ArrowDownCircle,
     ShieldCheck,
     LayoutDashboard,
     History,
     ChevronRight,
     TrendingUp,
-    Eye,
-    EyeOff,
     FileText,
     Clock,
-    Wallet,
     ShieldAlert,
     Copy,
     Check,
@@ -49,11 +44,8 @@ import {
     Flag,
     Sparkles,
     AlertTriangle,
-    DollarSign,
-    Landmark,
     PartyPopper,
     Info,
-    QrCode,
     Flame,
     TrendingDown,
     User
@@ -110,44 +102,6 @@ const ContractTimer = ({ expira4h, expira5d, arrecadado }) => {
     );
 };
 
-// Mapeamento global de tipos de transação
-const TIPOS_LABEL = {
-    deposito: 'Depósito',
-    saque: 'Saque',
-    recebimento: 'Recebimento',
-    desbloqueio_dados: 'Verificação KYC',
-    compra_score: 'Compra de Score',
-    taxa_match: 'Taxa de Match',
-    taxa_solicitacao: 'Taxa de Publicação',
-    taxa_saque: 'Taxa de Saque',
-    taxa_intermediacao: 'Taxa de Intermediação',
-    taxa_postagem: 'Marketplace',
-    taxa_adm_emprestimo: 'Taxa Admin',
-    confirmacao_pagamento: 'Pagamento Pendente',
-    confirmacao_recebimento: 'Recebimento Confirmado',
-    pagamento_parcela: 'Pagamento de Parcela',
-    assinatura: 'Assinatura Premium',
-    bonus: 'Bônus',
-    resgate_pontos: 'Resgate de Pontos',
-    retorno_investimento: 'Retorno Investimento',
-    aporte_capital: 'Aporte de Capital',
-};
-
-const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_match', 'taxa_solicitacao', 'taxa_saque', 'taxa_intermediacao', 'taxa_postagem', 'taxa_adm_emprestimo', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento', 'resgate_pontos']);
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'bonus', 'confirmacao_recebimento', 'retorno_investimento', 'aporte_capital']);
-const TIPOS_NEGATIVO = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura']);
-
-const formatarTipo = (tipo, detalhes) => {
-    if (tipo === 'taxa_postagem' && detalhes) {
-        if (detalhes.includes('DESTAQUE_LINK')) return 'Destaque de Anúncio';
-        if (detalhes.includes('BOOST_LINK')) return 'Boost de Views';
-        return 'Marketplace';
-    }
-    return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Transação';
-};
-const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
-const corValor = (tipo) => TIPOS_SAIDA.has(tipo) || tipo === 'saque' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
-
 // Timer regressivo para cards do marketplace
 const MarketTimer = ({ expiresAt }) => {
     const tempo = useCountdown(expiresAt);
@@ -156,10 +110,23 @@ const MarketTimer = ({ expiresAt }) => {
 };
 
 
+const NOMES_SECOES = {
+    home: 'Início',
+    solicitar: 'Solicitar Apoio',
+    oportunidades: 'Oportunidades',
+    score: 'Meu Score',
+    historico: 'Histórico',
+    contratos: 'Meus Contratos',
+    marketplace: 'Marketplace',
+    'novo-anuncio': 'Novo Anúncio',
+    'detalhes-produto': 'Detalhes',
+    'pagar-taxa': 'Pagamento',
+};
+
 const DashboardCliente = ({ initialView = 'home' }) => {
     const [usuario, setUsuario] = useState(() => {
         const cached = localStorage.getItem('usuario_snapshot');
-        return cached ? JSON.parse(cached) : { nome: '', saldo: 0, score: 0 };
+        return cached ? JSON.parse(cached) : { nome: '', score: 0 };
     });
     const [snapshot, setSnapshot] = useState(() => {
         const cached = localStorage.getItem('full_snapshot');
@@ -167,7 +134,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     });
     const savedView = sessionStorage.getItem('psypay_activeView') || initialView;
     const [activeView, setActiveView] = useState(savedView);
-    const [verSaldo, setVerSaldo] = useState(true);
+    // DEPRECATED: saldo removido. A Psy Pay nao segura dinheiro de usuarios.
     const [aceiteTermos, setAceiteTermos] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     
@@ -203,28 +170,16 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [modal, setModal] = useState({ open: false, type: '', data: null });
 
     // Forms state
-    const [valorNotificacao, setValorNotificacao] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editTelefone, setEditTelefone] = useState('');
     const [editChavePix, setEditChavePix] = useState('');
-    const [metodoDeposito, setMetodoDeposito] = useState('pix');
-    const [parceiroIdDeposito, setParceiroIdDeposito] = useState('');
     const [parceiros, setParceiros] = useState([]);
-
-    const [valorSaque, setValorSaque] = useState('');
-    const [metodoSaque, setMetodoSaque] = useState('pix');
-    const [parceiroIdSaque, setParceiroIdSaque] = useState('');
 
     const [valor, setValor] = useState('');
     const [parcelas, setParcelas] = useState(1);
     const [taxaCompensacao, setTaxaCompensacao] = useState('5');
-    const [senhaSaque, setSenhaSaque] = useState('');
-    const [showSenhaSaque, setShowSenhaSaque] = useState(false);
 
     const [loadingPDF, setLoadingPDF] = useState(false);
-    const [codigo2faSaque, setCodigo2faSaque] = useState('');
-    const [passoDeposito, setPassoDeposito] = useState(1);
-    const [passoSaque, setPassoSaque] = useState(1);
     const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
     const [tipoUpgrade, setTipoUpgrade] = useState(null);
@@ -573,7 +528,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 taxa_compensacao: tx, aceite_termos: true, aceite_termos_plataforma: true
             });
             if (taxaRes.qr_code) {
-                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id, transacao_id: taxaRes.transacao_id });
+                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id, transacao_id: taxaRes.transacao_id, valor: taxaRes.valor });
                 setActiveView('pagar-taxa');
             } else {
                 setMensagem('Erro ao gerar PIX.');
@@ -656,35 +611,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     };
 
 
-    const handleDepositarVirtual = async () => {
-        const v = parseFloat(valorNotificacao);
-        if (!v || v <= 0) {
-            showModal({ title: 'Valor Inválido', message: 'Informe um valor maior que zero.', type: 'error' });
-            return;
-        }
-        if (v < 10) {
-            showModal({ title: 'Valor Mínimo', message: 'O valor mínimo para depósito virtual é R$ 10,00.', type: 'warning' });
-            return;
-        }
-        setLoadingAction(true);
-        try {
-            const res = await api.post('/financeiro/deposito-pix', { valor: v });
-            if (res.qr_code) {
-                setQrCodeData({ qr_code: res.qr_code, qr_code_base64: res.qr_code_base64, payment_id: res.payment_id || 'virtual' });
-                setPassoDeposito(2);
-            } else {
-                showModal({ title: 'Pronto!', message: `Crédito de R$ ${v.toFixed(2)} liberado!`, type: 'success' });
-                carregarSnapshot();
-                setActiveView('home');
-            }
-        } catch (err) {
-            showModal({ title: 'Erro', message: err.response?.data?.detail || err.message, type: 'error' });
-        } finally {
-            setLoadingAction(false);
-        }
-    };
-
-
     const handleSincronizarPix = async () => {
         setLoadingAction(true);
         try {
@@ -692,7 +618,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             if (res.status === 'success') {
                 showModal({ title: 'Sucesso', message: res.message, type: 'success' });
                 setActiveView('home');
-                setPassoDeposito(1);
                 carregarSnapshot();
             } else {
                 showModal({ title: 'Atenção', message: res.message, type: 'warning' });
@@ -701,70 +626,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             showModal({ title: 'Aguarde', message: 'Pagamento ainda não detectado. Tente novamente em 1 minuto.', type: 'info' });
         } finally {
             setLoadingAction(false);
-        }
-    };
-
-    const handleNotificarDeposito = async () => {
-        const v = parseFloat(valorNotificacao);
-        if (!v || v <= 0) {
-            showModal({ title: 'Valor Inválido', message: 'Informe um valor de depósito maior que zero.', type: 'error' });
-            return;
-        }
-        if (metodoDeposito === 'especie' && !parceiroIdDeposito) {
-            showModal({ title: 'Parceiro Obrigatório', message: 'Selecione o estabelecimento para o depósito.', type: 'warning' });
-            return;
-        }
-        setLoadingAction(true);
-        try {
-            await api.post('/financeiro/notificar-deposito', { 
-                valor: v,
-                metodo: metodoDeposito,
-                parceiro_id: metodoDeposito === 'especie' ? parseInt(parceiroIdDeposito) : null
-            });
-            showModal({ title: 'Notificação Enviada', message: 'Seu depósito está sendo analisado.', type: 'success' });
-            setValorNotificacao('');
-            setParceiroIdDeposito('');
-            carregarSnapshot();
-            setActiveView('home');
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
-        } finally {
-            setLoadingAction(false);
-        }
-    };
-
-    const handleSolicitarSaque = async () => {
-        if (!senhaSaque || !codigo2faSaque) {
-            setMensagem('Erro: Senha e Código 2FA são obrigatórios.');
-            return;
-        }
-        const v = parseFloat(valorSaque);
-        if (!v || v <= 0) {
-            setMensagem('Erro: O valor de saque deve ser maior que zero.');
-            return;
-        }
-        if (metodoSaque === 'especie' && !parceiroIdSaque) {
-            setMensagem('Erro: Selecione o parceiro para o saque.');
-            return;
-        }
-        try {
-            await api.post('/financeiro/solicitar-saque', {
-                valor: v || 0,
-                metodo: metodoSaque || 'pix',
-                parceiro_id: metodoSaque === 'especie' ? (parseInt(parceiroIdSaque) || null) : null,
-                chave_pix: metodoSaque === 'pix' ? (usuario.chave_pix || "") : "",
-                senha: senhaSaque || "",
-                codigo_2fa: codigo2faSaque || ""
-            });
-            setMensagem('Solicitação de saque enviada com sucesso!');
-            setValorSaque('');
-            setSenhaSaque('');
-            setCodigo2faSaque('');
-            setParceiroIdSaque('');
-            setActiveView('home');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
         }
     };
 
@@ -875,22 +736,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const handleReverPix = async (transacaoId) => {
-        try {
-            const res = await api.get(`/financeiro/deposito/pix-detalhes/${transacaoId}`);
-            setQrCodeData({
-                qr_code: res.qr_code,
-                qr_code_base64: res.qr_code_base64,
-                payment_id: res.payment_id,
-                expires_at: res.expires_at
-            });
-            setActiveView('depositar');
-            setPassoDeposito(2);
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        }
-    };
-
     const handleCancelarPendente = async (id) => {
         if (!confirm('Cancelar esta transacao pendente?')) return;
         try {
@@ -899,28 +744,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             carregarSnapshot();
         } catch (err) {
             setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        }
-    };
-
-    const handleConfirmarRecebimento = async (id) => {
-        if (!confirm('Deseja confirmar que recebeu o PIX deste saque corretamente na sua conta?')) return;
-        setLoadingAction(true);
-        try {
-            await api.post(`/financeiro/confirmar-recebimento/${id}`);
-            showModal({ 
-                title: 'Confirmado!', 
-                message: 'Obrigado por confirmar o recebimento. Isso ajuda na segurança da nossa comunidade.', 
-                type: 'success' 
-            });
-            carregarSnapshot();
-        } catch (err) {
-            showModal({ 
-                title: 'Erro na Confirmação', 
-                message: err.message || 'Não foi possível confirmar o recebimento agora.', 
-                type: 'danger' 
-            });
-        } finally {
-            setLoadingAction(false);
         }
     };
 
@@ -1049,7 +872,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     </div>
                     <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pague a Taxa via PIX</h3>
                     <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
-                        Pague R$ 2,00 para publicar seu pedido. O pedido sera criado automaticamente apos a confirmacao do pagamento.
+                        Pague R$ {(qrCodeData.valor || 0).toFixed(2)} para publicar seu pedido. O pedido sera criado automaticamente apos a confirmacao do pagamento.
                     </p>
                     {qrCodeData.qr_code_base64 && (
                         <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
@@ -1111,9 +934,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     loadingAction={loadingAction}
                     paginaHist={paginaHist}
                     setPaginaHist={setPaginaHist}
-                    handleReverPix={handleReverPix}
                     handleCancelarPendente={handleCancelarPendente}
-                    handleConfirmarRecebimento={handleConfirmarRecebimento}
                 />
             )}
 

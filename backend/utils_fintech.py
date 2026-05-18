@@ -13,6 +13,12 @@ def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Dec
     if not usuario:
         raise ValueError("Usuário não encontrado.")
 
+    # Anti-fraude: verifica tomador antes de criar pedido
+    from utils_seguranca import verificar_conta_suspeita
+    risco = verificar_conta_suspeita(db, usuario)
+    if risco["bloquear_operacoes"]:
+        raise ValueError(f"Operacao bloqueada: conta em analise. Motivo: {', '.join(risco['flags'])}")
+
     agora = datetime.datetime.now(datetime.timezone.utc)
     nova_solicitacao = SolicitacaoEmprestimo(
         usuario_id=usuario.id,
@@ -36,13 +42,17 @@ def criar_solicitacao_p2p(usuario_id: str, valor: Decimal, prazo: int, taxa: Dec
     return nova_solicitacao
 
 
-def calcular_taxa_match(valor: Decimal) -> Decimal:
+def calcular_taxa_solicitacao(valor: Decimal) -> Decimal:
     taxa = valor * Decimal("0.02")
     if taxa < Decimal("2.00"):
         taxa = Decimal("2.00")
     if taxa > Decimal("20.00"):
         taxa = Decimal("20.00")
     return taxa
+
+
+def calcular_taxa_match(valor: Decimal) -> Decimal:
+    return Decimal("2.00")
 
 
 def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session, ip_cliente: str = None, aceite_plataforma: bool = False) -> dict:
@@ -62,6 +72,15 @@ def aceitar_oferta(solicitacao_id: int, credor_id: str, db: Session, ip_cliente:
 
     if not credor:
         raise ValueError("Usuário não encontrado.")
+
+    # Anti-fraude: verifica credor e tomador
+    from utils_seguranca import verificar_conta_suspeita
+    risco_credor = verificar_conta_suspeita(db, credor)
+    if risco_credor["bloquear_operacoes"]:
+        raise ValueError(f"Operacao bloqueada: conta do apoiador em analise. Motivo: {', '.join(risco_credor['flags'])}")
+    risco_tomador = verificar_conta_suspeita(db, tomador)
+    if risco_tomador["bloquear_operacoes"]:
+        raise ValueError(f"Operacao bloqueada: conta do tomador em analise. Motivo: {', '.join(risco_tomador['flags'])}")
 
     taxa_match = calcular_taxa_match(solicitacao.valor)
     agora = datetime.datetime.now(datetime.timezone.utc)

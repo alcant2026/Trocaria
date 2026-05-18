@@ -197,40 +197,11 @@ async def comprar_views_ads(dados: CompraViewsRequest, db: Session = Depends(get
     custo = pacote["preco"]
     views = pacote["views"]
     
-    if usuario.saldo < custo:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente para impulsionar.")
-    
-    # 1. Deduzir saldo do usuário
-    usuario.saldo -= custo
-    
-    # 2. Direcionar Lucro para a Empresa (Plataforma ID 000PL - Lucro Livre)
-    plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-    if plataforma:
-        plataforma.saldo += custo
-
-    # 3. Atualizar Link
-    link.visualizacoes_restantes += views
-    link.is_boosted = True
-    link.ponto_min = pacote["ponto_min"]
-    link.ponto_max = pacote["ponto_max"]
-    # Estender expiração para longa duração (ex: +30 dias de vida no banco)
-    link.data_expiracao = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
-    
-    # 4. Registrar Transação de Saída
-    transacao = Transacao(
-        usuario_id=usuario.id,
-        valor=custo,
-        tipo=TipoTransacao.TAXA_POSTAGEM, # Log da receita Ads
-        status="concluido",
-        detalhes=f"IMPULSIONAMENTO ADS: {views} views para o link #{link.id}"
+    # DEPRECATED: Sistema de saldo removido. Use a rota /financeiro/assinar-plano ou /financeiro/webhook para pagar taxas via PIX.
+    raise HTTPException(
+        status_code=410,
+        detail="Sistema de saldo descontinuado. Para impulsionar links, use o pagamento via PIX direto (taxa de servico)."
     )
-    db.add(transacao)
-
-    # NOVO: Acumular no gasto total de taxas para dividendos
-    
-    db.commit()
-    
-    return {"message": f"Sucesso! {views} visualizações adicionadas ao seu link.", "saldo_restante": float(usuario.saldo or 0)}
 
 @router.get("/meus-links")
 async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):

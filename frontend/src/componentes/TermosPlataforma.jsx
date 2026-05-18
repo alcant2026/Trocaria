@@ -17,12 +17,12 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
 
                 {tipo === 'criar' && (
                     <p><strong style={{ color: 'var(--text-main)' }}>3. Taxa de Publicacao</strong><br />
-                    A taxa de R$ 2,00 (ou outro valor definido) e destinada a cobrir custos operacionais da plataforma. Esta taxa <strong>nao e reembolsavel</strong>, mesmo que o pedido nao seja aceito por nenhum apoiador.</p>
+                    A taxa de publicacao e de 2% do valor solicitado (minimo R$ 2,00, maximo R$ 20,00) e destinada a cobrir custos operacionais da plataforma. Esta taxa <strong>nao e reembolsavel</strong>, mesmo que o pedido nao seja aceito por nenhum apoiador.</p>
                 )}
 
                 {tipo === 'apoiar' && (
                     <p><strong style={{ color: 'var(--text-main)' }}>3. Taxa de Match</strong><br />
-                    A taxa de match de 2% (minimo R$ 2, maximo R$ 20) sera adicionada ao valor combinado e paga pelo tomador. Esta taxa cobre o servico de conexao entre as partes e <strong>nao e reembolsavel</strong> apos a confirmacao.</p>
+                    A taxa de match e fixa no valor de R$ 2,00 e paga pelo apoiador para confirmar o match. Esta taxa cobre o servico de conexao entre as partes e <strong>nao e reembolsavel</strong> apos a confirmacao.</p>
                 )}
 
                 <p><strong style={{ color: 'var(--text-main)' }}>4. Nao Garantia de Pagamento</strong><br />

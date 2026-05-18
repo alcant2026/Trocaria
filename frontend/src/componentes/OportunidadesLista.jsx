@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Star, ShieldCheck, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, User, Star, ShieldCheck, AlertTriangle, CheckCircle, Copy, Check, FileText, AlertCircle } from 'lucide-react';
 import api from '../api';
 import TermosPlataforma from './TermosPlataforma';
 import PagamentoPolling from './PagamentoPolling';
@@ -14,6 +14,9 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     const [copiado, setCopiado] = useState(false);
     const [showTermosAceite, setShowTermosAceite] = useState(false);
     const [pendenteAceitarId, setPendenteAceitarId] = useState(null);
+    const [showContratoModal, setShowContratoModal] = useState(false);
+    const [contratoSelecionado, setContratoSelecionado] = useState(null);
+    const [aceiteContrato, setAceiteContrato] = useState(false);
 
     useEffect(() => {
         carregar(true);
@@ -39,8 +42,27 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
     };
 
     const aceitar = async (id) => {
-        setPendenteAceitarId(id);
-        setShowTermosAceite(true);
+        const op = oportunidades.find(o => o.id === id);
+        if (!op) return;
+        setContratoSelecionado(op);
+        setAceiteContrato(false);
+        setShowContratoModal(true);
+    };
+
+    const prosseguirAceite = async () => {
+        if (!contratoSelecionado) return;
+        if (!aceiteContrato) {
+            alert('Você deve aceitar o Contrato de Mútuo e o Termo de Ciência de Risco para continuar.');
+            return;
+        }
+        try {
+            await api.post(`/emprestimos/aceitar-ciencia-risco/${contratoSelecionado.id}`);
+            setShowContratoModal(false);
+            setPendenteAceitarId(contratoSelecionado.id);
+            setShowTermosAceite(true);
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
     };
 
     const aceitarAposAceite = async () => {
@@ -251,6 +273,43 @@ const OportunidadesLista = ({ usuario, onUpdate }) => {
                     }} disabled={loading} style={{ padding: '8px 20px' }}>
                         {loading ? 'Carregando...' : 'Carregar Mais Pedidos'}
                     </button>
+                </div>
+            )}
+
+            {showContratoModal && contratoSelecionado && (
+                <div className="modal-overlay" onClick={() => setShowContratoModal(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            <FileText size={32} color="var(--primary)" />
+                            <h3 style={{ margin: '0.5rem 0 0.25rem' }}>Contrato de Mútuo</h3>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Revise os dados antes de confirmar seu apoio.</p>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                            <p><strong>Tomador:</strong> {contratoSelecionado.tomador_nome}</p>
+                            <p><strong>Valor:</strong> R$ {contratoSelecionado.valor?.toFixed(2)}</p>
+                            <p><strong>Taxa de Juros:</strong> {contratoSelecionado.taxa_juros}%</p>
+                            <p><strong>Prazo:</strong> {contratoSelecionado.parcelas}x</p>
+                            <p><strong>Valor da Parcela:</strong> R$ {contratoSelecionado.valor_parcela?.toFixed(2)}</p>
+                            <p><strong>Total Devido:</strong> R$ {contratoSelecionado.valor_total?.toFixed(2)}</p>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.8rem', marginBottom: '1rem', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={aceiteContrato}
+                                onChange={(e) => setAceiteContrato(e.target.checked)}
+                                style={{ marginTop: '2px' }}
+                            />
+                            <span>Li e aceito o <strong>Contrato de Mútuo</strong> e o <strong>Termo de Ciência de Risco</strong>.</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={prosseguirAceite}>
+                                Prosseguir
+                            </button>
+                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowContratoModal(false)}>
+                                Voltar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -72,33 +72,23 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         for emp in emprestimos_ativos:
             divida_total_pendente += calcular_divida_total(emp)
         
-        saldo_caixa_total = usuario.saldo_caixa or Decimal("0.00")
-        saldo_caixa_disponivel = max(Decimal("0.00"), saldo_caixa_total - divida_total_pendente)
+        # DEPRECATED: saldo e saldo_caixa removidos. A Psy Pay nao segura dinheiro de usuarios.
+        saldo_caixa_total = Decimal("0.00")
+        saldo_caixa_disponivel = Decimal("0.00")
 
         # 0.1 Calcular Métricas Financeiras (Otimizado)
         capital_aportado = Decimal("0.00")
         capital_resgatado = Decimal("0.00")
-        if usuario.saldo_caixa and usuario.saldo_caixa > 0:
-            capital_aportado = db.query(func.coalesce(func.sum(Transacao.valor), 0)).filter(
-                Transacao.usuario_id == usuario.id,
-                Transacao.tipo.in_([TipoTransacao.APORTE_CAIXA, TipoTransacao.APORTE_POOL]),
-                Transacao.status == "concluido"
-            ).scalar() or Decimal("0.00")
-            capital_resgatado = db.query(func.coalesce(func.sum(Transacao.valor), 0)).filter(
-                Transacao.usuario_id == usuario.id,
-                Transacao.tipo.in_([TipoTransacao.RESGATE_CAIXA, TipoTransacao.RESGATE_POOL]),
-                Transacao.status == "concluido"
-            ).scalar() or Decimal("0.00")
 
-        capital_liquido = max(Decimal("0.00"), capital_aportado - capital_resgatado)
-        rendimento_abs = max(Decimal("0.00"), (usuario.saldo_caixa or 0) - capital_liquido)
-        rendimento_pct = (float(rendimento_abs) / float(capital_liquido)) * 100 if capital_liquido > 0 else 0.0
+        capital_liquido = Decimal("0.00")
+        rendimento_abs = Decimal("0.00")
+        rendimento_pct = 0.0
 
         snapshot = {
             "perfil": {
                 "id": usuario.id,
                 "nome": usuario.nome,
-                "saldo": float(usuario.saldo or 0),
+                "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
                 "score": float(usuario.score or 0),
                 "is_admin": usuario.is_admin,
                 "is_verified": usuario.is_verified,
@@ -276,24 +266,20 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             # Fiscal Resumo Otimizado (Lógica replicada de rotas_financeiro para evitar circularidade)
 
-            # Soma de saldos de usuários REAIS (Exclui conta de sistema 000PL)
-            saldo_usuarios = db.query(func.sum(Usuario.saldo)).filter(Usuario.id != "000PL").scalar() or Decimal("0.00")
+            # DEPRECATED: saldo e saldo_caixa descontinuados. A Psy Pay nao segura dinheiro de usuarios.
+            saldo_usuarios = Decimal("0.00")
             total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
-            # 1. Saldo Total no Pool (Soma de todos os usuários)
-            saldo_pool_caixa = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+            # 1. Saldo Total no Pool - DESCONTINUADO
+            saldo_pool_caixa = Decimal("0.00")
 
-            # 2. Dados da Plataforma (Usuário 000PL) para Isolação
+            # 2. Dados da Plataforma - tracking de receita (nao e dinheiro disponivel para saque)
             plataforma = db.query(Usuario).filter(Usuario.id == "000PL").first()
-            if not plataforma:
-                p_saldo = Decimal("0.00")
-                p_saldo_caixa = Decimal("0.00")
-            else:
-                p_saldo = plataforma.saldo or Decimal("0.00")
-                p_saldo_caixa = plataforma.saldo_caixa or Decimal("0.00")
+            p_saldo = Decimal("0.00")  # DEPRECATED
+            p_saldo_caixa = Decimal("0.00")  # DEPRECATED
 
             total_sacado_admin = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.usuario_id == "000PL", # Saques agora são no 000PL
@@ -431,10 +417,9 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 SolicitacaoEmprestimo.status == StatusSolicitacao.APROVADO
             ).scalar() or Decimal("0.00")
 
-            # 5. Reconciliação Híbrida:
-            # Se o saldo atual é maior que (Aportes - Resgates), a diferença é lucro histórico (antes dos logs detalhados)
-            capital_liquido_investido = total_aportado_pool - total_resgatado_pool
-            lucro_reconciliado = max(Decimal("0.00"), usuario.saldo_caixa - capital_liquido_investido)
+            # 5. Reconciliação Híbrida - DEPRECATED: saldo_caixa descontinuado
+            capital_liquido_investido = Decimal("0.00")
+            lucro_reconciliado = Decimal("0.00")
             
             # Usamos o maior entre a reconciliação e a soma dos logs (para evitar duplicidade ou perdas)
             juros_acumulados_pool = max(lucro_reconciliado, juros_via_logs)
@@ -568,8 +553,8 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                     "id": u.id,
                     "nome": u.nome,
                     "cpf": u.cpf,
-                    "saldo": float(u.saldo or 0),
-                    "saldo_caixa": float(u.saldo_caixa or 0),
+                    "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
+                    "saldo_caixa": 0.0,  # DEPRECATED
                     "score": float(u.score or 0),
                     "is_verified": u.is_verified,
                     "is_good_payer": fidelidade_map.get(u.id, False)

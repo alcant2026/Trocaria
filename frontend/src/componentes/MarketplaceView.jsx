@@ -84,7 +84,7 @@ const MarketplaceView = ({
                         <h4 style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                             <Zap size={18} fill="var(--primary)" /> MEMBRO PREMIUM ATIVO
                         </h4>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Você ganha 1 ponto por cada link aberto. A cada 1.000 pontos = R$ 0,10 de saldo!</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Você ganha 1 ponto por cada link aberto. A cada 1.000 pontos = R$ 0,10 de premio! (pago via PIX direto)</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Seus Pontos</div>

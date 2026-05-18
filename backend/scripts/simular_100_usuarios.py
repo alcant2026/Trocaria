@@ -196,10 +196,11 @@ with engine.connect() as conn:
     print(f"\nCriando transacoes de taxa...")
     taxa_count = 0
     for uid in random.sample(usuarios_criados, 30):
+        valor_taxa = round(random.uniform(2.00, 20.00), 2)
         conn.execute(text("""
             INSERT INTO transacoes (usuario_id, valor, tipo, status, data_criacao, metodo, detalhes)
-            VALUES (:uid, 2.00, 'taxa_solicitacao', 'concluido', :data, 'pix', 'Taxa de publicacao simulada')
-        """), {"uid": uid, "data": agora - datetime.timedelta(days=random.randint(1, 30))})
+            VALUES (:uid, :valor, 'taxa_solicitacao', 'concluido', :data, 'pix', 'Taxa de publicacao simulada')
+        """), {"uid": uid, "valor": valor_taxa, "data": agora - datetime.timedelta(days=random.randint(1, 30))})
         taxa_count += 1
     print(f"  {taxa_count} transacoes de taxa criadas")
 

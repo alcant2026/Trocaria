@@ -12,38 +12,46 @@ class StatusSolicitacao(enum.Enum):
     CONCLUIDO = "concluido"
 
 class TipoTransacao(enum.Enum):
-    DEPOSITO = "deposito"
-    SAQUE = "saque"
-    INVESTIMENTO = "investimento"
-    RECEBIMENTO = "recebimento"
-    COMPRA_SCORE = "compra_score"
-    DESBLOQUEIO_DADOS = "desbloqueio_dados"
-    TAXA_SAQUE = "taxa_saque"
-    TAXA_INTERMEDIACAO = "taxa_intermediacao"
-    TAXA_MATCH = "taxa_match"
-    TAXA_ESPECIE = "taxa_especie"  # deprecated - mantido para compatibilidade
-    APORTE_CAPITAL = "aporte_capital"
-    PAGAMENTO_PARCELA = "pagamento_parcela"
-    TAXA_POSTAGEM = "taxa_postagem"
-    RETORNO_INVESTIMENTO = "retorno_investimento"
-    APORTE_CAIXA = "aporte_caixa"
-    RESGATE_CAIXA = "resgate_caixa"
-    APORTE_POOL = "aporte_pool"
-    RESGATE_POOL = "resgate_pool"
-    ABERTURA_GAVETA = "abertura_gaveta"
-    FECHAMENTO_GAVETA = "fechamento_gaveta"
-    BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"
-    RETORNO_POOL = "retorno_pool"
-    COMISSAO_PARCEIRO = "comissao_parceiro"  # deprecated - mantido para compatibilidade
-    TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"
-    TAXA_DEPOSITO_VIRTUAL = "taxa_deposito_virtual"
-    TAXA_SOLICITACAO = "taxa_solicitacao"
-    TAXA_ORIGEM = "taxa_origem"
-    CONFIRMACAO_PAGAMENTO = "confirmacao_pagamento"
-    CONFIRMACAO_RECEBIMENTO = "confirmacao_recebimento"
-    ASSINATURA = "assinatura"
-    RESGATE_PONTOS = "resgate_pontos"
-    BONUS = "bonus"
+    # === TIPOS DEPRECADOS (remover em migracao futura) ===
+    # DEPOSITO e SAQUE removidos pois a Psy Pay nao e instituicao financeira
+    # e nao pode segurar dinheiro de usuarios (Lei 12.865/2013, Lei 4.595/1964)
+    DEPOSITO = "deposito"  # DEPRECATED: nao usar
+    SAQUE = "saque"  # DEPRECATED: nao usar
+    
+    # === TIPOS VALIDOS (taxas de servico e registros P2P) ===
+    INVESTIMENTO = "investimento"  # Registro de intencao de investimento (nao movimenta dinheiro)
+    RECEBIMENTO = "recebimento"  # Confirmacao de recebimento P2P
+    COMPRA_SCORE = "compra_score"  # Taxa de servico
+    DESBLOQUEIO_DADOS = "desbloqueio_dados"  # Taxa de servico (KYC)
+    TAXA_SAQUE = "taxa_saque"  # DEPRECATED: renomear para taxa_cobranca
+    TAXA_SERVICO = "taxa_servico"  # Taxa generica de servico (substitui intermediacao)
+    TAXA_MATCH = "taxa_match"  # Taxa de publicacao/match
+    TAXA_ESPECIE = "taxa_especie"  # DEPRECATED
+    PAGAMENTO_PARCELA = "pagamento_parcela"  # Registro de confirmacao P2P
+    TAXA_POSTAGEM = "taxa_postagem"  # Taxa de destaque no marketplace
+    TAXA_ADM_EMPRESTIMO = "taxa_adm_emprestimo"  # Taxa de uso de ferramenta de cobranca
+    TAXA_SOLICITACAO = "taxa_solicitacao"  # Taxa de publicacao de pedido
+    TAXA_ORIGEM = "taxa_origem"  # Taxa de servico
+    CONFIRMACAO_PAGAMENTO = "confirmacao_pagamento"  # Registro P2P (investidor confirma pagamento)
+    CONFIRMACAO_RECEBIMENTO = "confirmacao_recebimento"  # Registro P2P (tomador confirma recebimento)
+    ASSINATURA = "assinatura"  # Assinatura Premium (taxa de servico)
+    RESGATE_PONTOS = "resgate_pontos"  # Premiacao do ranking (pago via PIX direto)
+    BONUS = "bonus"  # Pontos de indicacao (sem valor monetario direto)
+    
+    # === TIPOS DEPRECADOS DE POOL/CAPITAL (remover em migracao) ===
+    APORTE_CAPITAL = "aporte_capital"  # DEPRECATED: nao usar
+    APORTE_CAIXA = "aporte_caixa"  # DEPRECATED: nao usar
+    RESGATE_CAIXA = "resgate_caixa"  # DEPRECATED: nao usar
+    APORTE_POOL = "aporte_pool"  # DEPRECATED: nao usar
+    RESGATE_POOL = "resgate_pool"  # DEPRECATED: nao usar
+    RETORNO_INVESTIMENTO = "retorno_investimento"  # DEPRECATED: nao usar
+    RETORNO_POOL = "retorno_pool"  # DEPRECATED: nao usar
+    ABERTURA_GAVETA = "abertura_gaveta"  # DEPRECATED: nao usar
+    FECHAMENTO_GAVETA = "fechamento_gaveta"  # DEPRECATED: nao usar
+    BONUS_PAGADOR_CAIXA = "bonus_pagador_caixa"  # DEPRECATED: nao usar
+    COMISSAO_PARCEIRO = "comissao_parceiro"  # DEPRECATED: nao usar
+    TAXA_DEPOSITO_VIRTUAL = "taxa_deposito_virtual"  # DEPRECATED: nao usar
+    TAXA_INTERMEDIACAO = "taxa_intermediacao"  # DEPRECATED: renomeado para taxa_servico
 
 class RegistroAuditoria(Base):
     __tablename__ = "registros_auditoria"
@@ -63,6 +71,8 @@ class Usuario(Base):
     cpf = Column(String(14), unique=True, index=True, nullable=False)
     senha_hash = Column(Text, nullable=False)
     chave_pix = Column(String(255), nullable=False)
+    # DEPRECATED: saldo e saldo_caixa serao removidos na proxima migracao.
+    # A Psy Pay nao segura dinheiro de usuarios (Lei 12.865/2013, art. 8o).
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
     valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)
@@ -400,3 +410,122 @@ class DenunciaUsuario(Base):
     
     denunciante = relationship("Usuario", foreign_keys=[denunciante_id])
     denunciado = relationship("Usuario", foreign_keys=[denunciado_id])
+
+
+class Disputa(Base):
+    """Sistema de disputas e mediação entre usuários (Tomador x Investidor)."""
+    __tablename__ = "disputas"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    solicitacao_emprestimo_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"), nullable=False, index=True)
+    
+    # Partes envolvidas
+    requerente_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    requerido_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    # Tipo e descrição
+    tipo = Column(String(50), nullable=False)  # nao_recebimento, valor_incorreto, calote, fraude, outro
+    descricao = Column(Text, nullable=False)
+    evidencias = Column(Text, nullable=True)  # JSON com URLs ou descrições de evidências
+    
+    # Status do processo de mediação
+    status = Column(String(30), default="aberta")  # aberta, em_analise, mediando, resolvida, encaminhada_judicial, cancelada
+    
+    # Resolução
+    decisao = Column(Text, nullable=True)  # Descrição da decisão da mediação
+    decisao_favoravel_a = Column(String(5), ForeignKey("usuarios.id"), nullable=True)  # Quem ganhou a disputa
+    valor_ressarcimento = Column(Numeric(precision=20, scale=2), nullable=True)
+    
+    # Prazos
+    data_abertura = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_analise = Column(DateTime, nullable=True)  # Quando um analista pegou o caso
+    data_resolucao = Column(DateTime, nullable=True)
+    data_limite_resposta = Column(DateTime, nullable=True)  # Prazo para o requerido responder
+    
+    # Analista responsável (admin)
+    analista_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True)
+    
+    # Comunicações
+    resposta_requerido = Column(Text, nullable=True)
+    data_resposta_requerido = Column(DateTime, nullable=True)
+    
+    # Auditoria
+    ip_abertura = Column(String(45), nullable=True)
+    user_agent_abertura = Column(String(200), nullable=True)
+    
+    requerente = relationship("Usuario", foreign_keys=[requerente_id])
+    requerido = relationship("Usuario", foreign_keys=[requerido_id])
+    analista = relationship("Usuario", foreign_keys=[analista_id])
+    decisao_favoravel = relationship("Usuario", foreign_keys=[decisao_favoravel_a])
+    solicitacao = relationship("SolicitacaoEmprestimo")
+
+
+class ContratoMutuo(Base):
+    """Contratos digitais de mútuo entre particulares (prova de nao-intermediacao)."""
+    __tablename__ = "contratos_mutuo"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    numero_contrato = Column(String(50), unique=True, nullable=False, index=True)
+    
+    # Partes
+    tomador_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    investidor_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    # Operação vinculada
+    solicitacao_emprestimo_id = Column(Integer, ForeignKey("solicitacoes_emprestimo.id"), nullable=False)
+    
+    # Valores
+    valor_principal = Column(Numeric(precision=20, scale=2), nullable=False)
+    taxa_juros_mensal = Column(Numeric(precision=5, scale=2), nullable=False)
+    prazo_meses = Column(Integer, nullable=False)
+    
+    # Status do contrato
+    status = Column(String(30), default="pendente")  # pendente, ativo, quitado, inadimplente, cancelado
+    
+    # Assinaturas digitais
+    tomador_aceite = Column(Boolean, default=False)
+    tomador_data_aceite = Column(DateTime, nullable=True)
+    tomador_ip = Column(String(45), nullable=True)
+    tomador_hash = Column(String(200), nullable=True)
+    
+    investidor_aceite = Column(Boolean, default=False)
+    investidor_data_aceite = Column(DateTime, nullable=True)
+    investidor_ip = Column(String(45), nullable=True)
+    investidor_hash = Column(String(200), nullable=True)
+    
+    # Termo de ciência de risco
+    termo_risco_aceite = Column(Boolean, default=False)
+    termo_risco_hash = Column(String(200), nullable=True)
+    
+    # Hash de integridade do contrato completo
+    hash_integridade = Column(String(200), nullable=False)
+    
+    # JSON do contrato completo
+    contrato_json = Column(Text, nullable=False)
+    
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_atualizacao = Column(DateTime, nullable=True)
+    
+    tomador = relationship("Usuario", foreign_keys=[tomador_id])
+    investidor = relationship("Usuario", foreign_keys=[investidor_id])
+    solicitacao = relationship("SolicitacaoEmprestimo")
+
+
+class ConsentimentoLGPD(Base):
+    """Registro de consentimentos LGPD dos usuários para rastreabilidade legal."""
+    __tablename__ = "consentimentos_lgpd"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    tipo_consentimento = Column(String(100), nullable=False)  # termos_uso, privacidade, marketing, cookies, kyc
+    versao_documento = Column(String(20), nullable=False)  # Ex: "2.0"
+    
+    aceite = Column(Boolean, default=False)
+    data_aceite = Column(DateTime, nullable=True)
+    data_revogacao = Column(DateTime, nullable=True)
+    
+    ip_aceite = Column(String(45), nullable=True)
+    user_agent_aceite = Column(String(200), nullable=True)
+    
+    usuario = relationship("Usuario")

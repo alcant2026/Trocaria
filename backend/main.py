@@ -7,7 +7,11 @@ import os
 from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema
-from rotas import rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage
+from rotas import (
+    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, 
+    rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, 
+    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas
+)
 
 app = FastAPI(title="PSY PAY API P2P")
 
@@ -77,9 +81,25 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(self)"
     if not request.url.path.startswith("/api/"):
         response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://peer-5gq5.onrender.com http://localhost:*"
     return response
+
+@app.middleware("http")
+async def block_suspicious_ips(request: Request, call_next):
+    """Bloqueia IPs suspeitos e requisições de países sancionados."""
+    from utils_seguranca import verificar_ip_suspeito
+    client_ip = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for") or request.client.host or "unknown"
+    resultado = verificar_ip_suspeito(client_ip)
+    if resultado["bloqueado"]:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": f"Acesso negado: {resultado['motivo']}. Contate suporte@psypay.com.br se acredita que isto é um erro."}
+        )
+    return await call_next(request)
 
 @app.middleware("http")
 async def rate_limit_mutation(request: Request, call_next):
@@ -177,15 +197,9 @@ async def startup_db_setup():
 
         from modelos.modelos_db import Usuario
         with SessionLocal() as db:
-            if not db.query(Usuario).filter(Usuario.id == "000PL").first():
-                plataforma = Usuario(
-                    id="000PL", nome="Plataforma Psy Pay", email="financeiro@psypay.com.br",
-                    cpf="00000000000", senha_hash="plataforma", chave_pix="financeiro@psypay.com.br",
-                    is_admin=False, is_active=True
-                )
-                db.add(plataforma)
-                db.commit()
-                print("✅ Conta plataforma criada")
+            # REMOVIDO: Conta 000PL nao e mais criada automaticamente.
+            # A Psy Pay nao segura dinheiro de usuarios (Lei 12.865/2013).
+            # Taxas sao recebidas diretamente na conta bancaria da empresa (CNPJ).
             if not db.query(Usuario).filter(Usuario.is_admin == True).first():
                 import secrets
                 admin = Usuario(
@@ -230,7 +244,11 @@ async def startup_db_setup():
     print("✅ Online")
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
-ROUTER_MODULES = [rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, rotas_marketplace, rotas_storage]
+ROUTER_MODULES = [
+    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, 
+    rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, 
+    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas
+]
 for module in ROUTER_MODULES:
     app.include_router(module.router, prefix="/api")
 for module in ROUTER_MODULES:

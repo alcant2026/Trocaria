@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   Shield,
-  ShoppingBag
+  ShoppingBag,
+  Download
 } from 'lucide-react';
 import api, { BASE_URL } from './api';
 import Login from './paginas/Login';
@@ -124,6 +125,22 @@ const App = () => {
         return () => window.removeEventListener('psypay_unauthorized', handleUnauthorized);
     }, [logout]);
 
+    const baixarDadosLGPD = async () => {
+        try {
+            const blob = await api.getBlob('/compliance/lgpd/acesso');
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `meus-dados-psy-pay-${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Erro ao baixar dados: ' + (err.message || 'Tente novamente.'));
+        }
+    };
+
     if (loading) return <LoadingScreen message="Carregando..." />;
 
 
@@ -185,6 +202,9 @@ const App = () => {
                         <a href="#perfil" className={`nav-item ${page === 'perfil' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Perfil
                         </a>
+                        <button className="nav-item" onClick={() => { setMenuAberto(false); baixarDadosLGPD(); }} style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}>
+                            <Download size={20} /> Baixar meus dados (LGPD)
+                        </button>
                     </div>
                     <div className="drawer-footer">
                         <div className="footer-user-info">
@@ -249,13 +269,11 @@ const App = () => {
                             <button className="btn btn-danger" onClick={async () => {
                                 setModalExcluir(false);
                                 try {
-                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://peer-5gq5.onrender.com/api'}/auth/excluir-conta`, {
-                                        method: 'DELETE',
-                                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                                    });
-                                    if (res.ok) logout();
-                                    else alert('Erro ao excluir conta.');
-                                } catch (err) { alert('Erro de conexão.'); }
+                                    await api.delete('/compliance/lgpd/exclusao');
+                                    logout();
+                                } catch (err) {
+                                    alert('Erro ao excluir conta: ' + (err.message || 'Tente novamente.'));
+                                }
                             }}>Sim, Excluir Agora</button>
                             <button className="btn btn-secondary" onClick={() => setModalExcluir(false)}>Manter Minha Conta</button>
                         </div>

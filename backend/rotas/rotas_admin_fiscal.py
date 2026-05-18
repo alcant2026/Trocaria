@@ -47,9 +47,9 @@ async def gerar_relatorio_fiscal_admin(
         data_ini = datetime.datetime.strptime(inicio, "%Y-%m-%d")
         data_fim = datetime.datetime.strptime(fim, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         
-        # 1. CUSTÓDIA TOTAL (Dinheiro de Terceiros - Isento de Imposto para o Admin)
-        # Soma de todos os saldo_caixa (Pool) de todos os usuários
-        custodia_total = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")
+        # 1. CUSTÓDIA TOTAL - DEPRECATED: A Psy Pay nao segura dinheiro de usuarios.
+        # Sistema de saldo/saldo_caixa descontinuado.
+        custodia_total = Decimal("0.00")
         
         # 2. FATURAMENTO REAL (Taxas e Comissões - Sujeito a Carnê-Leão)
         tipos_faturamento = [

@@ -1,11 +1,11 @@
 import React from 'react';
 import { HandCoins, PlusCircle, History, LayoutDashboard, ShieldCheck, ShoppingBag, Clock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
-const TIPOS_ENTRADA = new Set(['deposito', 'recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
+// DEPRECATED: deposito e saque removidos. A Psy Pay nao segura dinheiro de usuarios.
+const TIPOS_ENTRADA = new Set(['recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
 const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento']);
 
 const TIPOS_LABEL = {
-    deposito: 'Depósito',
     recebimento: 'Recebimento',
     desbloqueio_dados: 'Verificação',
     taxa_servico: 'Taxa de Serviço',
@@ -29,7 +29,7 @@ const formatarTipo = (tipo, detalhes) => {
 };
 
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
-const corValor = (tipo) => TIPOS_SAIDA.has(tipo) || tipo === 'saque' ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
+const corValor = (tipo) => TIPOS_SAIDA.has(tipo) ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
 const HomeView = ({ usuario, historico, isFirstLoad, isOffline, mostrarAlertaRejeicao, fecharAlertaRejeicao, setActiveView, carregarMeusLinksMarketplace }) => {
     return (

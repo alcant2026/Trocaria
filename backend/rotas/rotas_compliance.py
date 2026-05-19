@@ -238,7 +238,7 @@ async def solicitar_portabilidade(
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode('utf-8')),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=psypay_dados_{usuario.id}.csv"}
+            headers={"Content-Disposition": f"attachment; filename=trocaria_dados_{usuario.id}.csv"}
         )
     else:
         # JSON
@@ -372,7 +372,7 @@ async def solicitar_exclusao_lgpd(
     
     # Anonimiza dados pessoais
     usuario.nome = f"Usuário Excluído ({usuario_id_original})"
-    usuario.email = f"excluido_{usuario_id_original}@psypay-anon.com"
+    usuario.email = f"excluido_{usuario_id_original}@trocaria-anon.com"
     usuario.cpf = f"00000000{usuario_id_original}"[:11]
     usuario.telefone = "00000000000"
     usuario.chave_pix = "EXCLUIDO"
@@ -529,15 +529,15 @@ async def listar_consentimentos(
 @router.get("/info-tratamento")
 async def informacoes_tratamento():
     """
-    Retorna informações públicas sobre como a Psy Pay trata dados pessoais.
+    Retorna informações públicas sobre como a Trocaria trata dados pessoais.
     Equivalente ao art. 9º da LGPD.
     """
     return {
-        "controlador": "Psy Pay - [INSERIR RAZÃO SOCIAL]",
+        "controlador": "Trocaria - [INSERIR RAZÃO SOCIAL]",
         "cnpj": "[INSERIR CNPJ]",
         "encarregado_dados": {
             "nome": "[INSERIR NOME DPO]",
-            "email": "dpo@psypay.com.br",
+            "email": "dpo@trocaria.com.br",
             "telefone": "[INSERIR]"
         },
         "finalidades_principais": [
@@ -588,11 +588,11 @@ async def informacoes_tratamento():
 @router.get("/declaracao-regulatoria")
 async def declaracao_regulatoria_publica():
     """
-    Retorna a declaração pública de que a Psy Pay NÃO é instituição financeira.
+    Retorna a declaração pública de que a Trocaria NÃO é instituição financeira.
     Esta rota é pública e pode ser acessada sem autenticação.
     """
     return {
-        "declaracao": "A Psy Pay NÃO é uma instituição financeira, banco, financeira, SCD, SEP, instituição de pagamento ou qualquer outra entidade sujeita à regulação do Banco Central do Brasil ou da CVM.",
+        "declaracao": "A Trocaria NÃO é uma instituição financeira, banco, financeira, SCD, SEP, instituição de pagamento ou qualquer outra entidade sujeita à regulação do Banco Central do Brasil ou da CVM.",
         "natureza_juridica": "Plataforma de correspondência de interesses entre particulares para operações de mútuo (art. 586, Código Civil)",
         "nao_somos": [
             "Banco ou instituição financeira",
@@ -609,7 +609,7 @@ async def declaracao_regulatoria_publica():
             "Atribuição de score de reputação",
             "Ferramentas de cobrança (mediante taxa de serviço)"
         ],
-        "fluxo_dinheiro": "O dinheiro das operações de mútuo circula DIRETAMENTE entre Tomador e Investidor via PIX, sem passar pela plataforma. A Psy Pay recebe apenas taxas de serviço.",
+        "fluxo_dinheiro": "O dinheiro das operações de mútuo circula DIRETAMENTE entre Tomador e Investidor via PIX, sem passar pela plataforma. A Trocaria recebe apenas taxas de serviço.",
         "base_legal": [
             "Art. 586 e seguintes do Código Civil (mútuo entre particulares)",
             "Art. 39, §1º do CDC (programas de fidelidade)",
@@ -617,5 +617,5 @@ async def declaracao_regulatoria_publica():
         ],
         "documentacao_completa": "/docs/NAO_SOMOS_INSTITUICAO_FINANCEIRA.md",
         "data_declaracao": "18/05/2026",
-        "contato_juridico": "juridico@psypay.com.br"
+        "contato_juridico": "juridico@trocaria.com.br"
     }

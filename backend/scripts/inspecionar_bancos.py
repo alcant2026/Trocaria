@@ -1,5 +1,5 @@
 """
-🦅 PSY PAY — Inspetor de Banco de Dados
+🦅 TROCARIA — Inspetor de Banco de Dados
 Roda localmente para ver o que tem no banco (SQLite ou Neon).
 Para usar com o Neon: defina DATABASE_URL no .env antes de rodar.
 """

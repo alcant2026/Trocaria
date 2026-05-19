@@ -1,4 +1,4 @@
-# Rotas da API · Psy Pay
+# Rotas da API · Trocaria
 
 Base URL: `https://peer-5gq5.onrender.com/api` (prod) ou `http://localhost:8000/api` (dev)
 

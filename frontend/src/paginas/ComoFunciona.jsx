@@ -8,13 +8,13 @@ const ComoFunciona = () => {
                 <button onClick={() => window.location.hash = 'cliente'} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                     <ArrowLeft size={20} />
                 </button>
-                <h1 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 800 }}>Como Funciona a Psy Pay</h1>
+                <h1 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 800 }}>Como Funciona a Trocaria</h1>
             </div>
 
             <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--primary)' }}>O que e a Psy Pay?</h2>
+                <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--primary)' }}>O que e a Trocaria?</h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.7' }}>
-                    Psy Pay e uma <strong style={{ color: 'var(--text-main)' }}>Rede de Apoio entre Pares</strong> (Peer-to-Peer). 
+                    Trocaria e uma <strong style={{ color: 'var(--text-main)' }}>Rede de Apoio entre Pares</strong> (Peer-to-Peer). 
                     Conectamos pessoas que precisam de apoio financeiro com pessoas dispostas a ajudar. 
                     Diferente de bancos ou financeiras, <strong style={{ color: 'var(--text-main)' }}>nao emprestamos dinheiro</strong> — 
                     apenas <strong style={{ color: 'var(--text-main)' }}>conectamos pessoas</strong>. 
@@ -109,7 +109,7 @@ const ComoFunciona = () => {
             <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--primary)' }}>Marketplace de Produtos</h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.7' }}>
-                    Alem do apoio financeiro, a Psy Pay tem um <strong style={{ color: 'var(--text-main)' }}>marketplace de classificados</strong> 
+                    Alem do apoio financeiro, a Trocaria tem um <strong style={{ color: 'var(--text-main)' }}>marketplace de classificados</strong> 
                     onde voce pode anunciar produtos e servicos. Cada clique em seu anuncio rende pontos que podem ser convertidos em dinheiro. 
                     Usuarios Premium ganham de 1 a 5 pontos por clique (aleatorio), enquanto usuarios gratis ganham 1 ponto fixo.
                 </p>

@@ -1,4 +1,4 @@
-# PLANO DE RESPOSTA A INCIDENTES DE SEGURANÇA - PSY PAY
+# PLANO DE RESPOSTA A INCIDENTES DE SEGURANÇA - TROCARIA
 
 **Versão:** 1.0  
 **Classificação:** Confidencial - Uso Interno  
@@ -8,7 +8,7 @@
 
 ## 1. OBJETIVO
 
-Este documento estabelece os procedimentos para identificação, contenção, erradicação, recuperação e lições aprendidas em caso de incidentes de segurança cibernética, vazamento de dados, fraudes ou qualquer evento que comprometa a integridade, confidencialidade ou disponibilidade da Psy Pay.
+Este documento estabelece os procedimentos para identificação, contenção, erradicação, recuperação e lições aprendidas em caso de incidentes de segurança cibernética, vazamento de dados, fraudes ou qualquer evento que comprometa a integridade, confidencialidade ou disponibilidade da Trocaria.
 
 ---
 
@@ -27,7 +27,7 @@ Este documento estabelece os procedimentos para identificação, contenção, er
 | Função | Responsabilidade | Contato |
 |--------|-----------------|---------|
 | **Incident Commander** | Coordena toda a resposta ao incidente | [INSERIR] |
-| **DPO (Encarregado)** | Interface legal, notificações à ANPD e usuários | dpo@psypay.com.br |
+| **DPO (Encarregado)** | Interface legal, notificações à ANPD e usuários | dpo@trocaria.com.br |
 | **Tech Lead** | Análise técnica, contenção e recuperação | [INSERIR] |
 | **Comunicação** | Comunicação externa (imprensa, usuários) | [INSERIR] |
 | **Jurídico** | Avaliação de riscos legais e processuais | [INSERIR] |
@@ -140,7 +140,7 @@ Dentro de **7 dias** após o encerramento:
 ### 5.3 Template de Notificação a Usuários
 
 ```
-Assunto: Notificação de Segurança - Psy Pay
+Assunto: Notificação de Segurança - Trocaria
 
 Prezado(a) [Nome],
 
@@ -163,10 +163,10 @@ O que você deve fazer:
 - Monitorar suas contas bancárias;
 - Desconfiar de e-mails ou mensagens suspeitas.
 
-Para dúvidas: dpo@psypay.com.br
+Para dúvidas: dpo@trocaria.com.br
 
 Atenciosamente,
-Equipe de Segurança Psy Pay
+Equipe de Segurança Trocaria
 ```
 
 ---

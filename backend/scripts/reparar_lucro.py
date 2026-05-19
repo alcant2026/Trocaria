@@ -1,7 +1,7 @@
 # =============================================================================
 # DEPRECATED
 # =============================================================================
-# Este script esta DEPRECATED porque a Psy Pay nao e instituicao financeira
+# Este script esta DEPRECATED porque a Trocaria nao e instituicao financeira
 # e nao segura mais dinheiro de usuarios (Lei 12.865/2013, art. 8o).
 # Campos saldo/saldo_caixa nao devem mais ser manipulados.
 # =============================================================================
@@ -19,7 +19,7 @@ from modelos.modelos_db import Usuario, Transacao, TipoTransacao, Parceiro, engi
 
 def reparar_saldo_plataforma():
     print("[DEPRECATED] Este script foi descontinuado.")
-    print("A Psy Pay nao segura dinheiro de usuarios. Nenhum saldo foi alterado.")
+    print("A Trocaria nao segura dinheiro de usuarios. Nenhum saldo foi alterado.")
     return
 
     # CODIGO LEGADO COMENTADO — manipulava saldo da plataforma 000PL

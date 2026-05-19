@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "INICIANDO PSY PAY BACKEND (512MB Free)..."
+echo "INICIANDO TROCARIA BACKEND (512MB Free)..."
 mkdir -p uploads
 gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app \
   --bind 0.0.0.0:$PORT \

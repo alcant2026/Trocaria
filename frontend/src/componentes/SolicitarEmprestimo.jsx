@@ -34,7 +34,7 @@ const SolicitarEmprestimo = ({
 
                     <div style={{ background: 'rgba(255,152,0,0.06)', border: '1px solid rgba(255,152,0,0.15)', padding: '10px 12px', borderRadius: '10px', marginBottom: '10px' }}>
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4', textAlign: 'center' }}>
-                            ⚠️ <strong style={{ color: '#FF9800' }}>Aviso importante:</strong> O Psy Pay <strong>não é instituição financeira</strong>. 
+                            ⚠️ <strong style={{ color: '#FF9800' }}>Aviso importante:</strong> O Trocaria <strong>não é instituição financeira</strong>. 
                             Atuamos como plataforma de conexão entre pessoas. 
                             Todo apoio é um acordo direto entre as partes via PIX. 
                             <strong>Limite máximo: R$ 5.000 por operação.</strong>

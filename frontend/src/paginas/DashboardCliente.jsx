@@ -134,9 +134,9 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         const cached = localStorage.getItem('full_snapshot');
         return cached ? JSON.parse(cached) : {};
     });
-    const savedView = sessionStorage.getItem('psypay_activeView') || initialView;
+    const savedView = sessionStorage.getItem('trocaria_activeView') || initialView;
     const [activeView, setActiveView] = useState(savedView);
-    // DEPRECATED: saldo removido. A Psy Pay nao segura dinheiro de usuarios.
+    // DEPRECATED: saldo removido. A Trocaria nao segura dinheiro de usuarios.
     const [aceiteTermos, setAceiteTermos] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     
@@ -215,7 +215,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
     const [meusEmprestimos, setMeusEmprestimos] = useState([]);
-    const [marketplaceTab, setMarketplaceTab] = useState(sessionStorage.getItem('psypay_marketTab') || 'explorar');
+    const [marketplaceTab, setMarketplaceTab] = useState(sessionStorage.getItem('trocaria_marketTab') || 'explorar');
     const [pageExplorar, setPageExplorar] = useState(1);
     const [hasMoreExplorar, setHasMoreExplorar] = useState(false);
     const [pageMeusLinks, setPageMeusLinks] = useState(1);
@@ -241,19 +241,19 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     // Persistir activeView ao mudar
     useEffect(() => {
         if (activeView && activeView !== 'home') {
-            sessionStorage.setItem('psypay_activeView', activeView);
+            sessionStorage.setItem('trocaria_activeView', activeView);
         } else {
-            sessionStorage.removeItem('psypay_activeView');
+            sessionStorage.removeItem('trocaria_activeView');
         }
         if (activeView !== 'marketplace') {
-            sessionStorage.removeItem('psypay_marketTab');
+            sessionStorage.removeItem('trocaria_marketTab');
         }
     }, [activeView]);
 
     // Persistir marketplaceTab
     useEffect(() => {
         if (activeView === 'marketplace') {
-            sessionStorage.setItem('psypay_marketTab', marketplaceTab);
+            sessionStorage.setItem('trocaria_marketTab', marketplaceTab);
         }
     }, [marketplaceTab, activeView]);
 
@@ -729,7 +729,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `contrato_psypay_${id}.pdf`);
+            link.setAttribute('download', `contrato_trocaria_${id}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
@@ -1115,7 +1115,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                                 if (pixCobranca.tomador_telefone) {
                                     const num = pixCobranca.tomador_telefone.replace(/\D/g, '');
                                     const tel = num.startsWith('55') ? num : '55' + num;
-                                    const msg = encodeURIComponent(`Ola ${pixCobranca.tomador_nome.split(' ')[0]}, voce tem um debito de R$ ${pixCobranca.debito?.toFixed(2)}. Entre em contato para regularizar. - Psy Pay`);
+                                    const msg = encodeURIComponent(`Ola ${pixCobranca.tomador_nome.split(' ')[0]}, voce tem um debito de R$ ${pixCobranca.debito?.toFixed(2)}. Entre em contato para regularizar. - Trocaria`);
                                     window.open(`https://wa.me/${tel}?text=${msg}`, '_blank');
                                 }
                             }} />

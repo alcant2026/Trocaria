@@ -1,4 +1,4 @@
-# Psy Pay · Plataforma de Crédito Colaborativo P2P
+# Trocaria · Plataforma de Crédito Colaborativo P2P
 
 Plataforma financeira descentralizada que conecta pessoas para empréstimos entre pares, com marketplace de afiliados, rede de indicação multi-nível e sistema de gamificação com prêmios em dinheiro real.
 
@@ -69,7 +69,7 @@ Plataforma financeira descentralizada que conecta pessoas para empréstimos entr
 ## Estrutura do Projeto
 
 ```
-psy-pay/
+trocaria/
 ├── frontend/src/
 │   ├── paginas/          # Dashboard, Login, Registro, Admin, Verificação
 │   ├── componentes/      # LandingPage, Marketplace, RankingSemanal, Footer

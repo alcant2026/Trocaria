@@ -199,7 +199,7 @@ async def aceitar_oferta_endpoint(request: Request, id: int, dados: AceiteReques
                        "Emprestar dinheiro envolve riscos incluindo calote, atraso e perda total do capital.",
             "aviso_legal": (
                 "ATENCAO: Ao aceitar esta oferta, voce esta realizando um MUTUO direto com outra pessoa fisica. "
-                "A Psy Pay NAO e parte na obrigacao, NAO garante o pagamento e NAO cobre prejuizos. "
+                "A Trocaria NAO e parte na obrigacao, NAO garante o pagamento e NAO cobre prejuizos. "
                 "O risco do credito e EXCLUSIVAMENTE SEU."
             ),
             "riscos": [
@@ -387,7 +387,7 @@ class ContratoPDF(FPDF):
         except:
             self.set_font('Helvetica', 'B', 22)
             self.set_text_color(255, 204, 0)
-            self.cell(0, 15, 'PSY PAY', 0, 1, 'C')
+            self.cell(0, 15, 'TROCARIA', 0, 1, 'C')
         self.set_font('Helvetica', 'I', 10)
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, 'Rede de Apoio entre Pares', 0, 1, 'C')
@@ -399,7 +399,7 @@ class ContratoPDF(FPDF):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, 'Pagina {} | Psy Pay | Documento entre Particulares'.format(self.page_no()), 0, 0, 'C')
+        self.cell(0, 10, 'Pagina {} | Trocaria | Documento entre Particulares'.format(self.page_no()), 0, 0, 'C')
 
 @router.get("/contrato/pdf/{id}")
 async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -462,7 +462,7 @@ async def baixar_contrato_pdf(id: int, db: Session = Depends(get_db), usuario: U
     buf = io.BytesIO()
     pdf.output(dest='S', name=buf)
     buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Termo_PsyPay_{}.pdf".format(solicitacao.id)})
+    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Termo_Trocaria_{}.pdf".format(solicitacao.id)})
 
 @router.post("/cancelar-pendente/{transacao_id}")
 async def cancelar_transacao_pendente(transacao_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -519,11 +519,11 @@ async def obter_chave_pix_tomador(
         "valor": float(pedido.valor),
         "mensagem": (
             f"Transfira R$ {pedido.valor} diretamente para {tomador.nome} via PIX. "
-            f"A Psy Pay NAO segura esse dinheiro. A transferencia e direta entre voces."
+            f"A Trocaria NAO segura esse dinheiro. A transferencia e direta entre voces."
         ),
         "aviso_legal": (
             "ATENCAO: Este e um mútuo entre particulares (art. 586, CC). "
-            "A Psy Pay apenas conectou as partes. A transferencia deve ser feita "
+            "A Trocaria apenas conectou as partes. A transferencia deve ser feita "
             "diretamente via PIX para a chave acima. Guarde o comprovante."
         )
     }

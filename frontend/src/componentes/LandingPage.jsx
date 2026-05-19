@@ -113,7 +113,7 @@ const LandingPage = () => {
             {/* Hero */}
             <section className="landing-hero">
                 <div className="landing-hero-content">
-                    <h1>Encontre o que você precisa na <span style={{ color: 'var(--primary)' }}>Psy Pay</span></h1>
+                    <h1>Encontre o que você precisa na <span style={{ color: 'var(--primary)' }}>Trocaria</span></h1>
                     <p>O marketplace da comunidade. Anuncie grátis ou destaque seu produto por apenas R$ 5,00.</p>
                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1.5rem' }}>
                         <a href="#registro" className="btn btn-primary" onClick={(e) => { e.preventDefault(); window.location.hash = 'registro'; }} style={{ padding: '0.9rem 1.5rem' }}>
@@ -129,7 +129,7 @@ const LandingPage = () => {
             <section style={{ maxWidth: '1100px', margin: '0 auto 2rem', padding: '0 1rem' }}>
                 <div style={{ background: 'rgba(255,152,0,0.06)', border: '1px solid rgba(255,152,0,0.15)', padding: '12px 16px', borderRadius: '12px', textAlign: 'center' }}>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
-                        ⚠️ <strong style={{ color: '#FF9800' }}>AVISO:</strong> O Psy Pay é uma plataforma de conexão entre pessoas. <strong>Não somos banco, instituição financeira ou sociedade de crédito.</strong> Não intermediamos valores. Todo apoio é um acordo direto entre as partes via PIX. Apoiar envolve <strong style={{ color: 'var(--danger)' }}>risco de perda total</strong>. Limite de R$ 5.000 por operação. Leia nossos <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso e Privacidade</a>.
+                        ⚠️ <strong style={{ color: '#FF9800' }}>AVISO:</strong> O Trocaria é uma plataforma de conexão entre pessoas. <strong>Não somos banco, instituição financeira ou sociedade de crédito.</strong> Não intermediamos valores. Todo apoio é um acordo direto entre as partes via PIX. Apoiar envolve <strong style={{ color: 'var(--danger)' }}>risco de perda total</strong>. Limite de R$ 5.000 por operação. Leia nossos <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso e Privacidade</a>.
                     </p>
                 </div>
             </section>

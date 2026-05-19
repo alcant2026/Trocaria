@@ -5,7 +5,7 @@ const TermosUso = ({ onConfirm }) => {
         <div style={{ padding: '1rem', color: 'var(--text-color)', lineHeight: '1.6', fontSize: '0.9rem', maxHeight: '70vh', overflowY: 'auto' }}>
             <h2 className="mb-1" style={{ color: 'var(--primary)' }}>Termos de Uso — Plataforma de Conexão P2P</h2>
 
-            <p className="mb-1"><strong>1. Natureza da Plataforma:</strong> O Psy Pay é uma <strong>plataforma de tecnologia</strong> (SaaS) que conecta pessoas para acordos de apoio mútuo direto. <strong>Não somos banco, fintech regulada, instituição financeira ou sociedade de crédito.</strong> Não captamos recursos do público, não intermediamos valores e não somos regulados pelo BACEN, CVM ou qualquer órgão regulador financeiro. Todo valor transacionado ocorre diretamente entre os usuários via PIX, sem passar pela plataforma.</p>
+            <p className="mb-1"><strong>1. Natureza da Plataforma:</strong> O Trocaria é uma <strong>plataforma de tecnologia</strong> (SaaS) que conecta pessoas para acordos de apoio mútuo direto. <strong>Não somos banco, fintech regulada, instituição financeira ou sociedade de crédito.</strong> Não captamos recursos do público, não intermediamos valores e não somos regulados pelo BACEN, CVM ou qualquer órgão regulador financeiro. Todo valor transacionado ocorre diretamente entre os usuários via PIX, sem passar pela plataforma.</p>
 
             <p className="mb-1"><strong>2. Taxas de Uso do Software:</strong> As taxas cobradas (publicação, match, destaque, verificação) remuneram exclusivamente a <strong>licença de uso da plataforma</strong> e o processamento de dados. São valores integrais e <strong>não reembolsáveis</strong>, independentemente do resultado do acordo entre as partes.</p>
 

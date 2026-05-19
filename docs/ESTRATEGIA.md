@@ -1,4 +1,4 @@
-# Estratégia de Negócio · Psy Pay
+# Estratégia de Negócio · Trocaria
 
 Modelo de receita real, custos operacionais e projeção de sustentabilidade. **Atualizado com o estado atual do código.**
 

@@ -25,7 +25,7 @@ def gerar_contrato_mutuo(
 ) -> Dict[str, Any]:
     """
     Gera um contrato de mútuo (emprestimo entre particulares) com hash de integridade.
-    Este contrato demonstra que a Psy Pay NAO e parte na relacao juridica.
+    Este contrato demonstra que a Trocaria NAO e parte na relacao juridica.
     """
     if data_emissao is None:
         data_emissao = datetime.now(timezone.utc)
@@ -84,7 +84,7 @@ def gerar_contrato_mutuo(
             "cessao": "Nao permitida sem consentimento expresso da outra parte"
         },
         
-        "psypay_declaracao": {
+        "trocaria_declaracao": {
             "natureza_juridica": "Plataforma de correspondencia de interesses (NAO e instituição financeira)",
             "nao_e": [
                 "Banco ou instituicao financeira",
@@ -101,7 +101,7 @@ def gerar_contrato_mutuo(
                 "Atribuicao de score de reputacao",
                 "Ferramentas de cobranca (mediante taxa de servico)"
             ],
-            "responsabilidade": "A Psy Pay NAO se responsabiliza pelo cumprimento das obrigacoes aqui assumidas. O risco do credito e exclusivo do Investidor."
+            "responsabilidade": "A Trocaria NAO se responsabiliza pelo cumprimento das obrigacoes aqui assumidas. O risco do credito e exclusivo do Investidor."
         },
         
         "assinaturas": {
@@ -231,12 +231,12 @@ nos termos do art. 586 e seguintes do Código Civil Brasileiro.
 3.1. O pagamento será feito DIRETAMENTE entre as partes via PIX, transferência 
 bancária ou outra forma acordada entre elas.
 
-3.2. A PSY PAY NÃO INTERMEDIA, NÃO SEGURA E NÃO TRANSFERE o dinheiro do empréstimo.
-A Psy Pay é apenas uma plataforma de correspondência de interesses.
+3.2. A TROCARIA NÃO INTERMEDIA, NÃO SEGURA E NÃO TRANSFERE o dinheiro do empréstimo.
+A Trocaria é apenas uma plataforma de correspondência de interesses.
 
 4. DISPOSIÇÕES GERAIS
 
-4.1. A Psy Pay NÃO é parte neste contrato e NÃO se responsabiliza pelo cumprimento 
+4.1. A Trocaria NÃO é parte neste contrato e NÃO se responsabiliza pelo cumprimento 
 das obrigações aqui assumidas.
 
 4.2. O risco do crédito é EXCLUSIVO do Investidor.
@@ -251,8 +251,8 @@ Investidor: {"Aceito eletronicamente em " + i_a['data_aceite'] if (i_a := contra
 
 Hash de Integridade: {contrato['hash_integridade']}
 
-DECLARAÇÃO PSY PAY:
-A Psy Pay é uma plataforma de correspondência de interesses entre particulares 
+DECLARAÇÃO TROCARIA:
+A Trocaria é uma plataforma de correspondência de interesses entre particulares 
 interessados em operações de mútuo. NÃO somos banco, financeira, SCD, SEP ou 
 instituição de pagamento. NÃO seguramos dinheiro de usuários. Cobramos apenas 
 taxas de serviço pelo uso da plataforma.

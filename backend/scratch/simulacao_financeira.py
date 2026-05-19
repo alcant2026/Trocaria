@@ -16,7 +16,7 @@ def simular_caixa():
     comissao_parceiro_saq = Decimal("0.01") # 1%
     lucro_app_saq = Decimal("0.01") # 1%
 
-    print("🚀 INICIANDO SIMULAÇÃO PSY PAY - 7 DIAS")
+    print("🚀 INICIANDO SIMULAÇÃO TROCARIA - 7 DIAS")
     print(f"Estado Inicial: Digital R$ {saldo_digital} | Gaveta R$ {saldo_gaveta}\n")
 
     for dia in range(1, 8):

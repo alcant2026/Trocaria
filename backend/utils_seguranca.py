@@ -1,5 +1,5 @@
 """
-utils_seguranca.py - Módulo de Segurança e Anti-Fraude Psy Pay
+utils_seguranca.py - Módulo de Segurança e Anti-Fraude Trocaria
 Proteções para produção: detecção de contas fake, validações KYC, limites de risco.
 """
 

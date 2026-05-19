@@ -13,7 +13,7 @@ class StatusSolicitacao(enum.Enum):
 
 class TipoTransacao(enum.Enum):
     # === TIPOS DEPRECADOS (remover em migracao futura) ===
-    # DEPOSITO e SAQUE removidos pois a Psy Pay nao e instituicao financeira
+    # DEPOSITO e SAQUE removidos pois a Trocaria nao e instituicao financeira
     # e nao pode segurar dinheiro de usuarios (Lei 12.865/2013, Lei 4.595/1964)
     DEPOSITO = "deposito"  # DEPRECATED: nao usar
     SAQUE = "saque"  # DEPRECATED: nao usar
@@ -72,7 +72,7 @@ class Usuario(Base):
     senha_hash = Column(Text, nullable=False)
     chave_pix = Column(String(255), nullable=False)
     # DEPRECATED: saldo e saldo_caixa serao removidos na proxima migracao.
-    # A Psy Pay nao segura dinheiro de usuarios (Lei 12.865/2013, art. 8o).
+    # A Trocaria nao segura dinheiro de usuarios (Lei 12.865/2013, art. 8o).
     saldo = Column(Numeric(precision=20, scale=2), default=0)
     saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
     valor_emprestado = Column(Numeric(precision=20, scale=2), default=0)

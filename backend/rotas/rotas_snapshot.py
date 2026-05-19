@@ -72,7 +72,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
         for emp in emprestimos_ativos:
             divida_total_pendente += calcular_divida_total(emp)
         
-        # DEPRECATED: saldo e saldo_caixa removidos. A Psy Pay nao segura dinheiro de usuarios.
+        # DEPRECATED: saldo e saldo_caixa removidos. A Trocaria nao segura dinheiro de usuarios.
         saldo_caixa_total = Decimal("0.00")
         saldo_caixa_disponivel = Decimal("0.00")
 
@@ -266,7 +266,7 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             # Fiscal Resumo Otimizado (Lógica replicada de rotas_financeiro para evitar circularidade)
 
-            # DEPRECATED: saldo e saldo_caixa descontinuados. A Psy Pay nao segura dinheiro de usuarios.
+            # DEPRECATED: saldo e saldo_caixa descontinuados. A Trocaria nao segura dinheiro de usuarios.
             saldo_usuarios = Decimal("0.00")
             total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),

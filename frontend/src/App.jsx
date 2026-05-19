@@ -122,8 +122,8 @@ const App = () => {
         init();
         
         const handleUnauthorized = () => logout();
-        window.addEventListener('psypay_unauthorized', handleUnauthorized);
-        return () => window.removeEventListener('psypay_unauthorized', handleUnauthorized);
+        window.addEventListener('trocaria_unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('trocaria_unauthorized', handleUnauthorized);
     }, [logout]);
 
     const baixarDadosLGPD = async () => {
@@ -132,7 +132,7 @@ const App = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `meus-dados-psy-pay-${new Date().toISOString().split('T')[0]}.json`);
+            link.setAttribute('download', `meus-dados-trocaria-${new Date().toISOString().split('T')[0]}.json`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -257,7 +257,7 @@ const App = () => {
                 <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
                     <a href="#comofunciona" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Como Funciona</a>
                     <a href="#privacidade" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Politica de Privacidade</a>
-                    <span>© 2026 Psy Pay</span>
+                    <span>© 2026 Trocaria</span>
                 </div>
             )}
 

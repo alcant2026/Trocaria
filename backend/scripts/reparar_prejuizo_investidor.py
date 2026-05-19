@@ -1,7 +1,7 @@
 # =============================================================================
 # DEPRECATED
 # =============================================================================
-# Este script esta DEPRECATED porque a Psy Pay nao e instituicao financeira
+# Este script esta DEPRECATED porque a Trocaria nao e instituicao financeira
 # e nao segura mais dinheiro de usuarios (Lei 12.865/2013, art. 8o).
 # O modelo de Investimento/Pool foi removido. Emprestimos sao P2P diretos.
 # NAO EXECUTE ESTE SCRIPT — ele nao faz mais sentido na arquitetura atual.
@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def reparar_prejuizos(dry_run=True):
     print("[DEPRECATED] Este script foi descontinuado.")
-    print("A Psy Pay nao segura dinheiro de usuarios nem gerencia pool de investimentos.")
+    print("A Trocaria nao segura dinheiro de usuarios nem gerencia pool de investimentos.")
     print("Emprestimos sao P2P diretos. Nenhuma acao foi realizada.")
     return
 

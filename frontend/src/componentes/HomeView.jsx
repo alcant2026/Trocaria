@@ -1,7 +1,7 @@
 import React from 'react';
 import { HandCoins, PlusCircle, History, LayoutDashboard, ShieldCheck, ShoppingBag, Clock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
-// DEPRECATED: deposito e saque removidos. A Psy Pay nao segura dinheiro de usuarios.
+// DEPRECATED: deposito e saque removidos. A Trocaria nao segura dinheiro de usuarios.
 const TIPOS_ENTRADA = new Set(['recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
 const TIPOS_SAIDA = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plataforma', 'taxa_match', 'taxa_solicitacao', 'pagamento_parcela', 'assinatura', 'confirmacao_pagamento']);
 

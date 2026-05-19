@@ -1,7 +1,7 @@
 import React from 'react';
 import { History, AlertCircle, CheckCircle, X, XCircle } from 'lucide-react';
 
-// DEPRECATED: deposito e saque removidos. A Psy Pay nao segura dinheiro.
+// DEPRECATED: deposito e saque removidos. A Trocaria nao segura dinheiro.
 const TIPOS_LABEL = {
     recebimento: 'Recebimento', desbloqueio_dados: 'Verificação',
     taxa_servico: 'Taxa de Serviço', taxa_plataforma: 'Taxa da Plataforma', taxa_match: 'Taxa de Match',

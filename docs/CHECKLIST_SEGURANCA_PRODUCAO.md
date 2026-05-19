@@ -1,4 +1,4 @@
-# CHECKLIST DE SEGURANÇA PARA PRODUÇÃO - PSY PAY
+# CHECKLIST DE SEGURANÇA PARA PRODUÇÃO - TROCARIA
 
 Este documento deve ser verificado antes de qualquer deploy em produção.
 

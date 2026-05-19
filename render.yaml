@@ -1,7 +1,7 @@
 services:
   # Backend API
   - type: web
-    name: psy-pay-api
+    name: trocaria-api
     runtime: python
     rootDir: backend
     buildCommand: pip install --no-cache-dir -r requirements.txt
@@ -35,7 +35,7 @@ services:
 
   # Frontend Static Site
   - type: static
-    name: psy-pay-web
+    name: trocaria-web
     rootDir: frontend
     buildCommand: npm install && npm run build
     publishDir: dist

@@ -114,7 +114,7 @@ const api = {
                             errorMessage.toLowerCase().includes(termo)
                         );
                         if (!ehErroNegocio) {
-                            window.dispatchEvent(new Event('psypay_unauthorized'));
+                            window.dispatchEvent(new Event('trocaria_unauthorized'));
                         }
                     }
 

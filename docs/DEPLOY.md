@@ -1,4 +1,4 @@
-# Guia de Deploy · Psy Pay
+# Guia de Deploy · Trocaria
 
 Deploy gratuito via [Render](https://render.com) + [Neon](https://neon.tech).
 

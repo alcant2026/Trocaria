@@ -1,5 +1,5 @@
 """
-Simulação Financeira Psy Pay — TODOS os custos incluídos
+Simulação Financeira Trocaria — TODOS os custos incluídos
 """
 
 from decimal import Decimal
@@ -11,7 +11,7 @@ def fmt(v):
 
 def simular():
     print("=" * 72)
-    print("  PSY PAY — SIMULAÇÃO FINANCEIRA COMPLETA (12 MESES)")
+    print("  TROCARIA — SIMULAÇÃO FINANCEIRA COMPLETA (12 MESES)")
     print("=" * 72)
 
     # === PARÂMETROS DE RECEITA ===

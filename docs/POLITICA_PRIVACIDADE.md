@@ -1,4 +1,4 @@
-# POLITICA DE PRIVACIDADE - PSY PAY
+# POLITICA DE PRIVACIDADE - TROCARIA
 
 **Versão:** 2.1 (Correspondência P2P)  
 **Data de vigência:** 18/05/2026  
@@ -8,7 +8,7 @@
 
 ## 1. INTRODUCAO
 
-A Psy Pay é uma plataforma de **correspondência de interesses entre particulares** para operações de mútuo. Não somos instituição financeira, não seguramos dinheiro de usuários e não intermediamos financeiramente.
+A Trocaria é uma plataforma de **correspondência de interesses entre particulares** para operações de mútuo. Não somos instituição financeira, não seguramos dinheiro de usuários e não intermediamos financeiramente.
 
 Esta política descreve como tratamos seus dados pessoais em conformidade com a LGPD.
 
@@ -31,7 +31,7 @@ Esta política descreve como tratamos seus dados pessoais em conformidade com a 
 ### 2.4 Dados de Pagamento de Taxas
 - Quando você paga uma taxa de serviço (publicação, cobrança, premium), processamos o pagamento via Mercado Pago ou PIX direto para conta da empresa
 
-**IMPORTANTE:** A Psy Pay NÃO coleta dados de cartão de crédito, NÃO armazena saldo bancário e NÃO processa transferências de empréstimos (que são feitas diretamente entre as partes via PIX).
+**IMPORTANTE:** A Trocaria NÃO coleta dados de cartão de crédito, NÃO armazena saldo bancário e NÃO processa transferências de empréstimos (que são feitas diretamente entre as partes via PIX).
 
 ---
 
@@ -69,7 +69,7 @@ Esta política descreve como tratamos seus dados pessoais em conformidade com a 
 ## 6. SEUS DIREITOS (LGPD)
 
 - Acesso, correção, exclusão, portabilidade, revogação de consentimento
-- Para exercer: dpo@psypay.com.br
+- Para exercer: dpo@trocaria.com.br
 - Prazo de resposta: 15 dias
 
 ---
@@ -87,7 +87,7 @@ Esta política descreve como tratamos seus dados pessoais em conformidade com a 
 
 ## 8. DPO
 
-- **E-mail:** dpo@psypay.com.br
+- **E-mail:** dpo@trocaria.com.br
 - **ANPD:** www.gov.br/anpd
 
 ---

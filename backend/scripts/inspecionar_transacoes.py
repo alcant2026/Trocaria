@@ -1,7 +1,7 @@
 # =============================================================================
 # DEPRECATED
 # =============================================================================
-# Este script esta DEPRECATED porque a Psy Pay nao e instituicao financeira
+# Este script esta DEPRECATED porque a Trocaria nao e instituicao financeira
 # e nao segura mais dinheiro de usuarios (Lei 12.865/2013, art. 8o).
 # Campos saldo/saldo_caixa nao devem mais ser exibidos nem manipulados.
 # =============================================================================
@@ -21,7 +21,7 @@ from modelos.modelos_db import Usuario, Transacao, TipoTransacao, engine
 def inspecionar_transacoes():
     with Session(engine) as db:
         print(f"--- Inspeção de Transações (Agora é {datetime.now()}) ---")
-        print("[AVISO] A Psy Pay nao segura saldo de usuarios. Exibindo apenas registros de transacoes.")
+        print("[AVISO] A Trocaria nao segura saldo de usuarios. Exibindo apenas registros de transacoes.")
         
         # Todas as transações de Assinatura
         assinaturas = db.query(Transacao).filter(Transacao.tipo == TipoTransacao.ASSINATURA).all()

@@ -180,7 +180,7 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Opt
     idempotency_key = str(uuid.uuid4())
     payload = {
         "transaction_amount": float(transacao.valor or 0),
-        "description": f"Saque Psy Pay - {usuario.nome} (ID:{transacao.id})",
+        "description": f"Saque Trocaria - {usuario.nome} (ID:{transacao.id})",
         "payment_method_id": "pix",
         "point_of_interaction": {
             "type": "payout"
@@ -245,12 +245,12 @@ async def processar_payout_pix_mp(transacao, usuario: Usuario, token_custom: Opt
 @limiter.limit("2/minute")
 async def solicitar_saque(request: Request, dados: SolicitacaoSaque, db: Session = Depends(get_db), usuario_logado: Usuario = Depends(obter_usuario_logado)):
     """
-    DEPRECATED: A Psy Pay nao e instituicao financeira e nao segura saldo de usuarios.
+    DEPRECATED: A Trocaria nao e instituicao financeira e nao segura saldo de usuarios.
     O dinheiro de emprestimos circula diretamente entre as partes via PIX.
     """
     raise HTTPException(
         status_code=410,  # Gone
-        detail="Sistema de saldo descontinuado. A Psy Pay nao segura dinheiro de usuarios. "
+        detail="Sistema de saldo descontinuado. A Trocaria nao segura dinheiro de usuarios. "
                "Emprestimos sao transferidos diretamente entre Tomador e Investidor via PIX."
     )
 
@@ -279,7 +279,7 @@ async def _deprecated_solicitar_saque(request: Request, dados: SolicitacaoSaque,
     if valor <= 0:
         raise HTTPException(status_code=400, detail="Valor de saque inválido.")
 
-    # REMOVIDO: checagem de usuario.saldo (Psy Pay nao segura dinheiro de usuarios)
+    # REMOVIDO: checagem de usuario.saldo (Trocaria nao segura dinheiro de usuarios)
 
     # AML (Anti-Lavagem de Dinheiro): Limites Escalonados (Tiers)
     if usuario.is_verified and usuario.is_subscriber:
@@ -367,7 +367,7 @@ async def _deprecated_solicitar_saque(request: Request, dados: SolicitacaoSaque,
     taxa = Decimal("0.00")
 
     total_debito = valor + taxa
-    # REMOVIDO: deducao de usuario.saldo (Psy Pay nao segura dinheiro de usuarios)
+    # REMOVIDO: deducao de usuario.saldo (Trocaria nao segura dinheiro de usuarios)
     
     # Valor que será efetivamente sacado (líquido)
     valor_liquido = valor
@@ -436,11 +436,11 @@ async def _deprecated_solicitar_saque(request: Request, dados: SolicitacaoSaque,
 @limiter.limit("2/minute")
 async def notificar_deposito(request: Request, dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
     """
-    DEPRECATED: A Psy Pay nao e instituicao financeira e nao aceita depositos.
+    DEPRECATED: A Trocaria nao e instituicao financeira e nao aceita depositos.
     """
     raise HTTPException(
         status_code=410,
-        detail="Sistema de deposito descontinuado. A Psy Pay nao segura dinheiro de usuarios."
+        detail="Sistema de deposito descontinuado. A Trocaria nao segura dinheiro de usuarios."
     )
 
 async def _deprecated_notificar_deposito(request: Request, dados: NotificacaoDeposito, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
@@ -564,7 +564,7 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
         transacao.status = "concluido"
         if not transacao.payment_id: transacao.payment_id = str(payment_id)
         transacao.detalhes += f" | Premium ativado - {dias} dias"
-        # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+        # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
         db.commit()
         log.info(f"ASSINATURA: Premium ativado para {usuario.nome}")
     elif transacao.tipo == TipoTransacao.DESBLOQUEIO_DADOS:
@@ -572,7 +572,7 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
         usuario.score = min((usuario.score or D("0")) + D("10"), D("1000"))
         transacao.status = "concluido"
         if not transacao.payment_id: transacao.payment_id = str(payment_id)
-        # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+        # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
         db.commit()
         log.info(f"KYC: {usuario.nome} verificado")
     elif transacao.tipo == TipoTransacao.TAXA_SOLICITACAO:
@@ -584,12 +584,12 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
             transacao.status = "concluido"
             transacao.detalhes = f"Taxa paga - Pedido #{solic.id} criado"
             if not transacao.payment_id: transacao.payment_id = str(payment_id)
-            # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+            # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
         db.commit()
     elif transacao.tipo == TipoTransacao.TAXA_MATCH:
         from utils_fintech import confirmar_match
         confirmar_match(db, transacao.id)
-        # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+        # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
     elif transacao.tipo == TipoTransacao.TAXA_POSTAGEM:
         if transacao.detalhes and "DESTAQUE_LINK:" in transacao.detalhes:
             link_id = int(transacao.detalhes.split(":")[1])
@@ -600,7 +600,7 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
                 link.data_expiracao = agora + dt.timedelta(days=7)
             transacao.status = "concluido"
             if not transacao.payment_id: transacao.payment_id = str(payment_id)
-            # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+            # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
             db.commit()
             log.info(f"DESTAQUE: Link #{link_id}")
         elif transacao.detalhes and "BOOST_LINK:" in transacao.detalhes:
@@ -615,7 +615,7 @@ def processar_pagamento_aprovado(db, transacao, payment_data):
                 link.data_expiracao = agora + dt.timedelta(days=30)
             transacao.status = "concluido"
             if not transacao.payment_id: transacao.payment_id = str(payment_id)
-            # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+            # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
             db.commit()
             log.info(f"BOOST: Link #{link_id} +{pacote['views'] if pacote else '?'} views")
 
@@ -693,7 +693,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes += f" | Premium ativado - {dias} dias"
-                            # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                            # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                             conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"assinatura de {usuario.nome}")
                             conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"assinatura premium")
                             db.commit()
@@ -718,7 +718,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     transacao.detalhes = f"Taxa paga - Pedido #{solic.id} criado"
                                     if not transacao.payment_id:
                                         transacao.payment_id = str(payment_id)
-                                    # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                    # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                     conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"publicacao de {usuario.nome}")
                                     conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"taxa de solicitacao P2P")
                                     db.commit()
@@ -728,7 +728,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     logger.error(f"Erro ao criar solicitacao apos pagamento: {e}")
                                     transacao.status = "concluido"
                                     transacao.detalhes += f" | Pago mas erro ao criar: {e}"
-                                    # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                    # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                     conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"publicacao de {usuario.nome}")
                                     conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"taxa de solicitacao P2P")
                                     db.commit()
@@ -736,7 +736,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             try:
                                 from utils_fintech import confirmar_match
                                 result = confirmar_match(db, transacao.id)
-                                # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                 conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"match de {usuario.nome}")
                                 conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"taxa de match P2P")
                                 logger.info(f"MATCH: {result['message']}")
@@ -757,7 +757,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
                             transacao.detalhes = "Conta verificada apos pagamento KYC"
-                            # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                            # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                             conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"KYC de {usuario.nome}")
                             conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"verificacao KYC")
                             db.commit()
@@ -777,7 +777,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 transacao.status = "concluido"
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
-                                # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                 conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"destaque de {usuario.nome}")
                                 conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"destaque de anuncio")
                                 db.commit()
@@ -800,7 +800,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                 transacao.status = "concluido"
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
-                                # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                 conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"boost de {usuario.nome}")
                                 conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"boost de anuncio")
                                 db.commit()
@@ -821,13 +821,13 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                                     if tomador.telefone:
                                         num = "".join(filter(str.isdigit, tomador.telefone))
                                         if not num.startswith("55"): num = "55" + num
-                                        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito or 0):.2f} do contrato #{sc.id} com {credor.nome}. - Psy Pay"
+                                        msg = f"Ola {tomador.nome.split()[0]}, voce tem um debito de R$ {float(debito or 0):.2f} do contrato #{sc.id} com {credor.nome}. - Trocaria"
                                         wa = f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
                                         print(f"COBRANCA: WhatsApp link para cobranca: {wa}")
                                 transacao.status = "concluido"
                                 if not transacao.payment_id:
                                     transacao.payment_id = str(payment_id)
-                                # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                                # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                                 conceder_pontos_indicacao(db, usuario, Decimal(str(valor_mp)), f"cobranca")
                                 conceder_pontos_compra(db, usuario, Decimal(str(valor_mp)), f"cobranca de divida")
                                 db.commit()
@@ -840,7 +840,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             transacao.status = "concluido"
                             if not transacao.payment_id:
                                 transacao.payment_id = str(payment_id)
-                            transacao.detalhes += " | [DEPRECATED: Sistema de saldo descontinuado. A Psy Pay nao segura dinheiro de usuarios.]"
+                            transacao.detalhes += " | [DEPRECATED: Sistema de saldo descontinuado. A Trocaria nao segura dinheiro de usuarios.]"
                             db.commit()
                             logger.warning(f"WEBHOOK MP: Transacao {transacao.id} tipo {transacao.tipo.value} finalizada sem creditar saldo (sistema descontinuado).")
                         else:
@@ -922,7 +922,7 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
         fee_details = payment.get("fee_details", [])
         total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
 
-        # REMOVIDO: usuario.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+        # REMOVIDO: usuario.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
         transacao.status = "concluido"
         if f"ID: {payment_id}" not in (transacao.detalhes or ""):
             transacao.detalhes = (transacao.detalhes or "") + f" | Vinculado ao ID MP: {payment_id}"
@@ -932,12 +932,12 @@ async def sincronizar_pix_manual(payment_id: str, db: Session = Depends(get_db),
         if transacao.parceiro_id:
             parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
             if parceiro:
-                # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                 transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
         
         # Subtrai taxas do admin
         plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-        # REMOVIDO: plataforma.saldo -= total_fee_mp (Psy Pay nao segura dinheiro de usuarios)
+        # REMOVIDO: plataforma.saldo -= total_fee_mp (Trocaria nao segura dinheiro de usuarios)
 
         if usuario.id != "000PL":
             pass  # score via depósito removido
@@ -981,7 +981,7 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
             total_fee_mp = sum(Decimal(str(fee.get("amount", 0))) for fee in fee_details)
             valor_mp = Decimal(str(payment.get("transaction_amount")))
 
-            # REMOVIDO: usuario_db.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+            # REMOVIDO: usuario_db.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
             transacao.status = "concluido"
             transacao.detalhes += f" | Polling Automático | [Taxas MP Absorvidas: R$ {total_fee_mp}]"
 
@@ -989,12 +989,12 @@ async def sincronizar_meu_pix_especifico(payment_id: str, db: Session = Depends(
             if transacao.parceiro_id:
                 parceiro = db.query(Parceiro).filter(Parceiro.id == transacao.parceiro_id).with_for_update().first()
                 if parceiro:
-                    # REMOVIDO: plataforma.saldo += valor_mp (Psy Pay nao segura dinheiro de usuarios)
+                    # REMOVIDO: plataforma.saldo += valor_mp (Trocaria nao segura dinheiro de usuarios)
                     transacao.detalhes += f" | [Custodiado por: {parceiro.nome}]"
             
             # Subtrai taxas do admin
             plataforma = db.query(Usuario).filter(Usuario.id == "000PL").with_for_update().first()
-            # REMOVIDO: plataforma.saldo -= total_fee_mp (Psy Pay nao segura dinheiro de usuarios)
+            # REMOVIDO: plataforma.saldo -= total_fee_mp (Trocaria nao segura dinheiro de usuarios)
 
             pass  # score via depósito removido
             db.commit()
@@ -1323,14 +1323,14 @@ class AssinarPlanoRequest(BaseModel):
 
 @router.post("/admin/adicionar-saldo")
 async def admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Form(gt=0), db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
-    """DEPRECATED: A Psy Pay nao segura saldo de usuarios."""
-    raise HTTPException(status_code=410, detail="Sistema de saldo descontinuado. A Psy Pay nao segura dinheiro de usuarios.")
+    """DEPRECATED: A Trocaria nao segura saldo de usuarios."""
+    raise HTTPException(status_code=410, detail="Sistema de saldo descontinuado. A Trocaria nao segura dinheiro de usuarios.")
 
 async def _deprecated_admin_adicionar_saldo(usuario_id: str = Form(...), valor: Decimal = Form(gt=0), db: Session = Depends(get_db), admin: Usuario = Depends(exigir_admin)):
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    # REMOVIDO: manipulacao de usuario.saldo (Psy Pay nao segura dinheiro de usuarios)
+    # REMOVIDO: manipulacao de usuario.saldo (Trocaria nao segura dinheiro de usuarios)
     db.commit()
     return {"message": f"[DEPRECATED] Sistema de saldo descontinuado.", "novo_saldo": 0.0}
 
@@ -1447,7 +1447,7 @@ async def _deprecated_sacar_lucro_plataforma(
     if not plataforma:
         raise HTTPException(status_code=500, detail="Erro interno: Conta de sistema não encontrada.")
     
-    # REMOVIDO: checagem de plataforma.saldo (Psy Pay nao segura dinheiro de usuarios)
+    # REMOVIDO: checagem de plataforma.saldo (Trocaria nao segura dinheiro de usuarios)
 
     # Registra a transação de auditoria vinculado à plataforma
     transacao = Transacao(
@@ -1486,13 +1486,13 @@ async def _deprecated_gerar_pix_aporte_admin(dados: DepositoPixRequest, db: Sess
     
     payment_data = {
         "transaction_amount": float(dados.valor or 0),
-        "description": f"Aporte Institucional Psy Pay - Admin {admin.id}",
+        "description": f"Aporte Institucional Trocaria - Admin {admin.id}",
         "payment_method_id": "pix",
         "date_of_expiration": expiracao_iso,
         "payer": {
             "email": admin.email, # O admin é o pagador
             "first_name": "ADMIN",
-            "last_name": "PSY PAY",
+            "last_name": "TROCARIA",
             "identification": {
                 "type": "CPF",
                 "number": admin.cpf.replace(".", "").replace("-", "")

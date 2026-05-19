@@ -634,7 +634,7 @@ async def gerar_2fa(usuario: Usuario = Depends(obter_usuario_logado), db: Sessio
         db.commit()
     
     totp = pyotp.TOTP(usuario.totp_secret)
-    provisioning_uri = totp.provisioning_uri(name=usuario.email, issuer_name="PSY PAY App")
+    provisioning_uri = totp.provisioning_uri(name=usuario.email, issuer_name="TROCARIA App")
     
     try:
         # Gerar imagem do QR Code
@@ -722,7 +722,7 @@ async def excluir_conta(dados: SolicitacaoExclusao, request: Request, usuario: U
     
     # 2. Anonimizar dados sensíveis (LGPD)
     usuario.nome = "Usuário Excluído"
-    usuario.email = f"excluido_{usuario.id}@psypay.com.br"
+    usuario.email = f"excluido_{usuario.id}@trocaria.com.br"
     usuario.cpf = f"000.000.000-{usuario.id}"
     usuario.chave_pix = "removida"
     usuario.senha_hash = "DELETADO"

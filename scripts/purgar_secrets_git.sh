@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./scripts/purgar_secrets_git.sh <URL_DO_REPO_REMOTO>
 #
 # EXEMPLO:
-#   ./scripts/purgar_secrets_git.sh https://github.com/SEU_USUARIO/psy-pay.git
+#   ./scripts/purgar_secrets_git.sh https://github.com/SEU_USUARIO/trocaria.git
 # =============================================================================
 
 REMOTE_URL="${1:-}"
@@ -27,7 +27,7 @@ MIRROR_DIR="${REPO_NAME}.git"
 BFG_JAR="bfg-1.14.0.jar"
 
 echo "=========================================="
-echo "  Psy Pay — Purga de Secrets do Git"
+echo "  Trocaria — Purga de Secrets do Git"
 echo "=========================================="
 echo ""
 echo "ATENCAO: Este script vai REESCREVER o historico Git."
@@ -85,10 +85,10 @@ echo "[3/6] Removendo arquivos sensiveis do historico..."
 
 if [ "$HAS_FILTER_REPO" = true ]; then
     git filter-repo --path backend/.env --invert-paths --force
-    git filter-repo --path-glob 'psy-pay-firebase-adminsdk-*.json' --invert-paths --force
+    git filter-repo --path-glob 'trocaria-firebase-adminsdk-*.json' --invert-paths --force
 elif [ "$HAS_BFG" = true ]; then
     java -jar "../$BFG_JAR" --delete-files .env
-    java -jar "../$BFG_JAR" --delete-files psy-pay-firebase-adminsdk-*.json
+    java -jar "../$BFG_JAR" --delete-files trocaria-firebase-adminsdk-*.json
 else
     echo "Nenhuma ferramenta de purga disponivel."
     exit 1
@@ -113,10 +113,10 @@ else
     echo "OK: backend/.env removido do historico."
 fi
 
-if git log --all --full-history -- "psy-pay-firebase-adminsdk-*.json" | grep -q .; then
-    echo "AVISO: psy-pay-firebase-adminsdk-*.json ainda encontrado no historico!"
+if git log --all --full-history -- "trocaria-firebase-adminsdk-*.json" | grep -q .; then
+    echo "AVISO: trocaria-firebase-adminsdk-*.json ainda encontrado no historico!"
 else
-    echo "OK: psy-pay-firebase-adminsdk-*.json removido do historico."
+    echo "OK: trocaria-firebase-adminsdk-*.json removido do historico."
 fi
 
 # ---------------------------------------------------------------------------

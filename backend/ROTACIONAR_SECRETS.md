@@ -1,4 +1,4 @@
-# Rotacao de Secrets — Psy Pay
+# Rotacao de Secrets — Trocaria
 
 > **AVISO:** Siga este procedimento IMEDIATAMENTE se suspeitar que alguma secret vazou (commit acidental, log exposto, etc.).
 
@@ -21,7 +21,7 @@
 
 1. Acesse [Firebase Console > Project Settings > Service Accounts](https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk).
 2. Clique em **Generate new private key**.
-3. Baixe o novo arquivo JSON (`psy-pay-firebase-adminsdk-*.json`).
+3. Baixe o novo arquivo JSON (`trocaria-firebase-adminsdk-*.json`).
 4. Substitua o arquivo antigo no servidor/deployment.
 5. **Delete a chave antiga** na console do Firebase (lista de chaves do service account).
 6. Atualize a variavel `GOOGLE_APPLICATION_CREDENTIALS` se necessario.
@@ -42,21 +42,21 @@
 
 ## 4. Remover Secrets do Historico Git
 
-Se `backend/.env` ou `psy-pay-firebase-adminsdk-*.json` foram commitados por engano, **apagar o arquivo em um commit novo nao e suficiente** — ele ainda estara no historico.
+Se `backend/.env` ou `trocaria-firebase-adminsdk-*.json` foram commitados por engano, **apagar o arquivo em um commit novo nao e suficiente** — ele ainda estara no historico.
 
 ### Opcao A: BFG Repo-Cleaner (mais rapido para repositorios grandes)
 
 ```bash
 # 1. Faca um clone mirror do repo
-git clone --mirror https://github.com/SEU_USUARIO/psy-pay.git
-cd psy-pay.git
+git clone --mirror https://github.com/SEU_USUARIO/trocaria.git
+cd trocaria.git
 
 # 2. Baixe o BFG
 wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar -O bfg.jar
 
 # 3. Remova os arquivos do historico
 java -jar bfg.jar --delete-files .env
-java -jar bfg.jar --delete-files psy-pay-firebase-adminsdk-*.json
+java -jar bfg.jar --delete-files trocaria-firebase-adminsdk-*.json
 
 # 4. Limpe o historico local
 git reflog expire --expire=now --all
@@ -73,12 +73,12 @@ git push --force
 pip install git-filter-repo
 
 # 2. Faca um clone mirror
-git clone --mirror https://github.com/SEU_USUARIO/psy-pay.git
-cd psy-pay.git
+git clone --mirror https://github.com/SEU_USUARIO/trocaria.git
+cd trocaria.git
 
 # 3. Remova os arquivos sensiveis do historico
 git filter-repo --path backend/.env --invert-paths
-git filter-repo --path-glob 'psy-pay-firebase-adminsdk-*.json' --invert-paths
+git filter-repo --path-glob 'trocaria-firebase-adminsdk-*.json' --invert-paths
 
 # 4. Force push
 git push --force

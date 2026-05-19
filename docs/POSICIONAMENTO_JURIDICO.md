@@ -1,14 +1,14 @@
-# POSICIONAMENTO JURIDICO DA PSY PAY
+# POSICIONAMENTO JURIDICO DA TROCARIA
 
 **Documento Interno - Estratégia de Compliance Regulatório**
 **Data:** 18/05/2026
-**Objetivo:** Definir claramente o escopo da Psy Pay para evitar caracterização como instituição financeira, intermediadora de valores, SCD, SEP ou instituição de pagamento.
+**Objetivo:** Definir claramente o escopo da Trocaria para evitar caracterização como instituição financeira, intermediadora de valores, SCD, SEP ou instituição de pagamento.
 
 ---
 
-## 1. O QUE A PSY PAY NÃO E (E NUNCA PODE SER)
+## 1. O QUE A TROCARIA NÃO E (E NUNCA PODE SER)
 
-Para evitar problema com CVM, Bacen e outras autoridades, a Psy Pay JAMAIS pode ser caracterizada como:
+Para evitar problema com CVM, Bacen e outras autoridades, a Trocaria JAMAIS pode ser caracterizada como:
 
 | O que NÃO somos | Por quê é proibido sem autorização | O que fazemos diferente |
 |----------------|-----------------------------------|------------------------|
@@ -22,10 +22,10 @@ Para evitar problema com CVM, Bacen e outras autoridades, a Psy Pay JAMAIS pode 
 
 ---
 
-## 2. O QUE A PSY PAY REALMENTE FAZ
+## 2. O QUE A TROCARIA REALMENTE FAZ
 
 ### 2.1 Definição Jurídica
-A Psy Pay é uma **plataforma tecnológica de correspondência entre particulares** para operações de **mútuo direto** (art. 586 do Código Civil), com as seguintes características:
+A Trocaria é uma **plataforma tecnológica de correspondência entre particulares** para operações de **mútuo direto** (art. 586 do Código Civil), com as seguintes características:
 
 - **Correspondente de interesses:** Conecta pessoas que querem emprestar com pessoas que querem tomar emprestado
 - **Geradora de contratos:** Elabora e armazena contratos de mútuo entre as partes
@@ -38,7 +38,7 @@ A Psy Pay é uma **plataforma tecnológica de correspondência entre particulare
 Tomador (Fulano)                              Investidor (Ciclano)
       |                                               |
       |-- R$ 2,00 (taxa de publicação) -->|            |
-      |          PSY PAY (nossa conta)     |            |
+      |          TROCARIA (nossa conta)     |            |
       |                                    |            |
       |<-------- R$ 1.000,00 (empréstimo) --------------|
       |         VIA PIX DIRETO (P2P)                    |
@@ -50,19 +50,19 @@ Tomador (Fulano)                              Investidor (Ciclano)
       |         VIA PIX DIRETO (P2P)                    |
 ```
 
-**IMPORTANTE:** O dinheiro do empréstimo NUNCA passa pela conta da Psy Pay. Vai direto do PIX do investidor para o PIX do tomador.
+**IMPORTANTE:** O dinheiro do empréstimo NUNCA passa pela conta da Trocaria. Vai direto do PIX do investidor para o PIX do tomador.
 
-### 2.3 O que a Psy Pay pode cobrar (e como)
+### 2.3 O que a Trocaria pode cobrar (e como)
 
 | Serviço | Quem paga | Como é cobrado | Para onde vai |
 |---------|----------|----------------|---------------|
-| Publicar pedido de empréstimo | Tomador | PIX direto para conta da Psy Pay | Conta corrente da empresa (CNPJ) |
-| Destacar/boost no marketplace | Anunciante | PIX direto para conta da Psy Pay | Conta corrente da empresa (CNPJ) |
-| Ferramenta de cobrança (boleto/PIX) | Credor | PIX direto para conta da Psy Pay | Conta corrente da empresa (CNPJ) |
-| Verificação KYC | Usuário | PIX direto para conta da Psy Pay | Conta corrente da empresa (CNPJ) |
-| Assinatura Premium | Usuário | PIX direto para conta da Psy Pay | Conta corrente da empresa (CNPJ) |
+| Publicar pedido de empréstimo | Tomador | PIX direto para conta da Trocaria | Conta corrente da empresa (CNPJ) |
+| Destacar/boost no marketplace | Anunciante | PIX direto para conta da Trocaria | Conta corrente da empresa (CNPJ) |
+| Ferramenta de cobrança (boleto/PIX) | Credor | PIX direto para conta da Trocaria | Conta corrente da empresa (CNPJ) |
+| Verificação KYC | Usuário | PIX direto para conta da Trocaria | Conta corrente da empresa (CNPJ) |
+| Assinatura Premium | Usuário | PIX direto para conta da Trocaria | Conta corrente da empresa (CNPJ) |
 
-**Regra de ouro:** A Psy Pay NUNCA recebe dinheiro que pertença aos usuários (empréstimos, saldos, depósitos). Recebe apenas suas **próprias taxas de serviço**.
+**Regra de ouro:** A Trocaria NUNCA recebe dinheiro que pertença aos usuários (empréstimos, saldos, depósitos). Recebe apenas suas **próprias taxas de serviço**.
 
 ---
 
@@ -118,7 +118,7 @@ O Código Civil permite que pessoas físicas façam empréstimos entre si (mútu
 
 ### 4.2 Ausência de Intermediação Financeira
 
-Como a Psy Pay:
+Como a Trocaria:
 - Não empresta dinheiro próprio
 - Não empresta dinheiro de terceiros
 - Não garante o empréstimo
@@ -133,7 +133,7 @@ Ela NÃO se enquadra nas definições de:
 
 ### 4.3 Correspondência de Interesses (Modelo Airbnb/OLX/Tinder)
 
-A Psy Pay opera no mesmo modelo jurídico de:
+A Trocaria opera no mesmo modelo jurídico de:
 - **Airbnb:** Conecta anfitrião e hóspede, cobra taxa de serviço
 - **OLX:** Conecta vendedor e comprador, cobra taxa de destaque
 - **Tinder:** Conecta pessoas, cobra assinatura premium
@@ -213,7 +213,7 @@ Para operar com segurança jurídica:
 
 ## 8. CONCLUSAO
 
-A Psy Pay pode operar legalmente **desde que**:
+A Trocaria pode operar legalmente **desde que**:
 
 1. Não segure dinheiro de usuários (sem saldo/escrow)
 2. Cobre apenas taxas de serviço (publicação, cobrança, destaque)

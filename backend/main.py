@@ -14,7 +14,7 @@ from rotas import (
     rotas_resgate
 )
 
-app = FastAPI(title="PSY PAY API P2P")
+app = FastAPI(title="TROCARIA API P2P")
 
 # Configuração de Pastas
 os.makedirs("uploads", exist_ok=True)
@@ -32,8 +32,8 @@ origins = [
     "https://www.cred30.site",
     "https://cred320.site",
     "https://www.cred320.site",
-    "https://psy-pay-front.onrender.com",
-    "https://psy-pay.onrender.com",
+    "https://trocaria-front.onrender.com",
+    "https://trocaria.onrender.com",
     "https://peer-5gq5.onrender.com",
     "https://peer-front.onrender.com",
     "https://peer.onrender.com",
@@ -98,7 +98,7 @@ async def block_suspicious_ips(request: Request, call_next):
     if resultado["bloqueado"]:
         return JSONResponse(
             status_code=403,
-            content={"detail": f"Acesso negado: {resultado['motivo']}. Contate suporte@psypay.com.br se acredita que isto é um erro."}
+            content={"detail": f"Acesso negado: {resultado['motivo']}. Contate suporte@trocaria.com.br se acredita que isto é um erro."}
         )
     return await call_next(request)
 
@@ -127,7 +127,7 @@ import ipaddress
 CLOUDFLARE_NETS = [ipaddress.ip_network(cidr) for cidr in CLOUDFLARE_IPS_V4]
 
 ALLOWED_HOSTS = {"cred30.site", "www.cred30.site", "cred320.site", "www.cred320.site",
-                 "psy-pay-front.onrender.com", "psy-pay.onrender.com",
+                 "trocaria-front.onrender.com", "trocaria.onrender.com",
                  "peer-5gq5.onrender.com", "peer-front.onrender.com", "peer.onrender.com",
                  "localhost", "127.0.0.1"}
 
@@ -199,13 +199,13 @@ async def startup_db_setup():
         from modelos.modelos_db import Usuario
         with SessionLocal() as db:
             # REMOVIDO: Conta 000PL nao e mais criada automaticamente.
-            # A Psy Pay nao segura dinheiro de usuarios (Lei 12.865/2013).
+            # A Trocaria nao segura dinheiro de usuarios (Lei 12.865/2013).
             # Taxas sao recebidas diretamente na conta bancaria da empresa (CNPJ).
             if not db.query(Usuario).filter(Usuario.is_admin == True).first():
                 import secrets
                 admin = Usuario(
-                    id="ADM01", nome="Admin Psy Pay", email="admin@psypay.com.br",
-                    cpf="00000000001", senha_hash=secrets.token_hex(16), chave_pix="admin@psypay.com.br",
+                    id="ADM01", nome="Admin Trocaria", email="admin@trocaria.com.br",
+                    cpf="00000000001", senha_hash=secrets.token_hex(16), chave_pix="admin@trocaria.com.br",
                     is_admin=True, is_active=True
                 )
                 db.add(admin)
@@ -267,11 +267,11 @@ def ping_curto():
 
 @app.get("/")
 async def root():
-    return {"status": "online", "message": "Psy Pay API"}
+    return {"status": "online", "message": "Trocaria API"}
 
 @app.get("/api")
 async def api_root():
-    return {"status": "online", "message": "Psy Pay API Gateway"}
+    return {"status": "online", "message": "Trocaria API Gateway"}
 
 @app.get("/robots.txt")
 async def robots():

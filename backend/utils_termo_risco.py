@@ -16,7 +16,7 @@ estou ciente e de acordo com os seguintes termos:
 1.1. Estou realizando uma operação de MÚTUO (empréstimo) diretamente com outra 
 pessoa física (Tomador), sem intervenção de instituição financeira.
 
-1.2. A Psy Pay é APENAS uma plataforma de correspondência de interesses. Ela NÃO é:
+1.2. A Trocaria é APENAS uma plataforma de correspondência de interesses. Ela NÃO é:
 - Banco ou instituição financeira
 - Correspondente bancário
 - Intermediária financeira
@@ -41,9 +41,9 @@ das parcelas ou quitacao.
 
 3. AUSÊNCIA DE GARANTIAS
 
-3.1. A Psy Pay NÃO garante o pagamento deste empréstimo.
-3.2. A Psy Pay NÃO avalisa, endossa ou garante a solvência do Tomador.
-3.3. A Psy Pay NÃO cobre prejuízos em caso de inadimplência.
+3.1. A Trocaria NÃO garante o pagamento deste empréstimo.
+3.2. A Trocaria NÃO avalisa, endossa ou garante a solvência do Tomador.
+3.3. A Trocaria NÃO cobre prejuízos em caso de inadimplência.
 3.4. O score de reputação é apenas uma referência baseada em histórico, não é 
 garantia de pagamento.
 
@@ -62,7 +62,7 @@ de concentração.
 - Usar ferramentas de cobrança da plataforma (mediante taxa de serviço)
 - Negativar o Tomador em cadastros de proteção ao crédito
 
-5.2. A Psy Pay pode fornecer os dados do contrato e do Tomador para auxiliar 
+5.2. A Trocaria pode fornecer os dados do contrato e do Tomador para auxiliar 
 em ação judicial, mas não assume custos processuais.
 
 6. TRIBUTAÇÃO
@@ -75,7 +75,7 @@ em ação judicial, mas não assume custos processuais.
 Ao clicar em "Li e aceito os riscos", declaro que:
 - Li e compreendi todos os riscos acima
 - Estou investindo por minha própria conta e risco
-- Entendo que a Psy Pay não garante o retorno do investimento
+- Entendo que a Trocaria não garante o retorno do investimento
 - Tenho capacidade financeira para assumir o prejuízo em caso de calote
 - Não me enquadro como investidor inexperiente ou vulnerável
 

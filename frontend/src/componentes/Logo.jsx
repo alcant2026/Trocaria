@@ -5,7 +5,7 @@ const Logo = ({ size = 32, showText = true }) => {
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
       <img 
         src="/logo.png" 
-        alt="PSY PAY Logo" 
+        alt="TROCARIA Logo" 
         style={{ 
           width: 'auto', 
           height: size, 
@@ -19,7 +19,7 @@ const Logo = ({ size = 32, showText = true }) => {
           color: 'var(--primary)', 
           letterSpacing: '-1px' 
         }}>
-          PSY PAY
+          TROCARIA
         </span>
       )}
     </div>

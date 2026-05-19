@@ -60,7 +60,7 @@ const Login = ({ onLogin }) => {
                         </a>
                     </div>
                     <div className="text-center mb-1">
-                        <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px', marginBottom: '0.25rem' }}>Entrar no Psy Pay</h1>
+                        <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.5px', marginBottom: '0.25rem' }}>Entrar no Trocaria</h1>
                         <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Rede de Apoio entre Pares</p>
                     </div>
 
@@ -136,7 +136,7 @@ const Login = ({ onLogin }) => {
                                 Esqueci minha senha
                             </a>
                             <a 
-                                href="https://wa.me/5591980177874?text=Olá,%20esqueci%20meus%20dados%20de%20acesso%20(CPF/Email)%20no%20PSY PAY%20e%20gostaria%20de%20recuperá-los." 
+                                href="https://wa.me/5591980177874?text=Olá,%20esqueci%20meus%20dados%20de%20acesso%20(CPF/Email)%20no%20TROCARIA%20e%20gostaria%20de%20recuperá-los." 
                                 target="_blank"
                                 rel="noreferrer"
                                 style={{ color: 'var(--primary)', fontSize: '0.85rem', opacity: 0.9, textDecoration: 'none', fontWeight: 500 }}

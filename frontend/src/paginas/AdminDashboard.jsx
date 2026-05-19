@@ -44,7 +44,7 @@ import {
 import ModalPremium from '../componentes/ModalPremium';
 
 // --- CONSTANTES E UTILITÁRIOS ---
-// DEPRECATED: deposito e saque removidos. A Psy Pay nao segura dinheiro de usuarios.
+// DEPRECATED: deposito e saque removidos. A Trocaria nao segura dinheiro de usuarios.
 const TIPOS_LABEL = {
     recebimento: 'Recebimento',
     compra_score: 'Compra de Score',
@@ -435,7 +435,7 @@ const AdminDashboard = () => {
         return (
             <div className="flex-center" style={{ height: '100vh', background: 'var(--bg-dark)', color: 'var(--primary)' }}>
                 <Zap className="animate-pulse" size={48} />
-                <p className="ml-1 font-bold">Iniciando PSY PAY Cyber-Hub...</p>
+                <p className="ml-1 font-bold">Iniciando TROCARIA Cyber-Hub...</p>
             </div>
         );
     }
@@ -446,7 +446,7 @@ const AdminDashboard = () => {
             <aside className="admin-sidebar">
                 <div className="sidebar-logo">
                     <Zap size={28} />
-                    <span>PSY PAY</span>
+                    <span>TROCARIA</span>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -516,7 +516,7 @@ const AdminDashboard = () => {
                             <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
                             <StatCard label="Pedidos Pendentes" value={solicitacoesAtivas.length} icon={Clock} color="var(--warning)" trend={null} />
                             <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
-                            {/* DEPRECATED: Saldo removido. A Psy Pay nao segura dinheiro de usuarios. */}
+                            {/* DEPRECATED: Saldo removido. A Trocaria nao segura dinheiro de usuarios. */}
                         </div>
                     </div>
                 )}
@@ -853,7 +853,7 @@ const AdminDashboard = () => {
                 isOpen={showNovoParceiroModal}
                 onClose={() => setShowNovoParceiroModal(false)}
                 title="Cadastrar Novo Parceiro (Lojista)"
-                message="Parceiros autorizados para serviços diversos da PSY PAY."
+                message="Parceiros autorizados para serviços diversos da TROCARIA."
                 type="info"
                 onConfirm={handleCriarParceiro}
                 confirmText="Salvar Parceiro"

@@ -1,10 +1,10 @@
 /**
- * Service Worker para Psy Pay - Cache de assets para otimizar Render Free Tier
+ * Service Worker para Trocaria - Cache de assets para otimizar Render Free Tier
  * 
  * Estratégia: Cache First para assets estáticos, Network First para API
  */
 
-const CACHE_NAME = 'psypay-v1';
+const CACHE_NAME = 'trocaria-v1';
 const STATIC_CACHE = [
   '/',
   '/index.html',

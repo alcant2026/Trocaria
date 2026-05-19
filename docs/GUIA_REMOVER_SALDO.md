@@ -50,7 +50,7 @@ saldo_caixa = Column(Numeric(precision=20, scale=2), default=0)
 As taxas de servico (R$ 2,00 de publicacao, R$ 2,00 de cobranca) continuam funcionando assim:
 
 1. Usuario gera PIX para pagar a taxa
-2. Pagamento vai DIRETO para a conta do Mercado Pago / conta PJ da Psy Pay
+2. Pagamento vai DIRETO para a conta do Mercado Pago / conta PJ da Trocaria
 3. Webhook confirma o pagamento
 4. A plataforma libera o servico (publica o pedido, libera ferramenta de cobranca)
 
@@ -140,9 +140,9 @@ Investidor confirma que recebeu uma parcela.
 
 ---
 
-### 7. MODELO DE RECEITA DA PSY PAY
+### 7. MODELO DE RECEITA DA TROCARIA
 
-A Psy Pay ganha dinheiro APENAS com:
+A Trocaria ganha dinheiro APENAS com:
 1. Taxa de publicacao de pedido: R$ 2,00
 2. Taxa de ferramenta de cobranca: R$ 2,00
 3. Taxa de destaque no marketplace: R$ 5,00 / variavel
@@ -172,7 +172,7 @@ A Psy Pay ganha dinheiro APENAS com:
 
 ```
 1. Joao (Tomador) quer R$ 1.000,00
-   -> Paga R$ 2,00 de taxa de publicacao (vai para conta da Psy Pay)
+   -> Paga R$ 2,00 de taxa de publicacao (vai para conta da Trocaria)
    -> Pedido fica visivel
 
 2. Maria (Investidora) aceita o pedido
@@ -186,7 +186,7 @@ A Psy Pay ganha dinheiro APENAS com:
    -> Maria clica "Confirmar recebimento" na plataforma (apenas registro)
 
 4. Se Joao nao pagar:
-   -> Maria pode usar ferramenta de cobranca (paga R$ 2,00 de taxa para Psy Pay)
+   -> Maria pode usar ferramenta de cobranca (paga R$ 2,00 de taxa para Trocaria)
    -> Sistema gera cobranca PIX para Joao pagar Maria
    -> Se persistir, Maria pode acionar judicialmente (fora da plataforma)
 ```

@@ -1,7 +1,7 @@
 # =============================================================================
 # DEPRECATED
 # =============================================================================
-# Este script esta DEPRECATED porque a Psy Pay nao e instituicao financeira
+# Este script esta DEPRECATED porque a Trocaria nao e instituicao financeira
 # e nao segura mais dinheiro de usuarios (Lei 12.865/2013, art. 8o).
 # Campos saldo/saldo_caixa nao devem mais ser consultados nem manipulados.
 # =============================================================================
@@ -14,7 +14,7 @@ from decimal import Decimal
 db = SessionLocal()
 
 print("[DEPRECATED] Este script foi descontinuado.")
-print("A Psy Pay nao segura dinheiro de usuarios. Nenhum saldo foi consultado.")
+print("A Trocaria nao segura dinheiro de usuarios. Nenhum saldo foi consultado.")
 
 # CODIGO LEGADO COMENTADO — consultava saldo_caixa (pool) e depositos PIX
 # total_pool = db.query(func.sum(Usuario.saldo_caixa)).scalar() or Decimal("0.00")

@@ -1,4 +1,4 @@
-# RESUMO DE PROTECOES IMPLEMENTADAS - PSY PAY
+# RESUMO DE PROTECOES IMPLEMENTADAS - TROCARIA
 
 **Data:** 18/05/2026
 **Versao:** 1.0
@@ -93,7 +93,7 @@
 #### ✅ Documentacao LGPD
 - [x] `docs/POLITICA_PRIVACIDADE.md`
 - [x] Consentimentos granularizados (termos, privacidade, marketing, cookies)
-- [x] DPO nomeado (dpo@psypay.com.br)
+- [x] DPO nomeado (dpo@trocaria.com.br)
 - [x] Prazo de resposta: 15 dias
 
 ---
@@ -215,10 +215,10 @@
 
 ### 10. CONTATOS IMPORTANTES
 
-- **Suporte:** suporte@psypay.com.br
-- **Ouvidoria:** ouvidoria@psypay.com.br
-- **DPO:** dpo@psypay.com.br
-- **Juridico:** juridico@psypay.com.br
+- **Suporte:** suporte@trocaria.com.br
+- **Ouvidoria:** ouvidoria@trocaria.com.br
+- **DPO:** dpo@trocaria.com.br
+- **Juridico:** juridico@trocaria.com.br
 - **ANPD:** www.gov.br/anpd | atendimento@anpd.gov.br
 - **Banco Central:** www.bcb.gov.br
 - **CVM:** www.cvm.gov.br

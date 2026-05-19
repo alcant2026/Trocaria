@@ -1,7 +1,7 @@
 # =============================================================================
 # DEPRECATED
 # =============================================================================
-# Este script esta DEPRECATED porque a Psy Pay nao e instituicao financeira
+# Este script esta DEPRECATED porque a Trocaria nao e instituicao financeira
 # e nao segura mais dinheiro de usuarios (Lei 12.865/2013, art. 8o).
 # Campos saldo/saldo_caixa nao devem mais ser manipulados.
 # A conta 000PL tambem nao e mais criada automaticamente.
@@ -13,7 +13,7 @@ from decimal import Decimal
 
 def migrar_saldos_teste():
     print("[DEPRECATED] Este script foi descontinuado.")
-    print("A Psy Pay nao segura dinheiro de usuarios. Nenhum saldo foi alterado.")
+    print("A Trocaria nao segura dinheiro de usuarios. Nenhum saldo foi alterado.")
     return
 
     # CODIGO LEGADO COMENTADO — manipulava saldo/saldo_caixa e criava 000PL
@@ -32,7 +32,7 @@ def migrar_saldos_teste():
     #     if not plataforma:
     #         plataforma = Usuario(
     #             id=plataforma_id,
-    #             nome="PSY PAY Plataforma (Sistema)",
+    #             nome="TROCARIA Plataforma (Sistema)",
     #             email="sistema@psy pay.com.br",
     #             cpf="000.000.000-00",
     #             senha_hash="SISTEMA_VIRTUAL",

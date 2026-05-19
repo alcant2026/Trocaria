@@ -1,11 +1,11 @@
 """
-Simulacao Financeira - Psy Pay (CUSTOS REDUZIDOS)
+Simulacao Financeira - Trocaria (CUSTOS REDUZIDOS)
 Modelo enxuto: sem pro-labore, marketing organico, operacao solo
 """
 import json
 
 print("=" * 70)
-print("  SIMULACAO FINANCEIRA - PSY PAY (Modelo Enxuto)")
+print("  SIMULACAO FINANCEIRA - TROCARIA (Modelo Enxuto)")
 print("=" * 70)
 
 # ============================================================

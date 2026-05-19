@@ -88,7 +88,7 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
 
             <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                    <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Psy Pay atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
+                    <AlertTriangle size={14} className="text-warning inline-block mr-1" /> <strong>AVISO LEGAL:</strong> Ao publicar, você declara ser o único responsável pelo produto/serviço. A Trocaria atua apenas como plataforma de classificados e não se responsabiliza por vícios, defeitos ou falta de entrega.
                 </p>
             </div>
 

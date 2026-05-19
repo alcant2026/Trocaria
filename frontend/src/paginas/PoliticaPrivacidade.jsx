@@ -7,7 +7,7 @@ const PoliticaPrivacidade = ({ onVoltar }) => {
             <div className="text-center mb-2">
                 <Landmark size={48} color="var(--primary)" className="mb-1" />
                 <h1 style={{ fontSize: '2rem' }}>Política de Privacidade</h1>
-                <p className="text-muted">Compromisso PSY PAY com a Governança e LGPD</p>
+                <p className="text-muted">Compromisso TROCARIA com a Governança e LGPD</p>
             </div>
 
             <section className="card mb-1">
@@ -15,7 +15,7 @@ const PoliticaPrivacidade = ({ onVoltar }) => {
                     <EyeOff size={20} color="var(--primary)" />
                     <h3 style={{ margin: 0 }}>1. Digital Credit Hub</h3>
                 </div>
-                <p>A PSY PAY opera como um Hub de Crédito Digital. Coletamos dados estritamente necessários para viabilizar operações de crédito e análise de risco:</p>
+                <p>A TROCARIA opera como um Hub de Crédito Digital. Coletamos dados estritamente necessários para viabilizar operações de crédito e análise de risco:</p>
                 <ul>
                     <li><strong>Identificação Institucional:</strong> Nome completo, CPF, e-mail e dados de contato para autenticação de conta única.</li>
                     <li><strong>Dados de Crédito:</strong> Chaves PIX para liquidação e movimentação, além de histórico de pagamentos para composição do Score de Fidelidade.</li>
@@ -48,7 +48,7 @@ const PoliticaPrivacidade = ({ onVoltar }) => {
                     <UserCheck size={20} color="var(--primary)" />
                     <h3 style={{ margin: 0 }}>4. Compartilhamento Restrito</h3>
                 </div>
-                <p>Diferente de modelos abertos, a PSY PAY **não comercializa e não compartilha** seus dados para fins publicitários. O processamento de dados é exclusivo para a análise de crédito interna e cumprimento de normativas de segurança do ecossistema financeiro digital.</p>
+                <p>Diferente de modelos abertos, a TROCARIA **não comercializa e não compartilha** seus dados para fins publicitários. O processamento de dados é exclusivo para a análise de crédito interna e cumprimento de normativas de segurança do ecossistema financeiro digital.</p>
             </section>
 
             <div className="text-center mt-2">

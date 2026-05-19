@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LoadingScreen = ({ message = "Inicializando Psy Pay..." }) => {
+const LoadingScreen = ({ message = "Inicializando Trocaria..." }) => {
   return (
     <div className="splash-container">
       <div className="splash-logo"></div>

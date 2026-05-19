@@ -10,7 +10,7 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
             <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '15px', fontSize: '0.78rem', lineHeight: '1.6', color: 'var(--text-muted)', maxHeight: '55vh', overflowY: 'auto' }}>
                 
                 <p><strong style={{ color: 'var(--text-main)' }}>1. Responsabilidade dos Usuarios</strong><br />
-                O Psy Pay e apenas uma plataforma de conexao entre pessoas. Nao participamos, garantimos ou nos responsabilizamos pelos acordos firmados entre os usuarios. Cada usuario e integralmente responsavel por suas escolhas e pelo cumprimento dos compromissos assumidos.</p>
+                O Trocaria e apenas uma plataforma de conexao entre pessoas. Nao participamos, garantimos ou nos responsabilizamos pelos acordos firmados entre os usuarios. Cada usuario e integralmente responsavel por suas escolhas e pelo cumprimento dos compromissos assumidos.</p>
 
                 <p><strong style={{ color: 'var(--text-main)' }}>2. Due Diligence</strong><br />
                 Antes de firmar qualquer acordo, recomendamos que voce verifique as informacoes da outra parte. A plataforma exibe dados como score de reputacao e status de verificacao, mas nao realiza verificacao completa de identidade ou capacidade financeira.</p>
@@ -32,7 +32,7 @@ const TermosPlataforma = ({ onAceitar, onVoltar, tipo }) => {
                     E proibido usar a plataforma para fraudes, adulteracao de informacoes, criacao de contas falsas ou qualquer atividade ilegal. Usuarios que violarem estas regras terao suas contas suspensas e os dados encaminhados as autoridades competentes.</p>
 
                 <p><strong style={{ color: 'var(--text-main)' }}>6. Isencao de Responsabilidade</strong><br />
-                    Ao utilizar a plataforma, voce isenta o Psy Pay de qualquer responsabilidade por danos diretos ou indiretos decorrentes dos acordos firmados entre usuarios, incluindo, mas nao se limitando a, inadimplencia, divergencias contratuais ou prejuizos financeiros.</p>
+                    Ao utilizar a plataforma, voce isenta o Trocaria de qualquer responsabilidade por danos diretos ou indiretos decorrentes dos acordos firmados entre usuarios, incluindo, mas nao se limitando a, inadimplencia, divergencias contratuais ou prejuizos financeiros.</p>
 
                 <p style={{ fontSize: '0.7rem', color: 'var(--warning)', marginTop: '15px', textAlign: 'center' }}>
                     Ao clicar em "Aceitar e Continuar", voce confirma que leu, entendeu e concorda com estas regras.

@@ -22,7 +22,7 @@ class FiscalPDF(FPDF):
         except:
             self.set_font('Arial', 'B', 22)
             self.set_text_color(41, 121, 255)
-            self.cell(0, 15, 'PSY PAY', 0, 1, 'C')
+            self.cell(0, 15, 'TROCARIA', 0, 1, 'C')
             self.ln(5)
         
         self.set_font('Arial', 'B', 14)
@@ -47,7 +47,7 @@ async def gerar_relatorio_fiscal_admin(
         data_ini = datetime.datetime.strptime(inicio, "%Y-%m-%d")
         data_fim = datetime.datetime.strptime(fim, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         
-        # 1. CUSTÓDIA TOTAL - DEPRECATED: A Psy Pay nao segura dinheiro de usuarios.
+        # 1. CUSTÓDIA TOTAL - DEPRECATED: A Trocaria nao segura dinheiro de usuarios.
         # Sistema de saldo/saldo_caixa descontinuado.
         custodia_total = Decimal("0.00")
         

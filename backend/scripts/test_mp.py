@@ -8,10 +8,10 @@ print("Iniciando requisição de teste para geração de PIX (R$ 5.00)...")
 
 payment_data = {
     "transaction_amount": 5.0,
-    "description": "Teste Unitário Psy Pay PIX",
+    "description": "Teste Unitário Trocaria PIX",
     "payment_method_id": "pix",
     "payer": {
-        "email": "test_script@psypay.com.br",
+        "email": "test_script@trocaria.com.br",
         "first_name": "Sr Teste",
         "identification": {
             "type": "CPF",

@@ -1,6 +1,6 @@
 # CHECKLIST: DADOS REAIS DA EMPRESA
 
-> ⚠️ **IMPORTANTE:** Antes de colocar a Psy Pay em produção, você DEVE preencher os dados reais da empresa em TODOS os documentos listados abaixo. Subir os documentos com placeholders pode invalidar a proteção jurídica e gerar multas do PROCON/CDC.
+> ⚠️ **IMPORTANTE:** Antes de colocar a Trocaria em produção, você DEVE preencher os dados reais da empresa em TODOS os documentos listados abaixo. Subir os documentos com placeholders pode invalidar a proteção jurídica e gerar multas do PROCON/CDC.
 
 ---
 
@@ -8,11 +8,11 @@
 
 | Dado | Exemplo | Onde usar |
 |------|---------|-----------|
-| **Razão Social** | Psy Pay Tecnologia Ltda. | Todos os termos |
+| **Razão Social** | Trocaria Tecnologia Ltda. | Todos os termos |
 | **CNPJ** | 12.345.678/0001-99 | Todos os termos, POSICIONAMENTO_JURIDICO.md |
 | **Endereço completo** | Av. Paulista, 1000, Sala 100, São Paulo/SP, CEP 01310-100 | TERMOS_DE_USO.md, POLITICA_PRIVACIDADE.md |
 | **Nome do DPO** | João da Silva | POLITICA_PRIVACIDADE.md |
-| **E-mail do DPO** | dpo@psypay.com.br | POLITICA_PRIVACIDADE.md, TERMOS_DE_USO.md |
+| **E-mail do DPO** | dpo@trocaria.com.br | POLITICA_PRIVACIDADE.md, TERMOS_DE_USO.md |
 | **Telefone de contato** | (11) 99999-9999 | TERMOS_DE_USO.md, NAO_SOMOS_INSTITUICAO_FINANCEIRA.md |
 | **Conta bancária da empresa (CNPJ)** | Banco XXX, Ag. 0001, CC 12345-6 | Webhook/configuração do Mercado Pago |
 
@@ -65,9 +65,9 @@ cd docs
 
 # Substitua os placeholders (exemplo com CNPJ)
 sed -i 's/00\.000\.000\/0000-00/12.345.678\/0001-99/g' *.md
-sed -i 's/NOME_DA_EMPRESA/Psy Pay Tecnologia Ltda./g' *.md
+sed -i 's/NOME_DA_EMPRESA/Trocaria Tecnologia Ltda./g' *.md
 sed -i 's/NOME_DO_DPO/João da Silva/g' *.md
-sed -i 's/DPO@EMPRESA.COM/dpo@psypay.com.br/g' *.md
+sed -i 's/DPO@EMPRESA.COM/dpo@trocaria.com.br/g' *.md
 ```
 
 > ⚠️ **ATENÇÃO:** Faça um `git diff` antes de commitar para garantir que não substituiu nada demais.

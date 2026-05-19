@@ -1,5 +1,5 @@
 """
-Simulacao de 100 usuarios na plataforma Psy Pay.
+Simulacao de 100 usuarios na plataforma Trocaria.
 Cria usuarios, anuncios, pedidos de apoio, matches, pagamentos e pontos.
 Uso: DATABASE_URL="postgresql://..." python scripts/simular_100_usuarios.py
 """

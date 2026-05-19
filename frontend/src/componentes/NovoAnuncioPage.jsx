@@ -94,24 +94,6 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
         }
         setLoading(false);
     };
-            const res = await api.post('/comunidade/postar-link', payload);
-            
-            for (const img of imagensValidas) {
-                try {
-                    await api.post('/comunidade/adicionar-imagem', { link_id: res.id, url_imagem: img.url });
-                } catch(e) { /* ignora erros de imagem individual */ }
-            }
-            
-            imagens.forEach(img => { if (img.preview) URL.revokeObjectURL(img.preview); });
-            setDados({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', valor: '', vendas_texto: '', codigo_2fa: '' });
-            setImagens([]);
-            showModal({ title: 'Sucesso!', message: 'Anuncio publicado!', type: 'success' });
-            if (onSucesso) onSucesso();
-        } catch (err) {
-            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao publicar', type: 'danger' });
-        }
-        setLoading(false);
-    };
 
     const getImagemSrc = (img) => {
         if (img.url) return img.url.startsWith('http') ? img.url : `${BACKEND_URL}${img.url}`;

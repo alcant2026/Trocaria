@@ -4,7 +4,7 @@ const Logo = ({ size = 32, showText = true }) => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
       <img 
-        src="/logo.png" 
+        src="/logo_v2.png" 
         alt="TROCARIA Logo" 
         style={{ 
           width: 'auto', 

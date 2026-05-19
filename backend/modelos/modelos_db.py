@@ -250,39 +250,88 @@ class LinkAfiliado(Base):
     __tablename__ = "links_afiliados"
 
     id = Column(Integer, primary_key=True, index=True)
-    nome_produto = Column(String(150), nullable=False)
-    descricao = Column(Text, nullable=True)
+    nome_produto = Column(String(90), nullable=False)  # OLX: max 90 chars
+    descricao = Column(Text, nullable=True)  # OLX: max 6000 chars
     categoria = Column(String(50), default="Geral", index=True)
     url_afiliado = Column(String(500), nullable=False)
-    url_imagem = Column(String(500), nullable=True)
-    valor = Column(Numeric(10, 2), default=0.00)
+    valor = Column(Numeric(10, 2), nullable=False)  # Preco obrigatorio
     is_active = Column(Boolean, default=True)
     data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
-    # Novos campos para Marketplace
     usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=True, index=True)
     is_boosted = Column(Boolean, default=False)
-    visualizacoes_restantes = Column(Integer, default=50) # Bônus inicial de 50 views
+    visualizacoes_restantes = Column(Integer, default=50)
     visualizacoes_totais = Column(Integer, default=0)
     data_expiracao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24))
-    nota = Column(Numeric(2, 1), default=0.0)  # Rating 0.0 a 5.0 (média)
+    nota = Column(Numeric(2, 1), default=0.0)
     total_avaliacoes = Column(Integer, default=0)
-    vendas_texto = Column(String(50), nullable=True)  # Ex: "8mil+ vendas"
+    vendas_texto = Column(String(50), nullable=True)
     denuncias_count = Column(Integer, default=0)
     
-    # Localização (herdado do anunciante)
     cidade = Column(String(100), nullable=True)
     estado = Column(String(50), nullable=True)
     
-    # Controle de pontos (Gamificação)
     ponto_min = Column(Integer, default=1)
     ponto_max = Column(Integer, default=1)
 
     usuario = relationship("Usuario")
+    imagens = relationship("ImagemAnuncio", back_populates="anuncio", cascade="all, delete-orphan")
+    ofertas = relationship("OfertaAnuncio", back_populates="anuncio", cascade="all, delete-orphan")
 
     from sqlalchemy import Index
     __table_args__ = (
         Index('idx_link_is_active', 'is_active'),
+        Index('idx_link_nome', 'nome_produto'),
+    )
+
+
+class ImagemAnuncio(Base):
+    """Imagens de anuncios (max 6 por anuncio, comprimidas para 500KB)."""
+    __tablename__ = "imagens_anuncios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True)
+    caminho_arquivo = Column(String(500), nullable=False)
+    ordem = Column(Integer, default=0)  # Ordem de exibicao
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    
+    anuncio = relationship("LinkAfiliado", back_populates="imagens")
+
+
+class OfertaAnuncio(Base):
+    """Sistema de ofertas estilo OLX: comprador propoe preco, vendedor aceita/recusa em 48h."""
+    __tablename__ = "ofertas_anuncios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True)
+    ofertante_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    valor_oferta = Column(Numeric(10, 2), nullable=False)
+    status = Column(String(20), default="pendente")  # pendente, aceita, recusada, expirada
+    
+    data_oferta = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_expiracao = Column(DateTime, nullable=False)  # 48h apos a oferta
+    data_resposta = Column(DateTime, nullable=True)
+    
+    anuncio = relationship("LinkAfiliado", back_populates="ofertas")
+    ofertante = relationship("Usuario", foreign_keys=[ofertante_id])
+
+
+class BloqueioUsuario(Base):
+    """Bloqueio user-to-user: usuario bloqueia outro para nao ver seus anuncios."""
+    __tablename__ = "bloqueios_usuarios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    bloqueador_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    bloqueado_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    data_bloqueio = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    
+    bloqueador = relationship("Usuario", foreign_keys=[bloqueador_id])
+    bloqueado = relationship("Usuario", foreign_keys=[bloqueado_id])
+    
+    __table_args__ = (
+        # Evita bloqueio duplicado
+        Index('idx_bloqueio_unico', 'bloqueador_id', 'bloqueado_id', unique=True),
     )
 
 class AcaoAdmin(Base):

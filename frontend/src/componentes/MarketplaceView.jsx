@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
 
 const CATEGORIAS_MARKETPLACE = [
@@ -32,39 +32,98 @@ const MarketplaceView = ({
     setSelectedAdDetails,
     setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
 }) => {
+    const [busca, setBusca] = useState('');
+    const [precoMin, setPrecoMin] = useState('');
+    const [precoMax, setPrecoMax] = useState('');
+    const [mostrarFiltros, setMostrarFiltros] = useState(false);
+
+    const handleBuscar = () => {
+        carregarExplorar(busca || undefined, precoMin || undefined, precoMax || undefined);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') handleBuscar();
+    };
+
+    const getImagemPrincipal = (l) => {
+        if (l.imagens && l.imagens.length > 0) return l.imagens[0];
+        return l.url_imagem || null;
+    };
+
     return (
         <div className="marketplace-container animate-fade-in">
             <div className="marketplace-header mb-1" style={{ flexWrap: 'wrap', gap: '10px' }}>
                 <div className="marketplace-tabs" style={{ flex: 1 }}>
                     <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
-                    <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anúncios</button>
+                    <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anuncios</button>
                     <button className={`m-tab ${marketplaceTab === 'ranking' ? 'active' : ''}`} onClick={() => setMarketplaceTab('ranking')}>Ranking</button>
-                    <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configurações</button>
+                    <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configuracoes</button>
                 </div>
                 
                 {marketplaceTab === 'explorar' && (
-                    <div className="filter-bar">
-                        <select 
-                            className="input-field m-filter-select"
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                        >
-                            {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Todas as Categorias' : cat}</option>)}
-                        </select>
-                        <select 
-                            className="input-field m-filter-select"
-                            value={selectedCity}
-                            onChange={(e) => setSelectedCity(e.target.value)}
-                            style={{ marginLeft: '6px' }}
-                        >
-                            <option value="Todas">Todas as Cidades</option>
-                            {usuario?.cidade && <option value={usuario.cidade}>{usuario.cidade} (sua)</option>}
-                        </select>
+                    <div className="filter-bar" style={{ width: '100%' }}>
+                        {/* BUSCA TEXTUAL */}
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                                <input 
+                                    className="input-field" 
+                                    placeholder="Buscar produtos..." 
+                                    value={busca}
+                                    onChange={(e) => setBusca(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    style={{ paddingLeft: '32px' }}
+                                />
+                            </div>
+                            <button className="btn btn-primary btn-sm" onClick={handleBuscar} style={{ height: '36px', minWidth: '70px' }}>Buscar</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setMostrarFiltros(!mostrarFiltros)} style={{ height: '36px', minWidth: '40px' }}>
+                                {mostrarFiltros ? '✕' : '⚙'}
+                            </button>
+                        </div>
+                        
+                        {/* FILTROS AVANCADOS */}
+                        {mostrarFiltros && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                <select 
+                                    className="input-field m-filter-select"
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    style={{ flex: 1, minWidth: '120px' }}
+                                >
+                                    {CATEGORIAS_MARKETPLACE.map(cat => <option key={cat} value={cat}>{cat === 'Geral' ? 'Todas Categorias' : cat}</option>)}
+                                </select>
+                                <select 
+                                    className="input-field m-filter-select"
+                                    value={selectedCity}
+                                    onChange={(e) => setSelectedCity(e.target.value)}
+                                    style={{ flex: 1, minWidth: '120px' }}
+                                >
+                                    <option value="Todas">Todas Cidades</option>
+                                    {usuario?.cidade && <option value={usuario.cidade}>{usuario.cidade} (sua)</option>}
+                                </select>
+                                <input 
+                                    className="input-field" 
+                                    placeholder="Preco min" 
+                                    type="number" 
+                                    value={precoMin}
+                                    onChange={(e) => setPrecoMin(e.target.value)}
+                                    style={{ width: '90px' }}
+                                />
+                                <input 
+                                    className="input-field" 
+                                    placeholder="Preco max" 
+                                    type="number" 
+                                    value={precoMax}
+                                    onChange={(e) => setPrecoMax(e.target.value)}
+                                    style={{ width: '90px' }}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
                 <button className="btn btn-primary btn-sm" onClick={() => setActiveView('novo-anuncio')} style={{ gap: '5px', whiteSpace: 'nowrap', height: '32px', minHeight: 'unset', fontSize: '0.75rem', padding: '0 10px', flexShrink: 0 }}>
-                    <Plus size={14} /> Novo Anúncio
+                    <Plus size={14} /> Novo Anuncio
                 </button>
             </div>
 
@@ -84,7 +143,7 @@ const MarketplaceView = ({
                         <h4 style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                             <Zap size={18} fill="var(--primary)" /> MEMBRO PREMIUM ATIVO
                         </h4>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Você ganha 1 ponto por cada link aberto. A cada 1.000 pontos = R$ 0,10 de premio! (pago via PIX direto)</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Voce ganha 1 ponto por cada link aberto. A cada 1.000 pontos = R$ 0,10 de premio! (pago via PIX direto)</p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Seus Pontos</div>
@@ -103,7 +162,7 @@ const MarketplaceView = ({
                     </div>
                     <div className="premium-text-wrap">
                         <h4>Seja um Membro Premium Marketplace</h4>
-                        <p>Ganhe de 1 a 5 pontos por clique (aleatório) e converta em dinheiro real! Grátis: 1 ponto fixo.</p>
+                        <p>Ganhe de 1 a 5 pontos por clique (aleatorio) e converta em dinheiro real! Gratis: 1 ponto fixo.</p>
                     </div>
                     <button 
                         className="btn btn-primary btn-sm premium-btn" 
@@ -153,13 +212,24 @@ const MarketplaceView = ({
                                     {marketplaceLinks.map(l => (
                                         <div key={l.id} className={`market-card ${l.patrocinado ? 'market-card--boosted' : 'market-card--free'}`}>
                                             <div className="market-img-wrapper">
-                                                <img src={l.url_imagem} alt={l.nome_produto} loading="lazy" width="180" height="180" />
+                                                {getImagemPrincipal(l) ? (
+                                                    <img src={getImagemPrincipal(l)} alt={l.nome_produto} loading="lazy" width="180" height="180" />
+                                                ) : (
+                                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)' }}>
+                                                        <span style={{ fontSize: '0.65rem' }}>Sem foto</span>
+                                                    </div>
+                                                )}
+                                                {l.total_imagens > 1 && (
+                                                    <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px' }}>
+                                                        📷 {l.total_imagens}
+                                                    </div>
+                                                )}
                                                 {l.patrocinado ? (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '10px', left: '10px', zIndex: 2 }}>
                                                         <div className="market-badge market-badge--gold" style={{ position: 'static' }}><Zap size={10} /> DESTAQUE</div>
                                                         {usuario.is_subscriber && l.ponto_max > 1 && (
                                                             <div className="market-badge" style={{ position: 'static', background: 'var(--success)', color: '#000', fontWeight: 900, border: 'none' }}>
-                                                                + ATÉ {l.ponto_max} PTS
+                                                                + ATE {l.ponto_max} PTS
                                                             </div>
                                                         )}
                                                     </div>
@@ -177,7 +247,7 @@ const MarketplaceView = ({
                                                 >
                                                     <Flag size={12} />
                                                 </button>
-                                                {l.valor > 0 && <div className="market-price-tag">R$ {l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>}
+                                                <div className="market-price-tag">R$ {l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                                             </div>
                                             <div className="market-info">
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
@@ -234,7 +304,7 @@ const MarketplaceView = ({
                         ) : (
                             <div className="market-empty">
                                 <ShoppingBag size={48} />
-                                <p>Nenhum produto em destaque no momento.</p>
+                                <p>Nenhum produto encontrado.</p>
                                 <button className="btn btn-link" onClick={() => setActiveView('novo-anuncio')}>Seja o primeiro a anunciar!</button>
                             </div>
                         )}
@@ -253,17 +323,23 @@ const MarketplaceView = ({
                             {meusLinksMarketplace.map(l => {
                                 const expirado = l.expires_at && new Date(l.expires_at) < new Date();
                                 const semViews = (l.views_restantes || 0) <= 0;
-                                // Regra OLX: destaque/turbinado não desativa por falta de views, só por tempo
                                 const inativo = !l.is_active || expirado || (!l.is_boosted && semViews);
+                                const imagemPrincipal = l.imagens && l.imagens.length > 0 ? l.imagens[0] : l.url_imagem;
 
                                 return (
                                     <div key={l.id} className={`market-card ${inativo ? 'market-card--inactive' : ''}`} style={{ borderColor: inativo ? 'rgba(255,61,0,0.2)' : 'rgba(var(--primary-rgb), 0.2)' }}>
                                         <div className="market-img-wrapper">
-                                            <img src={l.url_imagem} alt={l.nome_produto} width="180" height="180" style={{ opacity: inativo ? 0.4 : 1 }} />
+                                            {imagemPrincipal ? (
+                                                <img src={imagemPrincipal} alt={l.nome_produto} width="180" height="180" style={{ opacity: inativo ? 0.4 : 1 }} />
+                                            ) : (
+                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', opacity: inativo ? 0.4 : 1 }}>
+                                                    <span style={{ fontSize: '0.65rem' }}>Sem foto</span>
+                                                </div>
+                                            )}
                                             {l.is_boosted ? (
                                                 <div className="market-badge market-badge--gold"><Zap size={10} /> PAGO</div>
                                             ) : (
-                                                <div className="market-badge market-badge--free"><Clock size={10} /> GRÁTIS</div>
+                                                <div className="market-badge market-badge--free"><Clock size={10} /> GRATIS</div>
                                             )}
                                             {inativo && (
                                                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 3 }}>
@@ -307,15 +383,15 @@ const MarketplaceView = ({
                                                     <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Zap size={12} /> Turbinar</button>
                                                 </div>
                                                 <button className="btn btn-success w-full" onClick={async () => {
-                                                    if (!window.confirm('Marcar como vendido? Isso desativará o anúncio.')) return;
+                                                    if (!window.confirm('Marcar como vendido? Isso desativara o anuncio.')) return;
                                                     try {
                                                         await api.post(`/comunidade/marcar-vendido/${l.id}`);
-                                                        showModal({ title: 'Vendido!', message: 'Anúncio marcado como vendido. +1 venda!', type: 'success' });
+                                                        showModal({ title: 'Vendido!', message: 'Anuncio marcado como vendido. +1 venda!', type: 'success' });
                                                         carregarMeusLinksMarketplace();
                                                     } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
                                                 }} style={{ height: '28px', fontSize: '0.65rem', padding: '0 8px', marginTop: '6px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366' }}>✅ Marcar como Vendido</button>
                                             </>) : (
-                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anúncio grátis encerrado</p>
+                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anuncio gratis encerrado</p>
                                             )}
                                         </div>
                                     </div>
@@ -333,7 +409,7 @@ const MarketplaceView = ({
                 ) : (
                     <div className="market-empty">
                         <PlusCircle size={48} />
-                        <p>Você ainda não tem anúncios.</p>
+                        <p>Voce ainda nao tem anuncios.</p>
                         <button className="btn btn-link" onClick={() => setActiveView('novo-anuncio')}>Postar meu primeiro link</button>
                     </div>
                 )

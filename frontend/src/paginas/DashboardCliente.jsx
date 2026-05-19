@@ -440,13 +440,23 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     };
 
-    const carregarExplorar = async (reset = false) => {
+    const carregarExplorar = async (busca, precoMin, precoMax, reset = false) => {
+        // Handle old signature: carregarExplorar(reset = boolean)
+        if (typeof busca === 'boolean' || busca === undefined) {
+            reset = busca || false;
+            busca = undefined;
+            precoMin = undefined;
+            precoMax = undefined;
+        }
         const page = reset ? 1 : pageExplorar;
         setLoadingMarket(true);
         try {
             const catParam = selectedCategory && selectedCategory !== 'Geral' ? `&categoria=${selectedCategory}` : '';
             const cityParam = selectedCity && selectedCity !== 'Todas' ? `&cidade=${encodeURIComponent(selectedCity)}` : '';
-            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12${catParam}${cityParam}`);
+            const buscaParam = busca ? `&busca=${encodeURIComponent(busca)}` : '';
+            const precoMinParam = precoMin ? `&preco_min=${precoMin}` : '';
+            const precoMaxParam = precoMax ? `&preco_max=${precoMax}` : '';
+            const resp = await api.get(`/comunidade/explorar?page=${page}&limit=12${catParam}${cityParam}${buscaParam}${precoMinParam}${precoMaxParam}`);
             const novosLinks = resp.links || [];
             if (reset) {
                 setMarketplaceLinks(novosLinks);
@@ -1004,6 +1014,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 <DetalhesProduto
                     ad={selectedAdDetails}
                     onVoltar={() => { setSelectedAdDetails(null); setActiveView('marketplace'); }}
+                    usuario={usuario}
+                    api={api}
+                    showModal={showModal}
+                    onBloquearUsuario={() => { carregarExplorar(undefined, undefined, undefined, true); }}
                 />
             )}
 <ModalPremium

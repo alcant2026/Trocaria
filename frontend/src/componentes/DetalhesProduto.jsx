@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star, ChevronLeft, ChevronRight, Tag, UserX, HandCoins } from 'lucide-react';
 
 const WhatsAppIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff" style={{ flexShrink: 0 }}>
@@ -7,9 +7,14 @@ const WhatsAppIcon = () => (
     </svg>
 );
 
-// Página de detalhes do produto (estilo OLX)
-const DetalhesProduto = ({ ad, onVoltar }) => {
+const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsuario, onFazerOferta }) => {
+    const [imgIdx, setImgIdx] = useState(0);
+    const [valorOferta, setValorOferta] = useState('');
+    const [mostrarOferta, setMostrarOferta] = useState(false);
+
     if (!ad) return null;
+
+    const imagens = ad.imagens && ad.imagens.length > 0 ? ad.imagens : (ad.url_imagem ? [ad.url_imagem] : []);
 
     const abrirWhatsApp = () => {
         const link = ad.url_afiliado || '';
@@ -22,18 +27,72 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
         }
     };
 
+    const prevImg = () => setImgIdx(prev => (prev > 0 ? prev - 1 : imagens.length - 1));
+    const nextImg = () => setImgIdx(prev => (prev < imagens.length - 1 ? prev + 1 : 0));
+
+    const handleOferta = async () => {
+        const valor = parseFloat(valorOferta);
+        if (!valor || valor < 10) {
+            showModal({ title: 'Valor invalido', message: 'Oferta minima e R$ 10,00.', type: 'danger' });
+            return;
+        }
+        if (valor >= ad.valor) {
+            showModal({ title: 'Valor muito alto', message: 'Oferta deve ser menor que o preco do anuncio.', type: 'danger' });
+            return;
+        }
+        try {
+            await api.post('/comunidade/fazer-oferta', { link_id: ad.id, valor_oferta: valor });
+            showModal({ title: 'Oferta enviada!', message: 'O vendedor tem 48h para responder.', type: 'success' });
+            setValorOferta('');
+            setMostrarOferta(false);
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao enviar oferta.', type: 'danger' });
+        }
+    };
+
+    const handleBloquear = async () => {
+        if (!window.confirm(`Bloquear ${ad.anunciante}? Voce nao vera mais os anuncios dele.`)) return;
+        try {
+            await api.post('/comunidade/bloquear-usuario', { usuario_bloqueado_id: ad.usuario_id });
+            showModal({ title: 'Bloqueado', message: `${ad.anunciante} foi bloqueado.`, type: 'success' });
+            if (onBloquearUsuario) onBloquearUsuario(ad.usuario_id);
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao bloquear.', type: 'danger' });
+        }
+    };
+
+    const isDono = usuario && ad.usuario_id === usuario.id;
+
     return (
         <div className="card animate-fade-in">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
                 <button onClick={onVoltar} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
                     <ArrowLeft size={20} />
                 </button>
-                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Detalhes do Anúncio</h3>
+                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Detalhes do Anuncio</h3>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {ad.url_imagem && (
-                    <img src={ad.url_imagem} className="detail-image" style={{ width: '100%', borderRadius: '12px', maxHeight: '500px', objectFit: 'contain', background: 'rgba(0,0,0,0.3)' }} alt="Produto" />
+                {/* CARROSSEL DE IMAGENS */}
+                {imagens.length > 0 && (
+                    <div style={{ position: 'relative', width: '100%', borderRadius: '12px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
+                        <img src={imagens[imgIdx]} alt={ad.nome_produto} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block' }} />
+                        {imagens.length > 1 && (
+                            <>
+                                <button onClick={prevImg} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                                    <ChevronLeft size={18} />
+                                </button>
+                                <button onClick={nextImg} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                                    <ChevronRight size={18} />
+                                </button>
+                                <div style={{ position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px' }}>
+                                    {imagens.map((_, i) => (
+                                        <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === imgIdx ? 'var(--primary)' : 'rgba(255,255,255,0.4)' }} />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -43,6 +102,7 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                     </span>
                 </div>
 
+                {/* INFO DO ANUNCIANTE */}
                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '36px', height: '36px', background: 'rgba(var(--primary-rgb), 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -61,12 +121,12 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)' }}>
                                 {ad.anunciante_vendas || 0} VENDAS
                             </div>
-                            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Concluídas</div>
+                            <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Concluidas</div>
                         </div>
                     </div>
                     {ad.nota > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '0.75rem', color: '#FFD700' }}>
-                            <Star size={12} fill="#FFD700" /> {Number(ad.nota).toFixed(1)} ({ad.total_avaliacoes || 0} avaliações)
+                            <Star size={12} fill="#FFD700" /> {Number(ad.nota).toFixed(1)} ({ad.total_avaliacoes || 0} avaliacoes)
                         </div>
                     )}
                 </div>
@@ -81,21 +141,65 @@ const DetalhesProduto = ({ ad, onVoltar }) => {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                         <AlertTriangle size={16} color="#FFD600" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                                <strong>DICA DE SEGURANÇA:</strong> Combine os detalhes diretamente com o vendedor. Prefira negociar a entrega em locais públicos.
+                                <strong>DICA DE SEGURANCA:</strong> Combine os detalhes diretamente com o vendedor. Prefira negociar a entrega em locais publicos.
                         </p>
                     </div>
                 </div>
 
                 <div>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</h4>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descricao</h4>
                     <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                        {ad.descricao || "Nenhuma descrição fornecida para este anúncio."}
+                        {ad.descricao || "Nenhuma descricao fornecida para este anuncio."}
                     </p>
                 </div>
 
-                <button className="btn btn-primary detail-cta" style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={abrirWhatsApp}>
-                    <WhatsAppIcon /> Falar com Vendedor
-                </button>
+                {/* ACOES */}
+                {!isDono && (
+                    <>
+                        {/* FAZER OFERTA */}
+                        {mostrarOferta && (
+                            <div style={{ background: 'rgba(37,211,102,0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(37,211,102,0.2)' }}>
+                                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--success)' }}>
+                                    <HandCoins size={16} /> Fazer Oferta (min R$ 10,00)
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input 
+                                        className="input-field" 
+                                        type="number" 
+                                        placeholder="Valor da oferta" 
+                                        min="10" 
+                                        step="0.01"
+                                        value={valorOferta}
+                                        onChange={(e) => setValorOferta(e.target.value)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button className="btn btn-success btn-sm" onClick={handleOferta} style={{ minWidth: '80px' }}>Enviar</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => setMostrarOferta(false)}>Cancelar</button>
+                                </div>
+                                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '6px' }}>O vendedor tem 48h para aceitar ou recusar. Oferta expira automaticamente.</p>
+                            </div>
+                        )}
+
+                        {/* BOTOES DE ACAO */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button className="btn btn-primary detail-cta" style={{ flex: 1, padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minWidth: '200px' }} onClick={abrirWhatsApp}>
+                                <WhatsAppIcon /> Falar com Vendedor
+                            </button>
+                            <button className="btn btn-success" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={() => setMostrarOferta(!mostrarOferta)}>
+                                <Tag size={18} /> Oferta
+                            </button>
+                            <button className="btn btn-secondary" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={handleBloquear} title="Bloquear usuario">
+                                <UserX size={18} />
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {isDono && (
+                    <button className="btn btn-primary detail-cta" style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} onClick={abrirWhatsApp}>
+                        <WhatsAppIcon /> Compartilhar Link
+                    </button>
+                )}
             </div>
         </div>
     );

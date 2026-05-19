@@ -286,6 +286,18 @@ async def sitemap():
 # Pasta de uploads servida apenas via rota /api/admin/view-doc (protegida por auth)
 # NÃO usar StaticFiles para evitar acesso público a documentos de usuários
 
+# Imagens de anuncios sao publicas (estilo OLX)
+from fastapi.responses import FileResponse
+import mimetypes
+
+@app.get("/uploads/anuncios/{filename}")
+async def servir_imagem_anuncio(filename: str):
+    caminho = os.path.join("uploads", "anuncios", filename)
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Imagem nao encontrada.")
+    content_type, _ = mimetypes.guess_type(caminho)
+    return FileResponse(caminho, media_type=content_type or "image/jpeg")
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

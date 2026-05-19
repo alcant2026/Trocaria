@@ -31,17 +31,16 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
                 continue;
             }
             const localUrl = URL.createObjectURL(file);
-            const novaImagem = { preview: localUrl, url: null, file };
+            const novaImagem = { preview: localUrl, url: null, file, status: 'uploading' };
             setImagens(prev => [...prev, novaImagem]);
             try {
                 const formData = new FormData();
                 formData.append('file', file);
                 const res = await api.post('/comunidade/upload-imagem', formData);
-                setImagens(prev => prev.map(img => img.preview === localUrl ? { ...img, url: res.url_imagem } : img));
+                setImagens(prev => prev.map(img => img.preview === localUrl ? { ...img, url: res.url_imagem, status: 'success' } : img));
             } catch (err) {
-                showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao enviar imagem.', type: 'danger' });
-                setImagens(prev => prev.filter(img => img.preview !== localUrl));
-                URL.revokeObjectURL(localUrl);
+                console.error('Erro upload:', err);
+                setImagens(prev => prev.map(img => img.preview === localUrl ? { ...img, status: 'error', errorMsg: err.message || 'Falha no upload' } : img));
             }
         }
         setUploading(false);
@@ -77,6 +76,24 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
                 valor: parseFloat(dados.valor),
                 codigo_2fa: dados.codigo_2fa
             };
+            const res = await api.post('/comunidade/postar-link', payload);
+            
+            for (const img of imagensValidas) {
+                try {
+                    await api.post('/comunidade/adicionar-imagem', { link_id: res.id, url_imagem: img.url });
+                } catch(e) { /* ignora erros de imagem individual */ }
+            }
+            
+            imagens.forEach(img => { if (img.preview) URL.revokeObjectURL(img.preview); });
+            setDados({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', valor: '', vendas_texto: '', codigo_2fa: '' });
+            setImagens([]);
+            showModal({ title: 'Sucesso!', message: 'Anuncio publicado!', type: 'success' });
+            if (onSucesso) onSucesso();
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao publicar', type: 'danger' });
+        }
+        setLoading(false);
+    };
             const res = await api.post('/comunidade/postar-link', payload);
             
             for (const img of imagensValidas) {
@@ -149,8 +166,18 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
                 <label>Fotos do Produto * (max {MAX_IMAGENS})</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
                     {imagens.map((img, idx) => (
-                        <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
-                            <img src={getImagemSrc(img)} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: img.status === 'error' ? '2px solid var(--danger)' : img.status === 'uploading' ? '2px solid var(--primary)' : 'none' }}>
+                            <img src={getImagemSrc(img)} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: img.status === 'error' ? 0.5 : 1 }} />
+                            {img.status === 'uploading' && (
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ width: '20px', height: '20px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                                </div>
+                            )}
+                            {img.status === 'error' && (
+                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(255,0,0,0.8)', color: '#fff', fontSize: '0.5rem', padding: '2px', textAlign: 'center' }}>
+                                    Falha
+                                </div>
+                            )}
                             <button onClick={() => removerImagem(idx)} style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', padding: 0 }}>
                                 <X size={12} />
                             </button>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star, ChevronLeft, ChevronRight, Tag, UserX, HandCoins } from 'lucide-react';
+import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star, ChevronLeft, ChevronRight, Tag, UserX, HandCoins, Repeat, RefreshCw } from 'lucide-react';
 import { BACKEND_URL } from '../api';
 import SeloConfianca from './SeloConfianca';
 
@@ -22,6 +22,12 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
     const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
     const [codigoConfirmacao, setCodigoConfirmacao] = useState('');
     const [avaliacaoConfirmacao, setAvaliacaoConfirmacao] = useState(5);
+    
+    // Trade states
+    const [mostrarTroca, setMostrarTroca] = useState(false);
+    const [meusAnuncios, setMeusAnuncios] = useState([]);
+    const [loadingAnuncios, setLoadingAnuncios] = useState(false);
+    const [anuncioSelecionado, setAnuncioSelecionado] = useState(null);
 
     if (!ad) return null;
 
@@ -93,6 +99,39 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
             if (onConfirmarRecebimento) onConfirmarRecebimento();
         } catch (err) {
             showModal({ title: 'Erro', message: err.message || 'Erro ao confirmar recebimento.', type: 'danger' });
+        }
+    };
+
+    const carregarMeusAnuncios = async () => {
+        setLoadingAnuncios(true);
+        try {
+            const res = await api.get('/comunidade/meus-links', { noCache: true });
+            setMeusAnuncios(res.links.filter(l => l.is_active));
+        } catch (err) {
+            showModal({ title: 'Erro', message: 'Erro ao carregar seus anuncios.', type: 'danger' });
+        }
+        setLoadingAnuncios(false);
+    };
+
+    const handleProporTroca = async () => {
+        if (!anuncioSelecionado) {
+            showModal({ title: 'Selecione um anuncio', message: 'Escolha qual dos seus anuncios voce quer dar em troca.', type: 'warning' });
+            return;
+        }
+        try {
+            await api.post('/comunidade/propor-troca', {
+                anuncio_alvo_id: ad.id,
+                meu_anuncio_id: anuncioSelecionado.id
+            });
+            showModal({
+                title: 'Proposta Enviada!',
+                message: 'O vendedor foi notificado. Aguarde a resposta.',
+                type: 'success'
+            });
+            setMostrarTroca(false);
+            setAnuncioSelecionado(null);
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.message || 'Erro ao propor troca.', type: 'danger' });
         }
     };
 
@@ -269,6 +308,46 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
                             </div>
                         )}
 
+                        {/* PROPOR TROCA */}
+                        {mostrarTroca && (
+                            <div style={{ background: 'rgba(255,204,0,0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,204,0,0.2)' }}>
+                                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--primary)' }}>
+                                    <Repeat size={16} /> Propor Troca
+                                </label>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                    Selecione qual dos seus anuncios voce quer dar em troca pelo item deste vendedor.
+                                </p>
+                                {loadingAnuncios ? (
+                                    <div style={{ textAlign: 'center', padding: '10px', color: 'var(--text-muted)' }}><RefreshCw size={16} className="animate-spin" /> Carregando...</div>
+                                ) : meusAnuncios.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto', marginBottom: '10px' }}>
+                                        {meusAnuncios.map(a => (
+                                            <div 
+                                                key={a.id} 
+                                                onClick={() => setAnuncioSelecionado(a)}
+                                                style={{ 
+                                                    padding: '8px', 
+                                                    borderRadius: '8px', 
+                                                    border: `1px solid ${anuncioSelecionado?.id === a.id ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}`,
+                                                    background: anuncioSelecionado?.id === a.id ? 'rgba(255,204,0,0.1)' : 'transparent',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>{a.nome_produto}</div>
+                                                <div style={{ fontSize: '0.65rem', color: 'var(--success)' }}>R$ {a.valor}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '10px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Voce nao tem anuncios ativos para trocar.</div>
+                                )}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button className="btn btn-primary btn-sm" onClick={handleProporTroca} style={{ flex: 1 }} disabled={!anuncioSelecionado}>Enviar Proposta</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => { setMostrarTroca(false); setAnuncioSelecionado(null); }}>Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* BOTOES DE ACAO */}
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <button className="btn btn-primary detail-cta" style={{ flex: 1, padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minWidth: '200px' }} onClick={abrirWhatsApp}>
@@ -276,6 +355,9 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
                             </button>
                             <button className="btn btn-success" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={() => setMostrarOferta(!mostrarOferta)}>
                                 <Tag size={18} /> Oferta
+                            </button>
+                            <button className="btn" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,204,0,0.15)', border: '1px solid rgba(255,204,0,0.3)', color: 'var(--primary)' }} onClick={() => { setMostrarTroca(!mostrarTroca); if (!mostrarTroca) carregarMeusAnuncios(); }} title="Propor troca">
+                                <Repeat size={18} /> Trocar
                             </button>
                             <button className="btn" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(138,43,226,0.15)', border: '1px solid rgba(138,43,226,0.3)', color: '#8A2BE2' }} onClick={() => setMostrarConfirmar(!mostrarConfirmar)} title="Confirmar recebimento">
                                 <ShieldCheck size={18} /> Confirmar

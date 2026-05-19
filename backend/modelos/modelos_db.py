@@ -661,6 +661,42 @@ class ConfirmacaoVenda(Base):
     )
 
 
+class AcordoTroca(Base):
+    """Acordo de troca P2P entre dois anuncios. Fluxo de 3 etapas."""
+    __tablename__ = "acordos_troca"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Anuncios envolvidos
+    anuncio_a_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True) # Proponente
+    anuncio_b_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True) # Aceitante
+    
+    # Usuarios envolvidos
+    usuario_a_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True) # Proponente
+    usuario_b_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True) # Aceitante
+    
+    # Etapas de confirmacao
+    etapa_a_entregou = Column(Boolean, default=False) # A confirmou entrega
+    etapa_b_recebeu_entregou = Column(Boolean, default=False) # B confirmou recebimento e entrega
+    etapa_a_recebeu = Column(Boolean, default=False) # A confirmou recebimento final
+    
+    status = Column(String(20), default="pendente")  # pendente, aceita, em_andamento, concluida, cancelada, recusada
+    
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_expiracao = Column(DateTime, nullable=False)
+    
+    anuncio_a = relationship("LinkAfiliado", foreign_keys=[anuncio_a_id])
+    anuncio_b = relationship("LinkAfiliado", foreign_keys=[anuncio_b_id])
+    usuario_a = relationship("Usuario", foreign_keys=[usuario_a_id])
+    usuario_b = relationship("Usuario", foreign_keys=[usuario_b_id])
+    
+    __table_args__ = (
+        Index('idx_troca_status', 'status'),
+        Index('idx_troca_usuario_a', 'usuario_a_id'),
+        Index('idx_troca_usuario_b', 'usuario_b_id'),
+    )
+
+
 class ConsentimentoLGPD(Base):
     """Registro de consentimentos LGPD dos usuarios para rastreabilidade legal."""
     __tablename__ = "consentimentos_lgpd"

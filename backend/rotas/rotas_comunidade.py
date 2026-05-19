@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header, UploadFile, File
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, func
+from sqlalchemy import or_, and_, func
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import (
     Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, 
     AvaliacaoLink, HistoricoClique, DenunciaUsuario, ImagemAnuncio,
-    OfertaAnuncio, BloqueioUsuario, ConfirmacaoVenda
+    OfertaAnuncio, BloqueioUsuario, ConfirmacaoVenda, AcordoTroca
 )
 from pydantic import BaseModel, Field
 from decimal import Decimal
@@ -1136,4 +1136,195 @@ async def listar_bloqueados(db: Session = Depends(get_db), usuario: Usuario = De
             "nome": b.bloqueado.nome,
             "data_bloqueio": b.data_bloqueio.isoformat()
         } for b in bloqueios]
+    }
+
+
+# ==================== SISTEMA DE TROCAS ====================
+
+class ProporTrocaRequest(BaseModel):
+    anuncio_alvo_id: int
+    meu_anuncio_id: int
+
+@router.post("/propor-troca")
+async def propor_troca(dados: ProporTrocaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Usuario A propoe troca do seu anuncio pelo anuncio do Usuario B."""
+    anuncio_a = db.query(LinkAfiliado).filter(LinkAfiliado.id == dados.meu_anuncio_id, LinkAfiliado.usuario_id == usuario.id).first()
+    if not anuncio_a:
+        raise HTTPException(status_code=404, detail="Seu anuncio nao encontrado.")
+    
+    anuncio_b = db.query(LinkAfiliado).filter(LinkAfiliado.id == dados.anuncio_alvo_id, LinkAfiliado.is_active == True).first()
+    if not anuncio_b:
+        raise HTTPException(status_code=404, detail="Anuncio alvo nao encontrado ou inativo.")
+    
+    if anuncio_b.usuario_id == usuario.id:
+        raise HTTPException(status_code=400, detail="Voce nao pode trocar com seu proprio anuncio.")
+    
+    # Verificar se ja existe troca pendente envolvendo estes anuncios
+    existente = db.query(AcordoTroca).filter(
+        or_(
+            and_(AcordoTroca.anuncio_a_id == anuncio_a.id, AcordoTroca.anuncio_b_id == anuncio_b.id),
+            and_(AcordoTroca.anuncio_a_id == anuncio_b.id, AcordoTroca.anuncio_b_id == anuncio_a.id)
+        ),
+        AcordoTroca.status.in_(["pendente", "aceita", "em_andamento"])
+    ).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Ja existe uma proposta de troca pendente entre estes anuncios.")
+    
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    acordo = AcordoTroca(
+        anuncio_a_id=anuncio_a.id,
+        anuncio_b_id=anuncio_b.id,
+        usuario_a_id=usuario.id,
+        usuario_b_id=anuncio_b.usuario_id,
+        data_expiracao=agora + datetime.timedelta(hours=48)
+    )
+    db.add(acordo)
+    db.commit()
+    
+    return {
+        "message": "Proposta de troca enviada!",
+        "acordo_id": acordo.id,
+        "expira_em": acordo.data_expiracao.isoformat()
+    }
+
+
+class AceitarTrocaRequest(BaseModel):
+    acordo_id: int
+
+@router.post("/aceitar-troca")
+async def aceitar_troca(dados: AceitarTrocaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Usuario B aceita a proposta de troca."""
+    acordo = db.query(AcordoTroca).filter(AcordoTroca.id == dados.acordo_id).first()
+    if not acordo:
+        raise HTTPException(status_code=404, detail="Acordo nao encontrado.")
+    
+    if acordo.usuario_b_id != usuario.id:
+        raise HTTPException(status_code=403, detail="Apenas o destinatario pode aceitar esta troca.")
+    
+    if acordo.status != "pendente":
+        raise HTTPException(status_code=400, detail="Este acordo ja foi respondido ou expirou.")
+    
+    if acordo.data_expiracao < datetime.datetime.now(datetime.timezone.utc):
+        acordo.status = "cancelada"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Proposta expirou.")
+    
+    acordo.status = "aceita"
+    db.commit()
+    
+    return {"message": "Troca aceita! Combine a entrega com o outro usuario."}
+
+
+class EtapaTrocaRequest(BaseModel):
+    acordo_id: int
+
+@router.post("/confirmar-etapa-troca")
+async def confirmar_etapa_troca(dados: EtapaTrocaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Avanca etapa da troca. Fluxo: A entrega -> B recebe/entrega -> A recebe."""
+    acordo = db.query(AcordoTroca).filter(AcordoTroca.id == dados.acordo_id).first()
+    if not acordo:
+        raise HTTPException(status_code=404, detail="Acordo nao encontrado.")
+    
+    if acordo.status not in ["aceita", "em_andamento"]:
+        raise HTTPException(status_code=400, detail="Troca nao esta ativa.")
+    
+    # ETAPA 1: Usuario A confirma que entregou
+    if usuario.id == acordo.usuario_a_id and not acordo.etapa_a_entregou:
+        acordo.etapa_a_entregou = True
+        acordo.status = "em_andamento"
+        db.commit()
+        return {"message": "Entrega registrada! Aguarde o Usuario B confirmar o recebimento e a entrega dele.", "proxima_etapa": "b_recebe_entrega"}
+    
+    # ETAPA 2: Usuario B confirma que recebeu E entregou o dele
+    if usuario.id == acordo.usuario_b_id and acordo.etapa_a_entregou and not acordo.etapa_b_recebeu_entregou:
+        acordo.etapa_b_recebeu_entregou = True
+        db.commit()
+        return {"message": "Confirmado! Aguarde o Usuario A confirmar o recebimento final.", "proxima_etapa": "a_recebe"}
+    
+    # ETAPA 3: Usuario A confirma que recebeu o item do B (Conclusao)
+    if usuario.id == acordo.usuario_a_id and acordo.etapa_b_recebeu_entregou and not acordo.etapa_a_recebeu:
+        acordo.etapa_a_recebeu = True
+        acordo.status = "concluida"
+        
+        # Desativar anuncios
+        anuncio_a = db.query(LinkAfiliado).filter(LinkAfiliado.id == acordo.anuncio_a_id).first()
+        anuncio_b = db.query(LinkAfiliado).filter(LinkAfiliado.id == acordo.anuncio_b_id).first()
+        if anuncio_a: anuncio_a.is_active = False
+        if anuncio_b: anuncio_b.is_active = False
+        
+        # Bonus de score para ambos (+5 por troca segura)
+        user_a = db.query(Usuario).filter(Usuario.id == acordo.usuario_a_id).first()
+        user_b = db.query(Usuario).filter(Usuario.id == acordo.usuario_b_id).first()
+        if user_a: user_a.score = min((user_a.score or 0) + 5, 1000)
+        if user_b: user_b.score = min((user_b.score or 0) + 5, 1000)
+        
+        db.commit()
+        return {"message": "Troca concluida com sucesso! Ambos ganharam +5 de score.", "concluida": True}
+    
+    raise HTTPException(status_code=400, detail="Acao invalida ou etapa ja concluida.")
+
+
+@router.post("/recusar-troca")
+async def recusar_troca(dados: AceitarTrocaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Usuario B recusa a proposta."""
+    acordo = db.query(AcordoTroca).filter(AcordoTroca.id == dados.acordo_id).first()
+    if not acordo:
+        raise HTTPException(status_code=404, detail="Acordo nao encontrado.")
+    
+    if acordo.usuario_b_id != usuario.id:
+        raise HTTPException(status_code=403, detail="Apenas o destinatario pode recusar.")
+    
+    if acordo.status != "pendente":
+        raise HTTPException(status_code=400, detail="Acordo ja respondido.")
+    
+    acordo.status = "recusada"
+    db.commit()
+    return {"message": "Troca recusada."}
+
+
+@router.get("/minhas-trocas")
+async def minhas_trocas(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Retorna trocas do usuario."""
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    
+    # Expirar pendentes
+    db.query(AcordoTroca).filter(
+        AcordoTroca.status == "pendente",
+        AcordoTroca.data_expiracao < agora
+    ).update({"status": "cancelada"}, synchronize_session=False)
+    db.commit()
+    
+    # Como proponente
+    como_a = db.query(AcordoTroca).options(
+        joinedload(AcordoTroca.anuncio_a),
+        joinedload(AcordoTroca.anuncio_b)
+    ).filter(
+        AcordoTroca.usuario_a_id == usuario.id,
+        AcordoTroca.status.in_(["pendente", "aceita", "em_andamento", "concluida"])
+    ).order_by(AcordoTroca.data_criacao.desc()).all()
+    
+    # Como aceitante
+    como_b = db.query(AcordoTroca).options(
+        joinedload(AcordoTroca.anuncio_a),
+        joinedload(AcordoTroca.anuncio_b)
+    ).filter(
+        AcordoTroca.usuario_b_id == usuario.id,
+        AcordoTroca.status.in_(["pendente", "aceita", "em_andamento", "concluida"])
+    ).order_by(AcordoTroca.data_criacao.desc()).all()
+    
+    def format_troca(t):
+        return {
+            "id": t.id,
+            "meu_anuncio": t.anuncio_a.nome_produto if t.usuario_a_id == usuario.id else t.anuncio_b.nome_produto,
+            "outro_anuncio": t.anuncio_b.nome_produto if t.usuario_a_id == usuario.id else t.anuncio_a.nome_produto,
+            "status": t.status,
+            "etapa_a_entregou": t.etapa_a_entregou,
+            "etapa_b_recebeu_entregou": t.etapa_b_recebeu_entregou,
+            "etapa_a_recebeu": t.etapa_a_recebeu,
+            "expira_em": t.data_expiracao.isoformat()
+        }
+    
+    return {
+        "propostas_enviadas": [format_troca(t) for t in como_a],
+        "propostas_recebidas": [format_troca(t) for t in como_b]
     }

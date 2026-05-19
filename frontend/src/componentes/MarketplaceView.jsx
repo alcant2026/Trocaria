@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search, ShieldCheck, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search, ShieldCheck, CheckCircle, AlertCircle, Repeat } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
 import SeloConfianca from './SeloConfianca';
 import { BACKEND_URL } from '../api';
@@ -46,6 +46,8 @@ const MarketplaceView = ({
     const [mostrarFiltros, setMostrarFiltros] = useState(false);
     const [vendasPendentes, setVendasPendentes] = useState({ como_vendedor: [], como_comprador: [] });
     const [loadingVendas, setLoadingVendas] = useState(false);
+    const [trocas, setTrocas] = useState({ propostas_enviadas: [], propostas_recebidas: [] });
+    const [loadingTrocas, setLoadingTrocas] = useState(false);
 
     const carregarVendasPendentes = async () => {
         setLoadingVendas(true);
@@ -58,9 +60,23 @@ const MarketplaceView = ({
         setLoadingVendas(false);
     };
 
+    const carregarTrocas = async () => {
+        setLoadingTrocas(true);
+        try {
+            const res = await api.get('/comunidade/minhas-trocas');
+            setTrocas(res);
+        } catch (err) {
+            console.error('Erro ao carregar trocas:', err);
+        }
+        setLoadingTrocas(false);
+    };
+
     useEffect(() => {
         if (marketplaceTab === 'vendas') {
             carregarVendasPendentes();
+        }
+        if (marketplaceTab === 'trocas') {
+            carregarTrocas();
         }
     }, [marketplaceTab]);
 
@@ -84,6 +100,7 @@ const MarketplaceView = ({
                     <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
                     <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anuncios</button>
                     <button className={`m-tab ${marketplaceTab === 'vendas' ? 'active' : ''}`} onClick={() => setMarketplaceTab('vendas')}>Vendas</button>
+                    <button className={`m-tab ${marketplaceTab === 'trocas' ? 'active' : ''}`} onClick={() => setMarketplaceTab('trocas')}>Trocas</button>
                     <button className={`m-tab ${marketplaceTab === 'ranking' ? 'active' : ''}`} onClick={() => setMarketplaceTab('ranking')}>Ranking</button>
                     <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configuracoes</button>
                 </div>
@@ -552,6 +569,136 @@ const MarketplaceView = ({
                             </div>
                         ) : (
                             <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Nenhuma compra pendente.</div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {marketplaceTab === 'trocas' && (
+                <div className="animate-fade-in">
+                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Repeat size={18} color="var(--primary)" />
+                        Minhas Trocas
+                    </h3>
+                    
+                    {/* PROPOSTAS RECEBIDAS */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle size={14} color="var(--success)" /> Propostas Recebidas (Aguarde sua resposta)
+                        </h4>
+                        {loadingTrocas ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
+                        ) : trocas.propostas_recebidas.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {trocas.propostas_recebidas.map(t => (
+                                    <div key={t.id} style={{ 
+                                        background: t.status === 'aceita' ? 'rgba(255,204,0,0.05)' : 'rgba(255,255,255,0.03)', 
+                                        padding: '12px', 
+                                        borderRadius: '10px', 
+                                        border: `1px solid ${t.status === 'aceita' ? 'rgba(255,204,0,0.2)' : 'rgba(255,255,255,0.1)'}`
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Trocar: {t.meu_anuncio} ↔ {t.outro_anuncio}</span>
+                                            <span style={{ fontSize: '0.6rem', background: t.status === 'aceita' ? 'var(--primary)' : 'var(--text-muted)', color: t.status === 'aceita' ? '#000' : '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>{t.status}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <span>Expira: {new Date(t.expira_em).toLocaleDateString('pt-BR')} {new Date(t.expira_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        {t.status === 'pendente' && (
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button className="btn btn-success btn-sm" onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/aceitar-troca', { acordo_id: t.id });
+                                                        carregarTrocas();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }} style={{ flex: 1 }}>Aceitar Troca</button>
+                                                <button className="btn btn-secondary btn-sm" onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/recusar-troca', { acordo_id: t.id });
+                                                        carregarTrocas();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }}>Recusar</button>
+                                            </div>
+                                        )}
+                                        {t.status === 'aceita' && (
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--primary)', background: 'rgba(255,204,0,0.1)', padding: '8px', borderRadius: '6px' }}>
+                                                ✅ Troca aceita! Combine a entrega via WhatsApp. Após entregar, clique em "Confirmar Etapa".
+                                                <button className="btn btn-primary btn-sm" style={{ marginTop: '6px', width: '100%' }} onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/confirmar-etapa-troca', { acordo_id: t.id });
+                                                        carregarTrocas();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }}>Confirmar que Entreguei meu Item</button>
+                                            </div>
+                                        )}
+                                        {t.status === 'em_andamento' && !t.etapa_b_recebeu_entregou && (
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '8px', borderRadius: '6px' }}>
+                                                📦 O outro usuario entregou! Confirme que recebeu E que entregou o seu item.
+                                                <button className="btn btn-success btn-sm" style={{ marginTop: '6px', width: '100%' }} onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/confirmar-etapa-troca', { acordo_id: t.id });
+                                                        carregarTrocas();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }}>Confirmar Recebimento e Entrega</button>
+                                            </div>
+                                        )}
+                                        {t.status === 'em_andamento' && t.etapa_b_recebeu_entregou && !t.etapa_a_recebeu && (
+                                            <div style={{ fontSize: '0.7rem', color: '#8A2BE2', background: 'rgba(138,43,226,0.1)', padding: '8px', borderRadius: '6px' }}>
+                                                🎁 O outro usuario confirmou tudo! Confirme que recebeu o item dele para concluir.
+                                                <button className="btn btn-sm" style={{ marginTop: '6px', width: '100%', background: '#8A2BE2', color: '#fff', border: 'none' }} onClick={async () => {
+                                                    try {
+                                                        await api.post('/comunidade/confirmar-etapa-troca', { acordo_id: t.id });
+                                                        carregarTrocas();
+                                                    } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                }}>Confirmar Recebimento Final</button>
+                                            </div>
+                                        )}
+                                        {t.status === 'concluida' && (
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--success)', textAlign: 'center', fontWeight: 700 }}>
+                                                 Troca Concluida! +5 Score para ambos.
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Nenhuma proposta recebida.</div>
+                        )}
+                    </div>
+
+                    {/* PROPOSTAS ENVIADAS */}
+                    <div>
+                        <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertCircle size={14} color="var(--warning)" /> Propostas Enviadas (Aguardando resposta)
+                        </h4>
+                        {loadingTrocas ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
+                        ) : trocas.propostas_enviadas.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {trocas.propostas_enviadas.map(t => (
+                                    <div key={t.id} style={{ 
+                                        background: t.status === 'concluida' ? 'rgba(37,211,102,0.05)' : 'rgba(255,255,255,0.03)', 
+                                        padding: '12px', 
+                                        borderRadius: '10px', 
+                                        border: `1px solid ${t.status === 'concluida' ? 'rgba(37,211,102,0.2)' : 'rgba(255,255,255,0.1)'}`
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Trocar: {t.meu_anuncio} ↔ {t.outro_anuncio}</span>
+                                            <span style={{ fontSize: '0.6rem', background: t.status === 'concluida' ? 'var(--success)' : 'var(--warning)', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>{t.status}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>Expira: {new Date(t.expira_em).toLocaleDateString('pt-BR')} {new Date(t.expira_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        {t.status === 'concluida' && (
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--success)', textAlign: 'center', fontWeight: 700, marginTop: '6px' }}>
+                                                🎉 Troca Concluida! +5 Score para ambos.
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Nenhuma proposta enviada.</div>
                         )}
                     </div>
                 </div>

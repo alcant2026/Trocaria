@@ -32,7 +32,7 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                const res = await api.post('/comunidade/upload-imagem', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                const res = await api.post('/comunidade/upload-imagem', formData);
                 setImagens(prev => [...prev, res.url_imagem]);
             } catch (err) {
                 showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao enviar imagem.', type: 'danger' });

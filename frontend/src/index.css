@@ -352,30 +352,13 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
   padding: 1.5rem;
   position: relative;
   overflow: hidden;
-}
-
-/* 
-   Hack para background fixo no mobile: 
-   background-attachment: fixed é bugado no iOS/Android.
-   Usar um ::before fixo resolve o escalonamento e o jitter.
-*/
-.auth-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: url('/fundo_autenticacao.png');
-  background-size: cover;
-  background-position: center;
-  z-index: 0;
-  /* Garante que o fundo não mude de tamanho com a barra do navegador */
-  height: 100%;
-  width: 100%;
+  background: var(--bg-color);
 }
 
 .auth-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(0,0,0,0.4));
+  background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(0,0,0,0.85));
   z-index: 1;
 }
 

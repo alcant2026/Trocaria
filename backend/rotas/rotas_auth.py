@@ -191,13 +191,14 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             indicado_por_id = convidador.id
             # Premiar convidador com 10 pontos
             bonus_convidador = 10
-            convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + bonus_convidador
-            convidador.pontos_semanais = (convidador.pontos_semanais or 0) + bonus_convidador
-            db.add(Transacao(
-                usuario_id=convidador.id, valor=Decimal(str(bonus_convidador)),
-                tipo=TipoTransacao.BONUS, status="concluido",
-                detalhes=f"{bonus_convidador} pontos por indicar {dados.nome.split()[0]}"
-            ))
+            from utils_ranking import adicionar_pontos
+            adicionar_pontos(
+                usuario_id=convidador.id,
+                tipo="indicacao",
+                pontos=bonus_convidador,
+                db=db,
+                detalhes=f"Indicou {dados.nome.split()[0]}"
+            )
             # Quem usou o codigo tambem ganha 5 pontos de boas-vindas
             bonus_indicado = 5
 
@@ -215,8 +216,8 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         auditoria_id=auditoria.id,
         saldo=0,
         score=0,
-        pontos_marketplace=bonus_indicado,
-        pontos_semanais=bonus_indicado,
+        pontos_marketplace=0,
+        pontos_semanais=0,
         codigo_indicacao=codigo_indicacao,
         indicado_por=indicado_por_id
     )
@@ -235,11 +236,14 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
             indicado_id=novo_usuario.id
         ))
         if bonus_indicado > 0:
-            db.add(Transacao(
-                usuario_id=novo_usuario.id, valor=Decimal(str(bonus_indicado)),
-                tipo=TipoTransacao.BONUS, status="concluido",
-                detalhes=f"{bonus_indicado} pontos de boas-vindas por usar codigo de indicacao"
-            ))
+            from utils_ranking import adicionar_pontos
+            adicionar_pontos(
+                usuario_id=novo_usuario.id,
+                tipo="indicacao",
+                pontos=bonus_indicado,
+                db=db,
+                detalhes="Pontos de boas-vindas por usar codigo de indicacao"
+            )
         db.commit()
 
     # Criar usuário no Firebase Auth e gerar link de verificação

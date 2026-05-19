@@ -10,7 +10,8 @@ from utils_db import sincronizar_esquema
 from rotas import (
     rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, 
     rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, 
-    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas
+    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas,
+    rotas_resgate
 )
 
 app = FastAPI(title="PSY PAY API P2P")
@@ -245,9 +246,10 @@ async def startup_db_setup():
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
 ROUTER_MODULES = [
-    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, 
-    rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, 
-    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas
+    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro,
+    rotas_snapshot, rotas_comunidade, rotas_admin_fiscal,
+    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas,
+    rotas_resgate
 ]
 for module in ROUTER_MODULES:
     app.include_router(module.router, prefix="/api")

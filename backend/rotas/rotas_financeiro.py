@@ -9,8 +9,9 @@ PONTOS_POR_REAL_INDICADOR = 1  # 1 ponto por R$ 1 gasto em taxas (indicador)
 PONTOS_POR_REAL_COMPRADOR = 3  # 3 pontos por R$ 1 gasto em taxas (quem comprou)
 
 def conceder_pontos_indicacao(db: Session, usuario: Usuario, valor_pago: Decimal, descricao: str):
-    """Concede pontos a TODOS os indicadores do usuario (efeito rede)."""
+    """Concede pontos a TODOS os indicadores do usuario (efeito rede) via ExtratoPontos."""
     from modelos.modelos_db import Indicacao
+    from utils_ranking import adicionar_pontos
     
     # Buscar todos os indicadores na rede
     indicacoes = db.query(Indicacao).filter(Indicacao.indicado_id == usuario.id).all()
@@ -22,28 +23,38 @@ def conceder_pontos_indicacao(db: Session, usuario: Usuario, valor_pago: Decimal
         return
     
     for indicacao in indicacoes:
-        convidador = db.query(Usuario).filter(Usuario.id == indicacao.indicador_id).with_for_update().first()
+        convidador = db.query(Usuario).filter(Usuario.id == indicacao.indicador_id).first()
         if convidador:
-            convidador.pontos_marketplace = (convidador.pontos_marketplace or 0) + pontos
-            convidador.pontos_semanais = (convidador.pontos_semanais or 0) + pontos
-            db.add(Transacao(
-                usuario_id=convidador.id, valor=Decimal(str(pontos)),
-                tipo=TipoTransacao.BONUS, status="concluido",
-                detalhes=f"{pontos} pontos por indicacao - {descricao}"
-            ))
+            adicionar_pontos(
+                usuario_id=convidador.id,
+                tipo="indicacao",
+                pontos=pontos,
+                db=db,
+                valor_referencia=valor_pago,
+                detalhes=f"Bonus de indicacao: {descricao}"
+            )
 
 def conceder_pontos_compra(db: Session, usuario: Usuario, valor_pago: Decimal, descricao: str):
-    """Concede 3x pontos ao usuario que realizou a compra."""
-    pontos = int(valor_pago * PONTOS_POR_REAL_COMPRADOR)
-    if pontos <= 0:
-        return
-    usuario.pontos_marketplace = (usuario.pontos_marketplace or 0) + pontos
-    usuario.pontos_semanais = (usuario.pontos_semanais or 0) + pontos
-    db.add(Transacao(
-        usuario_id=usuario.id, valor=Decimal(str(pontos)),
-        tipo=TipoTransacao.BONUS, status="concluido",
-        detalhes=f"{pontos} pontos por compra - {descricao}"
-    ))
+    """Concede pontos ao usuario que realizou a compra via ExtratoPontos (cashback)."""
+    from utils_ranking import pontos_cashback
+    
+    # Mapeia descricao para tipo de cashback
+    tipo_map = {
+        "assinatura premium": "assinatura",
+        "taxa de solicitacao P2P": "taxa_publicacao",
+        "taxa de match P2P": "taxa_match",
+        "verificacao KYC": "kyc_pago",
+        "destaque de anuncio": "taxa_destaque",
+        "boost de anuncio": "taxa_boost",
+    }
+    
+    tipo = "taxa_publicacao"
+    for key in tipo_map:
+        if key in descricao.lower():
+            tipo = tipo_map[key]
+            break
+    
+    pontos_cashback(usuario.id, tipo, valor_pago, db)
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field

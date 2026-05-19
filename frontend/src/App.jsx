@@ -10,7 +10,8 @@ import {
   X,
   Shield,
   ShoppingBag,
-  Download
+  Download,
+  Coins
 } from 'lucide-react';
 import api, { BASE_URL } from './api';
 import Login from './paginas/Login';
@@ -202,6 +203,9 @@ const App = () => {
                         <a href="#perfil" className={`nav-item ${page === 'perfil' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Perfil
                         </a>
+                        <a href="#meus-pontos" className={`nav-item ${page === 'meus-pontos' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                            <Coins size={20} /> Meus Pontos
+                        </a>
                         <button className="nav-item" onClick={() => { setMenuAberto(false); baixarDadosLGPD(); }} style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}>
                             <Download size={20} /> Baixar meus dados (LGPD)
                         </button>
@@ -239,6 +243,7 @@ const App = () => {
                 {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
                 {page === 'pool' && <DashboardCliente initialView="pool" />}
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
+                {page === 'meus-pontos' && <DashboardCliente initialView="meus-pontos" />}
                 {page === 'vincular-mp' && <MarketplaceCallback />}
                 {page === 'admin' && <AdminDashboard />}
                 {page === 'perfil' && <Perfil />}

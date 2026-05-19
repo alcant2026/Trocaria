@@ -367,17 +367,15 @@ async def registrar_view(dados: RegistrarViewRequest, db: Session = Depends(get_
                 else:
                     pontos_ganhos = 1
 
-                usuario.pontos_marketplace = (usuario.pontos_marketplace or 0) + pontos_ganhos
-                usuario.pontos_semanais = (usuario.pontos_semanais or 0) + pontos_ganhos
-
-                # Registrar transação de pontos
-                db.add(Transacao(
+                # NOVO: Sistema de extrato de pontos acumulativo
+                from utils_ranking import adicionar_pontos
+                adicionar_pontos(
                     usuario_id=usuario.id,
-                    valor=Decimal(str(pontos_ganhos)),
-                    tipo=TipoTransacao.BONUS,
-                    status="concluido",
-                    detalhes=f"{pontos_ganhos} ponto(s) por clique no link #{link.id}" + (" (Premium Bonus)" if usuario.is_subscriber else "")
-                ))
+                    tipo="view_anuncio",
+                    pontos=pontos_ganhos,
+                    db=db,
+                    detalhes=f"Visualizou anuncio #{link.id}" + (" (Premium)" if usuario.is_subscriber else "")
+                )
                 pontos_info = pontos_ganhos
             else:
                 pontos_info = 0

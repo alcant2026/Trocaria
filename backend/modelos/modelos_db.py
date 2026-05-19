@@ -511,8 +511,72 @@ class ContratoMutuo(Base):
     solicitacao = relationship("SolicitacaoEmprestimo")
 
 
+class ExtratoPontos(Base):
+    """Extrato permanente de pontos do usuario (nunca reseta). Cada entrada e credito ou debito."""
+    __tablename__ = "extrato_pontos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    # Tipo de acao que gerou os pontos
+    tipo = Column(String(50), nullable=False)  # view_anuncio, conversa, indicacao, postagem, kyc, taxa_publicacao, taxa_match, taxa_destaque, taxa_boost, assinatura, cashback, resgate
+    
+    # Quantidade de pontos (positivo = ganhou, negativo = resgatou)
+    pontos = Column(Integer, nullable=False)
+    
+    # Valor monetario referencia (para cashback proporcional)
+    valor_referencia = Column(Numeric(precision=10, scale=2), nullable=True)
+    
+    # Detalhes
+    detalhes = Column(String(255), nullable=True)
+    
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    
+    usuario = relationship("Usuario")
+    
+    __table_args__ = (
+        Index('idx_extrato_user_data', 'usuario_id', 'data_criacao'),
+        Index('idx_extrato_tipo', 'tipo'),
+    )
+
+
+class ResgatePontos(Base):
+    """Solicitacoes de resgate de pontos em dinheiro via PIX (da conta da empresa CNPJ)."""
+    __tablename__ = "resgates_pontos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    # Pontos resgatados (negativo no extrato)
+    pontos = Column(Integer, nullable=False)
+    
+    # Valor em reais
+    valor = Column(Numeric(precision=10, scale=2), nullable=False)
+    
+    # Chave PIX para recebimento
+    chave_pix = Column(String(255), nullable=False)
+    
+    # Status
+    status = Column(String(20), default="pendente")  # pendente, processando, pago, falhou
+    
+    # Dados do PIX gerado (para confirmacao)
+    payment_id = Column(String(100), nullable=True)
+    
+    # Detalhes
+    detalhes = Column(String(255), nullable=True)
+    
+    data_solicitacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_pagamento = Column(DateTime, nullable=True)
+    
+    usuario = relationship("Usuario")
+    
+    __table_args__ = (
+        Index('idx_resgate_user_status', 'usuario_id', 'status'),
+    )
+
+
 class ConsentimentoLGPD(Base):
-    """Registro de consentimentos LGPD dos usuários para rastreabilidade legal."""
+    """Registro de consentimentos LGPD dos usuarios para rastreabilidade legal."""
     __tablename__ = "consentimentos_lgpd"
     
     id = Column(Integer, primary_key=True, index=True)

@@ -64,6 +64,7 @@ import ContratosView from '../componentes/ContratosView';
 import MarketplaceView from '../componentes/MarketplaceView';
 import NovoAnuncioPage from '../componentes/NovoAnuncioPage';
 import DetalhesProduto from '../componentes/DetalhesProduto';
+import MeusPontos from '../componentes/MeusPontos';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -111,16 +112,17 @@ const MarketTimer = ({ expiresAt }) => {
 
 
 const NOMES_SECOES = {
-    home: 'Início',
+    home: 'Inicio',
     solicitar: 'Solicitar Apoio',
     oportunidades: 'Oportunidades',
     score: 'Meu Score',
-    historico: 'Histórico',
+    historico: 'Historico',
     contratos: 'Meus Contratos',
     marketplace: 'Marketplace',
-    'novo-anuncio': 'Novo Anúncio',
+    'novo-anuncio': 'Novo Anuncio',
     'detalhes-produto': 'Detalhes',
     'pagar-taxa': 'Pagamento',
+    'meus-pontos': 'Meus Pontos',
 };
 
 const DashboardCliente = ({ initialView = 'home' }) => {
@@ -947,6 +949,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     handleConfirmarPagtoRecebido={handleConfirmarPagtoRecebido}
                     baixarContrato={baixarContrato}
                 />
+            )}
+
+            {activeView === 'meus-pontos' && (
+                <MeusPontos usuario={usuario} />
             )}
 
             {activeView === 'marketplace' && (

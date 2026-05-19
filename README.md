@@ -1,38 +1,40 @@
-# Trocaria · Plataforma de Crédito Colaborativo P2P
+# Trocaria · Classificados e Comunidade P2P
 
-Plataforma financeira descentralizada que conecta pessoas para empréstimos entre pares, com marketplace de afiliados, rede de indicação multi-nível e sistema de gamificação com prêmios em dinheiro real.
+Plataforma de classificados gratuitos que conecta compradores e vendedores locais. Marketplace com sistema de reputação comunitária, rede de indicação e gamificação com recompensas por engajamento.
 
 ---
 
 ## Funcionalidades Principais
 
-### Empréstimos P2P
-- Solicitações de crédito com valor, taxa de juros e parcelas
-- Match entre credores e tomadores com score de reputação (0-1000)
-- Verificação de identidade (KYC) via documentos
-- Cobrança automatizada e contratos digitais
+### Marketplace de Classificados
+- Anúncios gratuitos com duração de 24h (feed sempre atualizado)
+- Até 6 fotos por anúncio com compressão automática
+- Busca textual, filtros por categoria, cidade e faixa de preço
+- Sistema de ofertas entre usuários (48h para resposta)
+- Avaliações de 1-5 estrelas por anúncio
 
-### Marketplace de Afiliados
-- Landing page pública com categorias, busca e anúncios
-- Anúncios gratuitos (24h) ou **destaque por R$ 5,00** (7 dias)
-- Turbinar anúncios com views extras (pacotes de R$ 1 a R$ 35)
-- Sistema de avaliações (1-5 estrelas) e denúncias
+### Confiança Comunitária
+- Score de reputação (0-1000) baseado em interações verificadas
+- Confirmação bilateral de vendas: vendedor e comprador confirmam juntos
+- Selos visuais de confiança no perfil e nos anúncios
+- Denúncia comunitária: 3 denúncias = revisão automática
+- Bloqueio de usuários indesejados
 
-### Rede de Indicação Multi-nível
+### Rede de Indicação
 - Código de indicação único por usuário
-- Indicado ganha **5 pontos** ao usar código de amigo
-- Indicador ganha **10 pontos** por cada novo cadastro
-- Efeito rede: ao pagar taxas, **3x pontos** para você, **1x** para cada indicador
+- Indicado ganha **5 pontos** ao se cadastrar
+- Indicador ganha **10 pontos** por cada novo membro
+- Efeito rede: ao usar recursos da plataforma, pontos extras para toda a cadeia
 
 ### Campeonato Semanal
-- Ranking com top 20 usuários por `pontos_semanais`
+- Ranking com top 20 usuários por pontos acumulados na semana
 - **Reset automático todo sábado às 18:00 (BRT)**
-- Prêmio: **1000 pontos = R$ 1,00** creditado automaticamente no saldo
-- Histórico de pagamentos disponível para auditoria
+- Conversão: **1000 pontos = R$ 1,00** (resgate via PIX)
+- Histórico de resgates disponível
 
 ### Assinatura Premium
 - **Mensal: R$ 19,99** | **Anual: R$ 199,99**
-- Benefícios: 1-5 pontos aleatórios por clique (vs 1 fixo), prioridade nos anúncios, badge VIP
+- Benefícios: 1-5 pontos aleatórios por clique, badge exclusivo, prioridade visual
 
 ---
 
@@ -43,26 +45,21 @@ Plataforma financeira descentralizada que conecta pessoas para empréstimos entr
 | Frontend | React 18 + Vite (JavaScript) |
 | Backend | Python + FastAPI |
 | Banco | PostgreSQL via Neon (prod) / SQLite (dev) |
-| Pagamentos | Mercado Pago (PIX) |
+| Pagamentos | Mercado Pago (PIX para serviços da plataforma) |
 | Autenticação | JWT (CPF + senha) + 2FA (TOTP) |
-| Verificação Email | Firebase Auth (grátis, link de verificação) |
-| Verificação Telefone | Código na tela (hash SHA256 no banco) |
-| Deploy | Render (free tier) |
+| Verificação Email | Firebase Auth |
+| Deploy | Render |
 
 ---
 
-## Fontes de Receita
+## Recursos da Plataforma
 
-| Fonte | Valor |
-|-------|-------|
-| Taxa de solicitação P2P | R$ 2,00 |
-| Taxa de match (intermediação) | 2% (mín R$ 2, máx R$ 20) |
-| Assinatura Premium mensal | R$ 19,99 |
-| Assinatura Premium anual | R$ 199,99 |
-| Verificação KYC | R$ 14,99 |
-| Destaque de anúncio (7 dias) | R$ 5,00 |
-| Boost de views (4 tiers) | R$ 1 / 5 / 12 / 35 |
-| Cobrança de dívida | R$ 2,00 |
+| Recurso | Descrição |
+|---------|-----------|
+| Anúncio gratuito | 24h de visibilidade, 50 views iniciais |
+| Destaque de anúncio | R$ 5,00 por 7 dias no topo |
+| Boost de visibilidade | Pacotes de R$ 1 a R$ 35 para views extras |
+| Assinatura Premium | R$ 19,99/mês ou R$ 199,99/ano |
 
 ---
 
@@ -71,18 +68,17 @@ Plataforma financeira descentralizada que conecta pessoas para empréstimos entr
 ```
 trocaria/
 ├── frontend/src/
-│   ├── paginas/          # Dashboard, Login, Registro, Admin, Verificação
-│   ├── componentes/      # LandingPage, Marketplace, RankingSemanal, Footer
+│   ├── paginas/          # Dashboard, Login, Registro, Admin
+│   ├── componentes/      # Marketplace, Ranking, SeloConfianca, Modais
 │   ├── api.js            # Cliente HTTP com cache e retry
-│   └── firebase.js       # Inicialização Firebase (email verification)
+│   └── firebase.js       # Verificação de email
 ├── backend/
-│   ├── rotas/            # auth, emprestimo, financeiro, comunidade, marketplace, score, snapshot, storage
-│   ├── modelos/          # modelos_db.py (todas as tabelas SQLAlchemy)
-│   ├── utils_*.py        # Firebase, Telegram, Ranking, Storage, OTP log
-│   ├── scripts/          # Simulações financeiras e manutenção
-│   └── main.py           # Ponto de entrada FastAPI com middlewares
+│   ├── rotas/            # auth, comunidade, financeiro, marketplace, score
+│   ├── modelos/          # modelos_db.py (SQLAlchemy)
+│   ├── utils_*.py        # Ranking, Storage, Segurança
+│   └── main.py           # FastAPI com middlewares de segurança
 ├── docs/                 # Documentação
-└── render.yaml           # Config de deploy Render (backend + frontend)
+└── render.yaml           # Deploy Render
 ```
 
 ---
@@ -109,18 +105,18 @@ Backend: `http://localhost:8000` | Frontend: `http://localhost:3000`
 
 ```env
 # Banco de dados
-DATABASE_URL_LOCAL=sqlite:///./cred_plus.db
-DATABASE_URL=postgresql://...       # Produção (Neon)
+DATABASE_URL_LOCAL=sqlite:///./trocaria.db
+DATABASE_URL=postgresql://...       # Produção
 
 # Segurança
 SECRET_KEY=sua_chave_secreta
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# Firebase (verificação de email)
+# Firebase
 FIREBASE_API_KEY=AIzaSy...
 FIREBASE_SERVICE_ACCOUNT_PATH=/caminho/service-account.json
 
-# Mercado Pago
+# Mercado Pago (serviços da plataforma)
 MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
 MERCADOPAGO_PUBLIC_KEY=APP_USR-...
 

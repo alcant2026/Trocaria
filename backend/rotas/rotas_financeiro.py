@@ -2,7 +2,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, text, or_
+from decimal import Decimal
 import logging
+from modelos.modelos_db import Usuario
 
 # Bonus de indicacao: quando um usuario paga uma taxa, o convidador ganha pontos
 PONTOS_POR_REAL_INDICADOR = 1  # 1 ponto por R$ 1 gasto em taxas (indicador)

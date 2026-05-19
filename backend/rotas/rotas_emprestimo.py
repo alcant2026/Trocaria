@@ -8,7 +8,7 @@ from modelos.modelos_db import Usuario, SolicitacaoEmprestimo, StatusSolicitacao
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from utils_fintech import criar_solicitacao_p2p, aceitar_oferta
-from utils_emprestimo import confirmar_pagamento_externo, confirmar_recebimento_externo, aplicar_calote
+from utils_emprestimo import confirmar_pagamento_externo, confirmar_recebimento_externo, aplicar_calote, calcular_divida_total
 from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF

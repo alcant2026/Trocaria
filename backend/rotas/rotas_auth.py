@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 import bcrypt
 import pyotp
 from modelos.modelos_db import Usuario, RegistroAuditoria, Transacao, TipoTransacao, Indicacao

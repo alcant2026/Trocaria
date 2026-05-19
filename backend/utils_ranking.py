@@ -29,7 +29,7 @@ RESGATE_MINIMO_REAIS = Decimal("20.00")
 
 # Taxa de resgate (R$ 2,99 por saque)
 TAXA_RESGATE_REAIS = Decimal("2.99")
-TAXA_RESGATE_PONTOS = _reais_para_pontos(TAXA_RESGATE_REAIS)
+TAXA_RESGATE_PONTOS = int(TAXA_RESGATE_REAIS * Decimal(str(1000)))  # 1.000 pts = R$ 1,00
 
 # Pontos por engajamento (acoes gratuitas do usuario)
 PONTOS_VIEW_ANUNCIO = 1           # Abrir anuncio

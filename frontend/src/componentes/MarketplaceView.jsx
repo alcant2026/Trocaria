@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search, ShieldCheck, CheckCircle, AlertCircle } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
 import SeloConfianca from './SeloConfianca';
 import { BACKEND_URL } from '../api';
@@ -44,6 +44,25 @@ const MarketplaceView = ({
     const [precoMin, setPrecoMin] = useState('');
     const [precoMax, setPrecoMax] = useState('');
     const [mostrarFiltros, setMostrarFiltros] = useState(false);
+    const [vendasPendentes, setVendasPendentes] = useState({ como_vendedor: [], como_comprador: [] });
+    const [loadingVendas, setLoadingVendas] = useState(false);
+
+    const carregarVendasPendentes = async () => {
+        setLoadingVendas(true);
+        try {
+            const res = await api.get('/comunidade/minhas-vendas-pendentes');
+            setVendasPendentes(res);
+        } catch (err) {
+            console.error('Erro ao carregar vendas:', err);
+        }
+        setLoadingVendas(false);
+    };
+
+    useEffect(() => {
+        if (marketplaceTab === 'vendas') {
+            carregarVendasPendentes();
+        }
+    }, [marketplaceTab]);
 
     const handleBuscar = () => {
         carregarExplorar(busca || undefined, precoMin || undefined, precoMax || undefined);
@@ -64,6 +83,7 @@ const MarketplaceView = ({
                 <div className="marketplace-tabs" style={{ flex: 1 }}>
                     <button className={`m-tab ${marketplaceTab === 'explorar' ? 'active' : ''}`} onClick={() => setMarketplaceTab('explorar')}>Explorar</button>
                     <button className={`m-tab ${marketplaceTab === 'meus' ? 'active' : ''}`} onClick={() => setMarketplaceTab('meus')}>Meus Anuncios</button>
+                    <button className={`m-tab ${marketplaceTab === 'vendas' ? 'active' : ''}`} onClick={() => setMarketplaceTab('vendas')}>Vendas</button>
                     <button className={`m-tab ${marketplaceTab === 'ranking' ? 'active' : ''}`} onClick={() => setMarketplaceTab('ranking')}>Ranking</button>
                     <button className={`m-tab ${marketplaceTab === 'config' ? 'active' : ''}`} onClick={() => setMarketplaceTab('config')}>Configuracoes</button>
                 </div>
@@ -409,26 +429,19 @@ const MarketplaceView = ({
                                                     <button className="btn btn-secondary w-full gap-1" onClick={() => { setBoostTarget(l); setShowBoostModal(true); }} style={{ height: '32px', fontSize: '0.7rem', padding: '0 8px', flex: 1 }}><Zap size={12} /> Turbinar</button>
                                                 </div>
                                                 <button className="btn btn-success w-full" onClick={async () => {
-                                                    if (!window.confirm('Marcar como vendido? Isso desativara o anuncio.')) return;
                                                     try {
-                                                        await api.post(`/comunidade/marcar-vendido/${l.id}`);
-                                                        showModal({ title: 'Vendido!', message: 'Anuncio marcado como vendido. +1 venda!', type: 'success' });
+                                                        const res = await api.post(`/comunidade/marcar-vendido/${l.id}`);
+                                                        showModal({
+                                                            title: 'Venda Iniciada!',
+                                                            message: `Codigo de confirmacao: ${res.codigo_confirmacao}\n\nEnvie este codigo ao comprador. Ele tem 48h para confirmar o recebimento.`,
+                                                            type: 'success',
+                                                            confirmText: 'Entendi'
+                                                        });
                                                         carregarMeusLinksMarketplace();
                                                     } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
-                                                }} style={{ height: '28px', fontSize: '0.65rem', padding: '0 8px', marginTop: '6px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366' }}>✅ Marcar como Vendido</button>
-                                            </>) : (
-                                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anuncio gratis encerrado</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        {hasMoreMeusLinks && (
-                            <div className="market-load-more">
-                                <button className="btn btn-secondary btn-sm" onClick={() => carregarMeusLinksMarketplace()} disabled={loadingMarket}>
-                                    {loadingMarket ? <RefreshCw className="animate-spin" size={14} /> : 'Carregar Mais Meus Links'}
-                                </button>
+                                                }} style={{ height: '28px', fontSize: '0.65rem', padding: '0 8px', marginTop: '6px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366' }}>
+                                                    Marcar como Vendido
+                                                </button>
                             </div>
                         )}
                     </>
@@ -439,6 +452,109 @@ const MarketplaceView = ({
                         <button className="btn btn-link" onClick={() => setActiveView('novo-anuncio')}>Postar meu primeiro link</button>
                     </div>
                 )
+            )}
+
+            {marketplaceTab === 'vendas' && (
+                <div className="animate-fade-in">
+                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <ShieldCheck size={18} color="var(--primary)" />
+                        Confirmacoes de Venda
+                    </h3>
+                    
+                    {/* VENDAS COMO VENDEDOR */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle size={14} color="#25D366" /> Vendas Iniciadas (aguardando comprador)
+                        </h4>
+                        {loadingVendas ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
+                        ) : vendasPendentes.como_vendedor.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {vendasPendentes.como_vendedor.map(v => (
+                                    <div key={v.id} style={{ 
+                                        background: v.comprador_confirmou ? 'rgba(37,211,102,0.05)' : 'rgba(255,214,0,0.05)', 
+                                        padding: '12px', 
+                                        borderRadius: '10px', 
+                                        border: `1px solid ${v.comprador_confirmou ? 'rgba(37,211,102,0.2)' : 'rgba(255,214,0,0.2)'}`
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{v.produto}</span>
+                                            {v.comprador_confirmou ? (
+                                                <span style={{ fontSize: '0.6rem', background: 'var(--success)', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>CONFIRMADA</span>
+                                            ) : (
+                                                <span style={{ fontSize: '0.6rem', background: 'var(--warning)', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>PENDENTE</span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>Codigo: #{v.id}</span>
+                                            <span>Expira: {new Date(v.expira_em).toLocaleDateString('pt-BR')} {new Date(v.expira_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        {v.comprador_confirmou && (
+                                            <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--success)' }}>
+                                                Avaliacao do comprador: {'★'.repeat(v.avaliacao_comprador || 0)}{'☆'.repeat(5 - (v.avaliacao_comprador || 0))}
+                                                {!v.avaliacao_vendedor && (
+                                                    <button 
+                                                        className="btn btn-sm btn-secondary" 
+                                                        style={{ marginLeft: '8px', fontSize: '0.6rem', padding: '2px 6px' }}
+                                                        onClick={async () => {
+                                                            const nota = prompt('Avalie o comprador (1-5):');
+                                                            if (nota && nota >= 1 && nota <= 5) {
+                                                                try {
+                                                                    await api.post('/comunidade/avaliar-venda', { confirmacao_id: v.id, avaliacao: parseInt(nota) });
+                                                                    carregarVendasPendentes();
+                                                                } catch(e) { showModal({ title: 'Erro', message: e.message, type: 'danger' }); }
+                                                            }
+                                                        }}
+                                                    >
+                                                        Avaliar comprador
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Nenhuma venda pendente.</div>
+                        )}
+                    </div>
+
+                    {/* VENDAS COMO COMPRADOR */}
+                    <div>
+                        <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertCircle size={14} color="#8A2BE2" /> Compras para Confirmar
+                        </h4>
+                        {loadingVendas ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
+                        ) : vendasPendentes.como_comprador.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {vendasPendentes.como_comprador.map(v => (
+                                    <div key={v.id} style={{ 
+                                        background: v.status === 'confirmada' ? 'rgba(37,211,102,0.05)' : 'rgba(138,43,226,0.05)', 
+                                        padding: '12px', 
+                                        borderRadius: '10px', 
+                                        border: `1px solid ${v.status === 'confirmada' ? 'rgba(37,211,102,0.2)' : 'rgba(138,43,226,0.2)'}`
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{v.produto}</span>
+                                            {v.status === 'confirmada' ? (
+                                                <span style={{ fontSize: '0.6rem', background: 'var(--success)', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>CONFIRMADA</span>
+                                            ) : (
+                                                <span style={{ fontSize: '0.6rem', background: '#8A2BE2', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>AGUARDANDO</span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>Codigo: #{v.id}</span>
+                                            <span>Expira: {new Date(v.expira_em).toLocaleDateString('pt-BR')} {new Date(v.expira_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Nenhuma compra pendente.</div>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     );

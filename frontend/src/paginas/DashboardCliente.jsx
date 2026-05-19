@@ -1018,6 +1018,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     api={api}
                     showModal={showModal}
                     onBloquearUsuario={() => { carregarExplorar(undefined, undefined, undefined, true); }}
+                    onConfirmarRecebimento={() => { carregarExplorar(); carregarMeusLinksMarketplace(); }}
                 />
             )}
 <ModalPremium

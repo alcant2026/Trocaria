@@ -15,10 +15,13 @@ const normalizarImagem = (url) => {
     return `${BACKEND_URL}${url}`;
 };
 
-const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsuario, onFazerOferta }) => {
+const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsuario, onFazerOferta, onConfirmarRecebimento }) => {
     const [imgIdx, setImgIdx] = useState(0);
     const [valorOferta, setValorOferta] = useState('');
     const [mostrarOferta, setMostrarOferta] = useState(false);
+    const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+    const [codigoConfirmacao, setCodigoConfirmacao] = useState('');
+    const [avaliacaoConfirmacao, setAvaliacaoConfirmacao] = useState(5);
 
     if (!ad) return null;
 
@@ -66,6 +69,30 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
             if (onBloquearUsuario) onBloquearUsuario(ad.usuario_id);
         } catch (err) {
             showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao bloquear.', type: 'danger' });
+        }
+    };
+
+    const handleConfirmarRecebimento = async () => {
+        const codigo = parseInt(codigoConfirmacao);
+        if (!codigo || codigo < 1) {
+            showModal({ title: 'Codigo invalido', message: 'Informe o codigo de confirmacao fornecido pelo vendedor.', type: 'danger' });
+            return;
+        }
+        try {
+            const res = await api.post('/comunidade/confirmar-recebimento', {
+                confirmacao_id: codigo,
+                avaliacao: avaliacaoConfirmacao
+            });
+            showModal({
+                title: 'Recebimento Confirmado!',
+                message: `Venda concluida! Seu score: ${res.seu_score}. Score do vendedor: ${res.score_vendedor}.`,
+                type: 'success'
+            });
+            setMostrarConfirmar(false);
+            setCodigoConfirmacao('');
+            if (onConfirmarRecebimento) onConfirmarRecebimento();
+        } catch (err) {
+            showModal({ title: 'Erro', message: err.message || 'Erro ao confirmar recebimento.', type: 'danger' });
         }
     };
 
@@ -201,6 +228,47 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
                             </div>
                         )}
 
+                        {/* CONFIRMAR RECEBIMENTO */}
+                        {mostrarConfirmar && (
+                            <div style={{ background: 'rgba(138,43,226,0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(138,43,226,0.2)' }}>
+                                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: '#8A2BE2' }}>
+                                    <ShieldCheck size={16} /> Confirmar Recebimento
+                                </label>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                    Informe o codigo que o vendedor te enviou para confirmar que recebeu o produto.
+                                </p>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                    <input 
+                                        className="input-field" 
+                                        type="number" 
+                                        placeholder="Codigo de confirmacao" 
+                                        value={codigoConfirmacao}
+                                        onChange={(e) => setCodigoConfirmacao(e.target.value)}
+                                        style={{ flex: 1, textAlign: 'center', fontSize: '1.1rem', letterSpacing: '4px' }}
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '10px' }}>
+                                    <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Avalie o vendedor:</label>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <Star 
+                                                key={star} 
+                                                size={20} 
+                                                fill={star <= avaliacaoConfirmacao ? "#FFD700" : "transparent"} 
+                                                color={star <= avaliacaoConfirmacao ? "#FFD700" : "var(--text-muted)"} 
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => setAvaliacaoConfirmacao(star)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button className="btn btn-success btn-sm" onClick={handleConfirmarRecebimento} style={{ flex: 1 }}>Confirmar Recebimento</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => setMostrarConfirmar(false)}>Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* BOTOES DE ACAO */}
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <button className="btn btn-primary detail-cta" style={{ flex: 1, padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minWidth: '200px' }} onClick={abrirWhatsApp}>
@@ -208,6 +276,9 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
                             </button>
                             <button className="btn btn-success" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={() => setMostrarOferta(!mostrarOferta)}>
                                 <Tag size={18} /> Oferta
+                            </button>
+                            <button className="btn" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(138,43,226,0.15)', border: '1px solid rgba(138,43,226,0.3)', color: '#8A2BE2' }} onClick={() => setMostrarConfirmar(!mostrarConfirmar)} title="Confirmar recebimento">
+                                <ShieldCheck size={18} /> Confirmar
                             </button>
                             <button className="btn btn-secondary" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={handleBloquear} title="Bloquear usuario">
                                 <UserX size={18} />

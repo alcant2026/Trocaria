@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
+import SeloConfianca from './SeloConfianca';
 import { BACKEND_URL } from '../api';
 
 const CATEGORIAS_MARKETPLACE = [
@@ -255,6 +256,18 @@ const MarketplaceView = ({
                                                     <Flag size={12} />
                                                 </button>
                                                 <div className="market-price-tag">R$ {l.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                                {l.nivel_confianca && (
+                                                    <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2 }}>
+                                                        <SeloConfianca
+                                                            nivel={l.nivel_confianca}
+                                                            label={l.label_confianca}
+                                                            cor={l.cor_confianca}
+                                                            icone={l.icone_confianca}
+                                                            tamanho="xs"
+                                                            vendas={l.anunciante_vendas}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="market-info">
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
@@ -332,6 +345,7 @@ const MarketplaceView = ({
                                 const semViews = (l.views_restantes || 0) <= 0;
                                 const inativo = !l.is_active || expirado || (!l.is_boosted && semViews);
                                 const imagemPrincipal = l.imagens && l.imagens.length > 0 ? normalizarImagem(l.imagens[0]) : normalizarImagem(l.url_imagem);
+                                const vendaPendente = l.venda_pendente;
 
                                 return (
                                     <div key={l.id} className={`market-card ${inativo ? 'market-card--inactive' : ''}`} style={{ borderColor: inativo ? 'rgba(255,61,0,0.2)' : 'rgba(var(--primary-rgb), 0.2)' }}>
@@ -351,6 +365,11 @@ const MarketplaceView = ({
                                             {inativo && (
                                                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 3 }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '1px' }}>{expirado ? 'Expirado' : 'Sem Views'}</span>
+                                                </div>
+                                            )}
+                                            {vendaPendente && (
+                                                <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'var(--primary)', color: '#fff', fontSize: '0.55rem', padding: '3px 6px', borderRadius: '4px', fontWeight: 700, zIndex: 4 }}>
+                                                    Venda pendente
                                                 </div>
                                             )}
                                         </div>

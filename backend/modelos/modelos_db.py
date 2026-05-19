@@ -624,6 +624,43 @@ class ResgatePontos(Base):
     )
 
 
+class ConfirmacaoVenda(Base):
+    """Confirmacao bilateral de venda P2P. Ambos devem confirmar para gerar score."""
+    __tablename__ = "confirmacoes_venda"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links_afiliados.id"), nullable=False, index=True)
+    vendedor_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    comprador_id = Column(String(5), ForeignKey("usuarios.id"), nullable=False, index=True)
+    
+    # Confirmacao do vendedor
+    vendedor_confirmou = Column(Boolean, default=False)
+    data_confirmacao_vendedor = Column(DateTime, nullable=True)
+    
+    # Confirmacao do comprador
+    comprador_confirmou = Column(Boolean, default=False)
+    data_confirmacao_comprador = Column(DateTime, nullable=True)
+    
+    # Avaliacao do comprador sobre o vendedor (1-5)
+    avaliacao_comprador = Column(Integer, nullable=True)
+    # Avaliacao do vendedor sobre o comprador (1-5)
+    avaliacao_vendedor = Column(Integer, nullable=True)
+    
+    status = Column(String(20), default="pendente")  # pendente, confirmada, expirada, disputada
+    
+    data_criacao = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    data_expiracao = Column(DateTime, nullable=False)
+    
+    link = relationship("LinkAfiliado")
+    vendedor = relationship("Usuario", foreign_keys=[vendedor_id])
+    comprador = relationship("Usuario", foreign_keys=[comprador_id])
+    
+    __table_args__ = (
+        Index('idx_confirmacao_link', 'link_id'),
+        Index('idx_confirmacao_status', 'status'),
+    )
+
+
 class ConsentimentoLGPD(Base):
     """Registro de consentimentos LGPD dos usuarios para rastreabilidade legal."""
     __tablename__ = "consentimentos_lgpd"

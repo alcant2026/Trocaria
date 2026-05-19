@@ -7,7 +7,7 @@ from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import (
     Usuario, Transacao, TipoTransacao, LinkAfiliado, DenunciaLink, 
     AvaliacaoLink, HistoricoClique, DenunciaUsuario, ImagemAnuncio,
-    OfertaAnuncio, BloqueioUsuario
+    OfertaAnuncio, BloqueioUsuario, ConfirmacaoVenda
 )
 from pydantic import BaseModel, Field
 from decimal import Decimal
@@ -422,7 +422,11 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
             "nota": float(l.nota or 0) if l.nota else 0.0,
             "vendas_texto": l.vendas_texto or "",
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None,
-            "is_active": l.is_active
+            "is_active": l.is_active,
+            "venda_pendente": db.query(ConfirmacaoVenda).filter(
+                ConfirmacaoVenda.link_id == l.id,
+                ConfirmacaoVenda.status == "pendente"
+            ).first() is not None
         } for l in links],
         "total": total,
         "page": page,
@@ -432,13 +436,234 @@ async def obter_meus_links(page: int = 1, limit: int = 12, db: Session = Depends
 
 @router.post("/marcar-vendido/{link_id}")
 async def marcar_como_vendido(link_id: int, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Vendedor inicia processo de venda. Aguarda confirmacao do comprador."""
     link = db.query(LinkAfiliado).filter(LinkAfiliado.id == link_id, LinkAfiliado.usuario_id == usuario.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Anuncio nao encontrado.")
+    
+    # Verificar se ja existe confirmacao pendente
+    existente = db.query(ConfirmacaoVenda).filter(
+        ConfirmacaoVenda.link_id == link_id,
+        ConfirmacaoVenda.status == "pendente"
+    ).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Ja existe uma venda pendente para este anuncio.")
+    
     link.is_active = False
-    usuario.vendas_completadas = (usuario.vendas_completadas or 0) + 1
+    
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    confirmacao = ConfirmacaoVenda(
+        link_id=link_id,
+        vendedor_id=usuario.id,
+        comprador_id="system",  # Sera atualizado quando comprador confirmar
+        vendedor_confirmou=True,
+        data_confirmacao_vendedor=agora,
+        data_expiracao=agora + datetime.timedelta(hours=48)
+    )
+    db.add(confirmacao)
     db.commit()
-    return {"message": "Anuncio marcado como vendido!", "vendas": usuario.vendas_completadas}
+    
+    return {
+        "message": "Venda iniciada! Compartilhe o codigo de confirmacao com o comprador.",
+        "codigo_confirmacao": confirmacao.id,
+        "expira_em": confirmacao.data_expiracao.isoformat()
+    }
+
+
+class ConfirmarRecebimentoRequest(BaseModel):
+    confirmacao_id: int
+    avaliacao: int = Field(..., ge=1, le=5)
+
+@router.post("/confirmar-recebimento")
+async def confirmar_recebimento(dados: ConfirmarRecebimentoRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Comprador confirma que recebeu o produto. Completa a venda bilateral."""
+    confirmacao = db.query(ConfirmacaoVenda).filter(ConfirmacaoVenda.id == dados.confirmacao_id).first()
+    if not confirmacao:
+        raise HTTPException(status_code=404, detail="Confirmacao nao encontrada.")
+    
+    if confirmacao.status != "pendente":
+        raise HTTPException(status_code=400, detail="Esta confirmacao ja foi processada.")
+    
+    if confirmacao.data_expiracao < datetime.datetime.now(datetime.timezone.utc):
+        confirmacao.status = "expirada"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Codigo de confirmacao expirou (48h).")
+    
+    if confirmacao.comprador_id != "system" and confirmacao.comprador_id != usuario.id:
+        raise HTTPException(status_code=403, detail="Apenas o comprador pode confirmar este recebimento.")
+    
+    # Registrar confirmacao do comprador
+    confirmacao.comprador_confirmou = True
+    confirmacao.comprador_id = usuario.id
+    confirmacao.data_confirmacao_comprador = datetime.datetime.now(datetime.timezone.utc)
+    confirmacao.avaliacao_comprador = dados.avaliacao
+    confirmacao.status = "confirmada"
+    
+    # Atualizar score do vendedor (+3 por venda confirmada)
+    vendedor = db.query(Usuario).filter(Usuario.id == confirmacao.vendedor_id).first()
+    if vendedor:
+        vendedor.score = min((vendedor.score or 0) + 3, 1000)
+        vendedor.vendas_completadas = (vendedor.vendas_completadas or 0) + 1
+    
+    # Atualizar score do comprador (+2 por boa faith)
+    usuario.score = min((usuario.score or 0) + 2, 1000)
+    
+    # Atualizar nota do anuncio com a avaliacao do comprador
+    link = db.query(LinkAfiliado).filter(LinkAfiliado.id == confirmacao.link_id).first()
+    if link:
+        if link.total_avaliacoes and link.total_avaliacoes > 0:
+            nova_media = ((float(link.nota or 0) * link.total_avaliacoes) + dados.avaliacao) / (link.total_avaliacoes + 1)
+            link.nota = Decimal(str(round(nova_media, 1)))
+            link.total_avaliacoes += 1
+        else:
+            link.nota = Decimal(str(dados.avaliacao))
+            link.total_avaliacoes = 1
+    
+    db.commit()
+    
+    return {
+        "message": "Recebimento confirmado! Venda concluida com sucesso.",
+        "score_vendedor": float(vendedor.score or 0) if vendedor else 0,
+        "seu_score": float(usuario.score or 0)
+    }
+
+
+class AvaliarVendedorRequest(BaseModel):
+    confirmacao_id: int
+    avaliacao: int = Field(..., ge=1, le=5)
+
+@router.post("/avaliar-venda")
+async def avaliar_venda(dados: AvaliarVendedorRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Vendedor avalia o comprador apos confirmacao bilateral."""
+    confirmacao = db.query(ConfirmacaoVenda).filter(ConfirmacaoVenda.id == dados.confirmacao_id).first()
+    if not confirmacao:
+        raise HTTPException(status_code=404, detail="Confirmacao nao encontrada.")
+    
+    if confirmacao.status != "confirmada":
+        raise HTTPException(status_code=400, detail="Venda ainda nao foi confirmada pelo comprador.")
+    
+    if confirmacao.vendedor_id != usuario.id:
+        raise HTTPException(status_code=403, detail="Apenas o vendedor pode avaliar.")
+    
+    if confirmacao.avaliacao_vendedor:
+        raise HTTPException(status_code=400, detail="Voce ja avaliou este comprador.")
+    
+    confirmacao.avaliacao_vendedor = dados.avaliacao
+    
+    # Bonus score para comprador se avaliacao for positiva
+    if dados.avaliacao >= 4:
+        comprador = db.query(Usuario).filter(Usuario.id == confirmacao.comprador_id).first()
+        if comprador:
+            comprador.score = min((comprador.score or 0) + 1, 1000)
+    
+    db.commit()
+    return {"message": "Avaliacao registrada!"}
+
+
+@router.get("/minhas-vendas-pendentes")
+async def minhas_vendas_pendentes(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
+    """Retorna vendas pendentes do usuario (como vendedor ou comprador)."""
+    agora = datetime.datetime.now(datetime.timezone.utc)
+    
+    # Expirar pendentes
+    db.query(ConfirmacaoVenda).filter(
+        ConfirmacaoVenda.status == "pendente",
+        ConfirmacaoVenda.data_expiracao < agora
+    ).update({"status": "expirada"}, synchronize_session=False)
+    db.commit()
+    
+    # Como vendedor
+    como_vendedor = db.query(ConfirmacaoVenda).options(
+        joinedload(ConfirmacaoVenda.link)
+    ).filter(
+        ConfirmacaoVenda.vendedor_id == usuario.id,
+        ConfirmacaoVenda.status.in_(["pendente", "confirmada"])
+    ).order_by(ConfirmacaoVenda.data_criacao.desc()).all()
+    
+    # Como comprador
+    como_comprador = db.query(ConfirmacaoVenda).options(
+        joinedload(ConfirmacaoVenda.link)
+    ).filter(
+        ConfirmacaoVenda.comprador_id == usuario.id,
+        ConfirmacaoVenda.status.in_(["pendente", "confirmada"])
+    ).order_by(ConfirmacaoVenda.data_criacao.desc()).all()
+    
+    return {
+        "como_vendedor": [{
+            "id": c.id,
+            "link_id": c.link_id,
+            "produto": c.link.nome_produto if c.link else "N/D",
+            "status": c.status,
+            "comprador_confirmou": c.comprador_confirmou,
+            "avaliacao_comprador": c.avaliacao_comprador,
+            "avaliacao_vendedor": c.avaliacao_vendedor,
+            "data_criacao": c.data_criacao.isoformat(),
+            "expira_em": c.data_expiracao.isoformat()
+        } for c in como_vendedor],
+        "como_comprador": [{
+            "id": c.id,
+            "link_id": c.link_id,
+            "produto": c.link.nome_produto if c.link else "N/D",
+            "vendedor_confirmou": c.vendedor_confirmou,
+            "status": c.status,
+            "avaliacao_comprador": c.avaliacao_comprador,
+            "avaliacao_vendedor": c.avaliacao_vendedor,
+            "data_criacao": c.data_criacao.isoformat(),
+            "expira_em": c.data_expiracao.isoformat()
+        } for c in como_comprador]
+    }
+
+
+@router.get("/nivel-confianca/{usuario_id}")
+async def obter_nivel_confianca(usuario_id: str, db: Session = Depends(get_db)):
+    """Retorna nivel de confianca e badge visual do usuario."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+    
+    score = float(usuario.score or 0)
+    
+    if score >= 900:
+        nivel = "elite"
+        label = "Elite Trocaria"
+        cor = "#FFD700"
+        icone = "Gem"
+    elif score >= 700:
+        nivel = "confiavel"
+        label = "Confiavel"
+        cor = "#25D366"
+        icone = "BadgeCheck"
+    elif score >= 300:
+        nivel = "em_construcao"
+        label = "Em Construcao"
+        cor = "#FFD600"
+        icone = "Sprout"
+    else:
+        nivel = "risco"
+        label = "Risco"
+        cor = "#FF3D00"
+        icone = "AlertTriangle"
+    
+    # Verificar se esta no top 10 do ranking
+    from utils_ranking import calcular_ranking_completo
+    ranking = calcular_ranking_completo(db)
+    posicao = None
+    for i, r in enumerate(ranking):
+        if r["usuario_id"] == usuario_id:
+            posicao = i + 1
+            break
+    
+    is_lenda = posicao is not None and posicao <= 10
+    
+    return {
+        "score": score,
+        "nivel": nivel,
+        "label": "Lenda" if is_lenda else label,
+        "cor": cor,
+        "icone": "Crown" if is_lenda else icone,
+        "vendas": usuario.vendas_completadas or 0,
+        "ranking_posicao": posicao
+    }
 
 
 # ==================== EXPLORAR (BUSCA + FILTROS) ====================
@@ -502,6 +727,29 @@ async def explorar_comunidade(
     resultado = []
     for l in links:
         anunciante = l.usuario
+        score_vendedor = float(anunciante.score or 0) if anunciante else 0
+        
+        if score_vendedor >= 900:
+            nivel_confianca = "elite"
+            cor_confianca = "#FFD700"
+            icone_confianca = "Gem"
+            label_confianca = "Elite Trocaria"
+        elif score_vendedor >= 700:
+            nivel_confianca = "confiavel"
+            cor_confianca = "#25D366"
+            icone_confianca = "BadgeCheck"
+            label_confianca = "Confiavel"
+        elif score_vendedor >= 300:
+            nivel_confianca = "em_construcao"
+            cor_confianca = "#FFD600"
+            icone_confianca = "Sprout"
+            label_confianca = "Em Construcao"
+        else:
+            nivel_confianca = "risco"
+            cor_confianca = "#FF3D00"
+            icone_confianca = "AlertTriangle"
+            label_confianca = "Risco"
+        
         resultado.append({
             "id": l.id,
             "nome_produto": l.nome_produto,
@@ -524,7 +772,12 @@ async def explorar_comunidade(
             "estado": l.estado or "",
             "usuario_id": l.usuario_id,
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None,
-            "total_imagens": len(l.imagens)
+            "total_imagens": len(l.imagens),
+            "score_vendedor": score_vendedor,
+            "nivel_confianca": nivel_confianca,
+            "cor_confianca": cor_confianca,
+            "icone_confianca": icone_confianca,
+            "label_confianca": label_confianca
         })
     
     return {

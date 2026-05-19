@@ -769,6 +769,40 @@ p { margin-bottom: 1rem; color: var(--text-muted); }
     100% { transform: rotate(360deg); }
 }
 
+/* SELOS DE CONFIANCA */
+.selo-confianca {
+    transition: all 0.3s ease;
+}
+
+.selo-elite {
+    animation: elite-glow 2s ease-in-out infinite;
+}
+
+@keyframes elite-glow {
+    0%, 100% { box-shadow: 0 0 4px rgba(255, 215, 0, 0.3); }
+    50% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.6); }
+}
+
+.selo-lenda {
+    animation: lenda-shine 3s ease-in-out infinite;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(138, 43, 226, 0.15), rgba(255, 215, 0, 0.15));
+    background-size: 200% 200%;
+}
+
+@keyframes lenda-shine {
+    0%, 100% { background-position: 0% 50%; box-shadow: 0 0 6px rgba(255, 215, 0, 0.4); }
+    50% { background-position: 100% 50%; box-shadow: 0 0 16px rgba(255, 215, 0, 0.8); }
+}
+
+.selo-risco {
+    animation: risco-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes risco-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .splash-loader::after {
     content: '';
     position: absolute;

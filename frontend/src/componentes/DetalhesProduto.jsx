@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, User, ShieldCheck, AlertTriangle, Star, ChevronLeft, ChevronRight, Tag, UserX, HandCoins } from 'lucide-react';
 import { BACKEND_URL } from '../api';
+import SeloConfianca from './SeloConfianca';
 
 const WhatsAppIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff" style={{ flexShrink: 0 }}>
@@ -120,8 +121,21 @@ const DetalhesProduto = ({ ad, onVoltar, usuario, api, showModal, onBloquearUsua
                                 {ad.anunciante}
                                 {ad.anunciante_verificado && <ShieldCheck size={14} color="#00CFFF" title="Vendedor Verificado" />}
                             </div>
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                {ad.anunciante_desde && ad.anunciante_desde !== 'N/D' ? `Membro desde ${ad.anunciante_desde}` : 'Novo por aqui'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                {ad.nivel_confianca && (
+                                    <SeloConfianca
+                                        nivel={ad.nivel_confianca}
+                                        label={ad.label_confianca}
+                                        cor={ad.cor_confianca}
+                                        icone={ad.icone_confianca}
+                                        tamanho="xs"
+                                        score={ad.score_vendedor}
+                                        vendas={ad.anunciante_vendas}
+                                    />
+                                )}
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                    {ad.anunciante_desde && ad.anunciante_desde !== 'N/D' ? `Membro desde ${ad.anunciante_desde}` : 'Novo por aqui'}
+                                </span>
                             </div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>

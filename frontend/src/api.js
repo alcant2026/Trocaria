@@ -15,6 +15,9 @@ export const BASE_URL = normalizarUrl(viteUrl) || (import.meta.env.DEV
     ? (isCapacitor ? androidDevUrl : '/api') 
     : productionUrl);
 
+// URL base do backend (sem /api) para servir arquivos estaticos (imagens)
+export const BACKEND_URL = BASE_URL.replace(/\/api$/, '');
+
 // ============================================================================
 // CACHE EM MEMÓRIA PARA REDUZIR REQUISIÇÕES (Render Free Tier)
 // ============================================================================

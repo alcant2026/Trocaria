@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
+import { BACKEND_URL } from '../api';
 
 const CATEGORIAS_MARKETPLACE = [
     "Geral", "Celulares", "Informatica", "Eletronicos", "Veiculos",
@@ -20,6 +21,12 @@ const MarketTimer = ({ expiresAt }) => {
         return <span className="market-timer">{d}d{rh > 0 ? ` ${rh}h` : ''}</span>;
     }
     return <span className="market-timer">{`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}</span>;
+};
+
+const normalizarImagem = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    return `${BACKEND_URL}${url}`;
 };
 
 const MarketplaceView = ({
@@ -46,8 +53,8 @@ const MarketplaceView = ({
     };
 
     const getImagemPrincipal = (l) => {
-        if (l.imagens && l.imagens.length > 0) return l.imagens[0];
-        return l.url_imagem || null;
+        if (l.imagens && l.imagens.length > 0) return normalizarImagem(l.imagens[0]);
+        return normalizarImagem(l.url_imagem);
     };
 
     return (
@@ -324,7 +331,7 @@ const MarketplaceView = ({
                                 const expirado = l.expires_at && new Date(l.expires_at) < new Date();
                                 const semViews = (l.views_restantes || 0) <= 0;
                                 const inativo = !l.is_active || expirado || (!l.is_boosted && semViews);
-                                const imagemPrincipal = l.imagens && l.imagens.length > 0 ? l.imagens[0] : l.url_imagem;
+                                const imagemPrincipal = l.imagens && l.imagens.length > 0 ? normalizarImagem(l.imagens[0]) : normalizarImagem(l.url_imagem);
 
                                 return (
                                     <div key={l.id} className={`market-card ${inativo ? 'market-card--inactive' : ''}`} style={{ borderColor: inativo ? 'rgba(255,61,0,0.2)' : 'rgba(var(--primary-rgb), 0.2)' }}>

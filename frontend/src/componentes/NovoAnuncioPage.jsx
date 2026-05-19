@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Lock, Info, AlertTriangle, Send, CheckCircle, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { BACKEND_URL } from '../api';
 
 const MAX_IMAGENS = 6;
 const LIMITE_TITULO = 90;
@@ -29,28 +30,40 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
                 showModal({ title: 'Arquivo grande', message: `${file.name} excede 5MB.`, type: 'danger' });
                 continue;
             }
+            const localUrl = URL.createObjectURL(file);
+            const novaImagem = { preview: localUrl, url: null, file };
+            setImagens(prev => [...prev, novaImagem]);
             try {
                 const formData = new FormData();
                 formData.append('file', file);
                 const res = await api.post('/comunidade/upload-imagem', formData);
-                setImagens(prev => [...prev, res.url_imagem]);
+                setImagens(prev => prev.map(img => img.preview === localUrl ? { ...img, url: res.url_imagem } : img));
             } catch (err) {
                 showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao enviar imagem.', type: 'danger' });
+                setImagens(prev => prev.filter(img => img.preview !== localUrl));
+                URL.revokeObjectURL(localUrl);
             }
         }
         setUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const removerImagem = (idx) => setImagens(prev => prev.filter((_, i) => i !== idx));
+    const removerImagem = (idx) => {
+        setImagens(prev => {
+            const img = prev[idx];
+            if (img && img.preview && img.preview.startsWith('blob:')) URL.revokeObjectURL(img.preview);
+            return prev.filter((_, i) => i !== idx);
+        });
+    };
 
     const publicar = async () => {
         if (!dados.nome_produto || !dados.url_afiliado) return;
         if (!dados.valor || parseFloat(dados.valor) <= 0) {
-            showModal({ title: 'Preco obrigatorio', message: 'Informe um valor maior que zero.', type: 'danger' });
+            showModal({ title: 'Preco obrigatoria', message: 'Informe um valor maior que zero.', type: 'danger' });
             return;
         }
-        if (imagens.length === 0) {
+        const imagensValidas = imagens.filter(img => img.url);
+        if (imagensValidas.length === 0) {
             showModal({ title: 'Imagem obrigatoria', message: 'Adicione pelo menos 1 foto do produto.', type: 'danger' });
             return;
         }
@@ -66,13 +79,13 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
             };
             const res = await api.post('/comunidade/postar-link', payload);
             
-            // Upload das imagens para o anuncio criado
-            for (const url of imagens) {
+            for (const img of imagensValidas) {
                 try {
-                    await api.post('/comunidade/adicionar-imagem', { link_id: res.id, url_imagem: url });
+                    await api.post('/comunidade/adicionar-imagem', { link_id: res.id, url_imagem: img.url });
                 } catch(e) { /* ignora erros de imagem individual */ }
             }
             
+            imagens.forEach(img => { if (img.preview) URL.revokeObjectURL(img.preview); });
             setDados({ nome_produto: '', descricao: '', categoria: 'Geral', url_afiliado: '', valor: '', vendas_texto: '', codigo_2fa: '' });
             setImagens([]);
             showModal({ title: 'Sucesso!', message: 'Anuncio publicado!', type: 'success' });
@@ -81,6 +94,11 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
             showModal({ title: 'Erro', message: err.response?.data?.detail || 'Erro ao publicar', type: 'danger' });
         }
         setLoading(false);
+    };
+
+    const getImagemSrc = (img) => {
+        if (img.url) return img.url.startsWith('http') ? img.url : `${BACKEND_URL}${img.url}`;
+        return img.preview;
     };
 
     return (
@@ -130,9 +148,9 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
             <div className="input-group mb-1">
                 <label>Fotos do Produto * (max {MAX_IMAGENS})</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                    {imagens.map((url, idx) => (
+                    {imagens.map((img, idx) => (
                         <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
-                            <img src={url} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={getImagemSrc(img)} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             <button onClick={() => removerImagem(idx)} style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', padding: 0 }}>
                                 <X size={12} />
                             </button>
@@ -181,7 +199,7 @@ const NovoAnuncioPage = ({ usuario, onVoltar, onSucesso, api, showModal, CATEGOR
             </div>
 
             <button className="btn btn-primary mt-1" style={{ width: '100%', padding: '12px' }}
-                disabled={!dados.nome_produto || !dados.url_afiliado || imagens.length === 0 || loading}
+                disabled={!dados.nome_produto || !dados.url_afiliado || imagens.filter(i => i.url).length === 0 || loading}
                 onClick={publicar}>
                 {loading ? 'Publicando...' : 'Publicar Anuncio'}
                 {!loading && <Send size={16} style={{ marginLeft: '6px' }} />}

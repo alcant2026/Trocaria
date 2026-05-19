@@ -214,9 +214,11 @@ const MarketplaceView = ({
                         onClick={() => setShowAssinarModal(true)}
                     >
                         <Gem size={14} /> ASSINAR PREMIUM
-                    </button>
-                </div>
-            )}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anuncio gratis encerrado</p>
+                                        )}
 
             {marketplaceTab === 'ranking' && (
                 <div className="animate-fade-in">

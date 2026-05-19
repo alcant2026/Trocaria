@@ -1,5 +1,5 @@
-# Psy Pay - Configuração Git Ignore (Produção)
-# ATUALIZADO: Blindado para dados sensíveis e LGPD
+# Trocaria - Configuração Git Ignore (Produção)
+# Blindado para dados sensíveis e LGPD
 
 # 🐍 Python / Backend
 __pycache__/

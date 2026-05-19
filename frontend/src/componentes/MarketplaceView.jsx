@@ -214,11 +214,9 @@ const MarketplaceView = ({
                         onClick={() => setShowAssinarModal(true)}
                     >
                         <Gem size={14} /> ASSINAR PREMIUM
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>Anuncio gratis encerrado</p>
-                                        )}
+                    </button>
+                </div>
+            )}
 
             {marketplaceTab === 'ranking' && (
                 <div className="animate-fade-in">
@@ -461,8 +459,15 @@ const MarketplaceView = ({
                                                 }} style={{ height: '28px', fontSize: '0.65rem', padding: '0 8px', marginTop: '6px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366' }}>
                                                     Marcar como Vendido
                                                 </button>
-                            </div>
-                        )}
+                                            </>
+                                            )
+                                            : null
+                                        }
+                                    </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </>
                 ) : (
                     <div className="market-empty">

@@ -70,6 +70,13 @@ const MeusPontos = ({ usuario }) => {
     return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const calcularPontosHoje = () => {
+    const hoje = new Date().toISOString().split('T')[0];
+    return extrato
+      .filter(item => item.data?.startsWith(hoje) && item.pontos > 0)
+      .reduce((acc, item) => acc + item.pontos, 0);
+  };
+
   if (!saldo) return <div className="text-center p-4 text-muted">Carregando...</div>;
 
   return (
@@ -94,8 +101,18 @@ const MeusPontos = ({ usuario }) => {
           = R$ {saldo.saldo_reais?.toFixed(2)}
         </div>
         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-          1.000 pts = R$ 1,00 | Minimo para resgatar: 20.000 pts (R$ 20,00)
+          1.000 pts = R$ 1,00 | Minimo para resgatar: {saldo.minimo_pontos?.toLocaleString('pt-BR')} pts (R$ {saldo.minimo_reais?.toFixed(2)} incl. taxa)
         </div>
+        {saldo.taxa_resgate > 0 && (
+          <div style={{ fontSize: '0.7rem', color: 'var(--warning)', marginTop: '4px' }}>
+            Taxa de resgate: R$ {saldo.taxa_resgate?.toFixed(2)} por saque
+          </div>
+        )}
+        {calcularPontosHoje() > 0 && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '6px' }}>
+            +{calcularPontosHoje().toLocaleString('pt-BR')} pts hoje
+          </div>
+        )}
       </div>
 
       {/* ABAS */}
@@ -118,9 +135,15 @@ const MeusPontos = ({ usuario }) => {
             <>
               <h4 style={{ marginBottom: '12px', fontSize: '1rem' }}>Resgatar via PIX</h4>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                Voce vai resgatar <strong>R$ {saldo.saldo_reais?.toFixed(2)}</strong> ({saldo.saldo_pontos?.toLocaleString('pt-BR')} pts).
-                O dinheiro sera enviado para sua chave PIX em ate 48h.
+                Voce vai resgatar <strong>R$ {saldo.saldo_reais_bruto?.toFixed(2)}</strong> ({saldo.saldo_pontos?.toLocaleString('pt-BR')} pts).
+                <br />Taxa de resgate: <strong style={{ color: 'var(--danger)' }}>R$ {saldo.taxa_resgate?.toFixed(2)}</strong>
+                <br />Valor a receber: <strong style={{ color: 'var(--success)' }}>R$ {saldo.saldo_reais_liquido?.toFixed(2)}</strong>
               </p>
+              <div style={{ fontSize: '0.75rem', color: 'var(--warning)', marginBottom: '12px', padding: '8px', background: 'rgba(234,179,8,0.1)', borderRadius: '6px' }}>
+                <strong>Aviso:</strong> Ao confirmar, seus pontos serao debitados imediatamente.
+                Sera descontada uma taxa de R$ {saldo.taxa_resgate?.toFixed(2)} por saque.
+                O pagamento via PIX sera processado em ate 48h.
+              </div>
               <input
                 type="text"
                 className="input-field"

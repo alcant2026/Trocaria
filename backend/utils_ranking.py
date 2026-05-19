@@ -27,6 +27,10 @@ PONTOS_POR_REAL = 1000
 RESGATE_MINIMO_PONTOS = 20000  # R$ 20,00
 RESGATE_MINIMO_REAIS = Decimal("20.00")
 
+# Taxa de resgate (R$ 2,99 por saque)
+TAXA_RESGATE_REAIS = Decimal("2.99")
+TAXA_RESGATE_PONTOS = _reais_para_pontos(TAXA_RESGATE_REAIS)
+
 # Pontos por engajamento (acoes gratuitas do usuario)
 PONTOS_VIEW_ANUNCIO = 1           # Abrir anuncio
 PONTOS_CONVERSA = 5               # Iniciar conversa com vendedor
@@ -211,18 +215,25 @@ def pontos_cashback(usuario_id: str, tipo: str, valor_pago: Decimal, db: Session
 # =============================================================================
 
 def verificar_saldo_resgate(usuario_id: str, db: Session) -> dict:
-    """Verifica se usuario tem saldo suficiente para resgatar."""
+    """Verifica se usuario tem saldo suficiente para resgatar (considerando taxa)."""
     saldo = calcular_saldo_pontos(usuario_id, db)
-    valor = _pontos_para_reais(saldo)
-    pode_resgatar = saldo >= RESGATE_MINIMO_PONTOS
+    valor_bruto = _pontos_para_reais(saldo)
+    valor_liquido = max(Decimal("0.00"), valor_bruto - TAXA_RESGATE_REAIS)
+    
+    # Minimo: saldo deve cobrir o resgate minimo + taxa
+    minimo_total = RESGATE_MINIMO_REAIS + TAXA_RESGATE_REAIS
+    minimo_pontos_total = _reais_para_pontos(minimo_total)
+    pode_resgatar = saldo >= minimo_pontos_total
     
     return {
         "saldo_pontos": saldo,
-        "saldo_reais": float(valor),
+        "saldo_reais_bruto": float(valor_bruto),
+        "saldo_reais_liquido": float(valor_liquido),
+        "taxa_resgate": float(TAXA_RESGATE_REAIS),
         "pode_resgatar": pode_resgatar,
-        "minimo_pontos": RESGATE_MINIMO_PONTOS,
-        "minimo_reais": float(RESGATE_MINIMO_REAIS),
-        "falta_pontos": max(0, RESGATE_MINIMO_PONTOS - saldo),
+        "minimo_pontos": minimo_pontos_total,
+        "minimo_reais": float(minimo_total),
+        "falta_pontos": max(0, minimo_pontos_total - saldo),
     }
 
 
@@ -255,45 +266,59 @@ def solicitar_resgate(usuario_id: str, chave_pix: str, db: Session) -> dict:
         }
     
     pontos = saldo_info["saldo_pontos"]
-    valor = _pontos_para_reais(pontos)
+    valor_bruto = _pontos_para_reais(pontos)
     
-    # Debita os pontos do extrato
+    # Aplica taxa de resgate (R$ 2,99)
+    valor_liquido = max(Decimal("0.00"), valor_bruto - TAXA_RESGATE_REAIS)
+    
+    # Verifica se o valor liquido e suficiente para cobrir a taxa
+    if valor_liquido <= Decimal("0.00"):
+        return {
+            "sucesso": False,
+            "mensagem": f"Saldo insuficiente para cobrir a taxa de resgate (R$ {float(TAXA_RESGATE_REAIS):.2f}). Acumule mais pontos.",
+            "saldo_atual": saldo_info["saldo_pontos"],
+            "taxa_resgate": float(TAXA_RESGATE_REAIS),
+        }
+    
+    # Debita os pontos do extrato (valor bruto)
     debito = ExtratoPontos(
         usuario_id=usuario_id,
         tipo="resgate",
         pontos=-pontos,  # Negativo = debito
-        valor_referencia=valor,
-        detalhes=f"Solicitacao de resgate #{None} - R$ {float(valor):.2f}"
+        valor_referencia=valor_bruto,
+        detalhes=f"Solicitacao de resgate #{None} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
     )
     db.add(debito)
     db.flush()  # Para pegar o ID do debito
     
     # Atualiza detalhes com o ID real
-    debito.detalhes = f"Solicitacao de resgate #{debito.id} - R$ {float(valor):.2f}"
+    debito.detalhes = f"Solicitacao de resgate #{debito.id} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
     
-    # Cria a solicitacao de resgate
+    # Cria a solicitacao de resgate (valor liquido que o usuario recebe)
     resgate = ResgatePontos(
         usuario_id=usuario_id,
         pontos=pontos,
-        valor=valor,
+        valor=valor_liquido,
         chave_pix=chave_pix,
         status="pendente",
-        detalhes=f"Resgate solicitado. Debito extrato #{debito.id}"
+        detalhes=f"Resgate solicitado. Bruto: R$ {float(valor_bruto):.2f} | Taxa: R$ {float(TAXA_RESGATE_REAIS):.2f} | Liquido: R$ {float(valor_liquido):.2f} | Debito extrato #{debito.id}"
     )
     db.add(resgate)
     db.commit()
     db.refresh(resgate)
     
     # Atualiza o debito com o ID do resgate
-    debito.detalhes = f"Solicitacao de resgate #{resgate.id} - R$ {float(valor):.2f}"
+    debito.detalhes = f"Solicitacao de resgate #{resgate.id} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
     db.commit()
     
     return {
         "sucesso": True,
-        "mensagem": f"Resgate de R$ {float(valor):.2f} solicitado com sucesso! O pagamento sera feito via PIX em ate 48h.",
+        "mensagem": f"Resgate solicitado! Valor bruto: R$ {float(valor_bruto):.2f}. Taxa de resgate: R$ {float(TAXA_RESGATE_REAIS):.2f}. Voce recebera: R$ {float(valor_liquido):.2f} via PIX em ate 48h.",
         "resgate_id": resgate.id,
         "pontos_resgatados": pontos,
-        "valor": float(valor),
+        "valor_bruto": float(valor_bruto),
+        "taxa_resgate": float(TAXA_RESGATE_REAIS),
+        "valor_liquido": float(valor_liquido),
         "chave_pix": chave_pix,
         "status": "pendente",
     }

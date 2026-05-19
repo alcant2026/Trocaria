@@ -76,6 +76,40 @@ async def solicitar_verificacao_com_docs(
                 if content_type in {'application/pdf'} and tipo == 'application/pdf': return True
         return False
 
+    def comprimir_imagem(conteudo: bytes, max_size_kb: int = 200) -> bytes:
+        """Comprime imagens para economizar storage. PDFs nao sao comprimidos."""
+        from PIL import Image
+        import io
+        
+        # Verifica se e imagem
+        try:
+            img = Image.open(io.BytesIO(conteudo))
+        except Exception:
+            return conteudo  # Nao e imagem, retorna original (PDF)
+        
+        # Converte para RGB (remove alpha, reduz tamanho)
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        
+        # Redimensiona se for muito grande
+        max_dim = 1920
+        if max(img.size) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+        
+        # Comprime com qualidade progressiva
+        output = io.BytesIO()
+        qualidade = 85
+        while True:
+            output.seek(0)
+            output.truncate()
+            img.save(output, format='JPEG', quality=qualidade, optimize=True, progressive=True)
+            tamanho_kb = output.tell() / 1024
+            if tamanho_kb <= max_size_kb or qualidade <= 30:
+                break
+            qualidade -= 5
+        
+        return output.getvalue()
+
     def salvar_arquivo(arquivo: UploadFile, tipo_doc: str) -> str:
         if not arquivo or not arquivo.filename: return None
         if arquivo.content_type not in ALLOWED_TYPES:
@@ -85,13 +119,22 @@ async def solicitar_verificacao_com_docs(
             raise HTTPException(status_code=413, detail="Arquivo muito grande. Maximo de 5MB por arquivo.")
         if not validar_magic_bytes(conteudo, arquivo.content_type):
             raise HTTPException(status_code=400, detail="Arquivo invalido ou corrompido.")
+        
+        # Comprime imagens antes de salvar
+        tamanho_original = len(conteudo)
+        conteudo_comprimido = comprimir_imagem(conteudo, max_size_kb=200)
+        tamanho_final = len(conteudo_comprimido)
+        economia = (1 - tamanho_final / tamanho_original) * 100 if tamanho_original > 0 else 0
+        
         token = secrets.token_hex(8)
-        extensao = arquivo.filename.split('.')[-1][:5]
+        # Usa extensao .jpg para imagens comprimidas
+        extensao = "jpg" if arquivo.content_type in {"image/png", "image/jpeg", "image/jpg"} else arquivo.filename.split('.')[-1][:5]
         nome_seguro = f"{usuario.id}_{tipo_doc}_{token}.{extensao}"
         caminho_completo = os.path.join("uploads", nome_seguro)
         try:
             with open(caminho_completo, "wb") as f:
-                f.write(conteudo)
+                f.write(conteudo_comprimido)
+            print(f"[KYC] Arquivo {tipo_doc} comprimido: {tamanho_original/1024:.1f}KB -> {tamanho_final/1024:.1f}KB ({economia:.0f}% economia)")
             return caminho_completo
         except Exception as e:
             print("Erro ao salvar arquivo:", e)

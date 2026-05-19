@@ -95,6 +95,22 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
     if total_ativos >= 3:
         raise HTTPException(status_code=400, detail="Você já possui 3 links ativos. Impulsione um ou aguarde a expiração.")
 
+    # ANTI-FLOOD: Limite de 3 anúncios por dia + pontos decrescentes
+    from datetime import datetime, timedelta, timezone
+    hoje_inicio = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    anuncios_hoje = db.query(LinkAfiliado).filter(
+        LinkAfiliado.usuario_id == usuario.id,
+        LinkAfiliado.data_criacao >= hoje_inicio
+    ).count()
+
+    if anuncios_hoje >= 3:
+        raise HTTPException(status_code=400, detail="Limite diário atingido. Você pode postar no máximo 3 anúncios por dia.")
+
+    # Pontos decrescentes por anúncio no mesmo dia
+    # 1º anúncio: +20 pts | 2º: +10 pts | 3º: +5 pts
+    pontos_por_anuncio = [20, 10, 5]
+    pontos_ganhos = pontos_por_anuncio[anuncios_hoje] if anuncios_hoje < len(pontos_por_anuncio) else 0
+
     novo_link = LinkAfiliado(
         nome_produto=dados.nome_produto,
         descricao=dados.descricao,
@@ -115,8 +131,25 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
     db.add(novo_link)
     db.commit()
     db.refresh(novo_link)
-    
-    return {"message": "Link postado com sucesso! Voce tem 24h e 50 visualizacoes de bonus.", "id": novo_link.id}
+
+    # Adiciona pontos ao extrato (sistema acumulativo)
+    if pontos_ganhos > 0:
+        from utils_ranking import adicionar_pontos
+        adicionar_pontos(
+            usuario_id=usuario.id,
+            tipo="postagem",
+            pontos=pontos_ganhos,
+            db=db,
+            detalhes=f"Postou anúncio #{novo_link.id} ({anuncios_hoje + 1}º do dia)"
+        )
+
+    return {
+        "message": "Link postado com sucesso! Voce tem 24h e 50 visualizacoes de bonus.",
+        "id": novo_link.id,
+        "pontos_ganhos": pontos_ganhos,
+        "anuncios_hoje": anuncios_hoje + 1,
+        "limite_diario": 3
+    }
 
 
 DESTAQUE_PRECO = Decimal("5.00")

@@ -1,4 +1,4 @@
-package com.psypay.app;
+package com.trocaria.app;
 
 import com.getcapacitor.BridgeActivity;
 

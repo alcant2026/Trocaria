@@ -1,6 +1,6 @@
 {
-  "appId": "com.psypay.app",
-  "appName": "Psy Pay",
+  "appId": "com.trocaria.app",
+  "appName": "Trocaria",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",

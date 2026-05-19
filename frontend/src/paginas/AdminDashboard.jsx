@@ -268,7 +268,7 @@ const AdminDashboard = () => {
             const url = window.URL.createObjectURL(new Blob([blob]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `DEMONSTRATIVO_FISCAL_PSY_PAY_${dataInicio}_A_${dataFim}.pdf`);
+            link.setAttribute('download', `DEMONSTRATIVO_FISCAL_TROCARIA_${dataInicio}_A_${dataFim}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.remove();

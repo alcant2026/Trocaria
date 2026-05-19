@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Psy Pay</string>
-    <string name="title_activity_main">Psy Pay</string>
-    <string name="package_name">com.psypay.app</string>
-    <string name="custom_url_scheme">com.psypay.app</string>
+    <string name="app_name">Trocaria</string>
+    <string name="title_activity_main">Trocaria</string>
+    <string name="package_name">com.trocaria.app</string>
+    <string name="custom_url_scheme">com.trocaria.app</string>
 </resources>

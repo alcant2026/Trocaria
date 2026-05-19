@@ -155,12 +155,18 @@ async def upload_imagem_anuncio(
     usuario: Usuario = Depends(obter_usuario_logado)
 ):
     """Upload de imagem para anuncio. Comprime automaticamente. Max 6 imagens por anuncio."""
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Apenas arquivos de imagem sao aceitos.")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Nome do arquivo e obrigatorio.")
+    
+    extensao = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
+    if extensao not in ('jpg', 'jpeg', 'png', 'gif', 'webp'):
+        raise HTTPException(status_code=400, detail="Apenas imagens JPG, PNG, GIF ou WebP sao aceitas.")
     
     file_bytes = await file.read()
-    if len(file_bytes) > 5 * 1024 * 1024:  # Max 5MB antes da compressao
-        raise HTTPException(status_code=400, detail="Imagem muito grande. Maximo 5MB antes da compressao.")
+    if len(file_bytes) < 100:
+        raise HTTPException(status_code=400, detail="Arquivo muito pequeno ou corrompido.")
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Imagem muito grande. Maximo 5MB.")
     
     img_comprimida, ext = _comprimir_imagem(file_bytes, file.filename)
     

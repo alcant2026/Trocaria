@@ -1,13 +1,11 @@
 import React from 'react';
 
-const YingYangO = () => (
+const CircularArrow = () => (
   <svg viewBox="0 0 100 100" style={{ width: '1em', height: '1em', display: 'inline-block', verticalAlign: 'middle', margin: '0 1px' }}>
-    <circle cx="50" cy="50" r="50" fill="#FFCC00" />
-    <path d="M50 0 A50 50 0 0 1 100 50 A50 50 0 0 1 50 100 Z" fill="#00E676" />
-    <circle cx="50" cy="25" r="25" fill="#00E676" />
-    <circle cx="50" cy="75" r="25" fill="#FFCC00" />
-    <circle cx="50" cy="25" r="8" fill="#FFCC00" />
-    <circle cx="50" cy="75" r="8" fill="#00E676" />
+    <path d="M 25 50 A 25 25 0 0 1 75 50" stroke="#FFCC00" strokeWidth="14" fill="none" strokeLinecap="round" />
+    <polygon points="82,50 68,42 68,58" fill="#FFCC00" />
+    <path d="M 75 50 A 25 25 0 0 1 25 50" stroke="#00E676" strokeWidth="14" fill="none" strokeLinecap="round" />
+    <polygon points="18,50 32,42 32,58" fill="#00E676" />
   </svg>
 );
 
@@ -30,7 +28,7 @@ const Logo = ({ size = 32, showText = true }) => {
           color: 'var(--primary)', 
           letterSpacing: '-1px' 
         }}>
-          TR<YingYangO />CARIA
+          TR<CircularArrow />CARIA
         </span>
       )}
     </div>

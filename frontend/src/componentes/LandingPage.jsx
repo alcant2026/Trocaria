@@ -129,7 +129,7 @@ const LandingPage = () => {
             <section style={{ maxWidth: '1100px', margin: '0 auto 2rem', padding: '0 1rem' }}>
                 <div style={{ background: 'rgba(255,152,0,0.06)', border: '1px solid rgba(255,152,0,0.15)', padding: '12px 16px', borderRadius: '12px', textAlign: 'center' }}>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
-                        ⚠️ <strong style={{ color: '#FF9800' }}>AVISO:</strong> O Trocaria é uma plataforma de conexão entre pessoas. <strong>Não somos banco, instituição financeira ou sociedade de crédito.</strong> Não intermediamos valores. Todo apoio é um acordo direto entre as partes via PIX. Apoiar envolve <strong style={{ color: 'var(--danger)' }}>risco de perda total</strong>. Limite de R$ 5.000 por operação. Leia nossos <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso e Privacidade</a>.
+                        ⚠️ <strong style={{ color: '#FF9800' }}>AVISO:</strong> O Trocaria é uma <strong>plataforma de classificados</strong> que conecta pessoas para compra, venda e troca de produtos. <strong>Não somos banco, instituição financeira ou sociedade de crédito.</strong> A plataforma não participa das transações financeiras — toda negociação é direta entre as partes. Verifique a reputação do vendedor antes de negociar. Leia nossos <a href="#privacidade" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Termos de Uso e Privacidade</a>.
                     </p>
                 </div>
             </section>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api, { BASE_URL } from '../api';
-import { Shield, ShieldAlert, ShieldCheck, Smartphone, Lock, Copy, Check, AlertTriangle, Eye, EyeOff, User, Mail, Phone, Key, ArrowLeft, Gift } from 'lucide-react';
+import api, { BASE_URL, BACKEND_URL } from '../api';
+import { ShieldAlert, ShieldCheck, Lock, Copy, Check, User, Mail, Phone, Key, ArrowLeft, Camera, BadgeCheck, Upload } from 'lucide-react';
 
 const Perfil = () => {
     const [status2fa, setStatus2fa] = useState(null);
@@ -128,7 +128,7 @@ const Perfil = () => {
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
-                <button onClick={() => window.location.hash = 'cliente'} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <button onClick={() => window.location.hash = 'cliente'} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Voltar para o início">
                     <ArrowLeft size={20} />
                 </button>
                 <h2 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>Perfil</h2>
@@ -136,14 +136,14 @@ const Perfil = () => {
             {/* DADOS DO PERFIL */}
             <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div onClick={() => fileInputRef.current?.click()} style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(var(--primary-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
+                    <button onClick={() => fileInputRef.current?.click()} style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(var(--primary-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer', position: 'relative', flexShrink: 0, border: 'none' }} aria-label="Alterar foto de perfil">
                         {usuario?.foto_url ? (
                             <img src={`${BASE_URL}${usuario.foto_url}`} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                             <User size={28} color="var(--primary)" />
                         )}
                         {uploadingFoto && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spinner" /></div>}
-                    </div>
+                    </button>
                     <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" hidden onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -166,7 +166,7 @@ const Perfil = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <label htmlFor="email_perfil" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Mail size={12} /> Email
                             {usuario?.email_verificado ? (
                                 <span style={{ fontSize: '0.65rem', color: 'var(--success)', background: 'rgba(var(--success-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -178,10 +178,10 @@ const Perfil = () => {
                                 </span>
                             )}
                         </label>
-                        <input type="email" className="input-field" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Seu email" />
+                        <input id="email_perfil" type="email" className="input-field" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Seu email" />
                     </div>
                     <div>
-                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <label htmlFor="telefone_perfil" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Phone size={12} /> WhatsApp
                             {usuario?.telefone_verificado ? (
                                 <span style={{ fontSize: '0.65rem', color: 'var(--success)', background: 'rgba(var(--success-rgb), 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -193,11 +193,11 @@ const Perfil = () => {
                                 </span>
                             )}
                         </label>
-                        <input type="tel" className="input-field" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder="(DDD) 9xxxx-xxxx" />
+                        <input id="telefone_perfil" type="tel" className="input-field" value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)} placeholder="(DDD) 9xxxx-xxxx" />
                     </div>
                     <div>
-                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Key size={12} /> Chave PIX</label>
-                        <input type="text" className="input-field" value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder="Sua chave PIX" />
+                        <label htmlFor="pix_perfil" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}><Key size={12} /> Chave PIX</label>
+                        <input id="pix_perfil" type="text" className="input-field" value={editChavePix} onChange={(e) => setEditChavePix(e.target.value)} placeholder="Sua chave PIX" />
                     </div>
                     <button className="btn btn-primary w-full" onClick={salvarDados} disabled={salvando}>
                         {salvando ? 'Salvando...' : 'Salvar Alteracoes'}
@@ -275,6 +275,47 @@ const Perfil = () => {
                             setMensagem('Erro ao gerar codigo.');
                         }
                     }}>Gerar Meu Codigo de Indicacao</button>
+                )}
+            </div>
+
+            {/* SELFIE VERIFICATION */}
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: 'var(--radius-md)', background: usuario?.selfie_verificada ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 145, 0, 0.1)', color: usuario?.selfie_verificada ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {usuario?.selfie_verificada ? <BadgeCheck size={24} /> : <Camera size={24} />}
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1rem' }}>Selfie de Verificação</h3>
+                        <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                            {usuario?.selfie_verificada ? 'Selfie verificada' : usuario?.selfie_url ? 'Aguardando aprovação' : 'Opcional — ganhe um badge no perfil'}
+                        </p>
+                    </div>
+                </div>
+                {usuario?.selfie_verificada && usuario?.selfie_url && (
+                    <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                        <img src={`${BACKEND_URL}${usuario.selfie_url}`} alt="Selfie" style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--success)' }} />
+                    </div>
+                )}
+                {!usuario?.selfie_verificada && (
+                    <div style={{ textAlign: 'center' }}>
+                        <input type="file" accept="image/*" hidden id="selfie-input" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 5 * 1024 * 1024) { setMensagem('Arquivo muito grande. Maximo 5MB.'); return; }
+                            const form = new FormData();
+                            form.append('arquivo', file);
+                            try {
+                                const res = await api.post('/auth/enviar-selfie', form, { isMultipart: true });
+                                setMensagem(res.message);
+                                carregarPerfil();
+                            } catch (err) {
+                                setMensagem(err.message || 'Erro ao enviar selfie.');
+                            }
+                        }} />
+                        <label htmlFor="selfie-input" className="btn btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <Upload size={16} /> {usuario?.selfie_url ? 'Reenviar Selfie' : 'Enviar Selfie'}
+                        </label>
+                    </div>
                 )}
             </div>
 

@@ -23,13 +23,7 @@ from modelos.modelos_db import Usuario, ExtratoPontos, ResgatePontos
 # Taxa de conversao: 1.000 pontos = R$ 1,00
 PONTOS_POR_REAL = 1000
 
-# Resgate minimo
-RESGATE_MINIMO_PONTOS = 20000  # R$ 20,00
-RESGATE_MINIMO_REAIS = Decimal("20.00")
 
-# Taxa de resgate (R$ 2,99 por saque)
-TAXA_RESGATE_REAIS = Decimal("2.99")
-TAXA_RESGATE_PONTOS = int(TAXA_RESGATE_REAIS * Decimal(str(1000)))  # 1.000 pts = R$ 1,00
 
 # Pontos por engajamento (acoes gratuitas do usuario)
 PONTOS_VIEW_ANUNCIO = 1           # Abrir anuncio
@@ -210,176 +204,7 @@ def pontos_cashback(usuario_id: str, tipo: str, valor_pago: Decimal, db: Session
     )
 
 
-# =============================================================================
-# RESGATE DE PONTOS
-# =============================================================================
 
-def verificar_saldo_resgate(usuario_id: str, db: Session) -> dict:
-    """Verifica se usuario tem saldo suficiente para resgatar (considerando taxa)."""
-    saldo = calcular_saldo_pontos(usuario_id, db)
-    valor_bruto = _pontos_para_reais(saldo)
-    valor_liquido = max(Decimal("0.00"), valor_bruto - TAXA_RESGATE_REAIS)
-    
-    # Minimo: saldo deve cobrir o resgate minimo + taxa
-    minimo_total = RESGATE_MINIMO_REAIS + TAXA_RESGATE_REAIS
-    minimo_pontos_total = _reais_para_pontos(minimo_total)
-    pode_resgatar = saldo >= minimo_pontos_total
-    
-    return {
-        "saldo_pontos": saldo,
-        "saldo_reais_bruto": float(valor_bruto),
-        "saldo_reais_liquido": float(valor_liquido),
-        "taxa_resgate": float(TAXA_RESGATE_REAIS),
-        "pode_resgatar": pode_resgatar,
-        "minimo_pontos": minimo_pontos_total,
-        "minimo_reais": float(minimo_total),
-        "falta_pontos": max(0, minimo_pontos_total - saldo),
-    }
-
-
-def solicitar_resgate(usuario_id: str, chave_pix: str, db: Session) -> dict:
-    """
-    Usuario solicita resgate de TODOS os pontos acumulados.
-    Gera um PIX de saida da conta da empresa (CNPJ) para o usuario.
-    """
-    saldo_info = verificar_saldo_resgate(usuario_id, db)
-    
-    if not saldo_info["pode_resgatar"]:
-        return {
-            "sucesso": False,
-            "mensagem": f"Saldo insuficiente. Voce precisa de {RESGATE_MINIMO_PONTOS} pts (R$ {float(RESGATE_MINIMO_REAIS):.2f}) para resgatar.",
-            "saldo_atual": saldo_info["saldo_pontos"],
-            "saldo_reais": saldo_info["saldo_reais"],
-        }
-    
-    # Verifica se ja tem resgate pendente
-    resgate_pendente = db.query(ResgatePontos).filter(
-        ResgatePontos.usuario_id == usuario_id,
-        ResgatePontos.status.in_(["pendente", "processando"])
-    ).first()
-    
-    if resgate_pendente:
-        return {
-            "sucesso": False,
-            "mensagem": "Voce ja tem um resgate em andamento. Aguarde o pagamento.",
-            "resgate_id": resgate_pendente.id,
-        }
-    
-    pontos = saldo_info["saldo_pontos"]
-    valor_bruto = _pontos_para_reais(pontos)
-    
-    # Aplica taxa de resgate (R$ 2,99)
-    valor_liquido = max(Decimal("0.00"), valor_bruto - TAXA_RESGATE_REAIS)
-    
-    # Verifica se o valor liquido e suficiente para cobrir a taxa
-    if valor_liquido <= Decimal("0.00"):
-        return {
-            "sucesso": False,
-            "mensagem": f"Saldo insuficiente para cobrir a taxa de resgate (R$ {float(TAXA_RESGATE_REAIS):.2f}). Acumule mais pontos.",
-            "saldo_atual": saldo_info["saldo_pontos"],
-            "taxa_resgate": float(TAXA_RESGATE_REAIS),
-        }
-    
-    # Debita os pontos do extrato (valor bruto)
-    debito = ExtratoPontos(
-        usuario_id=usuario_id,
-        tipo="resgate",
-        pontos=-pontos,  # Negativo = debito
-        valor_referencia=valor_bruto,
-        detalhes=f"Solicitacao de resgate #{None} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
-    )
-    db.add(debito)
-    db.flush()  # Para pegar o ID do debito
-    
-    # Atualiza detalhes com o ID real
-    debito.detalhes = f"Solicitacao de resgate #{debito.id} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
-    
-    # Cria a solicitacao de resgate (valor liquido que o usuario recebe)
-    resgate = ResgatePontos(
-        usuario_id=usuario_id,
-        pontos=pontos,
-        valor=valor_liquido,
-        chave_pix=chave_pix,
-        status="pendente",
-        detalhes=f"Resgate solicitado. Bruto: R$ {float(valor_bruto):.2f} | Taxa: R$ {float(TAXA_RESGATE_REAIS):.2f} | Liquido: R$ {float(valor_liquido):.2f} | Debito extrato #{debito.id}"
-    )
-    db.add(resgate)
-    db.commit()
-    db.refresh(resgate)
-    
-    # Atualiza o debito com o ID do resgate
-    debito.detalhes = f"Solicitacao de resgate #{resgate.id} - R$ {float(valor_bruto):.2f} (taxa R$ {float(TAXA_RESGATE_REAIS):.2f})"
-    db.commit()
-    
-    return {
-        "sucesso": True,
-        "mensagem": f"Resgate solicitado! Valor bruto: R$ {float(valor_bruto):.2f}. Taxa de resgate: R$ {float(TAXA_RESGATE_REAIS):.2f}. Voce recebera: R$ {float(valor_liquido):.2f} via PIX em ate 48h.",
-        "resgate_id": resgate.id,
-        "pontos_resgatados": pontos,
-        "valor_bruto": float(valor_bruto),
-        "taxa_resgate": float(TAXA_RESGATE_REAIS),
-        "valor_liquido": float(valor_liquido),
-        "chave_pix": chave_pix,
-        "status": "pendente",
-    }
-
-
-def processar_resgate_pix(resgate_id: int, db: Session) -> dict:
-    """
-    [ADMIN] Processa o resgate gerando um PIX de saida.
-    Em producao, isso usaria a API do Mercado Pago ou do banco da empresa.
-    """
-    resgate = db.query(ResgatePontos).filter(ResgatePontos.id == resgate_id).first()
-    if not resgate:
-        return {"sucesso": False, "mensagem": "Resgate nao encontrado."}
-    
-    if resgate.status != "pendente":
-        return {"sucesso": False, "mensagem": f"Resgate ja esta {resgate.status}."}
-    
-    # Aqui voce integraria com o banco da empresa para gerar o PIX de saida
-    # Por enquanto, simulamos
-    resgate.status = "processando"
-    db.commit()
-    
-    # TODO: Integrar com API do banco da empresa para gerar PIX de saida
-    # Exemplo: SDK do Mercado Pago com access_token da conta da empresa (CNPJ)
-    # payment_data = {
-    #     "transaction_amount": float(resgate.valor),
-    #     "description": f"Resgate de pontos - {resgate.usuario.nome}",
-    #     "payment_method_id": "pix",
-    #     "payer": {"email": resgate.usuario.email}
-    # }
-    # result = sdk.payment().create(payment_data)
-    
-    return {
-        "sucesso": True,
-        "mensagem": "Resgate em processamento. O PIX sera gerado em breve.",
-        "resgate_id": resgate.id,
-        "valor": float(resgate.valor),
-        "chave_pix_destino": resgate.chave_pix,
-    }
-
-
-def confirmar_pagamento_resgate(resgate_id: int, payment_id: str, db: Session) -> dict:
-    """[ADMIN ou Webhook] Confirma que o PIX de resgate foi pago."""
-    resgate = db.query(ResgatePontos).filter(ResgatePontos.id == resgate_id).first()
-    if not resgate:
-        return {"sucesso": False, "mensagem": "Resgate nao encontrado."}
-    
-    resgate.status = "pago"
-    resgate.payment_id = payment_id
-    resgate.data_pagamento = datetime.datetime.now(timezone.utc)
-    db.commit()
-    
-    return {
-        "sucesso": True,
-        "mensagem": f"Resgate #{resgate_id} pago com sucesso! R$ {float(resgate.valor):.2f} enviados.",
-    }
-
-
-# =============================================================================
-# EXTRATO
-# =============================================================================
 
 def obter_extrato_completo(usuario_id: str, db: Session, limit: int = 100) -> list:
     """Retorna extrato completo de pontos do usuario."""
@@ -442,3 +267,63 @@ async def rotina_reset_ranking():
 
 
 import asyncio
+
+# =============================================================================
+# PRODUTOS PARA RESGATE (Top 20)
+# =============================================================================
+
+WHATSAPP_PLATAFORMA = "91980177874"
+
+def calcular_pontos_minimos(valor_reais: Decimal) -> int:
+    """Converte valor em R$ para pontos minimos necessarios."""
+    return int(valor_reais * Decimal(str(PONTOS_POR_REAL)))
+
+
+def usuario_esta_no_top20(usuario_id: str, db: Session) -> bool:
+    """Verifica se o usuario esta entre os 20 com mais pontos."""
+    from sqlalchemy import func
+    top = db.query(
+        ExtratoPontos.usuario_id,
+        func.sum(ExtratoPontos.pontos).label("total_pontos")
+    ).group_by(ExtratoPontos.usuario_id).order_by(
+        func.sum(ExtratoPontos.pontos).desc()
+    ).limit(20).all()
+    ids_top = [uid for uid, _ in top]
+    return usuario_id in ids_top
+
+
+def janela_resgate_aberta() -> bool:
+    """
+    Retorna True se ainda nao deu sabado 18h (horario de Brasilia).
+    O resgate abre automaticamente e fecha sabado as 18:00.
+    """
+    agora = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+    if agora.weekday() == 5 and agora.hour >= 18:
+        return False
+    return True
+
+
+def obter_posicao_usuario(usuario_id: str, db: Session) -> int:
+    """Retorna a posicao do usuario no ranking geral (0 se nao estiver no top)."""
+    from sqlalchemy import func
+    ranking = db.query(
+        ExtratoPontos.usuario_id,
+        func.sum(ExtratoPontos.pontos).label("total_pontos")
+    ).group_by(ExtratoPontos.usuario_id).order_by(
+        func.sum(ExtratoPontos.pontos).desc()
+    ).limit(20).all()
+    for i, (uid, _) in enumerate(ranking, 1):
+        if uid == usuario_id:
+            return i
+    return 0
+
+
+def proximo_fechamento() -> str:
+    """Retorna string com data do proximo fechamento (sabado 18h BRT)."""
+    agora = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+    dias_ate_sabado = (5 - agora.weekday()) % 7
+    if dias_ate_sabado == 0 and agora.hour >= 18:
+        dias_ate_sabado = 7
+    proximo = agora + datetime.timedelta(days=dias_ate_sabado)
+    proximo = proximo.replace(hour=18, minute=0, second=0, microsecond=0)
+    return proximo.strftime("%d/%m/%Y %H:%M")

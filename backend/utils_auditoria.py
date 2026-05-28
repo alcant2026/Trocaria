@@ -14,7 +14,7 @@ from sqlalchemy import desc, func
 
 from modelos.modelos_db import (
     RegistroAuditoria, AcaoAdmin, Transacao, 
-    Usuario, SolicitacaoEmprestimo
+    Usuario
 )
 
 # Chave secreta para assinar logs (deve vir do .env em produção)
@@ -278,35 +278,6 @@ def auditar_kyc(
     )
 
 
-def auditar_emprestimo(
-    db: Session,
-    emprestimo_id: int,
-    usuario_id: str,
-    acao: str,  # SOLICITACAO, APROVACAO, REJEICAO, QUITACAO, ATRASO
-    valor: float,
-    ip: Optional[str] = None,
-    detalhes_adicionais: Optional[Dict] = None
-):
-    """Audita eventos do ciclo de vida de um empréstimo."""
-    detalhes = {
-        "emprestimo_id": emprestimo_id,
-        "acao_emprestimo": acao,
-        "valor": float(valor),
-        "natureza": "emprestimo"
-    }
-    if detalhes_adicionais:
-        detalhes.update(detalhes_adicionais)
-    
-    auditor = AuditoriaImutavel(db)
-    return auditor.registrar(
-        ip=ip or "system",
-        acao=f"EMPRESTIMO_{acao.upper()}",
-        usuario_id=usuario_id,
-        detalhes=detalhes,
-        valor_envolvido=float(valor),
-        entidade_tipo="SolicitacaoEmprestimo",
-        entidade_id=str(emprestimo_id)
-    )
 
 
 # ============================================================================

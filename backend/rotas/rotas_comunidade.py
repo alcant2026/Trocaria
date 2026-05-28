@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Header, 
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_, func
+from decimal import Decimal
 from database import get_db
 from rotas.rotas_auth import obter_usuario_logado
 from modelos.modelos_db import (
@@ -208,6 +209,12 @@ async def postar_link_comunidade(request: Request, dados: LinkCreate, db: Sessio
             if not so_numeros.startswith('55') and len(so_numeros) <= 11:
                 so_numeros = '55' + so_numeros
             url_final = f"https://wa.me/{so_numeros}"
+
+    if usuario.comissao_devida and usuario.comissao_devida > 0:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Você possui R$ {float(usuario.comissao_devida):.2f} em comissão pendente. Quite o valor para publicar novos anúncios."
+        )
 
     if not usuario.two_factor_enabled or not usuario.totp_secret:
         raise HTTPException(status_code=403, detail="Para anunciar no Marketplace, ative a Autenticacao de Dois Fatores (Google Authenticator).")
@@ -499,14 +506,9 @@ async def confirmar_recebimento(dados: ConfirmarRecebimentoRequest, db: Session 
     confirmacao.avaliacao_comprador = dados.avaliacao
     confirmacao.status = "confirmada"
     
-    # Atualizar score do vendedor (+3 por venda confirmada)
     vendedor = db.query(Usuario).filter(Usuario.id == confirmacao.vendedor_id).first()
     if vendedor:
-        vendedor.score = min((vendedor.score or 0) + 3, 1000)
         vendedor.vendas_completadas = (vendedor.vendas_completadas or 0) + 1
-    
-    # Atualizar score do comprador (+2 por boa faith)
-    usuario.score = min((usuario.score or 0) + 2, 1000)
     
     # Atualizar nota do anuncio com a avaliacao do comprador
     link = db.query(LinkAfiliado).filter(LinkAfiliado.id == confirmacao.link_id).first()
@@ -518,13 +520,29 @@ async def confirmar_recebimento(dados: ConfirmarRecebimentoRequest, db: Session 
         else:
             link.nota = Decimal(str(dados.avaliacao))
             link.total_avaliacoes = 1
+
+    # Aplicar comissão de 3% sobre o valor do anúncio
+    COMISSAO_PERCENTUAL = Decimal("0.03")
+    if link and vendedor:
+        valor_venda = link.valor or Decimal("0")
+        comissao = (valor_venda * COMISSAO_PERCENTUAL).quantize(Decimal("0.01"))
+        if comissao > 0:
+            vendedor.comissao_devida = (vendedor.comissao_devida or Decimal("0")) + comissao
+            transacao_comissao = Transacao(
+                usuario_id=vendedor.id,
+                valor=comissao,
+                tipo=TipoTransacao.TAXA_SERVICO,
+                status="pendente",
+                metodo="pix",
+                detalhes=f"Comissão 3% venda anúncio #{confirmacao.link_id} - R$ {float(link.valor):.2f}"
+            )
+            db.add(transacao_comissao)
     
     db.commit()
     
     return {
         "message": "Recebimento confirmado! Venda concluida com sucesso.",
-        "score_vendedor": float(vendedor.score or 0) if vendedor else 0,
-        "seu_score": float(usuario.score or 0)
+        "comissao": float(comissao) if link and vendedor and comissao > 0 else 0,
     }
 
 
@@ -549,13 +567,6 @@ async def avaliar_venda(dados: AvaliarVendedorRequest, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="Voce ja avaliou este comprador.")
     
     confirmacao.avaliacao_vendedor = dados.avaliacao
-    
-    # Bonus score para comprador se avaliacao for positiva
-    if dados.avaliacao >= 4:
-        comprador = db.query(Usuario).filter(Usuario.id == confirmacao.comprador_id).first()
-        if comprador:
-            comprador.score = min((comprador.score or 0) + 1, 1000)
-    
     db.commit()
     return {"message": "Avaliacao registrada!"}
 
@@ -616,35 +627,11 @@ async def minhas_vendas_pendentes(db: Session = Depends(get_db), usuario: Usuari
 
 @router.get("/nivel-confianca/{usuario_id}")
 async def obter_nivel_confianca(usuario_id: str, db: Session = Depends(get_db)):
-    """Retorna nivel de confianca e badge visual do usuario."""
+    """Retorna status de confianca do usuario."""
     usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
     
-    score = float(usuario.score or 0)
-    
-    if score >= 900:
-        nivel = "elite"
-        label = "Elite Trocaria"
-        cor = "#FFD700"
-        icone = "Gem"
-    elif score >= 700:
-        nivel = "confiavel"
-        label = "Confiavel"
-        cor = "#25D366"
-        icone = "BadgeCheck"
-    elif score >= 300:
-        nivel = "em_construcao"
-        label = "Em Construcao"
-        cor = "#FFD600"
-        icone = "Sprout"
-    else:
-        nivel = "risco"
-        label = "Risco"
-        cor = "#FF3D00"
-        icone = "AlertTriangle"
-    
-    # Verificar se esta no top 10 do ranking
     from utils_ranking import calcular_ranking_completo
     ranking = calcular_ranking_completo(db)
     posicao = None
@@ -653,16 +640,84 @@ async def obter_nivel_confianca(usuario_id: str, db: Session = Depends(get_db)):
             posicao = i + 1
             break
     
-    is_lenda = posicao is not None and posicao <= 10
-    
     return {
-        "score": score,
-        "nivel": nivel,
-        "label": "Lenda" if is_lenda else label,
-        "cor": cor,
-        "icone": "Crown" if is_lenda else icone,
         "vendas": usuario.vendas_completadas or 0,
         "ranking_posicao": posicao
+    }
+
+
+@router.get("/perfil-vendedor/{usuario_id}")
+async def perfil_vendedor(usuario_id: str, db: Session = Depends(get_db)):
+    """Perfil publico do vendedor (estilo rede social)."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Vendedor nao encontrado.")
+
+    vendas = db.query(ConfirmacaoVenda).filter(
+        ConfirmacaoVenda.vendedor_id == usuario_id,
+        ConfirmacaoVenda.status == "concluido"
+    ).count()
+
+    items_a_venda = db.query(LinkAfiliado).filter(
+        LinkAfiliado.usuario_id == usuario_id,
+        LinkAfiliado.is_active == True
+    ).count()
+
+    from sqlalchemy import func
+    mais_vendido = db.query(
+        LinkAfiliado.categoria,
+        func.count(ConfirmacaoVenda.id).label("total")
+    ).join(
+        ConfirmacaoVenda, ConfirmacaoVenda.link_id == LinkAfiliado.id
+    ).filter(
+        ConfirmacaoVenda.vendedor_id == usuario_id,
+        ConfirmacaoVenda.status == "concluido"
+    ).group_by(LinkAfiliado.categoria).order_by(
+        func.count(ConfirmacaoVenda.id).desc()
+    ).first()
+
+    badges = []
+    if usuario.selfie_verificada:
+        badges.append({"tipo": "selfie_verificada", "label": "Selfie Verificada", "icone": "BadgeCheck"})
+    if usuario.is_verified:
+        badges.append({"tipo": "kyc", "label": "Identidade Verificada", "icone": "ShieldCheck"})
+    if usuario.email_verificado:
+        badges.append({"tipo": "email", "label": "Email Verificado", "icone": "MailCheck"})
+    if usuario.telefone_verificado:
+        badges.append({"tipo": "telefone", "label": "Telefone Verificado", "icone": "PhoneCheck"})
+    if usuario.two_factor_enabled:
+        badges.append({"tipo": "2fa", "label": "2FA Ativo", "icone": "Lock"})
+    if vendas >= 10:
+        badges.append({"tipo": "top_seller", "label": "Top Seller", "icone": "Crown"})
+    if vendas >= 50:
+        badges.append({"tipo": "elite_seller", "label": "Elite Seller", "icone": "Gem"})
+
+    from utils_ranking import calcular_ranking_completo
+    ranking = calcular_ranking_completo(db)
+    posicao = None
+    for i, r in enumerate(ranking):
+        if r["usuario_id"] == usuario_id:
+            posicao = i + 1
+            break
+
+    return {
+        "usuario": {
+            "id": usuario.id,
+            "nome": usuario.nome,
+            "foto_url": f"/auth/view-foto/{usuario.id}" if usuario.foto_perfil else None,
+            "selfie_url": f"/uploads/selfies/{usuario.id}.jpg" if usuario.selfie_url else None,
+            "selfie_verificada": usuario.selfie_verificada,
+            "cidade": usuario.cidade,
+            "estado": usuario.estado,
+            "membro_desde": usuario.data_aceite.strftime("%d/%m/%Y") if usuario.data_aceite else "N/D",
+        },
+        "estatisticas": {
+            "vendas_concluidas": vendas,
+            "items_a_venda": items_a_venda,
+            "mais_vendido": mais_vendido[0] if mais_vendido else None,
+        },
+        "badges": badges,
+        "ranking_posicao": posicao,
     }
 
 
@@ -727,29 +782,15 @@ async def explorar_comunidade(
     resultado = []
     for l in links:
         anunciante = l.usuario
-        score_vendedor = float(anunciante.score or 0) if anunciante else 0
-        
-        if score_vendedor >= 900:
-            nivel_confianca = "elite"
-            cor_confianca = "#FFD700"
-            icone_confianca = "Gem"
-            label_confianca = "Elite Trocaria"
-        elif score_vendedor >= 700:
-            nivel_confianca = "confiavel"
-            cor_confianca = "#25D366"
-            icone_confianca = "BadgeCheck"
-            label_confianca = "Confiavel"
-        elif score_vendedor >= 300:
-            nivel_confianca = "em_construcao"
-            cor_confianca = "#FFD600"
-            icone_confianca = "Sprout"
-            label_confianca = "Em Construcao"
-        else:
-            nivel_confianca = "risco"
-            cor_confianca = "#FF3D00"
-            icone_confianca = "AlertTriangle"
-            label_confianca = "Risco"
-        
+        badges_vendedor = []
+        if anunciante:
+            if anunciante.selfie_verificada:
+                badges_vendedor.append("selfie")
+            if anunciante.is_verified:
+                badges_vendedor.append("kyc")
+            if anunciante.vendas_completadas and anunciante.vendas_completadas >= 10:
+                badges_vendedor.append("top_seller")
+
         resultado.append({
             "id": l.id,
             "nome_produto": l.nome_produto,
@@ -768,16 +809,13 @@ async def explorar_comunidade(
             "anunciante_vendas": anunciante.vendas_completadas if anunciante else 0,
             "anunciante_desde": anunciante.data_aceite.strftime("%m/%Y") if anunciante and anunciante.data_aceite else "N/D",
             "anunciante_verificado": anunciante.is_verified if anunciante else False,
+            "anunciante_selfie": anunciante.selfie_verificada if anunciante else False,
+            "anunciante_badges": badges_vendedor,
             "cidade": l.cidade or "",
             "estado": l.estado or "",
             "usuario_id": l.usuario_id,
             "expires_at": l.data_expiracao.isoformat() if l.data_expiracao else None,
             "total_imagens": len(l.imagens),
-            "score_vendedor": score_vendedor,
-            "nivel_confianca": nivel_confianca,
-            "cor_confianca": cor_confianca,
-            "icone_confianca": icone_confianca,
-            "label_confianca": label_confianca
         })
     
     return {
@@ -1252,14 +1290,8 @@ async def confirmar_etapa_troca(dados: EtapaTrocaRequest, db: Session = Depends(
         if anuncio_a: anuncio_a.is_active = False
         if anuncio_b: anuncio_b.is_active = False
         
-        # Bonus de score para ambos (+5 por troca segura)
-        user_a = db.query(Usuario).filter(Usuario.id == acordo.usuario_a_id).first()
-        user_b = db.query(Usuario).filter(Usuario.id == acordo.usuario_b_id).first()
-        if user_a: user_a.score = min((user_a.score or 0) + 5, 1000)
-        if user_b: user_b.score = min((user_b.score or 0) + 5, 1000)
-        
         db.commit()
-        return {"message": "Troca concluida com sucesso! Ambos ganharam +5 de score.", "concluida": True}
+        return {"message": "Troca concluida com sucesso!", "concluida": True}
     
     raise HTTPException(status_code=400, detail="Acao invalida ou etapa ja concluida.")
 
@@ -1327,4 +1359,84 @@ async def minhas_trocas(db: Session = Depends(get_db), usuario: Usuario = Depend
     return {
         "propostas_enviadas": [format_troca(t) for t in como_a],
         "propostas_recebidas": [format_troca(t) for t in como_b]
+    }
+
+
+# ==================== COMISSAO / TAXA DO VENDEDOR ====================
+
+@router.get("/minha-comissao")
+async def minha_comissao_pendente(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Retorna o valor total de comissao pendente e as transacoes em aberto."""
+    transacoes = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.TAXA_SERVICO,
+        Transacao.status == "pendente"
+    ).order_by(Transacao.data_criacao.desc()).all()
+
+    total_pendente = usuario.comissao_devida or Decimal("0")
+
+    return {
+        "total_pendente": float(total_pendente),
+        "transacoes": [
+            {
+                "id": t.id,
+                "valor": float(t.valor),
+                "detalhes": t.detalhes,
+                "data": t.data_criacao.isoformat(),
+                "pago": t.status == "concluido",
+            }
+            for t in transacoes
+        ],
+    }
+
+
+@router.post("/gerar-pix-comissao")
+async def gerar_pix_comissao(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    """Gera um PIX para pagar toda a comissao pendente do vendedor."""
+    if not usuario.comissao_devida or usuario.comissao_devida <= 0:
+        raise HTTPException(status_code=400, detail="Nao ha comissao pendente.")
+
+    transacoes = db.query(Transacao).filter(
+        Transacao.usuario_id == usuario.id,
+        Transacao.tipo == TipoTransacao.TAXA_SERVICO,
+        Transacao.status == "pendente",
+        Transacao.payment_id == None
+    ).all()
+
+    if not transacoes:
+        raise HTTPException(status_code=400, detail="Nao ha comissao pendente para pagar.")
+
+    total = sum(t.valor for t in transacoes)
+
+    from rotas.rotas_financeiro import get_sdk
+    sdk = get_sdk()
+    if not sdk:
+        raise HTTPException(status_code=503, detail="Gateway de pagamento indisponivel.")
+
+    result = sdk.payment().create({
+        "transaction_amount": float(total),
+        "description": f"Pagamento de comissao - {usuario.nome}",
+        "payment_method_id": "pix",
+        "payer": {"email": usuario.email}
+    })
+
+    if result.get("status") not in (200, 201):
+        raise HTTPException(status_code=502, detail=f"Erro MP: {result.get('response', {}).get('message', 'erro desconhecido')}")
+
+    payment = result["response"]
+    payment_id = str(payment["id"])
+
+    for t in transacoes:
+        t.payment_id = payment_id
+
+    db.commit()
+
+    qr = payment.get("point_of_interaction", {}).get("transaction_data", {})
+
+    return {
+        "message": f"Pague R$ {float(total):.2f} via PIX para quitar a comissao.",
+        "total": float(total),
+        "payment_id": payment_id,
+        "qr_code": qr.get("qr_code"),
+        "qr_code_base64": qr.get("qr_code_base64"),
     }

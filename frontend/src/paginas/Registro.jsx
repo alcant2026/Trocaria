@@ -137,29 +137,30 @@ const Registro = () => {
                 <div className="card" style={{ width: '100%' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="input-group">
-                            <label>Nome Completo</label>
-                            <input name="nome" placeholder="Como quer ser chamado?" onChange={handleChange} className="input-field" required />
+                            <label htmlFor="nome_registro">Nome Completo</label>
+                            <input id="nome_registro" name="nome" placeholder="Como quer ser chamado?" onChange={handleChange} className="input-field" required />
                         </div>
 
                         <div className="input-group">
-                            <label>E-mail</label>
-                            <input name="email" type="email" placeholder="seu@email.com" onChange={handleChange} className="input-field" required />
+                            <label htmlFor="email_registro">E-mail</label>
+                            <input id="email_registro" name="email" type="email" placeholder="seu@email.com" onChange={handleChange} className="input-field" required />
                         </div>
 
                         <div className="input-row input-row-2">
                             <div className="input-group">
-                                <label>CPF</label>
-                                <input name="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={handleChange} className="input-field" required />
+                                <label htmlFor="cpf_registro">CPF</label>
+                                <input id="cpf_registro" name="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={handleChange} className="input-field" required />
                             </div>
                             <div className="input-group">
-                                <label>Chave PIX</label>
-                                <input name="chave_pix" placeholder="CPF ou E-mail" onChange={handleChange} className="input-field" required />
+                                <label htmlFor="pix_registro">Chave PIX</label>
+                                <input id="pix_registro" name="chave_pix" placeholder="CPF ou E-mail" onChange={handleChange} className="input-field" required />
                             </div>
                         </div>
 
                         <div className="input-group">
-                            <label>Telefone / WhatsApp</label>
+                            <label htmlFor="telefone_registro">Telefone / WhatsApp</label>
                             <input 
+                                id="telefone_registro"
                                 name="telefone" 
                                 placeholder="(00) 00000-0000" 
                                 value={formData.telefone}
@@ -170,11 +171,11 @@ const Registro = () => {
                         </div>
 
                         <div className="input-group">
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <label htmlFor="indicacao_registro" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 Codigo de Convite (opcional)
                                 <span style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 600 }}>+5 pts</span>
                             </label>
-                            <input name="codigo_indicacao" placeholder="Ex: ABC12345" value={formData.codigo_indicacao} onChange={handleChange} className="input-field" style={{ textTransform: 'uppercase' }} maxLength={8} />
+                            <input id="indicacao_registro" name="codigo_indicacao" placeholder="Ex: ABC12345" value={formData.codigo_indicacao} onChange={handleChange} className="input-field" style={{ textTransform: 'uppercase' }} maxLength={8} />
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use um codigo de amigo e ganhe 5 pontos de boas-vindas!</p>
                         </div>
 
@@ -197,9 +198,10 @@ const Registro = () => {
                         </div>
 
                         <div className="input-group">
-                            <label>Senha</label>
+                            <label htmlFor="senha_registro">Senha</label>
                             <div style={{ position: 'relative' }}>
                                 <input 
+                                    id="senha_registro"
                                     name="senha" 
                                     type={showSenha ? "text" : "password"} 
                                     placeholder="Mínimo 6 caracteres" 
@@ -224,6 +226,7 @@ const Registro = () => {
                                         alignItems: 'center',
                                         padding: '4px'
                                     }}
+                                    aria-label={showSenha ? "Esconder senha" : "Mostrar senha"}
                                 >
                                     {showSenha ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>

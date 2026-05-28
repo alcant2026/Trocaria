@@ -15,7 +15,6 @@ const TIPOS_NEGATIVO = new Set(['desbloqueio_dados', 'taxa_servico', 'taxa_plata
 
 const formatarTipo = (tipo, detalhes) => {
     if (tipo === 'desbloqueio_dados') {
-        if (detalhes?.toLowerCase().includes('empr')) return 'Taxa de Solicitação';
         return 'Taxa de Verificação';
     }
     return TIPOS_LABEL[tipo] || tipo?.replace(/_/g, ' ').toUpperCase() || 'TRANSAÇÃO';
@@ -23,7 +22,7 @@ const formatarTipo = (tipo, detalhes) => {
 const prefixoValor = (tipo) => TIPOS_ENTRADA.has(tipo) ? '+' : '-';
 const corValor = (tipo) => TIPOS_SAIDA.has(tipo) ? 'var(--danger)' : TIPOS_ENTRADA.has(tipo) ? 'var(--success)' : 'var(--text-main)';
 
-const HistoricoView = ({ historico, isFirstLoad, loadingAction, paginaHist, setPaginaHist, handleCancelarPendente }) => {
+const HistoricoView = ({ historico, isFirstLoad, loadingAction, paginaHist, setPaginaHist }) => {
     const ITENS_POR_PAGINA = 5;
 
     return (
@@ -67,19 +66,7 @@ const HistoricoView = ({ historico, isFirstLoad, loadingAction, paginaHist, setP
                                     </div>
                                 )}
 
-                                {/* BOTÃO CANCELAR (Taxas Pendentes) */}
-                                {h.status === 'pendente' && (h.tipo === 'taxa_solicitacao' || h.tipo === 'desbloqueio_dados' || h.tipo === 'assinatura') && (
-                                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <button 
-                                            className="btn btn-outline" 
-                                            style={{ width: '100%', fontSize: '0.75rem', padding: '8px', borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                                            onClick={() => handleCancelarPendente(h.id)}
-                                            disabled={loadingAction}
-                                        >
-                                            <X size={14} /> Cancelar
-                                        </button>
-                                    </div>
-                                )}
+
                             </div>
                         ))}
                     </div>

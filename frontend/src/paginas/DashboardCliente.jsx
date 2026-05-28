@@ -1,70 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import {
-    HandCoins,
-    PlusCircle,
     ShieldCheck,
-    LayoutDashboard,
-    History,
-    ChevronRight,
-    TrendingUp,
-    FileText,
     Clock,
     ShieldAlert,
     Copy,
-    Check,
-    CheckCircle2,
     AlertCircle,
-    Users,
-    UserPlus,
     X,
-    Gift,
     ArrowLeft,
-    ShoppingBag,
-    ChevronLeft,
-    ExternalLink,
-    Home,
-    CreditCard,
     Coins,
     Gem,
-    XCircle,
-    Timer,
     CheckCircle,
-    Bell,
-    RefreshCw,
-    ArrowDown,
-    Store,
-    Package,
-    Zap,
-    Rocket,
-    MapPin,
-    Lock,
-    Star,
-    Plus,
-    Flag,
-    Sparkles,
-    AlertTriangle,
-    PartyPopper,
-    Info,
     Flame,
-    TrendingDown,
-    User
+    TrendingDown
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
 import TermosUso from '../componentes/TermosUso';
 import BannerCookies from '../componentes/BannerCookies';
-import SolicitarEmprestimo from '../componentes/SolicitarEmprestimo';
-import OportunidadesLista from '../componentes/OportunidadesLista';
-import TermosPlataforma from '../componentes/TermosPlataforma';
+import SolicitarApoioComunitario from '../componentes/SolicitarApoioComunitario';
 import PagamentoPolling from '../componentes/PagamentoPolling';
 import HomeView from '../componentes/HomeView';
 import ScoreView from '../componentes/ScoreView';
 import HistoricoView from '../componentes/HistoricoView';
-import ContratosView from '../componentes/ContratosView';
 import MarketplaceView from '../componentes/MarketplaceView';
 import NovoAnuncioPage from '../componentes/NovoAnuncioPage';
 import DetalhesProduto from '../componentes/DetalhesProduto';
 import MeusPontos from '../componentes/MeusPontos';
+import ProdutosResgate from '../componentes/ProdutosResgate';
+import PerfilVendedor from './PerfilVendedor';
 
 const useCountdown = (isoDate) => {
     const calcularRestante = useCallback(() => {
@@ -113,19 +76,18 @@ const MarketTimer = ({ expiresAt }) => {
 
 const NOMES_SECOES = {
     home: 'Inicio',
-    solicitar: 'Solicitar Apoio',
-    oportunidades: 'Oportunidades',
+    solicitar: 'Pedir Apoio Comunitário',
     score: 'Meu Score',
     historico: 'Historico',
-    contratos: 'Meus Contratos',
     marketplace: 'Marketplace',
     'novo-anuncio': 'Novo Anuncio',
     'detalhes-produto': 'Detalhes',
-    'pagar-taxa': 'Pagamento',
     'meus-pontos': 'Meus Pontos',
+    'resgate-produtos': 'Prêmios Top 20',
+    'perfil-vendedor': 'Perfil do Vendedor',
 };
 
-const DashboardCliente = ({ initialView = 'home' }) => {
+const DashboardCliente = ({ initialView = 'home', isSubView, setIsSubView }) => {
     const [usuario, setUsuario] = useState(() => {
         const cached = localStorage.getItem('usuario_snapshot');
         return cached ? JSON.parse(cached) : { nome: '', score: 0 };
@@ -137,7 +99,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const savedView = sessionStorage.getItem('trocaria_activeView') || initialView;
     const [activeView, setActiveView] = useState(savedView);
     // DEPRECATED: saldo removido. A Trocaria nao segura dinheiro de usuarios.
-    const [aceiteTermos, setAceiteTermos] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     
     // NOVO: Assinatura Premium
@@ -175,14 +136,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [editEmail, setEditEmail] = useState('');
     const [editTelefone, setEditTelefone] = useState('');
     const [editChavePix, setEditChavePix] = useState('');
+
     const [parceiros, setParceiros] = useState([]);
-
-    const [valor, setValor] = useState('');
-    const [parcelas, setParcelas] = useState(1);
-    const [taxaCompensacao, setTaxaCompensacao] = useState('5');
-
-    const [loadingPDF, setLoadingPDF] = useState(false);
-    const [passoSolicitar, setPassoSolicitar] = useState(1);
     const [passoUpgrade, setPassoUpgrade] = useState(1);
     const [tipoUpgrade, setTipoUpgrade] = useState(null);
     const [mensagem, setMensagem] = useState(null);
@@ -209,12 +164,10 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [boostTarget, setBoostTarget] = useState(null);
     const [pixDestaque, setPixDestaque] = useState(null);
     const [pixBoost, setPixBoost] = useState(null);
-    const [pixCobranca, setPixCobranca] = useState(null);
     const [pixAssinatura, setPixAssinatura] = useState(null);
     const [meusLinks, setMeusLinks] = useState([]);
     const [meusLinksMarketplace, setMeusLinksMarketplace] = useState([]);
     const [marketplaceLinks, setMarketplaceLinks] = useState([]);
-    const [meusEmprestimos, setMeusEmprestimos] = useState([]);
     const [marketplaceTab, setMarketplaceTab] = useState(sessionStorage.getItem('trocaria_marketTab') || 'explorar');
     const [pageExplorar, setPageExplorar] = useState(1);
     const [hasMoreExplorar, setHasMoreExplorar] = useState(false);
@@ -226,6 +179,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [selectedCategory, setSelectedCategory] = useState('Geral');
     const [selectedCity, setSelectedCity] = useState('Todas');
     const [selectedAdDetails, setSelectedAdDetails] = useState(null);
+    const [selectedVendedorId, setSelectedVendedorId] = useState(null);
 
     const isFirstLoad = !usuario.nome && !isOffline;
 
@@ -237,6 +191,11 @@ const DashboardCliente = ({ initialView = 'home' }) => {
             return () => clearTimeout(timer);
         }
     }, [mensagem]);
+
+    // Notificar App.jsx se está em sub-view (esconde navbar)
+    useEffect(() => {
+        setIsSubView?.(activeView !== 'home');
+    }, [activeView, setIsSubView]);
 
     // Persistir activeView ao mudar
     useEffect(() => {
@@ -262,13 +221,8 @@ const DashboardCliente = ({ initialView = 'home' }) => {
     const [fotoRG, setFotoRG] = useState(null);
     const [fotoResidencia, setFotoResidencia] = useState(null);
     const [mostrarAlertaRejeicao, setMostrarAlertaRejeicaoState] = useState(
-        () => localStorage.getItem('alerta_rejeicao_tomador') !== 'fechado'
+        () => localStorage.getItem('alerta_rejeicao_cliente') !== 'fechado'
     );
-    const [showTermosAceite, setShowTermosAceite] = useState(false);
-    const [termosTipo, setTermosTipo] = useState('criar');
-
-    const [valorAvulsoPorId, setValorAvulsoPorId] = useState({}); // { id: 'valor' }
-    const [showAvulsoPorId, setShowAvulsoPorId] = useState({}); // { id: true/false }
 
     const fecharAlertaRejeicao = () => {
         localStorage.setItem('alerta_rejeicao_cliente', 'fechado');
@@ -399,10 +353,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 setEditTelefone(data.perfil.telefone || '');
                 setEditChavePix(data.perfil.chave_pix || '');
             }
-            if (data.cliente_emprestimos) {
-                setMeusEmprestimos(data.cliente_emprestimos || []);
-                localStorage.setItem('meus_emprestimos_snapshot', JSON.stringify(data.cliente_emprestimos));
-            }
             
             if (data.historico) {
                 setHistorico(data.historico);
@@ -518,111 +468,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         }
     }, [activeView]);
 
-    const handleSolicitar = async (e) => {
-        e.preventDefault();
-        const v = parseFloat(valor);
-        if (!v || v <= 0) { setMensagem('Valor invalido.'); return; }
-        if (!aceiteTermos) { showModal({ title: 'Termos', message: 'Aceite os termos.', type: 'warning' }); return; }
-        const tx = parseFloat(taxaCompensacao);
-        if (tx < 0) { setMensagem('Taxa de compensacao invalida.'); return; }
-        setTermosTipo('criar');
-        setShowTermosAceite(true);
-    };
-
-    const handleSolicitarAposAceite = async () => {
-        setShowTermosAceite(false);
-        const v = parseFloat(valor);
-        const tx = parseFloat(taxaCompensacao);
-        setLoadingAction(true);
-        try {
-            const taxaRes = await api.post('/emprestimos/gerar-taxa-solicitacao', {
-                valor: v, parcelas: parseInt(parcelas),
-                taxa_compensacao: tx, aceite_termos: true, aceite_termos_plataforma: true
-            });
-            if (taxaRes.qr_code) {
-                setQrCodeData({ qr_code: taxaRes.qr_code, qr_code_base64: taxaRes.qr_code_base64, payment_id: taxaRes.payment_id, transacao_id: taxaRes.transacao_id, valor: taxaRes.valor });
-                setActiveView('pagar-taxa');
-            } else {
-                setMensagem('Erro ao gerar PIX.');
-            }
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        } finally { setLoadingAction(false); }
-    };
-
-    const handlePagarParcela = (id, valorParcela, chavePix) => {
-        setPagamentoDados({ id, valor: valorParcela, chave_pix: chavePix, tipo: 'parcela' });
-        setShowPagamentoModal(true);
-    };
-
-    const [showConfirmarTipo, setShowConfirmarTipo] = useState(false);
-    const [confirmarTipoId, setConfirmarTipoId] = useState(null);
-    const [showPagamentoModal, setShowPagamentoModal] = useState(false);
-    const [pagamentoDados, setPagamentoDados] = useState({});
-
-    const handleConfirmarPagtoRecebido = (id) => {
-        setConfirmarTipoId(id);
-        setShowConfirmarTipo(true);
-    };
-
-    const confirmarRecebimentoComTipo = async (tipo) => {
-        setShowConfirmarTipo(false);
-        try {
-            const res = await api.post('/emprestimos/confirmar-recebimento/' + confirmarTipoId, { tipo });
-            setMensagem(res.message);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + err.message);
-        }
-        setConfirmarTipoId(null);
-    };
-
-    const handleQuitarTotalP2P = (id, total, chavePix) => {
-        setPagamentoDados({ id, valor: total, chave_pix: chavePix, tipo: 'quitacao' });
-        setShowPagamentoModal(true);
-    };
-
-    const handlePagarAvulsoP2P = (id, chavePix) => {
-        setPagamentoDados({ id, valor: 0, chave_pix: chavePix, tipo: 'avulso' });
-        setShowPagamentoModal(true);
-    };
-
-    const handlePagamentoAvulso = async (id) => {
-        const val = parseFloat(valorAvulsoPorId[id]);
-        if (!val || val <= 0) return showModal({ title: 'Valor Inválido', message: 'Informe um valor válido para o pagamento mensal.', type: 'error' });
-
-        try {
-            const res = await api.post(`/emprestimos/confirmar-pagamento/${id}`, { valor_pagamento: val });
-            setMensagem(res.message);
-            setValorAvulsoPorId(prev => ({ ...prev, [id]: '' }));
-            setShowAvulsoPorId(prev => ({ ...prev, [id]: false }));
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro no pagamento avulso: ' + err.message);
-        }
-    };
-    const handleQuitar = (emprestimoId) => {
-        showModal({
-            title: 'Liquidar Crédito',
-            message: 'Deseja quitar o valor integral do empréstimo agora? \nEsta ação liquidará todas as parcelas restantes.',
-            type: 'finance',
-            onConfirm: async () => {
-                closeModal();
-                setLoadingAction(true);
-                try {
-                    await api.post(`/emprestimos/confirmar-recebimento/${emprestimoId}`, { tipo: 'quitacao' });
-                    showModal({ title: 'Sucesso!', message: 'Crédito liquidado com sucesso!', type: 'success' });
-                    carregarSnapshot();
-                } catch (err) {
-                    setMensagem('Erro ao quitar: ' + err.message);
-                } finally {
-                    setLoadingAction(false);
-                }
-            }
-        });
-    };
-
-
     const handleSincronizarPix = async () => {
         setLoadingAction(true);
         try {
@@ -733,32 +578,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
         setTimeout(() => setCopiadoPix(false), 2000);
     };
 
-    const baixarContrato = async (id) => {
-        try {
-            const blob = await api.getBlob(`/emprestimos/contrato/pdf/${id}`);
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `contrato_trocaria_${id}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-        } catch (err) {
-            console.error('Erro ao baixar contrato:', err);
-        }
-    };
-
-    const handleCancelarPendente = async (id) => {
-        if (!confirm('Cancelar esta transacao pendente?')) return;
-        try {
-            const res = await api.post('/emprestimos/cancelar-pendente/' + id);
-            setMensagem(res.message || 'Transacao cancelada.');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        }
-    };
-
     // Render logic
     return (
         <div className="cliente-dashboard">
@@ -776,51 +595,36 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                         <ShieldAlert size={24} color="var(--warning)" title="Conta não verificada" />
                     )}
                 </h1>
-                <p className="text-muted">Rede de Apoio entre Pares.</p>
+                <p className="text-muted">Classificados Gratuitos • Confiança entre Pessoas.</p>
             </header>
 
-            {mensagem && (
-                <div className={`alert ${typeof mensagem === 'string' && (mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('não') || mensagem.toLowerCase().includes('falha')) ? 'alert-danger animate-shake' : 'alert-success'} `}>
+            {(typeof mensagem === 'string' ? mensagem : mensagem?.texto) && (
+                <div className={`alert ${(() => {
+                    const texto = typeof mensagem === 'string' ? mensagem : mensagem?.texto || '';
+                    const tipo = typeof mensagem === 'object' ? mensagem?.tipo : (texto.toLowerCase().includes('erro') || texto.toLowerCase().includes('não') || texto.toLowerCase().includes('falha')) ? 'erro' : 'sucesso';
+                    return tipo === 'erro' ? 'alert-danger animate-shake' : 'alert-success';
+                })()}`}>
                     <div className="alert-icon">
-                        {typeof mensagem === 'string' && (mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('não') || mensagem.toLowerCase().includes('falha')) ? (
-                            <AlertCircle size={20} />
-                        ) : (
-                            <CheckCircle size={20} />
-                        )}
+                        {(() => {
+                            const texto = typeof mensagem === 'string' ? mensagem : mensagem?.texto || '';
+                            const tipo = typeof mensagem === 'object' ? mensagem?.tipo : (texto.toLowerCase().includes('erro') || texto.toLowerCase().includes('não') || texto.toLowerCase().includes('falha')) ? 'erro' : 'sucesso';
+                            return tipo === 'erro' ? <AlertCircle size={20} /> : <CheckCircle size={20} />;
+                        })()}
                     </div>
-                    <span>{typeof mensagem === 'string' ? mensagem : JSON.stringify(mensagem)}</span>
+                    <span>{typeof mensagem === 'string' ? mensagem : mensagem.texto}</span>
                     <button onClick={() => setMensagem('')} className="alert-close"><X size={16} /></button>
                 </div>
             )}
 
-            {/* Top Grid for PC: Balance and Pending Actions */}
-            <div className="dashboard-grid">
-
-                {usuario.divida_total > 0 && (
-                    <div className="hide-on-mobile">
-                        {/* PC-only Widget: Resumo Financeiro */}
-                        <div className="card" style={{ height: '100%' }}>
-                            <h3 className="mb-1" style={{ fontSize: '1rem' }}>Resumo de Dívida</h3>
-                            <div className="info-block" style={{ background: 'rgba(255, 61, 0, 0.03)', border: '1px solid rgba(255, 61, 0, 0.1)' }}>
-                                <div className="info-label">Saldo Devedor Total</div>
-                                <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--danger)' }}>
-                                    R$ {(usuario.divida_total || 0).toLocaleString('pt-BR')}
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                                    Lembre-se: manter seus pagamentos em dia aumenta seu Score e libera limites maiores de até 1.2x seu Pool.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
+            {/* Top Grid for PC */}
+            <div className="dashboard-grid"></div>
 
             {/* Action Mosaic / Grid - Header for Active View */}
             {activeView !== 'home' && (
                 <div className="flex-between mb-1 animate-fade-in" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <button 
-                            onClick={() => { setActiveView('home'); setPassoSolicitar(1); setPassoUpgrade(1); }}
+                            onClick={() => { setActiveView('home'); setPassoUpgrade(1); }}
                             style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--primary)', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
                             <ArrowLeft size={20} />
@@ -848,20 +652,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
 
             {/* View Switcher Content */}
             {activeView === 'solicitar' && (
-                <SolicitarEmprestimo
-                    passoSolicitar={passoSolicitar}
-                    setPassoSolicitar={setPassoSolicitar}
+                <SolicitarApoioComunitario
                     usuario={usuario}
-                    aceiteTermos={aceiteTermos}
-                    setAceiteTermos={setAceiteTermos}
-                    valor={valor}
-                    setValor={setValor}
-                    parcelas={parcelas}
-                    setParcelas={setParcelas}
-                    taxaCompensacao={taxaCompensacao}
-                    setTaxaCompensacao={setTaxaCompensacao}
-                    loadingAction={loadingAction}
-                    handleSolicitar={handleSolicitar}
+                    onSucesso={() => {
+                        carregarSnapshot();
+                        setActiveView('home');
+                        setMensagem('Pedido de apoio publicado com sucesso!');
+                    }}
+                    aoVoltar={() => setActiveView('home')}
                 />
             )}
             {/* Modal de Termos de Uso */}
@@ -875,65 +673,14 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 )
             }
 
-            {activeView === 'pagar-taxa' && qrCodeData.qr_code && (
-                <div className="card text-center">
-                    <div className="flex-end mb-1">
-                        <button onClick={() => { setActiveView('home'); setQrCodeData({}); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '8px' }}>
-                            <ArrowLeft size={20} />
-                        </button>
-                    </div>
-                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pague a Taxa via PIX</h3>
-                    <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
-                        Pague R$ {(qrCodeData.valor || 0).toFixed(2)} para publicar seu pedido. O pedido sera criado automaticamente apos a confirmacao do pagamento.
-                    </p>
-                    {qrCodeData.qr_code_base64 && (
-                        <img src={`data:image/jpeg;base64,${qrCodeData.qr_code_base64}`} alt="QR Code PIX" style={{ width: '200px', height: '200px', borderRadius: '12px', marginBottom: '1rem' }} />
-                    )}
-                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', marginBottom: '1rem', wordBreak: 'break-all' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Codigo PIX:</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, flex: 1, margin: 0 }}>{qrCodeData.qr_code}</p>
-                            <button onClick={() => { navigator.clipboard.writeText(qrCodeData.qr_code); setMensagem('Codigo PIX copiado!'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }} title="Copiar codigo PIX">
-                                <Copy size={16} />
-                            </button>
-                        </div>
-                    </div>
-                    <PagamentoPolling transacaoId={qrCodeData.transacao_id} onConfirmado={() => {
-                        setActiveView('home');
-                        setQrCodeData({});
-                        setValor(''); setParcelas(1); setPassoSolicitar(1);
-                        carregarSnapshot();
-                        setMensagem('Pagamento confirmado! Pedido criado com sucesso.');
-                    }} />
-                </div>
-            )}
-
-            {activeView === 'oportunidades' && (
-                <OportunidadesLista
-                    usuario={usuario}
-                    onUpdate={() => { carregarSnapshot(); setActiveView('home'); }}
-                />
-            )}
             {activeView === 'score' && (
                 <ScoreView 
                     usuario={usuario}
-                    passoUpgrade={passoUpgrade}
-                    setPassoUpgrade={setPassoUpgrade}
-                    tipoUpgrade={tipoUpgrade}
                     setTipoUpgrade={setTipoUpgrade}
-                    qrCodeVerificacao={qrCodeVerificacao}
-                    setQrCodeVerificacao={setQrCodeVerificacao}
                     carregarSnapshot={carregarSnapshot}
-                    kycDetails={kycDetails}
-                    setKycDetails={setKycDetails}
-                    fotoRG={fotoRG}
-                    setFotoRG={setFotoRG}
-                    fotoResidencia={fotoResidencia}
-                    setFotoResidencia={setFotoResidencia}
                     loadingAction={loadingAction}
                     setLoadingAction={setLoadingAction}
                     setMensagem={setMensagem}
-                    historico={historico}
                     api={api}
                 />
             )}
@@ -946,23 +693,26 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     loadingAction={loadingAction}
                     paginaHist={paginaHist}
                     setPaginaHist={setPaginaHist}
-                    handleCancelarPendente={handleCancelarPendente}
-                />
-            )}
-
-            {activeView === 'contratos' && (
-                <ContratosView 
-                    meusEmprestimos={meusEmprestimos}
-                    handlePagarParcela={handlePagarParcela}
-                    handleQuitarTotalP2P={handleQuitarTotalP2P}
-                    handlePagarAvulsoP2P={handlePagarAvulsoP2P}
-                    handleConfirmarPagtoRecebido={handleConfirmarPagtoRecebido}
-                    baixarContrato={baixarContrato}
                 />
             )}
 
             {activeView === 'meus-pontos' && (
                 <MeusPontos usuario={usuario} />
+            )}
+
+            {activeView === 'resgate-produtos' && (
+                <ProdutosResgate
+                    usuario={usuario}
+                    onVoltar={() => setActiveView('home')}
+                    onMensagem={(msg) => setMensagem(msg)}
+                />
+            )}
+
+            {activeView === 'perfil-vendedor' && selectedVendedorId && (
+                <PerfilVendedor
+                    usuarioId={selectedVendedorId}
+                    onVoltar={() => { setSelectedVendedorId(null); setActiveView('home'); }}
+                />
             )}
 
             {activeView === 'marketplace' && (
@@ -993,6 +743,7 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                     showModal={showModal}
                     api={api}
                     setMensagem={setMensagem}
+                    onVerPerfilVendedor={(id) => { setSelectedVendedorId(id); setActiveView('perfil-vendedor'); }}
                 />
             )}
             
@@ -1108,38 +859,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                 </div>
             )}
 
-            {pixCobranca && (
-                <div className="modal-overlay" onClick={() => setPixCobranca(null)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
-                        <h3 style={{ marginBottom: '10px' }}>Cobranca do Devedor</h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>Pague R$ 2,00 via PIX para enviar cobranca a {pixCobranca.tomador_nome} (debito: R$ {pixCobranca.debito?.toFixed(2)}).</p>
-                        {pixCobranca.qr_code_base64 && (
-                            <img src={`data:image/png;base64,${pixCobranca.qr_code_base64}`} alt="QR Code PIX" style={{ width: '180px', height: '180px', margin: '0 auto 1rem', borderRadius: '12px' }} />
-                        )}
-                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <p style={{ fontSize: '0.75rem', fontWeight: 700, flex: 1, wordBreak: 'break-all', margin: 0 }}>{pixCobranca.qr_code}</p>
-                            <button onClick={() => { navigator.clipboard.writeText(pixCobranca.qr_code); setMensagem({ tipo: 'sucesso', texto: 'Codigo PIX copiado!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
-                                <Copy size={16} />
-                            </button>
-                        </div>
-                        {pixCobranca.transacao_id && (
-                            <PagamentoPolling transacaoId={pixCobranca.transacao_id} onConcluido={() => {
-                                setPixCobranca(null);
-                                carregarSnapshot();
-                                showModal({ title: 'Cobranca Enviada!', message: `Email e WhatsApp enviados para ${pixCobranca.tomador_nome}.`, type: 'success' });
-                                if (pixCobranca.tomador_telefone) {
-                                    const num = pixCobranca.tomador_telefone.replace(/\D/g, '');
-                                    const tel = num.startsWith('55') ? num : '55' + num;
-                                    const msg = encodeURIComponent(`Ola ${pixCobranca.tomador_nome.split(' ')[0]}, voce tem um debito de R$ ${pixCobranca.debito?.toFixed(2)}. Entre em contato para regularizar. - Trocaria`);
-                                    window.open(`https://wa.me/${tel}?text=${msg}`, '_blank');
-                                }
-                            }} />
-                        )}
-                        <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixCobranca(null)}>Fechar</button>
-                    </div>
-                </div>
-            )}
-
             {pixAssinatura && (
                 <div className="modal-overlay" onClick={() => setPixAssinatura(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', textAlign: 'center' }}>
@@ -1162,82 +881,6 @@ const DashboardCliente = ({ initialView = 'home' }) => {
                             }} />
                         )}
                         <button className="btn btn-secondary mt-1" style={{ width: '100%' }} onClick={() => setPixAssinatura(null)}>Fechar</button>
-                    </div>
-                </div>
-            )}
-
-            {showPagamentoModal && (
-                <div className="modal-overlay" onClick={() => setShowPagamentoModal(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-                        <h3 style={{ textAlign: 'center', marginBottom: '10px' }}>
-                            {pagamentoDados.tipo === 'avulso' ? 'Pagar Outro Valor' : pagamentoDados.tipo === 'quitacao' ? 'Quitar Total' : 'Pagar Parcela'}
-                        </h3>
-                        <div style={{ background: 'rgba(var(--primary-rgb), 0.05)', padding: '15px', borderRadius: '12px', marginBottom: '15px' }}>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Chave PIX do Credor:</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <strong style={{ fontSize: '0.9rem', wordBreak: 'break-all', flex: 1 }}>{pagamentoDados.chave_pix || '---'}</strong>
-                                <button onClick={() => { navigator.clipboard.writeText(pagamentoDados.chave_pix || ''); setMensagem({ tipo: 'sucesso', texto: 'Chave PIX copiada!' }); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
-                                    <Copy size={16} />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="input-group mb-1">
-                            <label>Valor a pagar (R$)</label>
-                            <input type="number" className="input-field" step="0.01" min="0.01"
-                                value={pagamentoDados.tipo === 'avulso' ? (pagamentoDados.avulsoValor || '') : (pagamentoDados.valor || 0)}
-                                onChange={(e) => {
-                                    if (pagamentoDados.tipo === 'avulso') {
-                                        setPagamentoDados(prev => ({ ...prev, avulsoValor: e.target.value }));
-                                    }
-                                }}
-                                disabled={pagamentoDados.tipo !== 'avulso'}
-                                placeholder="0,00"
-                            />
-                        </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
-                                const valorPagar = pagamentoDados.tipo === 'avulso' ? parseFloat(pagamentoDados.avulsoValor) : pagamentoDados.valor;
-                                if (!valorPagar || valorPagar <= 0) { setMensagem({ tipo: 'erro', texto: 'Valor invalido.' }); return; }
-                                try {
-                                    await api.post('/emprestimos/confirmar-pagamento/' + pagamentoDados.id, { valor_pagamento: valorPagar });
-                                    setShowPagamentoModal(false);
-                                    showModal({ title: 'Pagamento Registrado', message: 'Aguardando confirmacao do recebedor.', type: 'success' });
-                                    carregarSnapshot();
-                                } catch (err) { setMensagem({ tipo: 'erro', texto: err.message }); }
-                            }}>
-                                <CheckCircle size={16} /> Ja Enviei o PIX
-                            </button>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowPagamentoModal(false)}>Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showTermosAceite && (
-                <div className="modal-overlay" onClick={() => setShowTermosAceite(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-                        <TermosPlataforma
-                            tipo={termosTipo}
-                            onAceitar={termosTipo === 'criar' ? handleSolicitarAposAceite : () => {}}
-                            onVoltar={() => setShowTermosAceite(false)}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {showConfirmarTipo && (
-                <div className="modal-overlay" onClick={() => setShowConfirmarTipo(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()}>
-                        <h3 style={{ textAlign: 'center', marginBottom: '15px' }}>Confirmar Recebimento</h3>
-                        <p style={{ textAlign: 'center', fontSize: '0.85rem', marginBottom: '20px', color: 'var(--text-muted)' }}>
-                            O que o tomador pagou?
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button className="btn btn-primary" onClick={() => confirmarRecebimentoComTipo('parcela')}>Parcela completa</button>
-                            <button className="btn btn-outline" onClick={() => confirmarRecebimentoComTipo('avulso')}>Pagamento parcial</button>
-                            <button className="btn btn-outline" onClick={() => confirmarRecebimentoComTipo('quitacao')}>Quitacao total</button>
-                            <button className="btn btn-secondary" onClick={() => setShowConfirmarTipo(false)}>Cancelar</button>
-                        </div>
                     </div>
                 </div>
             )}

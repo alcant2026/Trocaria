@@ -3,96 +3,37 @@ import api, { BASE_URL } from '../api';
 import PagamentosRanking from '../componentes/PagamentosRanking';
 import './AdminDashboard.css';
 import {
-    LayoutDashboard,
-    ShieldCheck,
-    Users,
-    TrendingUp,
-    ListTodo,
-    BarChart3,
-    Clock,
-    CheckCircle,
-    XCircle,
-    User,
-    ArrowUpRight,
-    ArrowDownRight,
-    Copy,
-    Check,
-    ExternalLink,
-    Search,
-    Filter,
-    Store,
-    CreditCard,
-    Zap,
-    PlusCircle,
-    Undo2,
-    Calendar,
-    ArrowDown,
-    RefreshCw,
-    Sparkles,
-    Star,
-    Eye,
-    Trophy,
-    Trash2,
-    CheckCircle2,
-    Timer,
-    History,
-    AlertCircle,
-    X,
-    ShieldAlert,
-    AlertTriangle
+    LayoutDashboard, ShieldCheck, Users, TrendingUp, ListTodo,
+    BarChart3, Clock, CheckCircle, XCircle, User, ArrowUpRight,
+    ArrowDownRight, Copy, Check, ExternalLink, Search, Filter,
+    Store, CreditCard, Zap, PlusCircle, Undo2, RefreshCw,
+    Sparkles, Star, Eye, Trophy, Trash2, Timer, History,
+    AlertCircle, X, ShieldAlert, AlertTriangle, DollarSign,
+    Package, Ban, UserCheck, FileText, Image, Edit3,
+    ChevronDown, ChevronUp, Globe, Phone, Mail, MessageSquare,
+    Gavel, ThumbsUp, ThumbsDown, Activity, ShoppingBag, Scale,
 } from 'lucide-react';
 import ModalPremium from '../componentes/ModalPremium';
-
-// --- CONSTANTES E UTILITÁRIOS ---
-// DEPRECATED: deposito e saque removidos. A Trocaria nao segura dinheiro de usuarios.
-const TIPOS_LABEL = {
-    recebimento: 'Recebimento',
-    compra_score: 'Compra de Score',
-    desbloqueio_dados: 'Verificação KYC',
-    taxa_match: 'Taxa de Match',
-    taxa_solicitacao: 'Taxa de Publicação',
-    taxa_postagem: 'Marketplace',
-    taxa_intermediacao: 'Taxa de Serviço (Match)',
-    taxa_adm_emprestimo: 'Taxa Admin',
-    assinatura: 'Assinatura Premium',
-    bonus: 'Bônus',
-    resgate_pontos: 'Resgate de Pontos',
-    retorno_investimento: 'Retorno Investimento',
-    aporte_capital: 'Aporte de Capital',
-    ajuste: 'Ajuste',
-};
-
-const TAXAS_PRAZOS = {
-    0: 1,   // D+0 (Fast)
-    14: 2,  // D+14 (Standard)
-    35: 3   // D+35 (Premium)
-};
 
 const formatarDataBR = (iso) => {
     if (!iso) return '-';
     return new Date(iso).toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
     });
 };
 
-// --- COMPONENTES ATOMICOS ---
-const StatCard = ({ label, value, icon: Icon, color, trend }) => (
+const formatarMoeda = (v) =>
+    `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+const StatCard = ({ label, value, icon: Icon, color, subtitle }) => (
     <div className="stat-card">
-        <div className="stat-label">{label}</div>
-        <div className="stat-value" style={{ color: color }}>{value}</div>
-        <div className="flex-between">
-            {trend !== null && trend !== undefined && trend !== 0 && (
-                <span className="stat-change" style={{ color: trend >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {trend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                    {trend}% este mês
-                </span>
-            )}
+        <div className="stat-header">
+            <span className="stat-label">{label}</span>
             <Icon size={20} color={color} style={{ opacity: 0.5 }} />
         </div>
+        <div className="stat-value" style={{ color }}>{value}</div>
+        {subtitle && <div className="stat-subtitle">{subtitle}</div>}
     </div>
 );
 
@@ -104,100 +45,41 @@ const AdminDashboard = () => {
     const [pixCopiado, setPixCopiado] = useState(null);
     const [filtroUsuarios, setFiltroUsuarios] = useState('');
 
-    // Modais
     const [showRejeitarModal, setShowRejeitarModal] = useState(false);
     const [rejeicaoData, setRejeicaoData] = useState({ id: null, motivo: '' });
     const [loadingRejeicao, setLoadingRejeicao] = useState(false);
-
-    const handleResolverDisputa = async (id, acao) => {
-        if (!confirm('Tem certeza? Isso afetara o score dos usuarios envolvidos.')) return;
-        try {
-            if (acao === 'calote') {
-                await api.post('/emprestimos/calote/' + id);
-                setMensagem('Calote registrado! Credor reembolsado, tomador marcado como inadimplente.');
-            } else {
-                await api.post('/emprestimos/confirmar-recebimento/' + id);
-                setMensagem('Pagamento confirmado manualmente!');
-            }
-            carregarSnapshot();
-        } catch (e) {
-            setMensagem('Erro: ' + (e.message || e));
-        }
-    };
 
     // Resgates de Pontos
     const [resgates, setResgates] = useState([]);
     const [loadingResgates, setLoadingResgates] = useState(false);
 
-    const carregarResgates = async () => {
-        setLoadingResgates(true);
-        try {
-            const data = await api.get('/marketplace/admin/resgates-pendentes');
-            setResgates(data || []);
-        } catch (e) {
-            console.error('Erro ao carregar resgates:', e);
-        }
-        setLoadingResgates(false);
-    };
+    // Produtos CRUD
+    const [produtos, setProdutos] = useState([]);
+    const [loadingProdutos, setLoadingProdutos] = useState(false);
+    const [showProdutoModal, setShowProdutoModal] = useState(false);
+    const [editandoProduto, setEditandoProduto] = useState(null);
+    const [formProduto, setFormProduto] = useState({ nome: '', descricao: '', valor_reais: '', quantidade_disponivel: 1, foto_url: '' });
 
-    const handleAprovarResgate = async (id) => {
-        if (!confirm('Confirmar resgate? O admin deve enviar o PIX para o usuario.')) return;
-        try {
-            const res = await api.post('/marketplace/admin/aprovar-resgate/' + id);
-            setMensagem(res.message);
-            carregarResgates();
-        } catch (e) {
-            setMensagem('Erro: ' + (e.message || e));
-        }
-    };
+    // Denúncias
+    const [denunciasData, setDenunciasData] = useState([]);
+    const [expandedDenuncia, setExpandedDenuncia] = useState(null);
 
-    const handleRejeitarResgate = async (id) => {
-        if (!confirm('Rejeitar resgate? Os pontos serao devolvidos.')) return;
-        try {
-            const res = await api.post('/marketplace/admin/rejeitar-resgate/' + id);
-            setMensagem(res.message);
-            carregarResgates();
-        } catch (e) {
-            setMensagem('Erro: ' + (e.message || e));
-        }
-    };
+    // Disputas
+    const [disputas, setDisputas] = useState([]);
+    const [loadingDisputas, setLoadingDisputas] = useState(false);
 
-    const [loadingAcao, setLoadingAcao] = useState(false);
-    
-    // Gestão de Parceiros
-    const [showNovoParceiroModal, setShowNovoParceiroModal] = useState(false);
-    const [novoParceiroData, setNovoParceiroData] = useState({ 
-        nome: '', 
-        endereco: '', 
-        usuario_id: '', 
-        prazo_liquidacao: 0, 
-        taxa_comissao: 3.00 
-    });
-    const [loadingNovoParceiro, setLoadingNovoParceiro] = useState(false);
-    const [showExcluirParceiroModal, setShowExcluirParceiroModal] = useState(false);
-    const [parceiroParaExcluir, setParceiroParaExcluir] = useState(null);
-    const [loadingExclusao, setLoadingExclusao] = useState(false);
-
-    const [kycPendentes, setKycPendentes] = useState([]);
-    
-    // Filtros Fiscais (Admin)
-    const [dataInicio, setDataInicio] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
-    const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
+    // Data para fiscal
+    const [dataInicio, setDataInicio] = useState(
+        new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]
+    );
+    const [dataFim, setDataFim] = useState(
+        new Date().toISOString().split('T')[0]
+    );
     const [loadingFiscalPDF, setLoadingFiscalPDF] = useState(false);
-    const [loadingCobranca, setLoadingCobranca] = useState(false);
-
-    // Limits
-    const [showLimiteModal, setShowLimiteModal] = useState(false);
-    const [limiteData, setLimiteData] = useState({ id: null, valor: '' });
 
     useEffect(() => {
         carregarSnapshot();
-        
-        // Auto-Refresh a cada 30 segundos (Real-time monitoring)
-        const autoRefresh = setInterval(() => {
-            carregarSnapshot(true); // Chamada silenciosa
-        }, 30000);
-
+        const autoRefresh = setInterval(() => carregarSnapshot(true), 30000);
         return () => clearInterval(autoRefresh);
     }, []);
 
@@ -205,14 +87,11 @@ const AdminDashboard = () => {
         if (!silent) setLoading(true);
         try {
             const res = await api.get('/snapshot');
-            console.log("📊 Admin Snapshot Data:", res);
             setSnapshot(res);
-            try {
-                const kycRes = await api.get('/financeiro/admin/kyc-pendentes');
-                setKycPendentes(kycRes || []);
-            } catch(e) { console.error("Erro kyc", e); }
+            const admin = res?.admin || {};
+            setDenunciasData(admin.denuncias || []);
         } catch (err) {
-            if (!silent) setMensagem('Erro ao carregar dados: ' + (err.response?.data?.detail || err.message));
+            if (!silent) setMensagem('Erro: ' + (err.message || err));
         } finally {
             if (!silent) setLoading(false);
         }
@@ -222,135 +101,52 @@ const AdminDashboard = () => {
     const fiscal = adminData.fiscal || {};
     const pendentes = adminData.pendentes || [];
     const usuarios = adminData.gestao_usuarios || [];
-    const solicitacoesAtivas = adminData.solicitacoes_ativas || [];
-    const parceiros = adminData.gestao_parceiros || [];
-
-    // --- LOGICA DE AÇÕES ---
-    const handleExcluirParceiro = async () => {
-        if (!parceiroParaExcluir) return;
-        setLoadingExclusao(true);
-        try {
-            await api.delete(`/financeiro/admin/parceiros/${parceiroParaExcluir.id}`);
-            setMensagem(`Parceiro ${parceiroParaExcluir.nome} desativado com sucesso.`);
-            setShowExcluirParceiroModal(false);
-            carregarSnapshot(); // Recarrega para limpar a lista
-        } catch (err) {
-            setMensagem('Erro ao excluir parceiro: ' + (err.response?.data?.detail || err.message));
-        } finally {
-            setLoadingExclusao(false);
-            setParceiroParaExcluir(null);
-        }
-    };
-
-    const handleAjustarLimite = async () => {
-        setLoadingAcao(true);
-        try {
-            const limitVal = parseFloat(limiteData.valor.replace(',', '.'));
-            await api.put(`/financeiro/admin/cliente/${limiteData.id}/limite`, {
-                limite: isNaN(limitVal) ? null : limitVal
-            });
-            setMensagem('Limite atualizado com sucesso.');
-            setShowLimiteModal(false);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao definir limite: ' + (err.response?.data?.detail || err.message));
-        } finally {
-            setLoadingAcao(false);
-        }
-    };
 
     const handleDownloadFiscalPDF = async () => {
         try {
             setLoadingFiscalPDF(true);
-            const res = await api.getBlob(`/admin/fiscal/pdf?inicio=${dataInicio}&fim=${dataFim}`);
-            
-            const blob = res.data || res;
+            const blob = await api.getBlob(`/admin/fiscal/pdf?inicio=${dataInicio}&fim=${dataFim}`);
             const url = window.URL.createObjectURL(new Blob([blob]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `DEMONSTRATIVO_FISCAL_TROCARIA_${dataInicio}_A_${dataFim}.pdf`);
+            link.setAttribute('download', `DEMONSTRATIVO_FISCAL_${dataInicio}_A_${dataFim}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.remove();
         } catch (err) {
-            setMensagem('Erro ao baixar relatório fiscal: ' + err.message);
+            setMensagem('Erro ao baixar PDF: ' + err.message);
         } finally {
             setLoadingFiscalPDF(false);
         }
     };
 
-    const handleExecutarCobranca = async () => {
-        if (!confirm("⚠️ ATENÇÃO: Deseja executar a Cláusula 3.3 agora? O sistema irá varrer inadimplentes com mais de 5 dias para registro de inadimplência.")) {
-            return;
-        }
-
-        setLoadingCobranca(true);
-        try {
-            const response = await api.post(`/admin/fiscal/executar-cobranca`);
-
-            if (response.data.status === "sucesso") {
-                toast.success(response.data.mensagem);
-                if (response.data.detalhes && response.data.detalhes.length > 0) {
-                    console.log("LOGS DE COBRANÇA:", response.data.detalhes);
-                }
-                fetchSnapshot();
-            }
-        } catch (error) {
-            console.error("Erro ao executar cobrança:", error);
-            const errorMsg = error.response?.data?.detail || "Falha ao processar cobrança automática.";
-            toast.error(errorMsg);
-        } finally {
-            setLoadingCobranca(false);
-        }
-    };
-
-    const handleAprovar = async (id, tipo) => {
-        try {
-            const res = await api.post(`/financeiro/admin/confirmar/${id}`, { tipo });
-            setMensagem(res.message || 'Operação aprovada!');
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        }
-    };
-
     const handleAbrirDocumento = (url) => {
-        if (!url) {
-            setMensagem('Erro: Link do documento não encontrado.');
-            return;
-        }
-
+        if (!url) { setMensagem('Documento não encontrado.'); return; }
         let fullUrl = url;
         if (url.startsWith('/api')) {
-            const apiRoot = BASE_URL.endsWith('/api') ? BASE_URL.replace('/api', '') : BASE_URL;
-            fullUrl = `${apiRoot}${url}`;
+            fullUrl = `${BASE_URL.replace('/api', '')}${url}`;
         } else if (!url.startsWith('http')) {
             fullUrl = `${BASE_URL}${url}`;
         }
-
         const token = api.getToken();
-        if (token) {
-            fullUrl += `${fullUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
-        }
-
+        if (token) fullUrl += `${fullUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
         window.open(fullUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleAprovarKYC = async (p) => {
+        if (!window.confirm(`Aprovar verificação de ${p.usuario_nome}?`)) return;
+        try {
+            await api.post(`/financeiro/admin/confirmar/${p.transacao_id || p.id}`);
+            setMensagem(`✅ ${p.usuario_nome} verificado!`);
+            carregarSnapshot();
+        } catch (err) {
+            setMensagem('Erro: ' + (err.message || err));
+        }
     };
 
     const handleRejeitar = (id) => {
         setRejeicaoData({ id, motivo: '' });
         setShowRejeitarModal(true);
-    };
-
-    const handleConfirmarVerificacao = async (p) => {
-        if (!window.confirm(`Aprovar verificacao de ${p.usuario_nome}?`)) return;
-        try {
-            const id = p.transacao_id || p.id;
-            await api.post(`/financeiro/admin/confirmar/${id}`);
-            setMensagem(`Verificacao de ${p.usuario_nome} aprovada!`);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro: ' + (err.response?.data?.detail || err.message));
-        }
     };
 
     const confirmarRejeicao = async () => {
@@ -361,60 +157,9 @@ const AdminDashboard = () => {
             setShowRejeitarModal(false);
             carregarSnapshot();
         } catch (err) {
-            setMensagem('Erro: ' + err.message);
+            setMensagem('Erro: ' + (err.message || err));
         } finally {
             setLoadingRejeicao(false);
-        }
-    };
-
-    const handleSincronizarTokens = async () => {
-        try {
-            const res = await api.post('/financeiro/admin/parceiros/sincronizar-tokens');
-            setMensagem(res.message || res.data?.message || 'Tokens sincronizados com sucesso!');
-            carregarParceiros();
-        } catch (err) {
-            setMensagem('Erro ao sincronizar: ' + (err.response?.data?.detail || err.message));
-        }
-    };
-
-    const handleCriarParceiro = async () => {
-        if (!novoParceiroData.nome || !novoParceiroData.endereco) {
-            setMensagem('Erro: Preencha todos os campos do parceiro.');
-            return;
-        }
-        setLoadingNovoParceiro(true);
-        try {
-            await api.post('/financeiro/admin/fiscal/parceiros', novoParceiroData);
-            setMensagem('Sucesso: Parceiro cadastrado!');
-            setShowNovoParceiroModal(false);
-            setNovoParceiroData({ 
-                nome: '', 
-                endereco: '', 
-                usuario_id: '', 
-                prazo_liquidacao: 0, 
-                taxa_comissao: 3.00 
-            });
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao cadastrar: ' + err.message);
-        } finally {
-            setLoadingNovoParceiro(false);
-        }
-    };
-
-    const handleConfirmarExclusaoParceiro = async () => {
-        if (!parceiroParaExcluir) return;
-        setLoadingExclusao(true);
-        try {
-            await api.delete(`/financeiro/admin/fiscal/parceiros/${parceiroParaExcluir.id}`);
-            setMensagem('Sucesso: Parceiro removido.');
-            setShowExcluirParceiroModal(false);
-            setParceiroParaExcluir(null);
-            carregarSnapshot();
-        } catch (err) {
-            setMensagem('Erro ao remover: ' + err.message);
-        } finally {
-            setLoadingExclusao(false);
         }
     };
 
@@ -424,13 +169,144 @@ const AdminDashboard = () => {
         setTimeout(() => setPixCopiado(null), 2000);
     };
 
-    const usuariosFiltrados = useMemo(() => {
-        return usuarios.filter(u => 
-            u.nome.toLowerCase().includes(filtroUsuarios.toLowerCase()) || 
-            u.cpf.includes(filtroUsuarios)
-        );
-    }, [usuarios, filtroUsuarios]);
+    // ==================== USUÁRIOS ====================
+    const handleSuspender = async (userId, nome) => {
+        const motivo = prompt(`Motivo para suspender ${nome}:`);
+        if (!motivo) return;
+        try {
+            await api.post(`/financeiro/admin/suspender/${userId}`, { motivo });
+            setMensagem(`🚫 ${nome} suspenso.`);
+            carregarSnapshot();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
 
+    const handleReativar = async (userId, nome) => {
+        if (!window.confirm(`Reativar ${nome}?`)) return;
+        try {
+            await api.post(`/financeiro/admin/reativar/${userId}`);
+            setMensagem(`✅ ${nome} reativado.`);
+            carregarSnapshot();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
+
+    const usuariosFiltrados = useMemo(() =>
+        usuarios.filter(u =>
+            u.nome.toLowerCase().includes(filtroUsuarios.toLowerCase()) ||
+            u.cpf.includes(filtroUsuarios) ||
+            u.email?.toLowerCase().includes(filtroUsuarios.toLowerCase())
+        ), [usuarios, filtroUsuarios]);
+
+    // ==================== RESGATES ====================
+    const carregarResgates = async () => {
+        setLoadingResgates(true);
+        try {
+            const data = await api.get('/marketplace/admin/resgates-pendentes');
+            setResgates(data || []);
+        } catch (e) { console.error(e); }
+        setLoadingResgates(false);
+    };
+
+    const handleAprovarResgate = async (id) => {
+        if (!confirm('Confirmar resgate? O admin deve enviar o PIX.')) return;
+        try {
+            const res = await api.post('/marketplace/admin/aprovar-resgate/' + id);
+            setMensagem(res.message);
+            carregarResgates();
+        } catch (e) { setMensagem('Erro: ' + (e.message || e)); }
+    };
+
+    const handleRejeitarResgate = async (id) => {
+        if (!confirm('Rejeitar resgate? Pontos serão devolvidos.')) return;
+        try {
+            const res = await api.post('/marketplace/admin/rejeitar-resgate/' + id);
+            setMensagem(res.message);
+            carregarResgates();
+        } catch (e) { setMensagem('Erro: ' + (e.message || e)); }
+    };
+
+    // ==================== PRODUTOS ====================
+    const carregarProdutos = async () => {
+        setLoadingProdutos(true);
+        try {
+            const data = await api.get('/admin/produtos');
+            setProdutos(data || []);
+        } catch (e) { console.error(e); }
+        setLoadingProdutos(false);
+    };
+
+    const abrirNovoProduto = () => {
+        setEditandoProduto(null);
+        setFormProduto({ nome: '', descricao: '', valor_reais: '', quantidade_disponivel: 1, foto_url: '' });
+        setShowProdutoModal(true);
+    };
+
+    const abrirEditarProduto = (p) => {
+        setEditandoProduto(p);
+        setFormProduto({
+            nome: p.nome,
+            descricao: p.descricao || '',
+            valor_reais: String(p.valor_reais),
+            quantidade_disponivel: p.quantidade_disponivel,
+            foto_url: p.foto_url || '',
+        });
+        setShowProdutoModal(true);
+    };
+
+    const salvarProduto = async () => {
+        if (!formProduto.nome || !formProduto.valor_reais) {
+            setMensagem('Nome e valor são obrigatórios.');
+            return;
+        }
+        try {
+            if (editandoProduto) {
+                await api.put(`/admin/produtos/${editandoProduto.id}`, formProduto);
+                setMensagem('✅ Produto atualizado!');
+            } else {
+                await api.post('/admin/produtos', formProduto);
+                setMensagem('✅ Produto criado!');
+            }
+            setShowProdutoModal(false);
+            carregarProdutos();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
+
+    const handleDeletarProduto = async (id, nome) => {
+        if (!window.confirm(`Deletar "${nome}"?`)) return;
+        try {
+            await api.delete(`/admin/produtos/${id}`);
+            setMensagem(`🗑️ ${nome} removido.`);
+            carregarProdutos();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
+
+    // ==================== DENÚNCIAS ====================
+    const handleRevisarDenuncia = async (id) => {
+        try {
+            await api.post(`/financeiro/admin/denuncias/${id}/revisar`);
+            setMensagem('Denúncia revisada.');
+            carregarSnapshot();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
+
+    // ==================== DISPUTAS ====================
+    const carregarDisputas = async () => {
+        setLoadingDisputas(true);
+        try {
+            const data = await api.get('/admin/disputas');
+            setDisputas(data || []);
+        } catch (e) { console.error(e); }
+        setLoadingDisputas(false);
+    };
+
+    const handleResolverDisputa = async (id, decisao, notapublica) => {
+        try {
+            await api.post(`/admin/disputas/${id}/resolver`, { decisao, notapublica });
+            setMensagem('Disputa resolvida!');
+            carregarDisputas();
+        } catch (err) { setMensagem('Erro: ' + (err.message || err)); }
+    };
+
+    // ==================== RENDER ====================
     if (loading && !snapshot) {
         return (
             <div className="flex-center" style={{ height: '100vh', background: 'var(--bg-dark)', color: 'var(--primary)' }}>
@@ -442,93 +318,126 @@ const AdminDashboard = () => {
 
     return (
         <div className="admin-layout">
-            {/* --- SIDEBAR --- */}
+            {/* SIDEBAR */}
             <aside className="admin-sidebar">
                 <div className="sidebar-logo">
                     <Zap size={28} />
                     <span>TROCARIA</span>
+                    <span className="live-dot" />
                 </div>
-
                 <nav className="sidebar-nav">
-                    <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-                        <LayoutDashboard size={20} /> <span>Dashboard</span>
-                    </div>
-                    <div className={`nav-item ${activeTab === 'pendentes' ? 'active' : ''}`} onClick={() => setActiveTab('pendentes')}>
-                        <ListTodo size={20} /> <span>Aprovações</span>
-                        {pendentes.length > 0 && <span className="badge-notification">{pendentes.length}</span>}
-                    </div>
-                    <div className={`nav-item ${activeTab === 'emprestimos' ? 'active' : ''}`} onClick={() => setActiveTab('emprestimos')}>
-                        <CreditCard size={16} /> Pedidos
-                    </div>
-                    <div className={`nav-item ${activeTab === 'financeiro' ? 'active' : ''}`} onClick={() => setActiveTab('financeiro')}>
-                        <BarChart3 size={16} /> Movimentação
-                    </div>
-                    <div className={`nav-item ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>
-                        <Users size={20} /> <span>Usuários</span>
-                    </div>
-                    <div className={`nav-item ${activeTab === 'resgates' ? 'active' : ''}`} onClick={() => { setActiveTab('resgates'); carregarResgates(); }}>
-                        <Sparkles size={20} /> <span>Resgates</span>
-                    </div>
-                    <div className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`} onClick={() => setActiveTab('ranking')}>
-                        <Trophy size={20} /> <span>Ranking</span>
-                    </div>
+                    {[
+                        { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                        { key: 'pendentes', icon: ListTodo, label: 'Aprovações', badge: kycPendentes => pendentes.filter(p => p.tipo === 'desbloqueio_dados').length },
+                        { key: 'financeiro', icon: BarChart3, label: 'Financeiro' },
+                        { key: 'denuncias', icon: Gavel, label: 'Denúncias', badge: () => denunciasData.length },
+                        { key: 'usuarios', icon: Users, label: 'Usuários' },
+                        { key: 'produtos', icon: Package, label: 'Produtos' },
+                        { key: 'disputas', icon: Scale, label: 'Disputas', badge: () => disputas.filter(d => d.status === 'aberta' || d.status === 'em_andamento').length },
+                        { key: 'resgates', icon: Sparkles, label: 'Resgates' },
+                        { key: 'ranking', icon: Trophy, label: 'Ranking' },
+                    ].map(item => (
+                        <div
+                            key={item.key}
+                            className={`nav-item ${activeTab === item.key ? 'active' : ''}`}
+                            onClick={() => {
+                                setActiveTab(item.key);
+                                if (item.key === 'resgates') carregarResgates();
+                                if (item.key === 'produtos') carregarProdutos();
+                                if (item.key === 'disputas') carregarDisputas();
+                            }}
+                        >
+                            <item.icon size={20} />
+                            <span>{item.label}</span>
+                            {item.badge && item.badge() > 0 && (
+                                <span className="badge-notification">{item.badge()}</span>
+                            )}
+                        </div>
+                    ))}
                 </nav>
-
                 <div className="sidebar-footer">
-                    <div className="nav-item">
+                    <div className="nav-item" onClick={() => window.location.hash = 'cliente'}>
                         <Undo2 size={18} /> <span>Sair do Painel</span>
                     </div>
                 </div>
             </aside>
 
-            {/* --- CONTEUDO PRINCIPAL --- */}
+            {/* MAIN */}
             <main className="admin-main">
                 <header className="admin-header">
-                    <div className="header-title">
-                        <div className="flex-start gap-1">
-                            <h1>Painel Administrativo</h1>
-                        </div>
-                        <p className="text-muted">Rede de Apoio entre Pares.</p>
+                    <div>
+                        <h1 className="header-title">Painel Administrativo</h1>
+                        <p className="text-muted" style={{ fontSize: '0.85rem' }}>TROCARIA • Classificados Gratuitos • Marketplace</p>
                     </div>
-                    
-                    <div className="header-actions">
-                        <button className="btn btn-icon" onClick={carregarSnapshot} title="Sincronizar Dados">
+                    <div className="flex-start gap-1">
+                        <div className="live-indicator"><span className="live-dot" /> Ao vivo</div>
+                        <button className="btn btn-icon" onClick={() => carregarSnapshot()} title="Sincronizar">
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
                 </header>
 
                 {mensagem && (
-                    <div className={`alert ${mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('falha') ? 'alert-danger animate-shake' : 'alert-success'} mb-1`}>
-                        <div className="alert-icon">
-                            {mensagem.toLowerCase().includes('erro') || mensagem.toLowerCase().includes('falha') ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-                        </div>
+                    <div className={`alert ${mensagem.includes('Erro') ? 'alert-danger' : 'alert-success'} mb-1`}>
                         <span>{mensagem}</span>
                         <button onClick={() => setMensagem('')} className="alert-close"><X size={16} /></button>
                     </div>
                 )}
 
-                {/* --- VIEW: DASHBOARD --- */}
+                {/* ==================== DASHBOARD ==================== */}
                 {activeTab === 'dashboard' && (
                     <div className="animate-fade-in">
                         <div className="stats-grid">
-                            <StatCard label="Usuários" value={usuarios.length} icon={Users} color="var(--primary)" trend={null} />
-                            <StatCard label="Apoios Ativos" value={snapshot?.admin?.emprestimos_para_liberar?.length || 0} icon={ShieldCheck} color="var(--success)" trend={null} />
-                            <StatCard label="Pedidos Pendentes" value={solicitacoesAtivas.length} icon={Clock} color="var(--warning)" trend={null} />
-                            <StatCard label="KYC Pendentes" value={kycPendentes?.length || 0} icon={ListTodo} color="var(--primary)" trend={null} />
-                            {/* DEPRECATED: Saldo removido. A Trocaria nao segura dinheiro de usuarios. */}
+                            <StatCard label="Usuários" value={usuarios.length} icon={Users} color="var(--primary)" />
+                            <StatCard label="Vendas Concluídas" value={fiscal.total_vendas || 0} icon={TrendingUp} color="var(--success)" />
+                            <StatCard label="Anúncios Ativos" value={fiscal.total_anuncios_ativos || 0} icon={Store} color="var(--secondary)" />
+                            <StatCard label="KYC Pendentes" value={pendentes.filter(p => p.tipo === 'desbloqueio_dados').length || 0} icon={ShieldCheck} color="var(--warning)" />
+                            <StatCard label="Denúncias" value={fiscal.denuncias_pendentes || 0} icon={Gavel} color="var(--danger)" />
+                            <StatCard label="Comissões Recebidas" value={formatarMoeda(fiscal.total_comissoes)} icon={DollarSign} color="var(--success)" />
+                            <StatCard label="Comissões Pendentes" value={formatarMoeda(fiscal.total_comissoes_pendentes)} icon={Clock} color="var(--warning)" />
+                            <StatCard label="Produtos Resgate" value={fiscal.total_produtos || 0} icon={Package} color="var(--primary)" />
+                            <StatCard label="Receita Líquida (mês)" value={formatarMoeda(fiscal.lucro_plataforma_total)} icon={BarChart3} color="var(--primary)" />
+                            <StatCard label="Receita Histórica" value={formatarMoeda(fiscal.lucro_plataforma_historico)} icon={BarChart3} color="var(--secondary)" />
+                        </div>
+
+                        <div className="glass-panel mt-2">
+                            <h3>Histórico Mensal de Receita</h3>
+                            <div className="chart-bars">
+                                {(fiscal.historico_mensal || []).map((h, i) => {
+                                    const maxVal = Math.max(...(fiscal.historico_mensal || []).map(x => x.lucro), 1);
+                                    const pct = (h.lucro / maxVal) * 100;
+                                    return (
+                                        <div key={i} className="chart-bar-item">
+                                            <div className="chart-bar-value">{formatarMoeda(h.lucro)}</div>
+                                            <div className="chart-bar" style={{ height: `${Math.max(pct, 5)}%` }} />
+                                            <div className="chart-bar-label">{h.mes?.slice(-2)}</div>
+                                        </div>
+                                    );
+                                })}
+                                {(!fiscal.historico_mensal || fiscal.historico_mensal.length === 0) && (
+                                    <p className="text-muted">Nenhum dado histórico disponível.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="glass-panel mt-1">
+                            <h3>Sistema</h3>
+                            <div className="grid-3">
+                                <div className="stat-mini"><span>CPU</span><strong>{fiscal.cpu_uso || 0}%</strong></div>
+                                <div className="stat-mini"><span>RAM</span><strong>{fiscal.ram_uso || 0}%</strong></div>
+                                <div className="stat-mini"><span>Threads</span><strong>{fiscal.cpu_threads || 0}</strong></div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* --- VIEW: PENDENTES (KYC) --- */}
+                {/* ==================== APROVAÇÕES (KYC) ==================== */}
                 {activeTab === 'pendentes' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Verificações KYC Pendentes</h3>
+                            <h3><ShieldCheck size={20} /> Verificações KYC Pendentes</h3>
                         </div>
-
-                        {kycPendentes.length === 0 ? (
+                        {pendentes.filter(p => p.tipo === 'desbloqueio_dados').length === 0 ? (
                             <div className="empty-state">
                                 <ShieldCheck size={48} className="mb-1 opacity-20" />
                                 <p>Nenhuma verificação pendente.</p>
@@ -536,16 +445,9 @@ const AdminDashboard = () => {
                         ) : (
                             <div className="table-responsive">
                                 <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Usuário</th>
-                                            <th>CPF</th>
-                                            <th>Documentos</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
+                                    <thead><tr><th>Usuário</th><th>CPF</th><th>Documentos</th><th>Ações</th></tr></thead>
                                     <tbody>
-                                        {kycPendentes.map(p => (
+                                        {pendentes.filter(p => p.tipo === 'desbloqueio_dados').map(p => (
                                             <tr key={p.transacao_id || p.id} className="row-hover">
                                                 <td>
                                                     <div className="flex-start gap-1">
@@ -566,7 +468,7 @@ const AdminDashboard = () => {
                                                 </td>
                                                 <td>
                                                     <div className="flex-start gap-1">
-                                                        <button className="btn btn-icon-small text-success" onClick={() => handleConfirmarVerificacao(p)}><CheckCircle size={18} /></button>
+                                                        <button className="btn btn-icon-small text-success" onClick={() => handleAprovarKYC(p)}><CheckCircle size={18} /></button>
                                                         <button className="btn btn-icon-small text-danger" onClick={() => handleRejeitar(p.transacao_id || p.id)}><XCircle size={18} /></button>
                                                     </div>
                                                 </td>
@@ -579,86 +481,197 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: MOVIMENTAÇÃO --- */}
-                {activeTab === 'fiscal' && (
+                {/* ==================== FINANCEIRO ==================== */}
+                {activeTab === 'financeiro' && (
                     <div className="animate-fade-in">
-                        <div className="fiscal-grid">
-                            <section className="glass-panel">
-                                <h3>Taxas Arrecadadas</h3>
-                                <p className="text-muted text-xs mb-2">Resumo de taxas de serviço da plataforma.</p>
-                                
-                                <div className="grid-2">
-                                    <div className="revenue-item">
-                                        <span className="info-label">Verificações KYC</span>
-                                        <span className="font-bold">R$ {fiscal.detalhamento_lucro.kyc_score?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item" style={{ border: '1px solid var(--primary)', background: 'rgba(var(--primary-rgb), 0.05)' }}>
-                                        <span className="info-label text-primary">Taxa de Serviço</span>
-                                        <span className="font-bold text-primary">R$ {fiscal.detalhamento_lucro.taxa_adm_emprestimo?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item">
-                                        <span className="info-label">Taxa de Match</span>
-                                        <span className="font-bold">R$ {fiscal.detalhamento_lucro.taxa_intermediacao?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item">
-                                        <span className="info-label">Contribuições</span>
-                                        <span className="font-bold">R$ {fiscal.detalhamento_lucro.aportes_externos?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item" style={{ border: '1px solid var(--secondary)', background: 'rgba(var(--secondary-rgb), 0.05)' }}>
-                                        <span className="info-label text-secondary">Marketplace Ads</span>
-                                        <span className="font-bold text-secondary">R$ {fiscal.detalhamento_lucro.taxa_postagem?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item" style={{ border: '1px solid #FFD600', background: 'rgba(255, 214, 0, 0.05)' }}>
-                                        <span className="info-label" style={{ color: '#FFD600' }}>Assinaturas Premium</span>
-                                        <span className="font-bold" style={{ color: '#FFD600' }}>R$ {fiscal.detalhamento_lucro.assinaturas?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <div className="revenue-item" style={{ border: '1px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.05)' }}>
-                                        <span className="info-label" style={{ color: '#ff4d4d' }}>Bônus Concedidos</span>
-                                        <span className="font-bold" style={{ color: '#ff4d4d' }}>- R$ {fiscal.detalhamento_lucro.premios_marketplace?.toLocaleString('pt-BR')}</span>
-                                    </div>
-                                </div>
-                            </section>
+                        <div className="stats-grid">
+                            <StatCard label="Receita Líquida (mês)" value={formatarMoeda(fiscal.lucro_plataforma_total)} icon={DollarSign} color="var(--success)" subtitle="Taxas de serviço" />
+                            <StatCard label="Receita Histórica Total" value={formatarMoeda(fiscal.lucro_plataforma_historico)} icon={BarChart3} color="var(--primary)" subtitle="Desde o início" />
+                            <StatCard label="Comissões Recebidas" value={formatarMoeda(fiscal.total_comissoes)} icon={TrendingUp} color="var(--success)" subtitle="3% sobre vendas" />
+                            <StatCard label="Comissões Pendentes" value={formatarMoeda(fiscal.total_comissoes_pendentes)} icon={Clock} color="var(--warning)" subtitle="Aguardando pagamento" />
+                            <StatCard label="Taxas MP (est.)" value={formatarMoeda(fiscal.total_taxas_mp)} icon={CreditCard} color="var(--danger)" subtitle="1% do processado" />
+                            <StatCard label="Vendas Concluídas" value={fiscal.total_vendas || 0} icon={ShoppingBag} color="var(--secondary)" subtitle="Total na plataforma" />
+                        </div>
 
-                            <section className="glass-panel">
-                                 <h3>Ações Administrativas</h3>
-                                 <div className="flex-column gap-1 mt-1">
-                                     <button className="btn btn-outline w-full gap-1" disabled>
-                                         <ArrowUpRight size={18} /> Retirar Lucro (Descontinuado)
-                                     </button>
-                                 </div>
-                            </section>
+                        <div className="glass-panel mt-2">
+                            <div className="section-header">
+                                <h3>Relatório Fiscal PDF</h3>
+                            </div>
+                            <div className="flex-start gap-1">
+                                <div>
+                                    <label className="text-xs text-muted">De</label>
+                                    <input type="date" className="input-field" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-muted">Até</label>
+                                    <input type="date" className="input-field" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                                </div>
+                                <button className="btn btn-primary" onClick={handleDownloadFiscalPDF} disabled={loadingFiscalPDF} style={{ marginTop: '18px' }}>
+                                    <FileText size={16} /> {loadingFiscalPDF ? 'Gerando...' : 'Baixar PDF'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="glass-panel mt-1">
+                            <h3>Histórico Mensal</h3>
+                            <div className="chart-bars">
+                                {(fiscal.historico_mensal || []).map((h, i) => {
+                                    const maxVal = Math.max(...(fiscal.historico_mensal || []).map(x => x.lucro), 1);
+                                    const pct = (h.lucro / maxVal) * 100;
+                                    return (
+                                        <div key={i} className="chart-bar-item">
+                                            <div className="chart-bar-value">{formatarMoeda(h.lucro)}</div>
+                                            <div className="chart-bar" style={{ height: `${Math.max(pct, 5)}%` }} />
+                                            <div className="chart-bar-label">{h.mes?.slice(-2)}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* --- VIEW: PEDIDOS DE APOIO --- */}
-                {activeTab === 'emprestimos' && (
+                {/* ==================== DENÚNCIAS ==================== */}
+                {activeTab === 'denuncias' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Pedidos de Apoio</h3>
+                            <h3><Gavel size={20} /> Denúncias Pendentes ({denunciasData.length})</h3>
+                            <button className="btn btn-sm btn-outline" onClick={() => carregarSnapshot()}><RefreshCw size={14} /> Atualizar</button>
                         </div>
+                        {denunciasData.length === 0 ? (
+                            <div className="empty-state">
+                                <ThumbsUp size={48} className="mb-1 opacity-20" />
+                                <p>Nenhuma denúncia pendente.</p>
+                            </div>
+                        ) : (
+                            <div className="denuncias-list">
+                                {denunciasData.map(d => (
+                                    <div key={d.id} className={`denuncia-card ${d.denunciado_is_active === false ? 'suspended' : ''}`}>
+                                        <div className="denuncia-header">
+                                            <div className="denuncia-users">
+                                                <div className="user-tag">
+                                                    <User size={14} />
+                                                    <span className="font-bold">{d.denunciante_nome}</span>
+                                                    <span className="text-xs text-muted">(denunciante)</span>
+                                                </div>
+                                                <AlertTriangle size={16} className="text-danger" />
+                                                <div className="user-tag">
+                                                    <User size={14} />
+                                                    <span className="font-bold">{d.denunciado_nome}</span>
+                                                    {!d.denunciado_is_active && <span className="status-pill status-danger ml-1">SUSPENSO</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex-start gap-1">
+                                                <button className="btn btn-sm btn-primary" onClick={() => handleRevisarDenuncia(d.id)}>
+                                                    <CheckCircle size={14} /> Revisar
+                                                </button>
+                                                {d.denunciado_is_active !== false && (
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleSuspender(d.denunciado_id, d.denunciado_nome)}>
+                                                        <Ban size={14} /> Suspender
+                                                    </button>
+                                                )}
+                                                {d.denunciado_is_active === false && (
+                                                    <button className="btn btn-sm btn-outline" onClick={() => handleReativar(d.denunciado_id, d.denunciado_nome)}>
+                                                        <UserCheck size={14} /> Reativar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {d.motivo && (
+                                            <div className="denuncia-motivo">
+                                                <MessageSquare size={14} className="text-muted" />
+                                                <span>"{d.motivo}"</span>
+                                            </div>
+                                        )}
+                                        <div className="denuncia-footer">
+                                            <Clock size={12} className="text-muted" />
+                                            <span className="text-xs text-muted">{formatarDataBR(d.data)}</span>
+                                            <span className="text-xs text-muted">ID: {d.id}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
+                {/* ==================== USUÁRIOS ==================== */}
+                {activeTab === 'usuarios' && (
+                    <div className="glass-panel animate-fade-in">
+                        <div className="section-header">
+                            <h3><Users size={20} /> Usuários ({usuarios.length})</h3>
+                            <div className="search-bar">
+                                <Search size={16} />
+                                <input type="text" placeholder="Nome, CPF ou email..." value={filtroUsuarios}
+                                    onChange={e => setFiltroUsuarios(e.target.value)} />
+                            </div>
+                        </div>
                         <div className="table-responsive">
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Tomador</th>
-                                        <th>Valor</th>
-                                        <th>Taxa</th>
-                                        <th>Parcelas</th>
-                                        <th>Score</th>
+                                        <th>Usuário</th>
                                         <th>Status</th>
+                                        <th>Vendas</th>
+                                        <th>Comissão</th>
+                                        <th>2FA</th>
+                                        <th>Premium</th>
+                                        <th>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(snapshot?.cliente_emprestimos || []).filter(e => e.status === 'pendente').map(s => (
-                                        <tr key={s.id} className="row-hover">
-                                            <td className="font-bold">{s.contraparte_nome || s.tomador_nome || '—'}</td>
-                                            <td>R$ {s.valor?.toFixed(2)}</td>
-                                            <td>{s.taxa}%</td>
-                                            <td>{s.parcelas}x</td>
-                                            <td>{s.score_tomador || '—'}</td>
-                                            <td><span className="badge badge-warning">Pendente</span></td>
+                                    {usuariosFiltrados.map(u => (
+                                        <tr key={u.id} className={`row-hover ${!u.is_active ? 'row-suspended' : ''}`}>
+                                            <td>
+                                                <div className="flex-start gap-1">
+                                                    <div className="user-avatar">{u.nome.charAt(0)}</div>
+                                                    <div>
+                                                        <p className="font-bold">{u.nome}</p>
+                                                        <p className="text-xs text-muted">{u.cpf} • ID: {u.id}</p>
+                                                        {u.email && <p className="text-xs text-muted">{u.email}</p>}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className="flex-column gap-0-5">
+                                                    {u.is_active === false ? (
+                                                        <span className="status-pill status-danger">Suspenso</span>
+                                                    ) : (
+                                                        <span className="status-pill status-success">Ativo</span>
+                                                    )}
+                                                    {u.is_verified && <span className="status-pill status-info">Verif.</span>}
+                                                    {u.is_admin && <span className="status-pill status-warning">Admin</span>}
+                                                </div>
+                                            </td>
+                                            <td><span className="font-bold">{u.vendas_completadas || 0}</span></td>
+                                            <td>
+                                                {u.comissao_devida > 0 ? (
+                                                    <span className="text-warning font-bold">{formatarMoeda(u.comissao_devida)}</span>
+                                                ) : (
+                                                    <span className="text-muted">—</span>
+                                                )}
+                                            </td>
+                                            <td>{u.two_factor_enabled ? <CheckCircle size={16} className="text-success" /> : <XCircle size={16} className="text-muted" />}</td>
+                                            <td>{u.is_subscriber ? <span className="status-pill status-warning">Premium</span> : '—'}</td>
+                                            <td>
+                                                <div className="flex-start gap-0-5" style={{ flexWrap: 'wrap' }}>
+                                                    {u.chave_pix && (
+                                                        <button className="btn btn-icon-small text-primary" onClick={() => copiarPix(u.chave_pix, u.id)} title="Copiar PIX">
+                                                            {pixCopiado === u.id ? <Check size={14} /> : <Copy size={14} />}
+                                                        </button>
+                                                    )}
+                                                    {u.is_active !== false && !u.is_admin && (
+                                                        <button className="btn btn-icon-small text-danger" onClick={() => handleSuspender(u.id, u.nome)} title="Suspender">
+                                                            <Ban size={14} />
+                                                        </button>
+                                                    )}
+                                                    {u.is_active === false && (
+                                                        <button className="btn btn-icon-small text-success" onClick={() => handleReativar(u.id, u.nome)} title="Reativar">
+                                                            <UserCheck size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -667,84 +680,51 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {/* --- VIEW: DISPUTAS / PAGAMENTOS PENDENTES --- */}
-                {activeTab === 'emprestimos' && (
-                    <div className="glass-panel animate-fade-in mt-2">
-                        <div className="section-header">
-                            <h3>Pagamentos Pendentes de Confirmação</h3>
-                            <AlertTriangle size={16} color="var(--warning)" />
-                        </div>
-                        <p className="text-xs text-muted mb-2">Empréstimos onde o tomador já pagou mas o credor ainda não confirmou. Se o credor não confirmar, o admin pode resolver.</p>
-                        
-                        {(() => {
-                            const pendentes = (snapshot?.cliente_emprestimos || []).filter(e => e.pagamento_pendente);
-                            if (pendentes.length === 0) return <p className="text-muted">Nenhum pagamento pendente de confirmação.</p>;
-                            return pendentes.map(emp => (
-                                <div key={emp.id} className="info-block mb-1" style={{ border: '1px solid rgba(var(--warning-rgb), 0.3)', padding: '12px', borderRadius: '12px' }}>
-                                    <div className="flex-between">
-                                        <div>
-                                            <p style={{ fontWeight: 700, margin: 0 }}>Apoio #{emp.id}</p>
-                                            <p className="text-xs text-muted" style={{ margin: '2px 0' }}>
-                                                Tomador: {emp.contraparte_nome} | Credor: {emp.tipo === 'credor' ? 'Você' : emp.contraparte_nome}
-                                            </p>
-                                            <p className="text-xs text-muted" style={{ margin: 0 }}>
-                                                Pago em: {emp.confirmacao_pagamento_data || '—'}
-                                            </p>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button className="btn btn-sm btn-primary" style={{ padding: '6px 12px', fontSize: '0.7rem' }} onClick={() => handleResolverDisputa(emp.id, 'confirmar')}>
-                                                Confirmar (forçar)
-                                            </button>
-                                            <button className="btn btn-sm" style={{ padding: '6px 12px', fontSize: '0.7rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => handleResolverDisputa(emp.id, 'calote')}>
-                                                Marcar Calote
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ));
-                        })()}
-                    </div>
-                )}
-
-                {activeTab === 'resgates' && (
+                {/* ==================== PRODUTOS ==================== */}
+                {activeTab === 'produtos' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Resgates de Pontos</h3>
-                            <button className="btn btn-sm btn-outline" onClick={carregarResgates}><RefreshCw size={14} /> Atualizar</button>
+                            <h3><Package size={20} /> Produtos para Resgate</h3>
+                            <div className="flex-start gap-1">
+                                <button className="btn btn-sm btn-outline" onClick={carregarProdutos}><RefreshCw size={14} /></button>
+                                <button className="btn btn-sm btn-primary" onClick={abrirNovoProduto}><PlusCircle size={14} /> Novo</button>
+                            </div>
                         </div>
-
-                        {loadingResgates ? (
+                        {loadingProdutos ? (
                             <p className="text-muted">Carregando...</p>
-                        ) : resgates.length === 0 ? (
+                        ) : produtos.length === 0 ? (
                             <div className="empty-state">
-                                <Sparkles size={48} className="mb-1 opacity-20" />
-                                <p>Nenhum resgate pendente.</p>
+                                <Package size={48} className="mb-1 opacity-20" />
+                                <p>Nenhum produto cadastrado.</p>
                             </div>
                         ) : (
                             <div className="table-responsive">
                                 <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Usuário</th>
-                                            <th>CPF</th>
-                                            <th>Chave PIX</th>
-                                            <th>Valor</th>
-                                            <th>Data</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
+                                    <thead><tr><th>Produto</th><th>Valor</th><th>Pontos</th><th>Qtd</th><th>Status</th><th>Ações</th></tr></thead>
                                     <tbody>
-                                        {resgates.map(r => (
-                                            <tr key={r.id} className="row-hover">
-                                                <td className="font-bold">{r.usuario_nome}</td>
-                                                <td className="text-xs">{r.usuario_cpf}</td>
-                                                <td style={{ color: 'var(--success)', fontWeight: 700 }}>{r.chave_pix}</td>
-                                                <td>R$ {r.valor.toFixed(2)}</td>
-                                                <td className="text-xs text-muted">{r.data ? new Date(r.data).toLocaleString('pt-BR') : '—'}</td>
+                                        {produtos.map(p => (
+                                            <tr key={p.id} className="row-hover">
                                                 <td>
                                                     <div className="flex-start gap-1">
-                                                        <button className="btn btn-sm btn-primary" style={{ padding: '4px 10px', fontSize: '0.7rem' }} onClick={() => handleAprovarResgate(r.id)}>Aprovar</button>
-                                                        <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.7rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => handleRejeitarResgate(r.id)}>Rejeitar</button>
+                                                        {p.foto_url ? (
+                                                            <img src={p.foto_url} alt="" className="product-thumb" />
+                                                        ) : (
+                                                            <div className="product-thumb-placeholder"><Image size={16} /></div>
+                                                        )}
+                                                        <div>
+                                                            <p className="font-bold">{p.nome}</p>
+                                                            {p.descricao && <p className="text-xs text-muted">{p.descricao}</p>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>{formatarMoeda(p.valor_reais)}</td>
+                                                <td><span className="text-primary font-bold">{p.pontos_minimos}</span></td>
+                                                <td>{p.quantidade_disponivel}</td>
+                                                <td><span className={`status-pill ${p.status === 'ativo' ? 'status-success' : 'status-danger'}`}>{p.status}</span></td>
+                                                <td>
+                                                    <div className="flex-start gap-1">
+                                                        <button className="btn btn-icon-small text-primary" onClick={() => abrirEditarProduto(p)}><Edit3 size={14} /></button>
+                                                        <button className="btn btn-icon-small text-danger" onClick={() => handleDeletarProduto(p.id, p.nome)}><Trash2 size={14} /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -756,182 +736,156 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {activeTab === 'ranking' && <PagamentosRanking />}
-
-                {activeTab === 'usuarios' && (
+                {/* ==================== DISPUTAS ==================== */}
+                {activeTab === 'disputas' && (
                     <div className="glass-panel animate-fade-in">
                         <div className="section-header">
-                            <h3>Usuários</h3>
-                            <div className="search-bar">
-                                <Search size={16} />
-                                <input type="text" placeholder="Buscar por nome ou CPF..." value={filtroUsuarios}
-                                    onChange={(e) => setFiltroUsuarios(e.target.value)} />
+                            <h3><Scale size={20} /> Disputas ({disputas.length})</h3>
+                            <button className="btn btn-sm btn-outline" onClick={carregarDisputas}><RefreshCw size={14} /> Atualizar</button>
+                        </div>
+                        {loadingDisputas ? (
+                            <p className="text-muted">Carregando...</p>
+                        ) : disputas.length === 0 ? (
+                            <div className="empty-state">
+                                <Scale size={48} className="mb-1 opacity-20" />
+                                <p>Nenhuma disputa registrada.</p>
                             </div>
-                        </div>
-
-                        <div className="table-responsive">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Membro</th>
-                                        <th>Score</th>
-                                        <th>Verificado</th>
-                                        <th>Admin</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {usuariosFiltrados.map(u => (
-                                        <tr key={u.id} className="row-hover">
-                                            <td>
-                                                <div className="flex-start gap-1">
-                                                    <div className="user-avatar">{u.nome.charAt(0)}</div>
-                                                    <div>
-                                                        <p className="font-bold">{u.nome}</p>
-                                                        <p className="text-xs text-muted">{u.cpf} (ID: {u.id})</p>
-                                                    </div>
+                        ) : (
+                            <div className="disputas-list">
+                                {disputas.map(d => (
+                                    <div key={d.id} className={`disputa-card ${d.status === 'resolvida' ? 'resolved' : ''} ${d.status === 'aberta' ? 'open' : ''}`}>
+                                        <div className="disputa-header">
+                                            <div className="flex-start gap-1">
+                                                <span className={`status-pill ${d.status === 'aberta' ? 'status-warning' : d.status === 'em_andamento' ? 'status-info' : 'status-success'}`}>
+                                                    {d.status}
+                                                </span>
+                                                <span className="font-bold">#{d.id}</span>
+                                            </div>
+                                            <div className="text-xs text-muted">{formatarDataBR(d.data)}</div>
+                                        </div>
+                                        <div className="disputa-body">
+                                            <div className="disputa-info">
+                                                <div className="info-row"><span className="info-label">Produto:</span><span className="font-bold">{d.produto}</span></div>
+                                                <div className="info-row"><span className="info-label">Valor:</span><span>{formatarMoeda(d.valor)}</span></div>
+                                                <div className="info-row"><span className="info-label">Aberto por:</span><span>{d.abridor_nome} ({d.abridor_id})</span></div>
+                                                <div className="info-row"><span className="info-label">Vendedor:</span><span>{d.vendedor_id}</span></div>
+                                                <div className="info-row"><span className="info-label">Comprador:</span><span>{d.comprador_id}</span></div>
+                                            </div>
+                                            <div className="disputa-motivo">
+                                                <strong>Motivo:</strong> {d.motivo}
+                                                {d.descricao && <p className="text-xs text-muted mt-1">{d.descricao}</p>}
+                                            </div>
+                                            {d.decisao && (
+                                                <div className="disputa-decisao">
+                                                    <strong>Decisão:</strong> {d.decisao}
+                                                    {d.notapublica && <p className="text-xs text-muted mt-1">{d.notapublica}</p>}
                                                 </div>
-                                            </td>
-                                            <td><span className="text-primary font-bold">{u.score}</span></td>
-                                            <td><span className={`status-pill ${u.is_verified ? 'status-success' : 'status-warning'}`}>{u.is_verified ? 'Sim' : 'Não'}</span></td>
-                                            <td>{u.is_admin ? 'Sim' : '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            )}
+                                        </div>
+                                        {d.status !== 'resolvida' && (
+                                            <div className="disputa-actions">
+                                                <button className="btn btn-sm btn-success" onClick={() => {
+                                                    const decisao = prompt('Decisão (ex: "Favorável ao comprador"):');
+                                                    if (decisao) handleResolverDisputa(d.id, decisao, '');
+                                                }}>Resolver</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
+
+                {/* ==================== RESGATES ==================== */}
+                {activeTab === 'resgates' && (
+                    <div className="glass-panel animate-fade-in">
+                        <div className="section-header">
+                            <h3><Sparkles size={20} /> Resgates de Pontos</h3>
+                            <button className="btn btn-sm btn-outline" onClick={carregarResgates}><RefreshCw size={14} /> Atualizar</button>
+                        </div>
+                        {loadingResgates ? (
+                            <p className="text-muted">Carregando...</p>
+                        ) : resgates.length === 0 ? (
+                            <div className="empty-state">
+                                <Sparkles size={48} className="mb-1 opacity-20" />
+                                <p>Nenhum resgate pendente.</p>
+                            </div>
+                        ) : (
+                            <div className="table-responsive">
+                                <table className="data-table">
+                                    <thead><tr><th>Usuário</th><th>CPF</th><th>Chave PIX</th><th>Valor</th><th>Data</th><th>Ações</th></tr></thead>
+                                    <tbody>
+                                        {resgates.map(r => (
+                                            <tr key={r.id} className="row-hover">
+                                                <td className="font-bold">{r.usuario_nome}</td>
+                                                <td className="text-xs">{r.usuario_cpf}</td>
+                                                <td className="font-bold" style={{ color: 'var(--success)' }}>{r.chave_pix}</td>
+                                                <td>{formatarMoeda(r.valor)}</td>
+                                                <td className="text-xs text-muted">{r.data ? formatarDataBR(r.data) : '—'}</td>
+                                                <td>
+                                                    <div className="flex-start gap-1">
+                                                        <button className="btn btn-sm btn-primary" onClick={() => handleAprovarResgate(r.id)}>Aprovar</button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => handleRejeitarResgate(r.id)}>Rejeitar</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ==================== RANKING ==================== */}
+                {activeTab === 'ranking' && <PagamentosRanking />}
             </main>
 
-            {/* --- MODAIS (REUTILIZADOS) --- */}
+            {/* MODAIS */}
             <ModalPremium
                 isOpen={showRejeitarModal}
                 onClose={() => setShowRejeitarModal(false)}
                 title="Rejeitar Solicitação"
-                message={`Deseja rejeitar a solicitação #${rejeicaoData.id}? Informe o motivo.`}
+                message={`Motivo da rejeição #${rejeicaoData.id}:`}
                 type="error"
                 onConfirm={confirmarRejeicao}
-                confirmText="Rejeitar Agora"
+                confirmText="Rejeitar"
                 loading={loadingRejeicao}
             >
-                <textarea
-                    className="input-field mt-1 w-full"
-                    placeholder="Ex: Documento borrado ou chave PIX incorreta..."
+                <textarea className="input-field mt-1 w-full"
+                    placeholder="Ex: Documento ilegível..."
                     value={rejeicaoData.motivo}
-                    onChange={(e) => setRejeicaoData({ ...rejeicaoData, motivo: e.target.value })}
+                    onChange={e => setRejeicaoData({ ...rejeicaoData, motivo: e.target.value })}
                 />
             </ModalPremium>
 
-            {/* Modal de Customização de Limite */}
-            <ModalPremium
-                isOpen={showLimiteModal}
-                onClose={() => setShowLimiteModal(false)}
-                title="Ajuste de Limite Personalizado"
-                message="Defina um teto de crédito manual para este usuário (Mestre). Deixe em branco se quiser devolver o usuário para a regra automática de Algoritmo do Score."
-                type="info"
-                onConfirm={handleAjustarLimite}
-                confirmText="Salvar Limite"
-                loading={loadingAcao}
-            >
-                <div style={{ textAlign: 'left', marginTop: '1rem' }}>
-                    <div className="input-group mb-1">
-                        <label>Novo Limite Permitido (R$)</label>
-                        <input
-                            type="number"
-                            className="input-field"
-                            placeholder="Deixe em branco para usar o Robô/Algoritmo"
-                            value={limiteData.valor}
-                            onChange={(e) => setLimiteData({ ...limiteData, valor: e.target.value })}
-                            min="0.00"
-                            step="0.01"
-                        />
-                    </div>
-                </div>
-            </ModalPremium>
-            {/* Modal Novo Parceiro */}
-            <ModalPremium
-                isOpen={showNovoParceiroModal}
-                onClose={() => setShowNovoParceiroModal(false)}
-                title="Cadastrar Novo Parceiro (Lojista)"
-                message="Parceiros autorizados para serviços diversos da TROCARIA."
-                type="info"
-                onConfirm={handleCriarParceiro}
-                confirmText="Salvar Parceiro"
-                loading={loadingNovoParceiro}
-            >
-                <div style={{ textAlign: 'left', marginTop: '1rem' }}>
-                    <div className="input-group mb-1">
-                        <label>Nome do Estabelecimento</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ex: Mercadinho do Josias"
-                            value={novoParceiroData.nome}
-                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, nome: e.target.value })}
-                        />
-                    </div>
-                    <div className="input-group mb-1">
-                        <label>ID do Usuário Vínculo (5 chars)</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ex: A1B2C"
-                            maxLength={5}
-                            value={novoParceiroData.usuario_id}
-                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, usuario_id: e.target.value.toUpperCase() })}
-                        />
-                    </div>
-                    <div className="input-group mb-1">
-                        <label>Endereço Completo</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            placeholder="Ex: Av. Paulista, 1000 - São Paulo"
-                            value={novoParceiroData.endereco}
-                            onChange={(e) => setNovoParceiroData({ ...novoParceiroData, endereco: e.target.value })}
-                        />
-                    </div>
-                    <div className="grid-2 gap-1">
-                        <div className="input-group">
-                            <label>Prazo de Liquidação</label>
-                            <select 
-                                className="input-field"
-                                value={novoParceiroData.prazo_liquidacao}
-                                onChange={(e) => {
-                                    const prazo = parseInt(e.target.value);
-                                    setNovoParceiroData({ 
-                                        ...novoParceiroData, 
-                                        prazo_liquidacao: prazo,
-                                        taxa_comissao: TAXAS_PRAZOS[prazo]
-                                    });
-                                }}
-                            >
-                                <option value={0}>Imediato (D+0) → {TAXAS_PRAZOS[0]}%</option>
-                                <option value={14}>14 dias (D+14) → {TAXAS_PRAZOS[14]}%</option>
-                                <option value={35}>35 dias (D+35) → {TAXAS_PRAZOS[35]}%</option>
-                            </select>
+            {/* MODAL PRODUTO */}
+            {showProdutoModal && (
+                <div className="modal-overlay" onClick={() => setShowProdutoModal(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <h3>{editandoProduto ? 'Editar Produto' : 'Novo Produto'}</h3>
+                        <div className="flex-column gap-1 mt-1">
+                            <input className="input-field" placeholder="Nome do produto" value={formProduto.nome}
+                                onChange={e => setFormProduto({ ...formProduto, nome: e.target.value })} />
+                            <textarea className="input-field" placeholder="Descrição" value={formProduto.descricao}
+                                onChange={e => setFormProduto({ ...formProduto, descricao: e.target.value })} />
+                            <input className="input-field" type="number" step="0.01" placeholder="Valor em R$" value={formProduto.valor_reais}
+                                onChange={e => setFormProduto({ ...formProduto, valor_reais: e.target.value })} />
+                            <input className="input-field" type="number" placeholder="Quantidade" value={formProduto.quantidade_disponivel}
+                                onChange={e => setFormProduto({ ...formProduto, quantidade_disponivel: Number(e.target.value) })} />
+                            <input className="input-field" placeholder="URL da foto" value={formProduto.foto_url}
+                                onChange={e => setFormProduto({ ...formProduto, foto_url: e.target.value })} />
                         </div>
-                        <div className="input-group">
-                            <label>Taxa de Serviço</label>
-                            <div className="text-primary font-bold mt-1" style={{ fontSize: '1.2rem' }}>
-                                {TAXAS_PRAZOS[novoParceiroData.prazo_liquidacao]}% (Fixo)
-                            </div>
+                        <div className="flex-start gap-1 mt-2">
+                            <button className="btn btn-primary" onClick={salvarProduto}>
+                                {editandoProduto ? 'Atualizar' : 'Criar'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setShowProdutoModal(false)}>Cancelar</button>
                         </div>
                     </div>
                 </div>
-            </ModalPremium>
-
-            {/* Modal Excluir Parceiro */}
-            <ModalPremium
-                isOpen={showExcluirParceiroModal}
-                onClose={() => setShowExcluirParceiroModal(false)}
-                title="Remover Parceiro?"
-                message={`Deseja desativar o parceiro "${parceiroParaExcluir?.nome}"? Ele não aparecerá mais como ponto de atendimento.`}
-                type="error"
-                onConfirm={handleConfirmarExclusaoParceiro}
-                confirmText="Sim, Remover"
-                loading={loadingExclusao}
-            />
+            )}
         </div>
     );
 };

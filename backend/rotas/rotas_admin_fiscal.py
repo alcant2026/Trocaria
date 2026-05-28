@@ -27,7 +27,7 @@ class FiscalPDF(FPDF):
         
         self.set_font('Arial', 'B', 14)
         self.set_text_color(80, 80, 80)
-        self.cell(0, 10, 'DEMONSTRATIVO DE INTERMEDIAÇÃO FINANCEIRA (CPF)', 0, 1, 'C')
+        self.cell(0, 10, 'DEMONSTRATIVO DE PRESTAÇÃO DE SERVIÇOS (CPF)', 0, 1, 'C')
         self.ln(10)
 
     def footer(self):
@@ -53,11 +53,7 @@ async def gerar_relatorio_fiscal_admin(
         
         # 2. FATURAMENTO REAL (Taxas e Comissões - Sujeito a Carnê-Leão)
         tipos_faturamento = [
-            TipoTransacao.COMPRA_SCORE, 
             TipoTransacao.DESBLOQUEIO_DADOS, 
-            TipoTransacao.TAXA_SAQUE, 
-            TipoTransacao.TAXA_INTERMEDIACAO,
-            TipoTransacao.TAXA_ADM_EMPRESTIMO,
             TipoTransacao.ASSINATURA
         ]
         
@@ -97,10 +93,10 @@ async def gerar_relatorio_fiscal_admin(
         # SEÇÃO A: PATRIMÔNIO DE TERCEIROS (NÃO TRIBUTÁVEL)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, ' A. RECURSOS CONSIGNADOS EM CUSTÓDIA (POOL)', 0, 1, 'L', True)
+        pdf.cell(0, 10, ' A. RECEITA DE TAXAS DE SERVIÇO', 0, 1, 'L', True)
         pdf.ln(2)
         pdf.set_font('Arial', '', 10)
-        pdf.multi_cell(0, 5, 'Dinheiro de investidores e tomadores mantido em custódia na plataforma. Estes valores não compõem a receita bruta da pessoa física intermediadora.')
+        pdf.multi_cell(0, 5, 'Taxas de serviço cobradas pela plataforma (publicação, destaque, assinatura, KYC). Estes valores não compõem receita de intermediação financeira.')
         pdf.ln(2)
         pdf.set_font('Arial', 'B', 12)
         pdf.cell(100, 10, 'TOTAL EM CUSTÓDIA ATUAL:', 0, 0)
@@ -110,7 +106,7 @@ async def gerar_relatorio_fiscal_admin(
         # SEÇÃO B: RECEITA DE INTERMEDIAÇÃO (TRIBUTÁVEL)
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, ' B. FATURAMENTO POR PRESTAÇÃO DE SERVIÇOS', 0, 1, 'L', True)
+        pdf.cell(0, 10, ' B. FATURAMENTO TRIBUTÁVEL', 0, 1, 'L', True)
         pdf.ln(2)
         pdf.set_font('Arial', '', 10)
         pdf.cell(100, 8, 'Faturamento Bruto de Taxas (Score, KYC, Limites):', 0, 0)
@@ -129,7 +125,7 @@ async def gerar_relatorio_fiscal_admin(
         
         pdf.ln(20)
         pdf.set_font('Arial', 'I', 8)
-        pdf.multi_cell(0, 5, 'Nota Legal: Documento gerado para fins de preenchimento de Carnê-Leão e declaração de IRPF. Recomenda-se a conferência com um contador especializado em Fintechs conforme a regulação do Banco Central do Brasil.', 0, 'C')
+        pdf.multi_cell(0, 5, 'Nota Legal: Documento gerado para fins de preenchimento de Carnê-Leão e declaração de IRPF. Recomenda-se a conferência com um contador especializado.', 0, 'C')
 
         pdf_output = pdf.output(dest='S')
         return StreamingResponse(
@@ -142,25 +138,3 @@ async def gerar_relatorio_fiscal_admin(
         print(f"Erro Fiscal: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/executar-cobranca")
-async def executar_cobranca_automatica(
-    db: Session = Depends(get_db),
-    admin: Usuario = Depends(exigir_admin)
-):
-    """
-    Gatilho manual para processar a Cláusula 3.3 (Liquidação via Pool após 5 dias).
-    """
-    from utils_emprestimo import processar_inadimplencia_coletiva_automatica
-    
-    try:
-        logs = processar_inadimplencia_coletiva_automatica(db)
-        db.commit()
-        return {
-            "status": "sucesso",
-            "mensagem": f"Processamento concluído. {len(logs)} ações detectadas.",
-            "detalhes": logs
-        }
-    except Exception as e:
-        db.rollback()
-        print(f"Erro ao processar cobrança: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro interno no motor de cobrança: {str(e)}")

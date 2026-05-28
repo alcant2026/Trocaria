@@ -7,7 +7,7 @@ from sqlalchemy import text, func
 from datetime import datetime, timezone, timedelta
 from modelos.modelos_db import (
     Usuario, Transacao, HistoricoClique, RegistroAuditoria, 
-    AcaoAdmin, SolicitacaoEmprestimo
+    AcaoAdmin
 )
 import logging
 

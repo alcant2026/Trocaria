@@ -77,7 +77,7 @@ async def admin_status_banco(
     [ADMIN] Retorna estatísticas gerais do banco para monitoramento.
     """
     from sqlalchemy import func
-    from modelos.modelos_db import Transacao, HistoricoClique, RegistroAuditoria, SolicitacaoEmprestimo
+    from modelos.modelos_db import Transacao, HistoricoClique, RegistroAuditoria
     
     total_usuarios = db.query(Usuario).count()
     total_free = db.query(Usuario).filter((Usuario.is_premium == False) | (Usuario.is_premium == None)).count()

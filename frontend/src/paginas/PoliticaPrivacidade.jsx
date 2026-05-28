@@ -1,62 +1,63 @@
 import React from 'react';
-import { Shield, Lock, EyeOff, Scale, UserCheck, Landmark } from 'lucide-react';
+import { Shield, Lock, EyeOff, Scale, UserCheck, ShoppingBag } from 'lucide-react';
 
 const PoliticaPrivacidade = ({ onVoltar }) => {
     return (
         <div className="animate-fade-in" style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', color: 'var(--text-color)', lineHeight: '1.8' }}>
             <div className="text-center mb-2">
-                <Landmark size={48} color="var(--primary)" className="mb-1" />
+                <ShoppingBag size={48} color="var(--primary)" className="mb-1" />
                 <h1 style={{ fontSize: '2rem' }}>Política de Privacidade</h1>
-                <p className="text-muted">Compromisso TROCARIA com a Governança e LGPD</p>
+                <p className="text-muted">Compromisso TROCARIA com a LGPD</p>
             </div>
 
             <section className="card mb-1">
                 <div className="flex items-center gap-2 mb-1">
                     <EyeOff size={20} color="var(--primary)" />
-                    <h3 style={{ margin: 0 }}>1. Digital Credit Hub</h3>
+                    <h3 style={{ margin: 0 }}>1. Dados Coletados</h3>
                 </div>
-                <p>A TROCARIA opera como um Hub de Crédito Digital. Coletamos dados estritamente necessários para viabilizar operações de crédito e análise de risco:</p>
+                <p>A TROCARIA coleta dados estritamente necessários para o funcionamento da plataforma de classificados:</p>
                 <ul>
-                    <li><strong>Identificação Institucional:</strong> Nome completo, CPF, e-mail e dados de contato para autenticação de conta única.</li>
-                    <li><strong>Dados de Crédito:</strong> Chaves PIX para liquidação e movimentação, além de histórico de pagamentos para composição do Score de Fidelidade.</li>
-                    <li><strong>Monitoramento de Segurança:</strong> Endereço IP, geolocalização aproximada e metadados de dispositivo para compliance e prevenção a fraudes bancárias.</li>
+                    <li><strong>Identificação:</strong> Nome completo, CPF, e-mail e telefone para criação e autenticação da conta.</li>
+                    <li><strong>Anúncios:</strong> Fotos, descrições, valores e categorias dos produtos que você anuncia.</li>
+                    <li><strong>Interações:</strong> Avaliações, denúncias e histórico de negociações para composição do Score de Confiança.</li>
+                    <li><strong>Segurança:</strong> Endereço IP e metadados de dispositivo para prevenção a fraudes.</li>
                 </ul>
             </section>
 
             <section className="card mb-1">
                 <div className="flex items-center gap-2 mb-1">
                     <Lock size={20} color="var(--primary)" />
-                    <h3 style={{ margin: 0 }}>2. Blindagem e Sigilo Financeiro</h3>
+                    <h3 style={{ margin: 0 }}>2. Segurança da Informação</h3>
                 </div>
-                <p>Implementamos padrões internacionais de segurança. Suas informações são protegidas por criptografia em repouso e em trânsito. Utilizamos autenticação multifator (MFA/2FA) e algoritmos de hash irreversíveis para o armazenamento de credenciais, garantindo o sigilo das operações.</p>
+                <p>Implementamos padrões de segurança para proteger suas informações. Utilizamos criptografia em repouso e em trânsito, autenticação multifator (2FA) e algoritmos de hash para armazenamento de credenciais.</p>
             </section>
 
             <section className="card mb-1">
                 <div className="flex items-center gap-2 mb-1">
                     <Scale size={20} color="var(--primary)" />
-                    <h3 style={{ margin: 0 }}>3. Transparência e LGPD</h3>
+                    <h3 style={{ margin: 0 }}>3. Seus Direitos (LGPD)</h3>
                 </div>
-                <p>Em total conformidade com a Lei Geral de Proteção de Dados (Lei 13.709/2018), asseguramos seus direitos fundamentais:</p>
+                <p>Em conformidade com a Lei Geral de Proteção de Dados (Lei 13.709/2018), asseguramos seus direitos:</p>
                 <ul>
-                    <li><strong>Acesso e Correção:</strong> Liberdade total para consultar e atualizar seus dados no perfil.</li>
-                    <li><strong>Eliminação de Dados:</strong> Você pode solicitar a anonimização de sua conta (Direito ao Esquecimento), ressalvadas as obrigações legais de guarda de registros financeiros e ausência de débitos ativos.</li>
+                    <li><strong>Acesso e Correção:</strong> Consulte e atualize seus dados a qualquer momento no perfil.</li>
+                    <li><strong>Eliminação:</strong> Solicite a exclusão da sua conta a qualquer momento, ressalvadas obrigações legais de retenção.</li>
                 </ul>
             </section>
 
             <section className="card mb-1">
                 <div className="flex items-center gap-2 mb-1">
                     <UserCheck size={20} color="var(--primary)" />
-                    <h3 style={{ margin: 0 }}>4. Compartilhamento Restrito</h3>
+                    <h3 style={{ margin: 0 }}>4. Compartilhamento</h3>
                 </div>
-                <p>Diferente de modelos abertos, a TROCARIA **não comercializa e não compartilha** seus dados para fins publicitários. O processamento de dados é exclusivo para a análise de crédito interna e cumprimento de normativas de segurança do ecossistema financeiro digital.</p>
+                <p>A TROCARIA <strong>não comercializa</strong> seus dados pessoais. Informações são compartilhadas apenas quando necessário para cumprimento de obrigações legais ou mediante sua autorização explícita.</p>
             </section>
 
             <div className="text-center mt-2">
                 <button className="btn btn-primary" onClick={onVoltar}>Voltar</button>
             </div>
-            
+
             <p className="text-center text-muted mt-2" style={{ fontSize: '0.75rem' }}>
-                Última atualização institucional: {new Date().toLocaleDateString('pt-BR')}
+                Última atualização: {new Date().toLocaleDateString('pt-BR')}
             </p>
         </div>
     );

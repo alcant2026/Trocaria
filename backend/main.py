@@ -8,10 +8,11 @@ from database import engine, SessionLocal, Base
 from sqlalchemy import text
 from utils_db import sincronizar_esquema
 from rotas import (
-    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro, 
+    rotas_auth, rotas_financeiro, 
     rotas_snapshot, rotas_comunidade, rotas_admin_fiscal, 
-    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas,
-    rotas_resgate
+    rotas_marketplace, rotas_storage, rotas_compliance,
+    rotas_resgate, rotas_pontos, rotas_admin_produtos,
+    rotas_disputas,
 )
 
 app = FastAPI(title="TROCARIA API P2P")
@@ -149,11 +150,6 @@ FILE_UPLOAD_MAX_SIZE = 2 * 1024 * 1024
 
 @app.middleware("http")
 async def limit_file_upload(request: Request, call_next):
-    if request.url.path.startswith("/api/score/") and request.method == "POST":
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > FILE_UPLOAD_MAX_SIZE:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=413, content={"detail": "Arquivo muito grande. Máximo permitido: 5MB."})
     response = await call_next(request)
     return response
 
@@ -186,10 +182,9 @@ async def startup_db_setup():
         sincronizar_esquema(Base, engine)
 
         if "sqlite" not in str(engine.url):
-            from modelos.modelos_db import TipoTransacao, StatusSolicitacao
+            from modelos.modelos_db import TipoTransacao
             with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                for enum_class, type_names in [(TipoTransacao, ["tipo_transacao", "tipotransacao"]), 
-                                             (StatusSolicitacao, ["status_solicitacao", "statussolicitacao"])]:
+                for enum_class, type_names in [(TipoTransacao, ["tipo_transacao", "tipotransacao"])]:
                     for type_name in type_names:
                         for member in enum_class:
                             try:
@@ -246,10 +241,11 @@ async def startup_db_setup():
 
 # Cadastro dos roteadores com e sem prefixo /api para compatibilidade
 ROUTER_MODULES = [
-    rotas_auth, rotas_emprestimo, rotas_score, rotas_financeiro,
+    rotas_auth, rotas_financeiro,
     rotas_snapshot, rotas_comunidade, rotas_admin_fiscal,
-    rotas_marketplace, rotas_storage, rotas_compliance, rotas_disputas,
-    rotas_resgate
+    rotas_marketplace, rotas_storage, rotas_compliance,
+    rotas_resgate, rotas_pontos, rotas_admin_produtos,
+    rotas_disputas,
 ]
 for module in ROUTER_MODULES:
     app.include_router(module.router, prefix="/api")
@@ -295,6 +291,14 @@ async def servir_imagem_anuncio(filename: str):
     caminho = os.path.join("uploads", "anuncios", filename)
     if not os.path.exists(caminho):
         raise HTTPException(status_code=404, detail="Imagem nao encontrada.")
+    content_type, _ = mimetypes.guess_type(caminho)
+    return FileResponse(caminho, media_type=content_type or "image/jpeg")
+
+@app.get("/uploads/selfies/{filename}")
+async def servir_selfie(filename: str):
+    caminho = os.path.join("uploads", "selfies", filename)
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Selfie nao encontrada.")
     content_type, _ = mimetypes.guess_type(caminho)
     return FileResponse(caminho, media_type=content_type or "image/jpeg")
 

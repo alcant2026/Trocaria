@@ -88,16 +88,6 @@ async def marketplace_callback(code: str, state: str, db: Session = Depends(get_
         expires_in = token_data.get("expires_in", 0)
         if expires_in:
             usuario.mp_token_expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in)
-        
-        # NOVO: Se o usuário for um Parceiro, salvar também na tabela de Parceiros
-        from modelos.modelos_db import Parceiro
-        parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id).first()
-        if parceiro:
-            parceiro.mp_access_token = usuario.mp_access_token
-            parceiro.mp_refresh_token = usuario.mp_refresh_token
-            parceiro.mp_user_id = usuario.mp_user_id
-            parceiro.mp_token_expires_at = usuario.mp_token_expires_at
-            logger.info(f"✅ MP vinculado ao Parceiro ID: {parceiro.id}")
 
         db.commit()
         return RedirectResponse(url=f"{FRONTEND_URL}/#marketplace?status=success")
@@ -113,22 +103,11 @@ async def get_mp_status(usuario: Usuario = Depends(obter_usuario_logado)):
 
 @router.post("/desconectar")
 async def desconectar_mp(db: Session = Depends(get_db), usuario: Usuario = Depends(obter_usuario_logado)):
-    """Remove as credenciais do Mercado Pago do usuário e do lojista vinculado."""
+    """Remove as credenciais do Mercado Pago do usuário."""
     usuario.mp_access_token = None
     usuario.mp_refresh_token = None
     usuario.mp_user_id = None
     usuario.mp_token_expires_at = None
-
-    # Limpa também do Parceiro vinculado (se existir)
-    from modelos.modelos_db import Parceiro
-    parceiro = db.query(Parceiro).filter(Parceiro.usuario_id == usuario.id).first()
-    if parceiro:
-        parceiro.mp_access_token = None
-        parceiro.mp_refresh_token = None
-        parceiro.mp_user_id = None
-        parceiro.mp_token_expires_at = None
-        logger.info(f"🔌 MP desvinculado do Parceiro ID: {parceiro.id}")
-
     db.commit()
     return {"message": "Conta Mercado Pago desconectada."}
 

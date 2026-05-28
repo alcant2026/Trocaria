@@ -105,6 +105,7 @@ const ModalPremium = ({
                     onClick={onClose}
                     className="modal-close"
                     style={{ position: 'absolute', top: '15px', right: '15px', color: 'var(--text-muted)' }}
+                    aria-label="Fechar modal"
                 >
                     <X size={20} />
                 </button>

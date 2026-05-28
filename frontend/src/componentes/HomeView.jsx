@@ -1,5 +1,5 @@
 import React from 'react';
-import { HandCoins, PlusCircle, History, LayoutDashboard, ShieldCheck, ShoppingBag, Clock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { HandCoins, PlusCircle, History, LayoutDashboard, ShieldCheck, ShoppingBag, Clock, ArrowUpCircle, ArrowDownCircle, Gift as GiftIcon, BadgeCheck as BadgeCheckIcon } from 'lucide-react';
 
 // DEPRECATED: deposito e saque removidos. A Trocaria nao segura dinheiro de usuarios.
 const TIPOS_ENTRADA = new Set(['recebimento', 'comissao_parceiro', 'bonus', 'confirmacao_recebimento']);
@@ -12,6 +12,7 @@ const TIPOS_LABEL = {
     taxa_plataforma: 'Taxa da Plataforma',
     taxa_match: 'Taxa de Match',
     taxa_solicitacao: 'Taxa de Publicação',
+    taxa_anuncio: 'Taxa de Anúncio',
     confirmacao_pagamento: 'Pagamento Pendente',
     confirmacao_recebimento: 'Recebimento Confirmado',
     pagamento_parcela: 'Pagamento',
@@ -53,31 +54,27 @@ const HomeView = ({ usuario, historico, isFirstLoad, isOffline, mostrarAlertaRej
                 </div>
             )}
 
-            <div className="action-grid animate-fade-in">
-                <div className="action-btn" onClick={() => setActiveView('oportunidades')} style={{ borderColor: 'var(--success)', background: 'linear-gradient(135deg, rgba(var(--success-rgb), 0.15) 0%, rgba(var(--success-rgb), 0.05) 100%)' }}>
-                    <HandCoins size={32} color="var(--success)" />
-                    <span style={{ color: 'var(--success)', fontWeight: 800, fontSize: '0.9rem' }}>Ver Pedidos</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('solicitar')}>
-                    <PlusCircle size={28} color="var(--primary)" />
-                    <span>Solicitar</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('historico')}>
-                    <History size={28} />
-                    <span>Histórico</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('contratos')}>
-                    <LayoutDashboard size={28} />
-                    <span>Contratos</span>
-                </div>
-                <div className="action-btn" onClick={() => setActiveView('score')}>
-                    <ShieldCheck size={28} />
-                    <span>Upgrade</span>
-                </div>
-                <div className="action-btn" onClick={() => { setActiveView('marketplace'); carregarMeusLinksMarketplace(); }}>
+            <div className="action-grid animate-fade-in" role="group" aria-label="Painel de Ações">
+                <button className="action-btn" onClick={() => { setActiveView('marketplace'); carregarMeusLinksMarketplace(); }} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }} aria-label="Ir para o Marketplace de Trocas">
                     <ShoppingBag size={28} color="var(--primary)" />
                     <span>Marketplace</span>
-                </div>
+                </button>
+                <button className="action-btn" onClick={() => setActiveView('novo-anuncio')} style={{ background: 'none', border: '1px solid rgba(var(--success-rgb), 0.3)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }} aria-label="Anunciar um produto ou serviço para troca">
+                    <PlusCircle size={28} color="var(--success)" />
+                    <span style={{ color: 'var(--success)', fontWeight: 800 }}>Anunciar</span>
+                </button>
+                <button className="action-btn" onClick={() => setActiveView('meus-pontos')} style={{ background: 'none', border: '1px solid rgba(255, 145, 0, 0.3)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }} aria-label="Ver meus pontos acumulados e resgatar">
+                    <HandCoins size={28} color="var(--warning)" />
+                    <span style={{ color: 'var(--warning)', fontWeight: 800 }}>Meus Pontos</span>
+                </button>
+                <button className="action-btn" onClick={() => setActiveView('resgate-produtos')} style={{ background: 'none', border: '1px solid rgba(var(--success-rgb), 0.3)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+                    <GiftIcon size={28} color="var(--success)" />
+                    <span style={{ color: 'var(--success)', fontWeight: 800 }}>Prêmios Top 20</span>
+                </button>
+                <button className="action-btn" onClick={() => setActiveView('score')} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }} aria-label="Ver badges e upgrades do perfil">
+                    <BadgeCheckIcon size={28} />
+                    <span>Badges</span>
+                </button>
             </div>
             
             <h3 className="section-title">Últimas Atividades</h3>

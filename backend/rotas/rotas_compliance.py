@@ -12,7 +12,7 @@ from typing import Optional, List
 from database import get_db
 from modelos.modelos_db import (
     Usuario, ConsentimentoLGPD, RegistroAuditoria,
-    Transacao, SolicitacaoEmprestimo, StatusSolicitacao
+    Transacao
 )
 from rotas.rotas_auth import obter_usuario_logado
 from utils_auditoria import (
@@ -77,15 +77,14 @@ async def acessar_dados_pessoais(
             "assinante_premium": usuario.is_subscriber,
             "email_verificado": usuario.email_verificado,
             "telefone_verificado": usuario.telefone_verificado,
-            "score": float(usuario.score or 0),
         },
         "dados_financeiros": {
             "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
             "saldo_caixa": 0.0,  # DEPRECATED
             "chave_pix": usuario.chave_pix,
             "valor_emprestado": float(usuario.valor_emprestado or 0),
-            "emprestimos_ativos": usuario.emprestimos_ativos,
-            "emprestimos_concluidos": usuario.emprestimos_concluidos,
+            "emprestimos_ativos": 0,
+            "emprestimos_concluidos": 0,
         },
         "gamificacao": {
             "pontos_marketplace": usuario.pontos_marketplace,
@@ -201,19 +200,7 @@ async def solicitar_portabilidade(
             }
             for t in db.query(Transacao).filter(Transacao.usuario_id == usuario.id).all()
         ],
-        "emprestimos": [
-            {
-                "id": e.id,
-                "valor": float(e.valor),
-                "taxa_juros": float(e.taxa_juros),
-                "prazo_meses": e.prazo_meses,
-                "status": e.status.value if hasattr(e.status, 'value') else str(e.status),
-                "data_criacao": e.data_criacao.isoformat() if e.data_criacao else None,
-            }
-            for e in db.query(SolicitacaoEmprestimo).filter(
-                SolicitacaoEmprestimo.usuario_id == usuario.id
-            ).all()
-        ]
+        "emprestimos": []
     }
     
     # Registrar auditoria
@@ -350,23 +337,7 @@ async def solicitar_exclusao_lgpd(
             detail="Você deve confirmar explicitamente (confirmacao=true) a solicitação de exclusão."
         )
     
-    # 1. Verifica empréstimos ativos
-    emprestimos_ativos = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status.in_([
-            StatusSolicitacao.PENDENTE, 
-            StatusSolicitacao.APROVADO
-        ])
-    ).count()
-    
-    if emprestimos_ativos > 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Não é possível excluir a conta com empréstimos ativos ou pendentes. "
-                   "Quite suas obrigações primeiro ou aguarde a conclusão das operações."
-        )
-    
-    # 2. Anonimização (não exclusão total por obrigações legais)
+    # 1. Anonimização (não exclusão total por obrigações legais)
     # Guardamos dados mínimos para PLD/FT e obrigações fiscais
     usuario_id_original = usuario.id
     
@@ -411,7 +382,6 @@ async def solicitar_exclusao_lgpd(
             "natureza": "exercicio_direito_lgpd",
             "direito": "esquecimento",
             "motivo": dados.motivo,
-            "emprestimos_ativos_no_momento": emprestimos_ativos,
             "tipo_exclusao": "anonimizacao_com_retencao_legal"
         },
         user_agent=request.headers.get("user-agent")
@@ -606,7 +576,6 @@ async def declaracao_regulatoria_publica():
             "Conexão entre pessoas interessadas em operações de mútuo",
             "Geração e armazenamento de contratos digitais",
             "Verificação de identidade (KYC)",
-            "Atribuição de score de reputação",
             "Ferramentas de cobrança (mediante taxa de serviço)"
         ],
         "fluxo_dinheiro": "O dinheiro das operações de mútuo circula DIRETAMENTE entre Tomador e Investidor via PIX, sem passar pela plataforma. A Trocaria recebe apenas taxas de serviço.",

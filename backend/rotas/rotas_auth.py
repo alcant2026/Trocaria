@@ -216,7 +216,6 @@ async def registrar_usuario(request: Request, dados: RegistroUsuario, db: Sessio
         aceite_termos=dados.aceite_termos,
         auditoria_id=auditoria.id,
         saldo=0,
-        score=0,
         pontos_marketplace=0,
         pontos_semanais=0,
         codigo_indicacao=codigo_indicacao,
@@ -393,7 +392,6 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
             "id": usuario.id,
             "nome": usuario.nome,
             "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
-            "score": float(usuario.score or 0),
             "is_admin": usuario.is_admin,
             "is_verified": usuario.is_verified,
             "two_factor_enabled": usuario.two_factor_enabled,
@@ -410,13 +408,30 @@ async def login(request: Request, dados: LoginUsuario, db: Session = Depends(get
 
 @router.get("/perfil")
 async def obter_perfil(usuario: Usuario = Depends(obter_usuario_logado), db: Session = Depends(get_db)):
+    badges = []
+    if usuario.selfie_verificada:
+        badges.append("selfie")
+    if usuario.is_verified:
+        badges.append("kyc")
+    if usuario.email_verificado:
+        badges.append("email")
+    if usuario.telefone_verificado:
+        badges.append("telefone")
+    if usuario.two_factor_enabled:
+        badges.append("2fa")
+    if usuario.vendas_completadas and usuario.vendas_completadas >= 10:
+        badges.append("top_seller")
+
     perfil = {
         "id": usuario.id,
         "nome": usuario.nome,
-        "saldo": 0.0,  # DEPRECATED: sistema de saldo descontinuado
-        "score": float(usuario.score or 0),
+        "saldo": 0.0,
         "is_admin": usuario.is_admin,
         "is_verified": usuario.is_verified,
+        "selfie_url": f"/uploads/selfies/{usuario.id}.jpg" if usuario.selfie_url else None,
+        "selfie_verificada": usuario.selfie_verificada,
+        "badges": badges,
+        "vendas_completadas": usuario.vendas_completadas or 0,
         "cpf": usuario.cpf,
         "email": usuario.email,
         "chave_pix": usuario.chave_pix,
@@ -707,21 +722,7 @@ async def excluir_conta(dados: SolicitacaoExclusao, request: Request, usuario: U
             detail="Senha incorreta. A exclusão da conta exige confirmação de segurança."
         )
 
-    # 1. Validar se tem empréstimos ativos (PENDENTE ou APROVADO)
-    from modelos.modelos_db import SolicitacaoEmprestimo, StatusSolicitacao
-    
-    tem_pendencias = db.query(SolicitacaoEmprestimo).filter(
-        SolicitacaoEmprestimo.usuario_id == usuario.id,
-        SolicitacaoEmprestimo.status.in_([StatusSolicitacao.PENDENTE, StatusSolicitacao.APROVADO])
-    ).first()
-    
-    if tem_pendencias:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não é possível excluir a conta com empréstimos ativos ou pendentes. Quite suas dívidas primeiro."
-        )
-    
-    # 2. Anonimizar dados sensíveis (LGPD)
+    # 1. Anonimizar dados sensíveis (LGPD)
     usuario.nome = "Usuário Excluído"
     usuario.email = f"excluido_{usuario.id}@trocaria.com.br"
     usuario.cpf = f"000.000.000-{usuario.id}"
@@ -889,4 +890,81 @@ async def confirmar_verificacao_email(request: Request, usuario: Usuario = Depen
     except Exception as e:
         print(f"Erro ao verificar e-mail: {e}")
         raise HTTPException(status_code=500, detail="Erro ao verificar status do e-mail.")
+
+
+@router.post("/enviar-selfie")
+async def enviar_selfie(
+    arquivo: UploadFile = File(...),
+    usuario: Usuario = Depends(obter_usuario_logado),
+    db: Session = Depends(get_db)
+):
+    """Usuario envia selfie para verificacao opcional."""
+    if not arquivo.content_type or not arquivo.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser uma imagem.")
+
+    from PIL import Image
+    import io
+    import os
+
+    conteudo = await arquivo.read()
+    if len(conteudo) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Imagem muito grande. Maximo 5MB.")
+
+    os.makedirs("uploads/selfies", exist_ok=True)
+    caminho = f"uploads/selfies/{usuario.id}.jpg"
+
+    img = Image.open(io.BytesIO(conteudo))
+    img = img.convert("RGB")
+    img.thumbnail((800, 800))
+    img.save(caminho, "JPEG", quality=85)
+
+    usuario.selfie_url = caminho
+    usuario.selfie_verificada = False
+    db.commit()
+
+    return {"message": "Selfie enviada! Aguardando aprovacao do admin.", "selfie_url": f"/uploads/selfies/{usuario.id}.jpg"}
+
+
+@router.get("/admin/selfies-pendentes")
+async def selfies_pendentes(
+    admin: Usuario = Depends(exigir_admin),
+    db: Session = Depends(get_db)
+):
+    """Admin lista usuarios com selfie pendente de aprovacao."""
+    usuarios = db.query(Usuario).filter(
+        Usuario.selfie_url.isnot(None),
+        Usuario.selfie_verificada == False
+    ).all()
+
+    return [
+        {
+            "id": u.id,
+            "nome": u.nome,
+            "selfie_url": f"/uploads/selfies/{u.id}.jpg",
+            "email": u.email,
+            "data_envio": u.data_aceite.isoformat() if u.data_aceite else None,
+        }
+        for u in usuarios
+    ]
+
+
+@router.post("/admin/aprovar-selfie/{usuario_id}")
+async def aprovar_selfie(
+    usuario_id: str,
+    dados: dict,
+    admin: Usuario = Depends(exigir_admin),
+    db: Session = Depends(get_db)
+):
+    """Admin aprova ou rejeita a selfie de um usuario."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+
+    aprovado = dados.get("aprovar", True)
+    usuario.selfie_verificada = aprovado
+
+    db.commit()
+
+    status_texto = "aprovada" if aprovado else "rejeitada"
+    return {"message": f"Selfie {status_texto} para {usuario.nome}.", "selfie_verificada": aprovado}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search, ShieldCheck, CheckCircle, AlertCircle, Repeat } from 'lucide-react';
+import { Plus, Zap, Gem, CreditCard, Clock, Flag, Eye, Star, Timer, RefreshCw, ShoppingBag, PlusCircle, Rocket, Search, ShieldCheck, CheckCircle, AlertCircle, Repeat, BadgeCheck as BadgeCheckIcon, Crown as CrownIcon } from 'lucide-react';
 import RankingSemanal from './RankingSemanal';
 import SeloConfianca from './SeloConfianca';
 import { BACKEND_URL } from '../api';
@@ -38,7 +38,8 @@ const MarketplaceView = ({
     setShowAssinarModal, handleSolicitarResgate,
     setActiveView,
     setSelectedAdDetails,
-    setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem
+    setBoostTarget, setShowBoostModal, setPixDestaque, showModal, api, setMensagem,
+    onVerPerfilVendedor
 }) => {
     const [busca, setBusca] = useState('');
     const [precoMin, setPrecoMin] = useState('');
@@ -320,7 +321,11 @@ const MarketplaceView = ({
                                                 </div>
                                                 <h3 className="market-title" style={{ marginBottom: '4px' }}>{l.nome_produto?.length > 60 ? l.nome_produto.substring(0, 60) + '...' : l.nome_produto}</h3>
                                                 <div className="market-meta" style={{ marginTop: '4px', borderTop: 'none', paddingTop: 0 }}>
-                                                    <span className="market-author">por {l.anunciante}</span>
+                                                    <span className="market-author" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onVerPerfilVendedor?.(l.usuario_id); }}>
+                                                        por {l.anunciante}
+                                                        {l.anunciante_selfie && <span title="Selfie Verificada" style={{ display: 'inline-flex', marginLeft: '4px', color: 'var(--success)', verticalAlign: 'middle' }}><BadgeCheckIcon size={12} /></span>}
+                                                        {l.anunciante_badges?.includes('top_seller') && <span title="Top Seller" style={{ display: 'inline-flex', marginLeft: '2px', color: '#FFD600', verticalAlign: 'middle' }}><CrownIcon size={12} /></span>}
+                                                    </span>
                                                     <div className="market-stars">
                                                         {[1, 2, 3, 4, 5].map((s) => {
                                                             const isDono = l.usuario_id === usuario?.id;

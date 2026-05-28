@@ -3,15 +3,12 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { 
   ArrowDownUp, 
-  TrendingUp, 
   Settings, 
   LogOut, 
   Menu, 
   X,
   Shield,
-  ShoppingBag,
-  Download,
-  Coins
+  Download
 } from 'lucide-react';
 import api, { BASE_URL } from './api';
 import Login from './paginas/Login';
@@ -39,6 +36,7 @@ const App = () => {
     const [user, setUser] = useState(null);
     const [menuAberto, setMenuAberto] = useState(false);
     const [page, setPage] = useState('login');
+    const [isSubView, setIsSubView] = useState(false);
     const [modalExcluir, setModalExcluir] = useState(false);
 
     const atualizarPerfil = useCallback(async () => {
@@ -166,7 +164,7 @@ const App = () => {
 
     return (
         <div className="app-container">
-            <nav className="navbar">
+            <nav className="navbar" style={{ display: isSubView ? 'none' : undefined }}>
                 <div className="navbar-container">
                     <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'cliente'; }}>
                         <Logo size={28} />
@@ -189,11 +187,8 @@ const App = () => {
                         <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Menu</h2>
                         </div>
-                        <a href="#cliente" className={`nav-item ${['cliente', 'tomador'].includes(page) ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
+                        <a href="#cliente" className={`nav-item ${page === 'cliente' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
-                        </a>
-                        <a href="#marketplace" className={`nav-item ${page === 'marketplace' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <ShoppingBag size={20} /> Marketplace
                         </a>
                         {user.is_admin && (
                             <a href="#admin" className={`nav-item ${page === 'admin' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
@@ -203,12 +198,6 @@ const App = () => {
                         <a href="#perfil" className={`nav-item ${page === 'perfil' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Perfil
                         </a>
-                        <a href="#meus-pontos" className={`nav-item ${page === 'meus-pontos' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <Coins size={20} /> Meus Pontos
-                        </a>
-                        <button className="nav-item" onClick={() => { setMenuAberto(false); baixarDadosLGPD(); }} style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}>
-                            <Download size={20} /> Baixar meus dados (LGPD)
-                        </button>
                     </div>
                     <div className="drawer-footer">
                         <div className="footer-user-info">
@@ -219,12 +208,15 @@ const App = () => {
                             </div>
                         </div>
                         <div className="footer-actions">
-                            <button className="btn-logout" onClick={logout}>
+                            <button className="btn btn-outline btn-sm w-full mb-1" onClick={() => { setMenuAberto(false); baixarDadosLGPD(); }} style={{ fontSize: '0.7rem', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                                <Download size={14} /> Baixar Dados
+                            </button>
+                            <button className="btn-logout" onClick={logout} style={{ flex: 1 }}>
                                 <LogOut size={18} />
                                 <span>Sair</span>
                             </button>
                             <button className="btn-delete-account" onClick={() => { setMenuAberto(false); setModalExcluir(true); }}>
-                                Excluir Conta (LGPD)
+                                Excluir Conta
                             </button>
                         </div>
                     </div>
@@ -240,8 +232,7 @@ const App = () => {
                 )}
             </main>
             <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>}>
-                {(page === 'cliente' || page === 'tomador') && <DashboardCliente />}
-                {page === 'pool' && <DashboardCliente initialView="pool" />}
+                {page === 'cliente' && <DashboardCliente isSubView={isSubView} setIsSubView={setIsSubView} />}
                 {page === 'marketplace' && <DashboardCliente initialView="marketplace" />}
                 {page === 'meus-pontos' && <DashboardCliente initialView="meus-pontos" />}
                 {page === 'vincular-mp' && <MarketplaceCallback />}
@@ -250,7 +241,7 @@ const App = () => {
                 {page === 'verificar-conta' && <VerificacaoConta onVerificado={onVerificado} />}
                 {page === 'comofunciona' && <ComoFunciona />}
                 {page === 'privacidade' && <PoliticaPrivacidade onVoltar={() => window.location.hash = 'cliente'} />}
-                {(!['cliente', 'tomador', 'pool', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade'].includes(page)) && <DashboardCliente />}
+                {(!['cliente', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade', 'meus-pontos', 'vincular-mp', 'verificar-conta'].includes(page)) && <DashboardCliente />}
             </Suspense>
 
             {!user && (

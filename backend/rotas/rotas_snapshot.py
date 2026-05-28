@@ -128,6 +128,12 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             TipoTransacao.DESBLOQUEIO_DADOS,
             TipoTransacao.TAXA_POSTAGEM,
             TipoTransacao.ASSINATURA,
+            TipoTransacao.TAXA_SERVICO,
+        ]
+        tipos_receita_antigos = [
+            TipoTransacao.DESBLOQUEIO_DADOS,
+            TipoTransacao.TAXA_POSTAGEM,
+            TipoTransacao.ASSINATURA,
         ]
 
         if usuario.is_admin:
@@ -167,8 +173,19 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                         info_p["url_residencia"] = f"/api/financeiro/admin/view-doc/{docs.usuario_id}/residencia" if docs.caminho_residencia else None
                 pendentes_list.append(info_p)
 
-            total_lucro_historico = db.query(func.sum(Transacao.valor)).filter(
+            # --- NOVO: entrada total / custos / lucro líquido ---
+            entrada_total = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+
+            entrada_taxa_servico = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo == TipoTransacao.TAXA_SERVICO,
+                Transacao.status == "concluido"
+            ).scalar() or Decimal("0.00")
+
+            entrada_outras = db.query(func.sum(Transacao.valor)).filter(
+                Transacao.tipo.in_(tipos_receita_antigos),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
 
@@ -177,8 +194,13 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
                 Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido"
             ).scalar() or Decimal("0.00")
-            total_taxas_mp = total_pix_recebido * Decimal("0.01")
+            custos_mp = total_pix_recebido * Decimal("0.01")
 
+            # Custos totais (MP + outros)
+            custos_total = custos_mp
+            lucro_liquido = max(Decimal("0.00"), entrada_total - custos_total)
+
+            # --- Manter lucro mensal para compatibilidade ---
             lucro_mensal_plataforma_bruto = db.query(func.sum(Transacao.valor)).filter(
                 Transacao.tipo.in_(tipos_receita),
                 Transacao.status == "concluido",
@@ -195,14 +217,20 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
 
             historico_raw = db.query(
                 trunc_fn.label("mes"),
-                func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("lucro_bruto"),
+                func.sum(case((Transacao.tipo.in_(tipos_receita), Transacao.valor), else_=0)).label("entrada"),
+                func.sum(case((and_(Transacao.tipo.in_(tipos_receita), Transacao.metodo == "pix"), Transacao.valor), else_=0)).label("pix_receita"),
             ).filter(Transacao.status == "concluido").group_by(trunc_fn).order_by(text("mes DESC")).limit(12).all()
 
             historico_mes = []
             for h in historico_raw:
+                pix_mes = Decimal(str(h.pix_receita or 0))
+                custos_mes = pix_mes * Decimal("0.01")
+                entrada_mes = Decimal(str(h.entrada or 0))
                 historico_mes.append({
                     "mes": h.mes,
-                    "lucro": float(h.lucro_bruto or 0),
+                    "entrada": float(entrada_mes or 0),
+                    "custos": float(custos_mes or 0),
+                    "lucro": float(max(Decimal("0.00"), entrada_mes - custos_mes) or 0),
                 })
 
             try:
@@ -262,9 +290,17 @@ async def obter_snapshot_dashboard(db: Session = Depends(get_db), usuario: Usuar
             snapshot["admin"] = {
                 "pendentes": pendentes_list,
                 "fiscal": {
+                    # NOVOS: entrada / custos / lucro
+                    "entrada_total": float(entrada_total or 0),
+                    "entrada_taxa_servico": float(entrada_taxa_servico or 0),
+                    "entrada_outras": float(entrada_outras or 0),
+                    "custos_mp": float(custos_mp or 0),
+                    "custos_total": float(custos_total or 0),
+                    "lucro_liquido": float(lucro_liquido or 0),
+                    # Compatibilidade
                     "lucro_plataforma_total": float(lucro_mensal_plataforma or 0),
-                    "lucro_plataforma_historico": float(total_lucro_historico or 0),
-                    "total_taxas_mp": float(total_taxas_mp),
+                    "lucro_plataforma_historico": float(entrada_total or 0),
+                    "total_taxas_mp": float(custos_mp or 0),
                     "total_comissoes": float(total_comissoes),
                     "total_comissoes_pendentes": float(total_comissoes_pendentes),
                     "total_vendas": total_vendas,

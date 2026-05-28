@@ -425,6 +425,38 @@
     font-weight: 700;
 }
 
+/* Stacked chart bars */
+.chart-bar-stacked {
+    width: 30px;
+    background: linear-gradient(to top, var(--success), rgba(0, 230, 118, 0.4));
+    border-radius: 6px 6px 0 0;
+    transition: height 0.5s ease;
+    min-height: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.chart-bar-segment {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    border-radius: 0;
+    transition: height 0.5s ease;
+}
+
+.chart-bar-custo {
+    background: linear-gradient(to top, var(--danger), rgba(255, 61, 0, 0.4));
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
 /* Grid helpers */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }

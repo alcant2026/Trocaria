@@ -393,23 +393,25 @@ const AdminDashboard = () => {
                             <StatCard label="Anúncios Ativos" value={fiscal.total_anuncios_ativos || 0} icon={Store} color="var(--secondary)" />
                             <StatCard label="KYC Pendentes" value={pendentes.filter(p => p.tipo === 'desbloqueio_dados').length || 0} icon={ShieldCheck} color="var(--warning)" />
                             <StatCard label="Denúncias" value={fiscal.denuncias_pendentes || 0} icon={Gavel} color="var(--danger)" />
-                            <StatCard label="Comissões Recebidas" value={formatarMoeda(fiscal.total_comissoes)} icon={DollarSign} color="var(--success)" />
-                            <StatCard label="Comissões Pendentes" value={formatarMoeda(fiscal.total_comissoes_pendentes)} icon={Clock} color="var(--warning)" />
+                            <StatCard label="ENTRADA TOTAL" value={formatarMoeda(fiscal.entrada_total)} icon={TrendingUp} color="var(--success)" subtitle="Todas as receitas" />
+                            <StatCard label="CUSTOS" value={formatarMoeda(fiscal.custos_total)} icon={ArrowDownRight} color="var(--danger)" subtitle="Taxas MP (1%)" />
+                            <StatCard label="LUCRO LÍQUIDO" value={formatarMoeda(fiscal.lucro_liquido)} icon={DollarSign} color="var(--primary)" subtitle="Entrada - Custos" />
+                            <StatCard label="Comissões Pendentes" value={formatarMoeda(fiscal.total_comissoes_pendentes)} icon={Clock} color="var(--warning)" subtitle="Aguardando pagamento" />
                             <StatCard label="Produtos Resgate" value={fiscal.total_produtos || 0} icon={Package} color="var(--primary)" />
-                            <StatCard label="Receita Líquida (mês)" value={formatarMoeda(fiscal.lucro_plataforma_total)} icon={BarChart3} color="var(--primary)" />
-                            <StatCard label="Receita Histórica" value={formatarMoeda(fiscal.lucro_plataforma_historico)} icon={BarChart3} color="var(--secondary)" />
                         </div>
 
                         <div className="glass-panel mt-2">
-                            <h3>Histórico Mensal de Receita</h3>
+                            <h3>Histórico Mensal — Entrada vs Custos vs Lucro</h3>
                             <div className="chart-bars">
                                 {(fiscal.historico_mensal || []).map((h, i) => {
-                                    const maxVal = Math.max(...(fiscal.historico_mensal || []).map(x => x.lucro), 1);
-                                    const pct = (h.lucro / maxVal) * 100;
+                                    const allVals = (fiscal.historico_mensal || []).flatMap(x => [x.entrada || 0, x.custos || 0]);
+                                    const maxVal = Math.max(...allVals, 1);
                                     return (
                                         <div key={i} className="chart-bar-item">
-                                            <div className="chart-bar-value">{formatarMoeda(h.lucro)}</div>
-                                            <div className="chart-bar" style={{ height: `${Math.max(pct, 5)}%` }} />
+                                            <div className="chart-bar-value" style={{ fontSize: '0.5rem' }}>{formatarMoeda(h.lucro)}</div>
+                                            <div className="chart-bar-stacked" style={{ height: `${Math.max((h.entrada / maxVal) * 100, 5)}%` }}>
+                                                <div className="chart-bar-segment chart-bar-custo" style={{ height: `${((h.custos || 0) / Math.max(h.entrada, 1)) * 100}%` }} />
+                                            </div>
                                             <div className="chart-bar-label">{h.mes?.slice(-2)}</div>
                                         </div>
                                     );
@@ -417,6 +419,11 @@ const AdminDashboard = () => {
                                 {(!fiscal.historico_mensal || fiscal.historico_mensal.length === 0) && (
                                     <p className="text-muted">Nenhum dado histórico disponível.</p>
                                 )}
+                            </div>
+                            <div className="flex-start gap-2 mt-1" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                <span><span className="legend-dot" style={{ background: 'var(--success)' }} /> Entrada</span>
+                                <span><span className="legend-dot" style={{ background: 'var(--danger)' }} /> Custos</span>
+                                <span><span className="legend-dot" style={{ background: 'var(--primary)' }} /> Lucro (rótulo)</span>
                             </div>
                         </div>
 
@@ -485,11 +492,12 @@ const AdminDashboard = () => {
                 {activeTab === 'financeiro' && (
                     <div className="animate-fade-in">
                         <div className="stats-grid">
-                            <StatCard label="Receita Líquida (mês)" value={formatarMoeda(fiscal.lucro_plataforma_total)} icon={DollarSign} color="var(--success)" subtitle="Taxas de serviço" />
-                            <StatCard label="Receita Histórica Total" value={formatarMoeda(fiscal.lucro_plataforma_historico)} icon={BarChart3} color="var(--primary)" subtitle="Desde o início" />
-                            <StatCard label="Comissões Recebidas" value={formatarMoeda(fiscal.total_comissoes)} icon={TrendingUp} color="var(--success)" subtitle="3% sobre vendas" />
+                            <StatCard label="ENTRADA TOTAL" value={formatarMoeda(fiscal.entrada_total)} icon={TrendingUp} color="var(--success)" subtitle="Todas as receitas" />
+                            <StatCard label="Taxa Serviço (3%)" value={formatarMoeda(fiscal.entrada_taxa_servico)} icon={DollarSign} color="var(--success)" subtitle="Comissões recebidas" />
+                            <StatCard label="Outras Receitas" value={formatarMoeda(fiscal.entrada_outras)} icon={BarChart3} color="var(--primary)" subtitle="KYC / assinaturas" />
+                            <StatCard label="CUSTOS (MP 1%)" value={formatarMoeda(fiscal.custos_total)} icon={ArrowDownRight} color="var(--danger)" subtitle="Taxas processamento" />
+                            <StatCard label="LUCRO LÍQUIDO" value={formatarMoeda(fiscal.lucro_liquido)} icon={CreditCard} color="var(--warning)" subtitle="Entrada - Custos" />
                             <StatCard label="Comissões Pendentes" value={formatarMoeda(fiscal.total_comissoes_pendentes)} icon={Clock} color="var(--warning)" subtitle="Aguardando pagamento" />
-                            <StatCard label="Taxas MP (est.)" value={formatarMoeda(fiscal.total_taxas_mp)} icon={CreditCard} color="var(--danger)" subtitle="1% do processado" />
                             <StatCard label="Vendas Concluídas" value={fiscal.total_vendas || 0} icon={ShoppingBag} color="var(--secondary)" subtitle="Total na plataforma" />
                         </div>
 
@@ -513,19 +521,26 @@ const AdminDashboard = () => {
                         </div>
 
                         <div className="glass-panel mt-1">
-                            <h3>Histórico Mensal</h3>
+                            <h3>Histórico Mensal — Entrada vs Custos vs Lucro</h3>
                             <div className="chart-bars">
                                 {(fiscal.historico_mensal || []).map((h, i) => {
-                                    const maxVal = Math.max(...(fiscal.historico_mensal || []).map(x => x.lucro), 1);
-                                    const pct = (h.lucro / maxVal) * 100;
+                                    const allVals = (fiscal.historico_mensal || []).flatMap(x => [x.entrada || 0, x.custos || 0]);
+                                    const maxVal = Math.max(...allVals, 1);
                                     return (
                                         <div key={i} className="chart-bar-item">
-                                            <div className="chart-bar-value">{formatarMoeda(h.lucro)}</div>
-                                            <div className="chart-bar" style={{ height: `${Math.max(pct, 5)}%` }} />
+                                            <div className="chart-bar-value" style={{ fontSize: '0.5rem' }}>{formatarMoeda(h.lucro)}</div>
+                                            <div className="chart-bar-stacked" style={{ height: `${Math.max((h.entrada / maxVal) * 100, 5)}%` }}>
+                                                <div className="chart-bar-segment chart-bar-custo" style={{ height: `${((h.custos || 0) / Math.max(h.entrada, 1)) * 100}%` }} />
+                                            </div>
                                             <div className="chart-bar-label">{h.mes?.slice(-2)}</div>
                                         </div>
                                     );
                                 })}
+                            </div>
+                            <div className="flex-start gap-2 mt-1" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                <span><span className="legend-dot" style={{ background: 'var(--success)' }} /> Entrada</span>
+                                <span><span className="legend-dot" style={{ background: 'var(--danger)' }} /> Custos (dentro)</span>
+                                <span><span className="legend-dot" style={{ background: 'var(--primary)' }} /> Lucro (rótulo)</span>
                             </div>
                         </div>
                     </div>

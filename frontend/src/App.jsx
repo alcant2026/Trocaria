@@ -8,7 +8,10 @@ import {
   Menu, 
   X,
   Shield,
-  Download
+  Download,
+  Sun,
+  Moon,
+  Search
 } from 'lucide-react';
 import api, { BASE_URL } from './api';
 import Login from './paginas/Login';
@@ -17,7 +20,6 @@ import Perfil from './paginas/Perfil';
 import RecuperarSenha from './paginas/RecuperarSenha';
 import VerificacaoConta from './paginas/VerificacaoConta';
 import Logo from './componentes/Logo';
-import Footer from './componentes/Footer';
 import BannerCookies from './componentes/BannerCookies';
 import TemporizadorInatividade from './componentes/TemporizadorInatividade';
 import LoadingScreen from './componentes/LoadingScreen';
@@ -38,6 +40,19 @@ const App = () => {
     const [page, setPage] = useState('login');
     const [isSubView, setIsSubView] = useState(false);
     const [modalExcluir, setModalExcluir] = useState(false);
+    const [tema, setTema] = useState(() => localStorage.getItem('trocaria_tema') || 'dark');
+
+    const toggleTema = useCallback(() => {
+        setTema(prev => {
+            const novo = prev === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('trocaria_tema', novo);
+            return novo;
+        });
+    }, []);
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', tema);
+    }, [tema]);
 
     const atualizarPerfil = useCallback(async () => {
         try {
@@ -167,16 +182,17 @@ const App = () => {
             <nav className="navbar" style={{ display: isSubView ? 'none' : undefined }}>
                 <div className="navbar-container">
                     <a href="#" className="nav-brand" onClick={(e) => { e.preventDefault(); window.location.hash = 'cliente'; }}>
-                        <Logo size={28} />
+                        <Logo size={24} />
+                        <span className="nav-brand-name">Trocaria</span>
                     </a>
 
-                    <div className="nav-user-preview">
-                        <div className="user-info">
-                            <div className="user-avatar">{user.nome[0].toUpperCase()}</div>
-                            <span className="user-firstname">{user.nome.split(' ')[0]}</span>
-                        </div>
+                    <div className="nav-right">
+                        <button className="nav-icon-btn" onClick={toggleTema} title={tema === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+                            {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
+                        <div className="user-avatar-sm">{user.nome[0].toUpperCase()}</div>
                         <button className="mobile-menu-btn" onClick={() => setMenuAberto(!menuAberto)} aria-label="Abrir Menu">
-                            {menuAberto ? <X size={26} /> : <Menu size={26} />}
+                            {menuAberto ? <X size={22} /> : <Menu size={22} />}
                         </button>
                     </div>
                 </div>
@@ -184,8 +200,11 @@ const App = () => {
                 <div className={`mobile-overlay ${menuAberto ? 'open' : ''}`} onClick={() => setMenuAberto(false)}></div>
                 <div className={`mobile-drawer ${menuAberto ? 'open' : ''}`}>
                     <div className="nav-links">
-                        <div style={{ padding: '0 0.5rem', marginBottom: '1.5rem' }}>
-                            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Menu</h2>
+                        <div className="drawer-header">
+                            <h2>Menu</h2>
+                            <button className="nav-icon-btn" onClick={toggleTema} title={tema === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+                                {tema === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
                         </div>
                         <a href="#cliente" className={`nav-item ${page === 'cliente' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
                             <ArrowDownUp size={20} /> Início
@@ -196,22 +215,28 @@ const App = () => {
                             </a>
                         )}
                         <a href="#perfil" className={`nav-item ${page === 'perfil' ? 'active' : ''}`} onClick={() => setMenuAberto(false)}>
-                            <Shield size={20} color={user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'} /> Perfil
+                            <Shield size={20} /> Perfil
                         </a>
+                        <div className="drawer-theme-row">
+                            <span className="nav-item" style={{ cursor: 'default' }}>
+                                {tema === 'dark' ? <Moon size={20} /> : <Sun size={20} />} {tema === 'dark' ? 'Escuro' : 'Claro'}
+                            </span>
+                            <label className="theme-switch">
+                                <input type="checkbox" checked={tema === 'light'} onChange={toggleTema} />
+                                <span className="theme-slider"></span>
+                            </label>
+                        </div>
                     </div>
                     <div className="drawer-footer">
                         <div className="footer-user-info">
                             <div className="footer-avatar">{user.nome[0].toUpperCase()}</div>
                             <div className="footer-texts">
                                 <span className="footer-name">{user.nome.split(' ')[0]}</span>
-                                <span className="footer-sub">Perfil Ativo</span>
+                                <span className="footer-sub">{user.email || 'Perfil Ativo'}</span>
                             </div>
                         </div>
                         <div className="footer-actions">
-                            <button className="btn btn-outline btn-sm w-full mb-1" onClick={() => { setMenuAberto(false); baixarDadosLGPD(); }} style={{ fontSize: '0.7rem', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                                <Download size={14} /> Baixar Dados
-                            </button>
-                            <button className="btn-logout" onClick={logout} style={{ flex: 1 }}>
+                            <button className="btn-logout" onClick={logout}>
                                 <LogOut size={18} />
                                 <span>Sair</span>
                             </button>
@@ -244,14 +269,6 @@ const App = () => {
                 {(!['cliente', 'admin', 'login', 'perfil', 'comofunciona', 'marketplace', 'privacidade', 'meus-pontos', 'vincular-mp', 'verificar-conta'].includes(page)) && <DashboardCliente />}
             </Suspense>
 
-            {!user && (
-                <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
-                    <a href="#comofunciona" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Como Funciona</a>
-                    <a href="#privacidade" style={{ color: 'var(--text-muted)', textDecoration: 'underline', marginRight: '15px' }}>Politica de Privacidade</a>
-                    <span>© 2026 Trocaria</span>
-                </div>
-            )}
-
             {modalExcluir && (
                 <div className="modal-overlay">
                     <div className="modal-card" style={{ borderColor: 'var(--danger)' }}>
@@ -276,7 +293,6 @@ const App = () => {
                     </div>
                 </div>
             )}
-            <Footer />
             <TemporizadorInatividade aoDeslogar={logout} />
             <BannerCookies usuario={user} onUpdate={atualizarPerfil} />
         </div>
